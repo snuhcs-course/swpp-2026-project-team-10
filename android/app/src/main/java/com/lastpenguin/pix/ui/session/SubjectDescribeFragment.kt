@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
@@ -24,6 +25,7 @@ import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.generation.DescriptionForm
 import com.lastpenguin.pix.ui.generation.showScene
+import com.lastpenguin.pix.ui.generation.title
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
 import com.lastpenguin.pix.ui.settings.tutorialFor
@@ -61,8 +63,8 @@ class SubjectDescribeFragment : Fragment(R.layout.fragment_describe_pose) {
             onForget = viewModel::forget,
         )
         this.form = form
-        // Back and Cancel leave the photographer's description as it is; Subject view opens it again.
-        binding.cancelButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
+        // Back leaves the photographer's description as it is; Subject view opens it again.
+        binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { backToSubject() }
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -117,6 +119,9 @@ class SubjectDescribeFragment : Fragment(R.layout.fragment_describe_pose) {
             return
         }
         binding.sceneImage.showScene(ui.scene)
+        // The situation the photographer's photo was taken for (FR-4.8); none from an older photographer.
+        binding.situationTag.isVisible = ui.situation != null
+        ui.situation?.let { binding.situationTag.setText(it.title) }
         binding.descriptionError.visibility = if (ui.rejected) View.VISIBLE else View.GONE
         val photographer = ui.photographerName
         val theirs = ui.writer == Role.PHOTOGRAPHER

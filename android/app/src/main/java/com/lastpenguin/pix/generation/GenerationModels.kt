@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -29,11 +29,50 @@ sealed interface PoseRequest {
     }
 }
 
+/**
+ * Which prompts the server uses for a set (FR-4.8, Design 2.6.3): each changes the framing and the kind of pose, and
+ * [apiName] is the `situation` sent. [SELFIE] goes with a scene from the front camera only, since the server refuses a
+ * selfie with another situation; [DEFAULT] is the prompts before Iteration 4.
+ */
+enum class Situation(val apiName: String) {
+    DEFAULT("default"),
+    BACKGROUND("background"),
+    HALF_BODY("half_body"),
+    FULL_BODY("full_body"),
+    LANDMARK("landmark"),
+    SELFIE("selfie"),
+    ;
+
+    /** The situation a scene photo gets: a front-camera photo is always a selfie, and a rear-camera one never is. */
+    fun forScene(selfie: Boolean): Situation = when {
+        selfie -> SELFIE
+        this == SELFIE -> DEFAULT
+        else -> this
+    }
+
+    companion object {
+        /** The situation named [apiName] on the server, or null for none or a name this phone does not know. */
+        fun named(apiName: String?): Situation? = entries.firstOrNull { it.apiName == apiName }
+    }
+}
+
 /** One pose of a set: [id] names its slot (`pose-1` … `pose-4`), [text] is what the image model is asked for. */
 data class PlannedPose(val id: String, val text: String)
 
-/** Why a candidate failed (Design 2.5.3): [NO_PERSON] is the server finding no one in the scene photo (FR-4.13). */
-enum class GenerationError { OFFLINE, TIMEOUT, RATE_LIMITED, REJECTED, NO_PERSON, SERVER }
+/**
+ * Why a candidate, or a whole run, failed (Design 2.5.3; FR-4.7): [RATE_LIMITED] is this phone's hourly limit and
+ * [DAILY_LIMITED] everyone's limit for the day; [REJECTED] is the description filter refusing the text (FR-4.12) and
+ * [DECLINED] the image service refusing the request; [NO_PERSON] is the server finding no one in the scene photo
+ * (FR-4.13).
+ */
+enum class GenerationError { OFFLINE, TIMEOUT, RATE_LIMITED, DAILY_LIMITED, REJECTED, DECLINED, NO_PERSON, SERVER }
+
+/**
+ * A run that ended before any pose was planned, as when the suggestions cannot be had, with the [error] the screens
+ * show (FR-4.7). Any other exception that ends a run counts as [GenerationError.SERVER].
+ */
+class GenerationFailedException(val error: GenerationError, cause: Throwable? = null) :
+    Exception("Pose generation failed: $error", cause)
 
 /** What a run reports: the poses of the set once, then one result per pose. */
 sealed interface GenerationEvent {

@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Type, shapes, and component styles over the tokens in colors.xml. Every control is at least 44 dp tall, and the
-     camera screens' 48 x 48 dp (NFR-16), though they draw smaller shapes inside that; radius 999 for chips and pills,
-     16 for buttons and cards, 28 for sheets. -->
+     camera screens' 48 x 48 dp (NFR-16), though they draw smaller shapes inside that. Radii (#199): fully round for
+     chips and pills, 12 for small thumbnails, 16 for buttons, fields, info cards, and pose slots, 24 for large cards
+     and images, 28 for sheets. Spacing is 8, 12, 16, or 24 dp, with 20 dp at the screen's sides and bottom. -->
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Type: Manrope for the UI (Pretendard on a phone in Korean: the @font/pix_* aliases), DM Mono for the room code. -->
@@ -70,6 +71,14 @@
         <item name="android:textColor">@color/pix_text_muted</item>
     </style>
 
+    <!-- What the scene photo for poses should hold, on its panel above the shutter (R&S 6.3, #210). -->
+    <style name="TextAppearance.Pix.Instruction" parent="TextAppearance.Pix.Body">
+        <item name="android:fontFamily">@font/pix_semibold</item>
+        <item name="fontFamily">@font/pix_semibold</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">@color/pix_text</item>
+    </style>
+
     <style name="TextAppearance.Pix.Body.Small">
         <item name="android:textSize">13sp</item>
     </style>
@@ -133,7 +142,7 @@
         <item name="backgroundTint">@color/button_primary_background</item>
         <item name="android:textColor">@color/button_primary_text</item>
         <item name="iconTint">@color/button_primary_text</item>
-        <item name="rippleColor">#1F141413</item>
+        <item name="rippleColor">@color/pix_ripple_on_accent</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action</item>
     </style>
 
@@ -160,7 +169,7 @@
         <item name="iconTint">@color/button_secondary_text</item>
         <item name="iconPadding">8dp</item>
         <item name="iconGravity">textStart</item>
-        <item name="rippleColor">#1FFFFFFF</item>
+        <item name="rippleColor">@color/pix_ripple_strong</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action</item>
     </style>
 
@@ -178,9 +187,9 @@
         <item name="android:minHeight">48dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
-        <item name="cornerRadius">14dp</item>
+        <item name="cornerRadius">16dp</item>
         <item name="android:textColor">@color/button_text_text</item>
-        <item name="rippleColor">#14FFFFFF</item>
+        <item name="rippleColor">@color/pix_ripple</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
     </style>
 
@@ -188,6 +197,33 @@
     <style name="Widget.Pix.Button.Text.Small">
         <item name="android:minHeight">40dp</item>
         <item name="android:minWidth">0dp</item>
+    </style>
+
+    <!-- The step's action at a screen's top right, such as Select on Pick a pose (#199): yellow text without a pill
+         (#204), faint while disabled, in a touch area at least 88 dp wide and 48 dp high, in the middle of the 56 dp
+         header. The text ends at the area's right edge, so it lines up with the screen's content below. Back is at
+         the top left. -->
+    <style name="Widget.Pix.Button.Header">
+        <item name="android:minHeight">48dp</item>
+        <item name="android:minWidth">88dp</item>
+        <item name="android:insetTop">4dp</item>
+        <item name="android:insetBottom">4dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">0dp</item>
+        <item name="android:gravity">end|center_vertical</item>
+        <item name="cornerRadius">20dp</item>
+        <item name="backgroundTint">@android:color/transparent</item>
+        <item name="android:textColor">@color/button_header_text</item>
+        <item name="rippleColor">@color/pix_ripple</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
+    </style>
+
+    <!-- The same action in the camera's 48 dp top bar, such as Use on the scene photo's review: in the middle of the bar,
+         with the bar's 52 dp touch height, whose last 4 dp reach over the image's top edge. -->
+    <style name="Widget.Pix.Button.Header.Camera">
+        <item name="android:minHeight">52dp</item>
+        <item name="android:insetTop">4dp</item>
+        <item name="android:insetBottom">8dp</item>
     </style>
 
     <!-- A friend's initial in a circle. -->
@@ -216,7 +252,7 @@
         <item name="iconTint">@color/button_secondary_text</item>
         <item name="iconSize">16dp</item>
         <item name="iconPadding">6dp</item>
-        <item name="rippleColor">#1FFFFFFF</item>
+        <item name="rippleColor">@color/pix_ripple_strong</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
         <item name="android:textSize">12sp</item>
     </style>
@@ -241,7 +277,7 @@
         <item name="iconPadding">0dp</item>
         <item name="iconSize">18dp</item>
         <item name="iconTint">@color/button_secondary_text</item>
-        <item name="rippleColor">#1FFFFFFF</item>
+        <item name="rippleColor">@color/pix_ripple_strong</item>
     </style>
 
     <!-- An icon button over a photo, such as the ♥ on Pick a pose: the round shape in glass, so it shows on any photo. -->
@@ -273,7 +309,7 @@
         <item name="android:paddingTop">6dp</item>
         <item name="android:paddingBottom">10dp</item>
         <item name="android:textColor">@color/button_secondary_text</item>
-        <item name="rippleColor">#1FFFFFFF</item>
+        <item name="rippleColor">@color/pix_ripple_strong</item>
         <item name="android:textSize">12sp</item>
     </style>
 
@@ -315,7 +351,7 @@
         <item name="cornerRadius">12dp</item>
         <item name="backgroundTint">@color/segment_background</item>
         <item name="android:textColor">@color/segment_text</item>
-        <item name="rippleColor">#14FFFFFF</item>
+        <item name="rippleColor">@color/pix_ripple</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Label.Bold</item>
     </style>
 
@@ -335,8 +371,8 @@
         <item name="trackInsideCornerSize">2dp</item>
         <item name="thumbColor">@color/slider_thumb</item>
         <item name="trackColorActive">@color/slider_track_active</item>
-        <item name="trackColorInactive">#33FFFFFF</item>
-        <item name="haloColor">#33F2C14E</item>
+        <item name="trackColorInactive">@color/pix_track</item>
+        <item name="haloColor">@color/pix_accent_soft</item>
         <item name="haloRadius">18dp</item>
         <item name="tickVisible">false</item>
         <item name="labelStyle">@style/Widget.Pix.Slider.Label</item>
@@ -345,7 +381,7 @@
     <!-- The guide's own controls use the guide color. -->
     <style name="Widget.Pix.Slider.Guide">
         <item name="trackColorActive">@color/slider_guide_track_active</item>
-        <item name="haloColor">#335EEAD4</item>
+        <item name="haloColor">@color/pix_guide_soft</item>
     </style>
 
     <style name="Widget.Pix.Slider.Label" parent="Widget.Material3.Slider.Label">
@@ -389,6 +425,17 @@
         <item name="tint">@color/pix_text</item>
     </style>
 
+    <!-- The chevron at the end of a row or card that a tap opens (#204). Its tip is drawn 8 dp inside its 24 dp box,
+         so after the row's 8 dp end padding it is 16 dp from the edge on every screen, as far as Settings' text is
+         from the other edge. -->
+    <style name="Widget.Pix.Chevron" parent="">
+        <item name="android:layout_width">24dp</item>
+        <item name="android:layout_height">24dp</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="android:src">@drawable/ic_chevron_right</item>
+        <item name="tint">@color/pix_text_faint</item>
+    </style>
+
     <!-- One box of the 6-digit room code (R&S 6.7). Six of them fit a 360 dp wide phone. -->
     <style name="Widget.Pix.CodeDigit" parent="">
         <item name="android:layout_width">44dp</item>
@@ -420,9 +467,10 @@
         <item name="chipStrokeColor">@color/pix_outline</item>
         <item name="chipStrokeWidth">1dp</item>
         <item name="chipMinHeight">36dp</item>
+        <item name="chipCornerRadius">18dp</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Label</item>
         <item name="android:textColor">@color/pix_text_soft</item>
-        <item name="rippleColor">#14FFFFFF</item>
+        <item name="rippleColor">@color/pix_ripple</item>
         <item name="closeIconVisible">true</item>
         <item name="closeIcon">@drawable/ic_close</item>
         <item name="closeIconTint">@color/pix_text_muted</item>
@@ -431,10 +479,10 @@
 
     <style name="Widget.Pix.PoseCard" parent="Widget.Material3.CardView.Outlined">
         <item name="cardBackgroundColor">@color/pix_surface</item>
-        <item name="cardCornerRadius">18dp</item>
+        <item name="cardCornerRadius">16dp</item>
         <item name="cardElevation">0dp</item>
         <item name="strokeColor">@color/pose_card_stroke</item>
-        <item name="rippleColor">#14FFFFFF</item>
+        <item name="rippleColor">@color/pix_ripple</item>
     </style>
 
     <style name="Widget.Pix.Card" parent="Widget.Material3.CardView.Filled">
@@ -465,7 +513,19 @@
     <!-- Matches Widget.Pix.PoseCard, so the image follows the card's corners. -->
     <style name="ShapeAppearance.Pix.PoseImage" parent="">
         <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">18dp</item>
+        <item name="cornerSize">16dp</item>
+    </style>
+
+    <!-- A large image of its own, such as a candidate on Pick a pose: the corners of Widget.Pix.Card. -->
+    <style name="ShapeAppearance.Pix.LargeImage" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">24dp</item>
+    </style>
+
+    <!-- The saved guides at the end of My library's row on Add a pose guide (FR-3.11). -->
+    <style name="ShapeAppearance.Pix.TinyThumbnail" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">8dp</item>
     </style>
 
     <style name="ShapeAppearance.Pix.SmallThumbnail" parent="">
@@ -479,7 +539,7 @@
     </style>
 
     <style name="Widget.Pix.BottomSheet.DragHandle" parent="Widget.Material3.BottomSheet.DragHandle">
-        <item name="tint">#47FFFFFF</item>
+        <item name="tint">@color/pix_handle</item>
     </style>
 
     <style name="MaterialAlertDialog.Pix.Title.Text" parent="MaterialAlertDialog.Material3.Title.Text">

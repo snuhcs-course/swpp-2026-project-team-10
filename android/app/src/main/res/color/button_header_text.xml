@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The step's action at a screen's top right (#204): the accent, faint while it cannot be used. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/pix_text_faint" android:state_enabled="false" />
+    <item android:color="@color/pix_accent" />
+</selector>

@@ -1,24 +1,25 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.view.LayoutInflater
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import androidx.appcompat.app.AppCompatActivity
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.android.material.chip.Chip
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
 import com.lastpenguin.pix.generation.DESCRIPTION_MAX_LENGTH
+import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.PromptEntry
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionPartner
+import com.lastpenguin.pix.ui.OwnActivities
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 import org.robolectric.annotation.GraphicsMode
 
 /*
@@ -37,6 +38,9 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class DescriptionFormTest {
+    @get:Rule
+    val activities = OwnActivities()
+
     private val changes = mutableListOf<String>()
     private val generated = mutableListOf<String>()
     private val focus = mutableListOf<Boolean>()
@@ -44,7 +48,7 @@ class DescriptionFormTest {
     private lateinit var shared: DescriptionForm
 
     private fun form(text: String? = "", rejected: Boolean = false): FragmentDescribePoseBinding {
-        val activity = Robolectric.buildActivity(AppCompatActivity::class.java).setup().get()
+        val activity = activities.start()
         val binding = FragmentDescribePoseBinding.inflate(LayoutInflater.from(activity))
         activity.setContentView(binding.root)
         DescriptionForm(
@@ -97,7 +101,7 @@ class DescriptionFormTest {
 
     @Test
     fun noText_keepsWhatTheFieldRestoredItself() {
-        val activity = Robolectric.buildActivity(AppCompatActivity::class.java).setup().get()
+        val activity = activities.start()
         val binding = FragmentDescribePoseBinding.inflate(LayoutInflater.from(activity))
         binding.descriptionInput.setText("Restored")
 
@@ -243,9 +247,9 @@ class DescriptionFormTest {
 
     private fun FragmentDescribePoseBinding.label() = generateButton.text.toString()
 
-    private fun FragmentDescribePoseBinding.suggest() = root.context.getString(R.string.suggest_four_poses)
+    private fun FragmentDescribePoseBinding.suggest() = root.context.getString(R.string.suggest_poses)
 
-    private fun FragmentDescribePoseBinding.describe() = root.context.getString(R.string.generate_four_from_description)
+    private fun FragmentDescribePoseBinding.describe() = root.context.getString(R.string.generate_from_description)
 
     @Test
     fun theButton_sendsTheFieldAsTyped_andItsLabelSaysWhatItStarts() {

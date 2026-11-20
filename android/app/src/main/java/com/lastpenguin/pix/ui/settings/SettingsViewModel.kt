@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import androidx.lifecycle.ViewModel
@@ -39,6 +39,9 @@ class SettingsViewModel(
     /** The Camera screen's base brightness in EV (FR-1.11), which its tap to focus goes back to. */
     val baseBrightness: StateFlow<Float> = settings.baseBrightness
 
+    /** Whether release builds send crash reports and usage data (FR-10.6); null until the stored answer is read. */
+    val shareUsage: StateFlow<Boolean?> = settings.shareUsage
+
     /** For the *Pix account* row: the Pix ID once signed in. */
     val account: StateFlow<AuthState> = auth.state
 
@@ -58,6 +61,10 @@ class SettingsViewModel(
         viewModelScope.launch { settings.setBaseBrightness(ev) }
     }
 
+    fun setShareUsage(share: Boolean) {
+        viewModelScope.launch { settings.setShareUsage(share) }
+    }
+
     /** Set at once: the stored answer comes back later, and a screen shown again must not show its tips twice. */
     private val tutorialClosed = MutableStateFlow(emptySet<TutorialScreen>())
 
@@ -67,7 +74,7 @@ class SettingsViewModel(
             seen != null && screen !in seen && screen !in closed
         }.distinctUntilChanged()
 
-    /** The tips of [screens] closed, by *Got it* or Back: they do not come by themselves again. */
+    /** The tips of [screens] closed, by a tap or Back: they do not come by themselves again. */
     fun tutorialSeen(screens: Set<TutorialScreen>) {
         tutorialClosed.update { it + screens }
         viewModelScope.launch { settings.setTutorialSeen(screens) }

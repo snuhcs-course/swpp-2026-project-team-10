@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -7,19 +7,28 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Rect
+import android.graphics.RectF
+import android.graphics.text.LineBreaker
 import android.os.Looper
 import android.os.SystemClock
+import android.text.Spanned
+import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.view.PreviewView
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.android.material.button.MaterialButton
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -27,6 +36,8 @@ import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
+import com.lastpenguin.pix.databinding.ViewPhotoViewerBinding
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.TipSource
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.NormalizedRect
@@ -36,22 +47,36 @@ import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import com.lastpenguin.pix.ui.OwnActivities
+import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.ScreenTestSupport
+import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.idleUntil
+import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
+import com.lastpenguin.pix.ui.generation.GenerationUiState
+import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.session.ShadowSurfaceViewRenderer
 import com.lastpenguin.pix.ui.session.SubjectFragment
 import java.time.Duration
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+
+/** How much of a 4:3 image's bottom the scene photo's panel may cover on the S22 when its hint takes two lines, in dp (#231). */
+private const val SCENE_PANEL_OVER_IMAGE_DP = 16
 
 /*
  * The camera screens' layout on the Galaxy S22's app area, 360 x 705 dp (R&S 6.2, 6.6; Testing Documentation 2.1.6).
@@ -63,7 +88,19 @@ import org.robolectric.annotation.GraphicsMode
  * ratio's area as the camera rebinds (Iter3-A12; until then it kept its place and the old ratio's area until the new
  * one streamed); a held 1:1 frame dimmed once. The ratios under the top bar, in their shapes, each taking taps on 48 dp.
  * The zoom readout's tap
- * area, the row's height, and every control's, at least 48 dp (NFR-16). Subject view's video placed the same way.
+ * area, the row's height, and every control's, at least 48 dp (NFR-16). Subject view's video placed the same way;
+ * its session photo's thumbnail (Iter4-A2) on Guide's icon line, shown before any photo, Guide where Camera's is and
+ * the thumbnail as far from the right edge, and the button beside it where Camera's shutter is, clear of both, with each of its labels at
+ * font scale 1 and 1.3. The session photos' viewer over the whole screen,
+ * on Subject view and on Camera.
+ * The scene photo's review (R&S 6.3, #199): a 3:4 photo in the middle of the room under the bar with its message 12 dp
+ * under it, a 9:16 one that leaves no room, with the message over its bottom on glass, and Use at the top right. The
+ * step's title, while framing and while reviewing, on Back's and Use's line, the bar then as tall as the other
+ * screens' headers, 8 dp above a 56 dp row (#204, #210).
+ * A photo without a person: its alert at the start of the message's first line, not at the box's edge (#204).
+ * The reference thumbnail hidden at the side (#237), in each corner: 16 dp of it in the preview, and its handle 48 dp
+ * wide over that strip, inside the preview and above the zoom row; shown again, whole in its corner.
+ * A photo taken with the phone held sideways, reviewed as framed while the photo sent on is turned upright (#206).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -80,15 +117,17 @@ class CameraLayoutTest {
         val modules: TestAppContainer,
     )
 
+    @get:Rule
+    val activities = OwnActivities()
+
+    private fun activity(): AppCompatActivity = activities.start(R.style.Theme_Pix)
+
     private fun camera(fontScale: Float = 1f): Camera {
         if (fontScale != 1f) RuntimeEnvironment.setFontScale(fontScale)
         val app = ApplicationProvider.getApplicationContext<Application>()
         shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
         val modules = TestAppContainer(camera = FakeCameraController(hasFlash = true, exposureRange = -6..6)).install()
-        val activity = Robolectric.buildActivity(AppCompatActivity::class.java).apply {
-            get().setTheme(R.style.Theme_Pix)
-        }
-            .setup().get()
+        val activity = activity()
         val nav = TestNavHostController(activity).apply { setGraph(R.navigation.nav_graph) }
         Navigation.setViewNavController(activity.findViewById(android.R.id.content), nav)
         val fragment = CameraFragment()
@@ -138,6 +177,301 @@ class CameraLayoutTest {
         val density = resources.displayMetrics.density
         fun dp(px: Number) = (px.toFloat() / density).roundToInt()
         return Rect(dp(at[0]), dp(at[1]), dp(at[0] + width), dp(at[1] + height))
+    }
+
+    // ---- The reference thumbnail hidden at the side (#237) ------------------------------------------
+
+    @Test
+    fun aHiddenThumbnail_leavesItsPeekAtItsCornersSide_underAHandleATouchTargetWide() {
+        val screen = camera()
+        val controls = screen.controls
+        // A 3:4 reference photo: small, its thumbnail is 54 x 72 dp.
+        screen.modules.guides.setGuide(guide())
+        val model = ViewModelProvider(screen.fragment, PixViewModels.Factory)[CameraViewModel::class.java]
+        val preview = controls.previewContainer.box()
+
+        for (corner in ReferenceCorner.entries) {
+            model.setReferenceCorner(corner)
+            model.setReferenceHidden(true)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+
+            val thumbnail = controls.referenceThumbnail.box()
+            val strip = Rect(thumbnail).apply { intersect(preview) }
+            // Only 16 dp of it are in the preview, at its corner's side and height, and see-through.
+            assertEquals("$corner", 16, strip.width())
+            assertEquals("$corner", if (corner.isLeft) preview.left else preview.right - 16, strip.left)
+            assertEquals("$corner", 72, thumbnail.height())
+            assertEquals("$corner", REFERENCE_HIDDEN_ALPHA, controls.referenceThumbnail.alpha, 0f)
+            // Its handle: a touch target wide from that side, over the strip, in the preview above the zoom row.
+            val handle = controls.referenceHandle.box()
+            assertTrue("$corner", controls.referenceHandle.isShown)
+            assertEquals("$corner", 48, handle.width())
+            assertEquals("$corner", if (corner.isLeft) preview.left else preview.right - 48, handle.left)
+            assertTrue("$corner: $handle over $strip", handle.contains(strip))
+            assertTrue("$corner", handle.top >= preview.top && handle.bottom <= controls.zoomRow.box().top)
+        }
+
+        // Shown again, it is whole in its corner, and nothing lies over the preview's side.
+        model.setReferenceHidden(false)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+        assertFalse(controls.referenceHandle.isShown)
+        assertTrue(preview.contains(controls.referenceThumbnail.box()))
+        assertEquals(1f, controls.referenceThumbnail.alpha, 0f)
+    }
+
+    @Test
+    fun aHiddenThumbnailOfAWidePhoto_keepsItsHandleInsideTheThumbnailsArea() {
+        val screen = camera()
+        val controls = screen.controls
+        // A 4:1 panorama: small, its thumbnail is 72 x 18 dp, shorter than the handle's 48 dp.
+        screen.modules.guides.setGuide(guide().copy(reference = ScreenTestSupport.bitmap(400, 100)))
+        val model = ViewModelProvider(screen.fragment, PixViewModels.Factory)[CameraViewModel::class.java]
+        // Where a thumbnail may be: from its top in a top corner to its bottom in a bottom one.
+        val shown = ReferenceCorner.entries.associateWith { corner ->
+            model.setReferenceCorner(corner)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+            controls.referenceThumbnail.box()
+        }
+        val top = shown.getValue(ReferenceCorner.TOP_LEFT).top
+        val bottom = shown.getValue(ReferenceCorner.BOTTOM_LEFT).bottom
+        assertEquals(18, shown.getValue(ReferenceCorner.TOP_LEFT).height())
+
+        for (corner in ReferenceCorner.entries) {
+            model.setReferenceCorner(corner)
+            model.setReferenceHidden(true)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+
+            val strip = controls.referenceThumbnail.box().apply { intersect(controls.previewContainer.box()) }
+            val handle = controls.referenceHandle.box()
+            // Still a touch target tall and over the strip, with its extra height toward the middle of the preview.
+            assertEquals("$corner", 48, handle.height())
+            assertTrue("$corner: $handle over $strip", handle.contains(strip))
+            assertTrue("$corner: $handle in $top..$bottom", handle.top >= top && handle.bottom <= bottom)
+            model.setReferenceHidden(false)
+        }
+    }
+
+    // ---- The scene photo's review ----------------------------------------------------------------
+
+    /** The scene photo step's review of a [width] x [height] px photo. */
+    private fun Camera.reviewing(width: Int, height: Int) {
+        (modules.camera as FakeCameraController).frame = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val generation = activity.viewModel<GenerationViewModel>()
+        generation.beginScene()
+        idle()
+        generation.takeScene()
+        idle()
+    }
+
+    /** Where [this] draws its picture on the screen, in dp. */
+    private fun ImageView.pictureBox(): Rect {
+        val at = IntArray(2)
+        getLocationInWindow(at)
+        val drawn = RectF(drawable.bounds).also(imageMatrix::mapRect)
+        val density = resources.displayMetrics.density
+        fun dp(px: Float) = (px / density).roundToInt()
+        return Rect(
+            dp(at[0] + paddingLeft + drawn.left),
+            dp(at[1] + paddingTop + drawn.top),
+            dp(at[0] + paddingLeft + drawn.right),
+            dp(at[1] + paddingTop + drawn.bottom),
+        )
+    }
+
+    @Test
+    fun scenePhotoReview_thePhotoInTheMiddleUnderTheBar_itsMessageUnderIt_andUseAtTheTopRight() {
+        val screen = camera()
+        screen.reviewing(300, 400)
+
+        val photo = screen.controls.sceneStill.pictureBox()
+        assertEquals(360, photo.width())
+        assertEquals(480, photo.height())
+        // As much room above, under the camera's own bar (48 dp above its overhang, #231), as below, to the screen's
+        // bottom at 705 dp.
+        assertTrue("$photo", abs((photo.top - 48) - (705 - photo.bottom)) <= 1)
+        val message = screen.controls.sceneMessage
+        assertTrue("${message.box()} under $photo", abs(message.box().top - (photo.bottom + 12)) <= 1)
+        assertNull(message.background)
+        // The flow's bar shows over the review, at the bar's bottom edge (#210).
+        assertTrue(screen.controls.sceneProgress.isShown)
+        assertTrue(screen.controls.sceneProgress.z > screen.controls.sceneReview.z)
+
+        // Use draws 40 dp in the middle of the bar above its overhang, on Back's line, its right edge 20 dp from the
+        // screen's (#210, #231).
+        val use = screen.controls.usePhotoButton as MaterialButton
+        val box = use.box()
+        val density = use.resources.displayMetrics.density
+        val drawnTop = box.top + (use.insetTop / density).roundToInt()
+        val drawnBottom = box.bottom - (use.insetBottom / density).roundToInt()
+        assertEquals(340, box.right)
+        assertEquals(40, drawnBottom - drawnTop)
+        assertEquals(24, (drawnTop + drawnBottom) / 2)
+    }
+
+    /** The middle of [this] on the screen, in dp. */
+    private fun View.middle(): Float {
+        val at = IntArray(2).also(::getLocationInWindow)
+        return (at[1] + height / 2f) / resources.displayMetrics.density
+    }
+
+    // The scene photo step (#231): its bar is the Camera screen's own, in height, icons, and where the image starts,
+    // while framing and on the review; the title on Back's line; the ratio fits beside the light, also at font scale
+    // 1.3; the panel that says what to frame is see-through, below a 4:3 image when its hint is on one line and over
+    // its last dp when the hint takes two (every situation's hint), and over a 16:9 one.
+    @Test
+    fun scenePhoto_theBar_isTheCamerasOwn_whileFramingAndReviewing() {
+        val screen = camera()
+        val bar = screen.controls.topBar.box()
+        val image = screen.controls.previewContainer.box().top
+        val icon = (screen.controls.flashButton as MaterialButton).iconSize
+        val generation = screen.activity.viewModel<GenerationViewModel>()
+
+        generation.beginScene()
+        idle()
+        assertEquals("framing", bar, screen.controls.topBar.box())
+        assertEquals("framing", image, screen.controls.previewContainer.box().top)
+        assertEquals(icon, (screen.controls.sceneBackButton as MaterialButton).iconSize)
+
+        (screen.modules.camera as FakeCameraController).frame = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
+        generation.takeScene()
+        idle()
+        assertEquals("reviewing", bar, screen.controls.topBar.box())
+    }
+
+    @Test
+    fun scenePhoto_theTitle_isOnBacksLine_whileFramingAndReviewing() {
+        val screen = camera()
+        val generation = screen.activity.viewModel<GenerationViewModel>()
+        generation.beginScene()
+        idle()
+        val back = screen.controls.sceneBackButton as MaterialButton
+        val density = back.resources.displayMetrics.density
+        // Back draws in the bar above its inset bottom, the 4 dp that lie over the image.
+        val backMiddle = (back.box().top + back.box().bottom - back.insetBottom / density) / 2f
+        assertEquals(24f, backMiddle, 1f)
+        assertEquals("framing", backMiddle, screen.controls.sceneTitle.middle(), 1f)
+
+        (screen.modules.camera as FakeCameraController).frame = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
+        generation.takeScene()
+        idle()
+        assertEquals("reviewing", backMiddle, screen.controls.sceneTitle.middle(), 1f)
+    }
+
+    @Test
+    fun scenePhoto_theBarFits_withTheLightTheRatioAndTheTitle_alsoAtFontScale130() {
+        for (scale in listOf(1f, 1.3f)) {
+            val screen = camera(fontScale = scale)
+            screen.activity.viewModel<GenerationViewModel>().beginScene()
+            idle()
+            val bar = screen.controls.topBar.box()
+            val parts = listOf(
+                screen.controls.sceneBackButton,
+                screen.controls.flashButton,
+                screen.controls.aspectButton,
+                screen.controls.sceneTitle,
+            )
+            for (part in parts) {
+                assertTrue(
+                    "$scale: ${part.box()} shown in $bar",
+                    part.isShown && bar.contains(part.box()),
+                )
+            }
+            for ((left, right) in parts.zipWithNext()) {
+                assertTrue("$scale: ${left.box()} before ${right.box()}", left.box().right <= right.box().left)
+            }
+            val title = screen.controls.sceneTitle
+            assertEquals("$scale: the title on one line", 1, title.lineCount)
+            assertEquals("$scale: the title whole", 0, title.layout.getEllipsisCount(0))
+        }
+    }
+
+    @Test
+    fun scenePhoto_thePanel_isSeeThrough_belowA43Image_orOverItsLastDpWhenItsHintTakesTwoLines() {
+        val screen = camera()
+        val generation = screen.activity.viewModel<GenerationViewModel>()
+        val lines = mutableSetOf<Int>()
+        for (situation in Situation.entries) {
+            generation.chooseSituation(situation)
+            generation.beginScene()
+            idle()
+
+            val panel = screen.controls.sceneGuide
+            val image = screen.controls.previewContainer.box()
+            val over = image.bottom - panel.box().top
+            val hint = screen.controls.sceneGuideText.lineCount
+            lines += hint
+            assertEquals(R.drawable.bg_glass_panel, shadowOf(panel.background).createdFromResId)
+            // A hint on one line leaves the image whole; a longer one, in English, covers its last dp.
+            assertTrue(
+                "$situation: ${panel.box()} over $image",
+                over <= if (hint ==
+                    1
+                ) {
+                    0
+                } else {
+                    SCENE_PANEL_OVER_IMAGE_DP
+                },
+            )
+            assertTrue("$situation: above the shutter", panel.box().bottom <= screen.controls.shutterButton.box().top)
+        }
+        assertEquals("hints of one line and of two", setOf(1, 2), lines)
+    }
+
+    @Test
+    fun scenePhoto_thePanel_isOverA169Image_aboveTheShutter() {
+        val screen = camera()
+        screen.ratio(AspectRatio.R16_9)
+        screen.activity.viewModel<GenerationViewModel>().beginScene()
+        idle()
+
+        val panel = screen.controls.sceneGuide.box()
+        assertTrue("$panel inside the image", screen.controls.previewContainer.box().contains(panel))
+        assertTrue("$panel above the shutter", panel.bottom <= screen.controls.shutterButton.box().top)
+    }
+
+    @Test
+    fun scenePhotoReview_aPhotoThatLeavesNoRoom_hasItsMessageOverItsBottom_onGlass() {
+        val screen = camera()
+        screen.reviewing(288, 512)
+
+        val photo = screen.controls.sceneStill.pictureBox()
+        val message = screen.controls.sceneMessage
+        assertTrue("${message.box()} over $photo", message.box().top < photo.bottom)
+        assertTrue("${message.box()} 20 dp above the bottom", message.box().bottom <= 705 - 20)
+        assertNotNull(message.background)
+    }
+
+    @Test
+    fun scenePhotoReview_heldSideways_showsThePhotoAsFramed_andKeepsItUprightForThePoses() {
+        val screen = camera()
+        screen.modules.turns.set(90)
+        screen.reviewing(300, 400)
+        val generation = screen.activity.viewModel<GenerationViewModel>()
+        idleUntil { generation.uiState.value.phase == GenerationUiState.Phase.REVIEWING }
+        idle()
+
+        val shown = screen.controls.sceneStill.drawable
+        assertEquals(300 to 400, shown.intrinsicWidth to shown.intrinsicHeight)
+        val scene = checkNotNull(generation.uiState.value.scene)
+        assertEquals(400 to 300, scene.width to scene.height)
+    }
+
+    @Test
+    fun scenePhotoReview_withoutAPerson_theAlertStartsTheFirstLine_besideItsWords() {
+        val screen = camera()
+        screen.modules.persons.found = false
+        screen.reviewing(300, 400)
+
+        val message = screen.controls.sceneMessage
+        val text = message.text as Spanned
+        // Not at the box's left edge, apart from centered lines (#204): in the text, before the first word.
+        assertTrue(message.compoundDrawablesRelative.all { it == null })
+        val alert = text.getSpans(0, text.length, InlineIconSpan::class.java).single()
+        assertEquals(0, text.getSpanStart(alert))
+        assertEquals(message.context.getString(R.string.scene_no_person_body), text.toString().trim())
+        // Never alone on a line, and two lines break evenly.
+        assertEquals(message.layout.getLineForOffset(0), message.layout.getLineForOffset(1))
+        assertEquals(LineBreaker.BREAK_STRATEGY_BALANCED, message.breakStrategy)
     }
 
     // ---- Ratios -----------------------------------------------------------------------------
@@ -453,13 +787,11 @@ class CameraLayoutTest {
 
     // ---- Subject view -----------------------------------------------------------------------
 
-    @Test
-    fun subjectView_placesTheVideoLikeTheCamera_withTheZoomRowAboveTheCaption() {
+    /** Subject view connected to a photographer framing in 16:9, with their video streaming. */
+    private fun subjectView(fontScale: Float = 1f): FragmentSubjectBinding {
+        if (fontScale != 1f) RuntimeEnvironment.setFontScale(fontScale)
         val modules = TestAppContainer().install()
-        val activity = Robolectric.buildActivity(AppCompatActivity::class.java).apply {
-            get().setTheme(R.style.Theme_Pix)
-        }
-            .setup().get()
+        val activity = activity()
         val fragment = SubjectFragment()
         activity.supportFragmentManager.beginTransaction().add(android.R.id.content, fragment).commitNow()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
@@ -476,7 +808,12 @@ class CameraLayoutTest {
             ),
         )
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
-        val binding = FragmentSubjectBinding.bind(fragment.requireView())
+        return FragmentSubjectBinding.bind(fragment.requireView())
+    }
+
+    @Test
+    fun subjectView_placesTheVideoLikeTheCamera_withTheZoomRowAboveTheCaption() {
+        val binding = subjectView()
 
         val video = binding.videoContainer.box()
         assertEquals(binding.topBar.box().bottom - TOP_BAR_OVERHANG_DP.toInt(), video.top)
@@ -488,7 +825,180 @@ class CameraLayoutTest {
         binding.editGuideButton.visibility = View.VISIBLE
         binding.brightnessButton.visibility = View.VISIBLE
         binding.brightnessPanel.visibility = View.VISIBLE
+        binding.galleryButton.visibility = View.VISIBLE
         idle()
         assertEveryControlAtLeast48(binding.root, "Subject view")
     }
+
+    private fun assertThumbnailBesideGuide(fontScale: Float) {
+        val camera = camera(fontScale).controls
+        val camerasGuide = camera.guideButtonIcon.box()
+        val shutter = camera.shutterButton.box()
+        val binding = subjectView(fontScale)
+        // Shown from the start, empty until the session's first photo (FR-6.14).
+        assertTrue("the thumbnail shows before any photo", binding.galleryButton.isShown)
+        // Guide where Camera's is, at its size, within a pixel's rounding (R&S 6.6).
+        val guideIcon = binding.guideButtonIcon.box()
+        assertTrue(
+            "$guideIcon where Camera's is, $camerasGuide",
+            abs(guideIcon.centerX() - camerasGuide.centerX()) <= 1,
+        )
+        assertEquals(camerasGuide.centerY(), guideIcon.centerY())
+        assertEquals(camerasGuide.width(), guideIcon.width())
+        binding.pickPoseButton.visibility = View.VISIBLE
+        val labels = listOf(
+            R.string.pick_pose_title,
+            R.string.generating_title,
+            R.string.describe_title,
+            R.string.pose_guide_title,
+        )
+        for (label in labels) {
+            binding.pickPoseLabel.setText(label)
+            idle()
+            val thumbnail = binding.galleryButton.box()
+            val guide = binding.guideButton.box()
+            val pick = binding.pickPoseButton.box()
+            val text = binding.pickPoseLabel.text
+            assertEquals("$text: on Guide's icon line", binding.guideButtonIcon.box().centerY(), thumbnail.centerY())
+            // Pick a pose in the shutter's place, clear of Guide and of the thumbnail.
+            assertTrue(
+                "$text: $pick centered where the shutter is, $shutter",
+                abs(pick.centerX() - shutter.centerX()) <= 1,
+            )
+            assertTrue("$text: $guide clear of $pick", guide.right <= pick.left)
+            assertTrue("$text: $pick clear of $thumbnail", pick.right <= thumbnail.left)
+            // As far from the right edge as Guide is from the left: the right third's middle, as on Camera.
+            assertTrue(
+                "$text: $thumbnail mirrors $guideIcon",
+                abs((360 - thumbnail.centerX()) - guideIcon.centerX()) <= 1,
+            )
+            assertTrue("$text: $thumbnail inside the screen", thumbnail.right <= 360 && thumbnail.bottom <= 705)
+        }
+    }
+
+    @Test
+    fun subjectView_theBottomRow_isCamerasRow_guideAtTheLeft_theThumbnailAtTheRight_pickAPoseInTheMiddle() =
+        assertThumbnailBesideGuide(fontScale = 1f)
+
+    @Test
+    fun subjectView_theBottomRow_isCamerasRow_atFontScale1_3() =
+        assertThumbnailBesideGuide(fontScale = 1.3f)
+
+    /**
+     * The photo viewer, shown: over the whole screen, Back at the top left and Share and Delete at the top right, their
+     * icons as far from the edges as Back's, each taking taps on 48 dp, and the photo from under the header to 12 dp
+     * over the strip of thumbnails, 48 dp tall and 24 dp over the bottom, in place while it is not shown yet.
+     */
+    private fun assertViewerCoversTheScreen(holder: FrameLayout) {
+        val viewer = ViewPhotoViewerBinding.inflate(LayoutInflater.from(holder.context), holder, true)
+        viewer.root.visibility = View.VISIBLE
+        idle()
+
+        assertEquals(Rect(0, 0, 360, 705), viewer.root.box())
+        val back = viewer.photoViewerBack.box()
+        assertTrue("$back at the top left", back.left <= 8 && back.top <= 16)
+        assertTrue("$back takes taps on 48 dp", back.width() >= 48 && back.height() >= 48)
+        val pages = viewer.photoViewerPages.box()
+        val strip = viewer.photoViewerStrip.box()
+        val share = viewer.photoViewerShare.box()
+        val delete = viewer.photoViewerDelete.box()
+        assertTrue("$pages under the header", pages.top >= viewer.photoViewerHeader.box().bottom)
+        // Share, then Delete at the header's end, on Back's line, as in a gallery app.
+        assertEquals("$delete as far from the right as $back from the left", 360 - back.left, delete.right)
+        assertTrue("$share before $delete, after $back", share.right <= delete.left && share.left >= back.right)
+        for (button in listOf(share, delete)) {
+            assertTrue("$button takes taps on 48 dp", button.width() >= 48 && button.height() >= 48)
+            assertTrue("$button on Back's line, $back", abs(button.centerY() - back.centerY()) <= 1)
+        }
+        // The strip of thumbnails at the bottom, each taking taps on 48 dp; in place while there is one photo.
+        assertEquals(View.INVISIBLE, viewer.photoViewerStrip.visibility)
+        assertEquals(48, strip.height())
+        assertEquals(strip.top - 12, pages.bottom)
+        assertEquals(705 - 24, strip.bottom)
+    }
+
+    @Test
+    fun subjectView_thePhotoViewer_coversTheWholeScreen_withBackAtTheTopLeft_andThePhotoUnderIt() =
+        assertViewerCoversTheScreen(subjectView().photoViewerHolder)
+
+    @Test
+    fun camera_thePhotoViewer_coversTheWholeScreen_withBackAtTheTopLeft_andThePhotoUnderIt() =
+        assertViewerCoversTheScreen(camera().controls.photoViewerHolder)
+
+    /** Subject view in a session, with a guide on the video and the photographer's tip of it, its banner closed. */
+    private fun subjectWithTip(fontScale: Float = 1f): FragmentSubjectBinding {
+        if (fontScale != 1f) RuntimeEnvironment.setFontScale(fontScale)
+        val modules = TestAppContainer().install()
+        val activity = activity()
+        val fragment = SubjectFragment()
+        activity.supportFragmentManager.beginTransaction().add(android.R.id.content, fragment).commitNow()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
+        modules.video.deliverFrame()
+        modules.session.deliver(
+            SessionMessage.Capabilities(CameraCapabilities(0.6f, 10f, listOf(0.6f, 1f, 2f), -6..6, 0.5f, true)),
+        )
+        // The widest readout the row shows.
+        modules.session.deliver(SessionMessage.CameraStateUpdate(zoom = 10f, by = Role.PHOTOGRAPHER, final = true))
+        modules.tipSync.startAsReceiver(fragment.viewLifecycleOwner.lifecycleScope)
+        modules.mirror.setGuide(
+            ReferenceGuide(
+                id = "g1",
+                mask = Bitmap.createBitmap(4, 8, Bitmap.Config.ARGB_8888),
+                outline = Bitmap.createBitmap(4, 8, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.TRANSPARENT) },
+                aspect = 0.5f,
+                source = GuideSource.GENERATED,
+                anchor = NormalizedRect(0.2f, 0.1f, 0.8f, 0.95f),
+            ),
+        )
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        // The longest tip the server writes: every sentence it has, one on a line.
+        modules.session.deliver(
+            SessionMessage.GuideTip(
+                "g1",
+                "Move until the person fits the guide's outline, then take it.\n" +
+                    "Hold the phone above your head, tilted down a little.\n" +
+                    "Put the person on the right of the frame.\nLeave almost no room above the head.\n" +
+                    "Hold the phone upright so the lines behind the person are level.",
+            ),
+        )
+        idle()
+        return FragmentSubjectBinding.bind(fragment.requireView())
+    }
+
+    private fun assertTheTipFitsOnSubjectView(binding: FragmentSubjectBinding, font: String) {
+        // The row: brightness and the tip at its start, clear of the readout; Save guide and the toggle at its end.
+        val row = binding.zoomRow.box()
+        val brightness = binding.brightnessButton.box()
+        val tip = binding.tipButtonFrame.box()
+        val readout = binding.zoomReadout.box()
+        assertTrue("$font: the tip button shows", binding.tipButtonFrame.isShown)
+        assertEquals("$font: the tip button beside the brightness", brightness.right, tip.left)
+        assertTrue("$font: $tip clear of the readout $readout", tip.right <= readout.left)
+        assertTrue("$font: the readout clear of Save guide", readout.right <= binding.saveGuideButton.box().left)
+        assertTrue("$font: in the row", tip.top >= row.top && tip.bottom <= row.bottom)
+        assertEveryControlAtLeast48(binding.root, "Subject view with a tip, $font")
+
+        // Open, the tip is whole on the screen above the caption, and the row moves above it.
+        binding.tipButton.performClick()
+        idle()
+        val banner = binding.tipBanner.box()
+        assertTrue("$font: the banner shows", binding.tipBanner.isShown)
+        // Every sentence shows: at least a line each, none cut off at the end.
+        val words = binding.tipText
+        assertTrue("$font: ${words.lineCount} lines", words.lineCount >= 5)
+        assertEquals("$font: the last line is whole", 0, words.layout.getEllipsisCount(words.lineCount - 1))
+        assertTrue("$font: the text is as tall as its lines", words.height >= words.layout.height)
+        assertTrue("$font: $banner above the caption", banner.bottom <= binding.bottomPanel.box().top)
+        assertTrue("$font: $banner under the top bar", banner.top >= binding.topBar.box().bottom)
+        assertTrue("$font: the row above the banner", binding.zoomRow.box().bottom <= banner.top)
+        assertEveryControlAtLeast48(binding.root, "Subject view with the tip open, $font")
+    }
+
+    @Test
+    fun subjectView_theTipButtonIsClearOfTheReadout_andItsCardOpensAboveTheCaption() =
+        assertTheTipFitsOnSubjectView(subjectWithTip(), "font scale 1")
+
+    @Test
+    fun subjectView_theTipButtonIsClearOfTheReadout_andItsCardOpensAboveTheCaption_atFontScale1_3() =
+        assertTheTipFitsOnSubjectView(subjectWithTip(fontScale = 1.3f), "font scale 1.3")
 }

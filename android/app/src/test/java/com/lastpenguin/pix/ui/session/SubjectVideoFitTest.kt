@@ -7,19 +7,19 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.widget.FrameLayout
-import androidx.appcompat.app.AppCompatActivity
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.guide.GuideOverlayView
+import com.lastpenguin.pix.ui.OwnActivities
 import com.lastpenguin.pix.ui.camera.PinchZoomController
 import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 import org.robolectric.annotation.GraphicsMode
 import org.webrtc.RendererCommon
 import org.webrtc.SurfaceViewRenderer
@@ -33,6 +33,9 @@ import org.webrtc.SurfaceViewRenderer
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class SubjectVideoFitTest {
+    @get:Rule
+    val activities = OwnActivities()
+
     private var eventTime = 1_000L
 
     @Test
@@ -97,7 +100,7 @@ class SubjectVideoFitTest {
 
     /** Subject view's layout, with the renderer's scaling as SubjectFragment sets it. */
     private fun screen(): Screen {
-        val activity = Robolectric.buildActivity(AppCompatActivity::class.java).setup().get()
+        val activity = activities.start()
         val root = LayoutInflater.from(activity).inflate(R.layout.fragment_subject, null)
         activity.setContentView(root)
         val video = root.findViewById<SurfaceViewRenderer>(R.id.liveView)

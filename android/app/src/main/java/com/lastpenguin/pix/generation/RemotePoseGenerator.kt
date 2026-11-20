@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -30,7 +30,7 @@ import retrofit2.HttpException
  * [PoseGenerator] through the Pix server (Design 2.6.3): `POST /pose-suggestions` for the poses, which are four
  * suggested ones or, for a description, the description and three variations of it; then one `POST /poses` per pose,
  * in parallel, each with the pose as its description. The description's own request goes out at once, before its
- * variations are known.
+ * variations are known. Every request names the set's situation (FR-4.8).
  * Owner: Server/AI/Sync (#7).
  */
 class RemotePoseGenerator(
@@ -46,12 +46,14 @@ class RemotePoseGenerator(
         request: PoseRequest,
         seed: Long,
         selfie: Boolean,
+        situation: Situation,
     ): Flow<GenerationEvent> = channelFlow {
-        // Encoded once and sent with every request, with `selfie` for a selfie's scene only.
+        // Encoded once and sent with every request, with `selfie` for a selfie's scene only, and the situation.
         val photo = withContext(imageDispatcher) { images.encodeScene(scene) }
         val parts = Parts(
             MultipartBody.Part.createFormData("image", "scene.jpg", photo.toRequestBody(JPEG)),
             if (selfie) "true".toRequestBody(TEXT) else null,
+            situation.forScene(selfie).apiName.toRequestBody(TEXT),
         )
         // One seed for the set gives each pose a seed of its own, in the order of the poses (Design 2.6.3, step 3).
         val seeds = Random(seed)
@@ -77,25 +79,27 @@ class RemotePoseGenerator(
         }
     }
 
-    /** What every request of a set sends besides its pose: the scene, and whether it is a selfie. */
-    private class Parts(val image: MultipartBody.Part, val selfie: RequestBody?)
+    /** What every request of a set sends besides its pose: the scene, whether it is a selfie, and the situation. */
+    private class Parts(val image: MultipartBody.Part, val selfie: RequestBody?, val situation: RequestBody)
 
     /**
      * The server's poses for the scene; it answers with its default poses when its model fails, so a failure here is
-     * the connection or the server itself. Throws an [IOException] or an [HttpException].
+     * the connection, a limit, or the server itself. Throws a [GenerationFailedException] that says which, since the
+     * run then ends before any pose (FR-4.7).
      */
     private suspend fun suggest(parts: Parts): List<String> {
         val answer = try {
-            withTimeoutOrNull(timeoutMs) { api.suggestPoses(parts.image, null, parts.selfie) }
+            withTimeoutOrNull(timeoutMs) { api.suggestPoses(parts.image, null, parts.selfie, parts.situation) }
                 ?: throw SocketTimeoutException("The server did not suggest poses in time")
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
-            Log.w(TAG, "suggestions: ${describe(error)}")
-            throw error
+            val body = errorBody(error)
+            Log.w(TAG, "suggestions: ${describe(error, body)}")
+            throw GenerationFailedException(errorOf(error, body), error)
         }
         val poses = answer.poses.filter { it.isNotBlank() }.take(POSE_COUNT)
-        if (poses.isEmpty()) throw IOException("The server suggested no poses")
+        if (poses.isEmpty()) throw GenerationFailedException(GenerationError.SERVER, IOException("No poses suggested"))
         return poses
     }
 
@@ -108,7 +112,7 @@ class RemotePoseGenerator(
         val wanted = POSE_COUNT - 1
         val variations = try {
             val answer = withTimeoutOrNull(VARIATION_TIMEOUT_MS) {
-                api.suggestPoses(parts.image, description.toRequestBody(TEXT), parts.selfie)
+                api.suggestPoses(parts.image, description.toRequestBody(TEXT), parts.selfie, parts.situation)
             }
             if (answer == null) Log.w(TAG, "variations: no answer within $VARIATION_TIMEOUT_MS ms")
             answer?.poses.orEmpty().drop(1).filter { it.isNotBlank() }.take(wanted)
@@ -129,6 +133,7 @@ class RemotePoseGenerator(
                     pose.text.toRequestBody(TEXT),
                     seed.toString().toRequestBody(TEXT),
                     parts.selfie,
+                    parts.situation,
                 )
                 val candidate = withContext(imageDispatcher) {
                     images.decodeCandidate(Base64.getDecoder().decode(answer.image))
@@ -154,14 +159,28 @@ class RemotePoseGenerator(
     }
 
     /**
-     * The statuses of Design 2.5.3, and for 422 its code: no person in the scene photo (FR-4.13), or a refused
-     * description. Anything else from the server, such as a rejected photo, is a server error.
+     * The statuses of Design 2.5.3, and their codes: for 429, everyone's day used up or this phone's hour; for 422, no
+     * person in the scene photo (FR-4.13), the image service declining, or a refused description, also without a
+     * readable code. Anything else from the server, such as a rejected photo, is a server error.
      */
     private fun errorOf(error: Exception, body: ApiErrorBody?): GenerationError = when (error) {
         is HttpException -> when (error.code()) {
-            429 -> GenerationError.RATE_LIMITED
-            422 -> if (body?.error?.code == NO_PERSON) GenerationError.NO_PERSON else GenerationError.REJECTED
+            429 -> if (body?.error?.code ==
+                DAILY_LIMITED
+            ) {
+                GenerationError.DAILY_LIMITED
+            } else {
+                GenerationError.RATE_LIMITED
+            }
+
+            422 -> when (body?.error?.code) {
+                NO_PERSON -> GenerationError.NO_PERSON
+                DECLINED -> GenerationError.DECLINED
+                else -> GenerationError.REJECTED
+            }
+
             504 -> GenerationError.TIMEOUT
+
             else -> GenerationError.SERVER
         }
 
@@ -200,6 +219,12 @@ class RemotePoseGenerator(
 
         /** The 422 code of a scene photo in which the server found no one (Design 2.5.3). */
         private const val NO_PERSON = "NO_PERSON"
+
+        /** The 422 code of the image service declining the request, apart from the description filter's REJECTED. */
+        private const val DECLINED = "DECLINED"
+
+        /** The 429 code of everyone's limit for the day, apart from this phone's hourly RATE_LIMITED. */
+        private const val DAILY_LIMITED = "DAILY_LIMITED"
         private val JPEG = "image/jpeg".toMediaType()
         private val TEXT = "text/plain".toMediaType()
         private val errorJson = Json { ignoreUnknownKeys = true }

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-17, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.camera
 
 import android.graphics.Bitmap
@@ -50,6 +50,11 @@ data class CameraState(
      * goes off or the camera closes. Not echoed to the subject.
      */
     val torch: Boolean = false,
+    /**
+     * The camera in use, in the photographer's `camera.state` that the subject keeps (#201). The photographer's own
+     * controller leaves it at its default and reports the camera in [CameraController.facing].
+     */
+    val facing: CameraFacing = CameraFacing.BACK,
 )
 
 /**
@@ -130,8 +135,19 @@ interface CameraController {
     /** Rebinds the use cases with a viewport of [ratio], after any photo being saved (FR-1.13). */
     fun setAspectRatio(ratio: AspectRatio)
 
-    /** Full resolution in the chosen aspect ratio to Pictures/Pix, never with the guide (FR-1.5). */
-    suspend fun takePhoto(): Result<Uri>
+    /**
+     * Full resolution in the chosen aspect ratio to Pictures/Pix, never with the guide (FR-1.5). Returns once the photo
+     * is saved or has failed. [onCaptured] runs on the main thread when the camera has taken the picture, which is when
+     * the next photo can be asked for while this one is still being saved (NFR-19); a photo that fails before that
+     * never calls it.
+     */
+    suspend fun takePhoto(onCaptured: () -> Unit = {}): Result<Uri>
+
+    /**
+     * Photos from now on are saved as the phone is held at [turn] (FR-1.5, `PhoneTurns`): sideways, a landscape photo,
+     * through its EXIF orientation. The camera's view stays portrait, and the front camera's photo stays mirrored.
+     */
+    fun setPhotoTurn(turn: Int) = Unit
 
     /**
      * Copies the latest live frame before suspending, then crops and rotates it upright (FR-4.1).

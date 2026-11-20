@@ -109,3 +109,4 @@ One Claude Code session (Claude Fable 5.1) for the Iteration 2 documents, 10/11â
 [#95]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/95
 [#97]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/97
 [#61]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/61
+[#96]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/96

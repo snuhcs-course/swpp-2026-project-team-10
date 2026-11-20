@@ -1,5 +1,5 @@
-# AI-generated with Claude Code, 2026-10-22, reviewed by Sungmin Jo
-"""Turns a `PixTimings` logcat dump into the zoom numbers of NFR-19 (Testing Documentation IT-10).
+# AI-generated with Claude Code, 2026-11-16, reviewed by Sungmin Jo and Dongje Park
+"""Turns a `PixTimings` logcat dump into the zoom and shutter numbers of NFR-19 (Testing Documentation IT-10).
 
 Record on the photographer's phone, from `android/`:
 
@@ -7,6 +7,9 @@ Record on the photographer's phone, from `android/`:
     # pinch for about ten seconds, cross 1x a few times, then press the shutter
     adb logcat -d -s PixTimings > zoom.log
     python3 scripts/zoom_timings.py zoom.log
+
+A log of shutter presses alone gives the *Shutter* table: from each press until the camera took the photo, until the
+photo was saved, and the longest time the preview showed no new frame around it.
 
 A frozen frame repeats the zoom of the frame before although the fingers moved (allowing for the camera's lag from
 request to picture): what a stutter looks like.
@@ -281,27 +284,71 @@ def switch_rows(marks: list[Mark], frames: list[Frame]) -> list[list[object]]:
 
 
 def capture_rows(marks: list[Mark], frames: list[Frame]) -> list[list[object]]:
-    rows = []
-    for start in (m for m in marks if m.name == "camera.capture.start"):
-        end = next(
+    """One row per shutter press, and their medians last. The shutter is free again once the camera has taken the photo
+    (`camera.capture.started`), so photos overlap: a mark belongs to the press with its `id`. A log of a build without
+    ids gives each mark to the oldest press still waiting for one, which is right while the photos do not overlap.
+
+    The longest frame gap of a photo is the longest wait for the frame after one that came from 200 ms before the camera
+    took the photo (before the press, in a log without `started`) until 300 ms after its result, and no later than
+    200 ms before the next photo was taken. So each stop of the preview counts for one photo, and a press that failed
+    before the camera took a photo has none."""
+    presses: list[dict] = []
+    by_id: dict[str, dict] = {}
+    for mark in marks:
+        if not mark.name.startswith("camera.capture."):
+            continue
+        kind = mark.name.removeprefix("camera.capture.")
+        key = mark.field("id")
+        if kind == "start":
+            press = {"start": mark.ms, "taken": None, "end": None, "result": "?"}
+            presses.append(press)
+            if key:
+                by_id[key] = press  # an app that started again counts from 1 again: the newest press has the id
+        elif kind == "started":
+            press = (
+                by_id.get(key) if key else next((p for p in presses if p["taken"] is None and p["end"] is None), None)
+            )
+            if press and press["taken"] is None:
+                press["taken"] = mark.ms
+        elif kind in ("saved", "failed"):
+            press = by_id.get(key) if key else next((p for p in presses if p["end"] is None), None)
+            if press and press["end"] is None:
+                press["end"] = mark.ms
+                press["result"] = kind
+    with_taken = any(press["taken"] for press in presses)
+    anchors = [press["taken"] if with_taken else press["start"] for press in presses]
+    waits = [
+        (a.ms, (b.sensor_us - a.sensor_us) / 1000)
+        for a, b in zip(frames, frames[1:])
+        if a.lens == b.lens and b.sensor_us > a.sensor_us
+    ]
+    values = []
+    for press, anchor in zip(presses, anchors):
+        start, end = press["start"], press["end"]
+        gap = None
+        if anchor is not None:
+            until = (end if end else start) + 300
+            later = [other for other in anchors if other is not None and other > anchor]
+            if later:
+                until = min(until, min(later) - 200)
+            found = [wait for at, wait in waits if anchor - 200 <= at < until]
+            gap = max(found) if found else None
+        values.append(
             (
-                m
-                for m in marks
-                if start.ms <= m.ms <= start.ms + SWITCH_WINDOW_MS
-                and m.name.startswith("camera.capture.")
-                and m is not start
-            ),
-            None,
+                press["taken"] - start if press["taken"] else None,
+                end - start if end else None,
+                press["result"],
+                gap,
+            )
         )
-        window = [f for f in frames if start.ms - 200 <= f.ms <= (end.ms if end else start.ms) + 300]
-        gaps = intervals(window)
-        rows.append(
-            [
-                fmt(end.ms - start.ms if end else None),
-                end.name.removeprefix("camera.capture.") if end else "?",
-                fmt(max(gaps) if gaps else None),
-            ]
-        )
+    rows: list[list[object]] = [[fmt(taken), fmt(total), result, fmt(gap)] for taken, total, result, gap in values]
+    if len(values) > 1:
+
+        def median(column: int) -> float | None:
+            found = [value[column] for value in values if value[column] is not None]
+            return statistics.median(found) if found else None
+
+        rows.append([fmt(median(0)), fmt(median(1)), "median", fmt(median(3))])
     return rows
 
 
@@ -336,34 +383,39 @@ def report(marks: list[Mark]) -> str:
                 ],
             )
         )
+    if any(m.name == "zoom.request" for m in marks):
+        out.append(
+            table(
+                "Pinches",
+                [
+                    "#",
+                    "s",
+                    "requests",
+                    "applied",
+                    "lens switches",
+                    "frames",
+                    "interval p50",
+                    "p95",
+                    "max",
+                    "drops",
+                    "frozen while zooming",
+                ],
+                rows,
+            )
+        )
+        out.append(
+            table(
+                "Lens switches",
+                ["switch", "no new frame (ms)", "until READY (ms)", "preview idle (ms)", "last frame held"],
+                switch_rows(marks, frames),
+            )
+        )
     out.append(
         table(
-            "Pinches",
-            [
-                "#",
-                "s",
-                "requests",
-                "applied",
-                "lens switches",
-                "frames",
-                "interval p50",
-                "p95",
-                "max",
-                "drops",
-                "frozen while zooming",
-            ],
-            rows,
+            "Shutter",
+            ["press → taken (ms)", "press → result (ms)", "result", "longest frame gap (ms)"],
+            capture_rows(marks, frames),
         )
-    )
-    out.append(
-        table(
-            "Lens switches",
-            ["switch", "no new frame (ms)", "until READY (ms)", "preview idle (ms)", "last frame held"],
-            switch_rows(marks, frames),
-        )
-    )
-    out.append(
-        table("Shutter", ["press → result (ms)", "result", "longest frame gap (ms)"], capture_rows(marks, frames))
     )
     return "\n".join(out)
 
@@ -378,8 +430,11 @@ def main() -> None:
     else:
         lines = sys.stdin.readlines()
     marks = parse(lines)
-    if not any(m.name == "zoom.request" for m in marks):
-        sys.exit("No zoom.request marks: pinch on the Camera screen of a debug build while logcat records.")
+    if not any(m.name in ("zoom.request", "camera.capture.start") for m in marks):
+        sys.exit(
+            "No zoom.request or camera.capture.start marks: pinch or press the shutter on the Camera screen of a debug"
+            " build while logcat records."
+        )
     print(report(marks))
 
 

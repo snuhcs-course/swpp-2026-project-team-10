@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -50,6 +50,9 @@ class FakeSessionManager : SessionManager {
 
     private val _peerCamera = MutableStateFlow<CameraState?>(null)
     override val peerCamera: StateFlow<CameraState?> = _peerCamera.asStateFlow()
+
+    private val _peerZoomHolder = MutableStateFlow<Role?>(null)
+    override val peerZoomHolder: StateFlow<Role?> = _peerZoomHolder.asStateFlow()
 
     private val _path = MutableStateFlow<IcePath?>(null)
     override val path: StateFlow<IcePath?> = _path.asStateFlow()
@@ -118,8 +121,10 @@ class FakeSessionManager : SessionManager {
     fun deliver(message: SessionMessage) {
         if (message is SessionMessage.Capabilities) _peerCapabilities.value = message.capabilities
         if (message is SessionMessage.CameraStateUpdate) {
-            _peerCamera.value = CameraState(message.zoom, message.exposure, message.flash, message.aspect)
+            _peerCamera.value =
+                CameraState(message.zoom, message.exposure, message.flash, message.aspect, facing = message.facing)
         }
+        if (message is SessionMessage.ZoomHoldUpdate) _peerZoomHolder.value = message.by
         check(_incoming.tryEmit(message))
     }
 }
@@ -215,7 +220,12 @@ class FakeCameraController(
         if (applies && _capabilities.value?.hasFlash == true) state.value = state.value.copy(torch = on)
     }
 
-    override fun setAspectRatio(ratio: AspectRatio) = Unit
+    /** Every ratio asked for, in order; the state changes only when a test sets it. */
+    val aspectRequests = mutableListOf<AspectRatio>()
+
+    override fun setAspectRatio(ratio: AspectRatio) {
+        aspectRequests += ratio
+    }
 
     /** The camera chosen (FR-1.14); a phone with a front camera unless a test says otherwise. */
     override val facing = MutableStateFlow(CameraFacing.BACK)
@@ -238,9 +248,24 @@ class FakeCameraController(
     /** When set, [takePhoto] fails with it, so a screen test can see each failure's message. */
     var photoFailure: Throwable? = null
 
-    override suspend fun takePhoto(): Result<Uri> {
+    /** When set, [takePhoto] waits for it once the camera took the photo: a photo that is still being saved. */
+    var saving: CompletableDeferred<Unit>? = null
+
+    /** The turn each photo was taken at ([setPhotoTurn]), in shutter order. */
+    val photoTurns = mutableListOf<Int>()
+    private var photoTurn = 0
+
+    override fun setPhotoTurn(turn: Int) {
+        photoTurn = turn
+    }
+
+    override suspend fun takePhoto(onCaptured: () -> Unit): Result<Uri> {
+        photoTurns += photoTurn
         photoFailure?.let { return Result.failure(it) }
-        return photo?.let { Result.success(it) } ?: Result.failure(UnsupportedOperationException())
+        val saved = photo?.let { Result.success(it) } ?: return Result.failure(UnsupportedOperationException())
+        onCaptured()
+        saving?.await()
+        return saved
     }
 
     override suspend fun grabFrame(): Result<Bitmap> =
@@ -362,8 +387,11 @@ class FakeGuideImageCodec(private val decodeAs: (guideId: String) -> ReferenceGu
     }
 }
 
-/** Encodes a guide's reference as its id's bytes when it has one, and decodes any `fake` bytes, with no graphics. */
-class FakeGuideReferenceCodec : GuideReferenceCodec {
+/**
+ * Encodes a guide's reference as its id's bytes when it has one, and decodes any `fake` bytes, with no graphics; a
+ * screen test that draws the decoded photo passes [decodeAs] with a real bitmap, as for [FakeGuideImageCodec].
+ */
+class FakeGuideReferenceCodec(private val decodeAs: () -> Bitmap = { fakeBitmap() }) : GuideReferenceCodec {
     val encoded = mutableListOf<String>()
     val decoded = mutableListOf<String>()
 
@@ -380,7 +408,7 @@ class FakeGuideReferenceCodec : GuideReferenceCodec {
     override fun decode(format: String, bytes: ByteArray): Bitmap? {
         if (format != "fake") return null
         decoded += String(bytes.copyOf(bytes.indexOf(0).takeIf { it >= 0 } ?: bytes.size))
-        return fakeBitmap()
+        return decodeAs()
     }
 }
 

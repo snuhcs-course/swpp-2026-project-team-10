@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["anthropic>=2.1,<3", "httpx2>=2.13.1", "pillow>=12.3.0"]
@@ -10,6 +10,7 @@ the app does, and `judge` has Claude check every candidate, set, and tip against
 with uv, which installs the Anthropic SDK for this script alone:
 
     uv run scripts/eval_poses.py generate --server http://127.0.0.1:8765 --run run1
+    uv run scripts/eval_poses.py generate --run landmark --only s03 --situation landmark  # one situation's prompts
     uv run --env-file .env scripts/eval_poses.py judge run1             # Batch API, half price; waits for the results
     uv run --env-file .env scripts/eval_poses.py judge run1 --now       # direct calls, for a pilot
     uv run scripts/eval_poses.py report run1 run2 run3
@@ -22,20 +23,27 @@ with uv, which installs the Anthropic SDK for this script alone:
 set of suggested poses): the scene prepared like the app's (upright, long side at most 1024 px, JPEG 85, no EXIF);
 without a description, POST /pose-suggestions and then four POST /poses in parallel; with one, POST /poses with the
 description at once and POST /pose-suggestions for three variations (10 s, the description again for any it does not
-get), then the other three. Each request has the app's 60 s limit and `selfie` for a selfie. The time of a set runs
+get), then the other three. Each request has the app's 60 s limit, `selfie` for a selfie, and the case's situation
+(FR-4.8), or the one --situation gives every case; a selfie keeps its own. The time of a set runs
 from its first request to its last candidate. Then one POST /pose-tips for one of the set's candidates, at a long side
 of 768 px, in the case's language. Sets go one at a time by default, as one user's would, so the times are those of
 one phone; --sets-at-once runs several, and the report says so. The server must allow the requests: start a local one
 with raised limits (README, *Evaluate the AI modules*). Everything goes to scripts/out/eval/<run>/, one folder per set,
-and a set that is there is never made again, so an interrupted run continues where it stopped.
+and a set that is there is never made again, so an interrupted run continues where it stopped. `retip` asks a run's
+tips again for the same candidates, after a change to the tip's prompt or rules: the images stay, the tips before are
+kept in each set's `tips_before`, and their judgments are set aside, those still on their way in a batch included.
 
-`judge` sends Claude (claude-opus-5-5) one request per candidate with the scene and the candidate, one per suggested
-set with its four poses, and one per tip with the scene, the candidate, and the sentence, each with its rubric and a
-JSON schema; verdicts go to judgments.jsonl with the rubric's hash, and a request already judged is not sent again. It
-reads ANTHROPIC_API_KEY. `report` counts the rules each candidate breaks, the requests it follows, the times, the
-suggested sets whose four poses all differ, and the tips that match their pose or hold a number or unit; with several
-runs it gives each run and all together, with 95 % intervals. `sample`, `agree`, and `judge --repeat` check the judge
-(3.1, *Judge validation*). `person` puts the phone's person check (the app's PersonCheckEval on a device) and
+`judge` sends Claude (claude-opus-5-5) one request per candidate with the scene and the candidate and one per suggested
+set with its four poses, each with its rubric and a JSON schema; verdicts go to judgments.jsonl with the rubric's hash,
+and a request already judged is not sent again. It reads ANTHROPIC_API_KEY. `report` counts the rules each candidate
+breaks, the requests it follows, the times, the suggested sets whose four poses all differ, and the tips that match
+their pose or hold a number or unit; with several runs it gives each run and all together, with 95 % intervals.
+`sample`, `agree`, and `judge --repeat` check the judge (3.1, *Judge validation*). The tips are checked by us, not by
+the judge: `sample --kind tip` writes label-tips.html, where each of us answers every sentence of every tip, and
+`agree --kind tip` counts the tips that match their pose from those answers into tip-check.json, which is where
+`report` takes the tips' metric from. The tips outside our sample may be read a second way, through Claude Code (3.1),
+into tip-check-rest.json of the same shape, which `report` gives on a line of its own. `judge --kinds tip` still has Claude read the tips, to try the rubric; its
+verdicts are not reported. `person` puts the phone's person check (the app's PersonCheckEval on a device) and
 the server's (try_person_check.py) together, as the app runs them. The photos go to the Pix server's models and to
 Anthropic.
 """
@@ -43,6 +51,7 @@ Anthropic.
 import argparse
 import asyncio
 import base64
+import collections
 import hashlib
 import html
 import io
@@ -57,7 +66,7 @@ import subprocess
 import sys
 import time
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 
@@ -66,6 +75,11 @@ from PIL import Image, ImageOps
 
 # The server's own check of a tip's sentence, kept in step with poses/tips.py by that script.
 from try_pose_tips import MEASURE
+
+# The rules a tip is judged by (eval/rubrics.toml, [tip]); a tip matches its pose when it keeps them all. The names the
+# judge reads the tip's lines under.
+TIP_RULES = ("distance", "phone", "frame", "rest")
+
 
 SERVER = Path(__file__).resolve().parents[1]
 CASES = SERVER / "eval" / "pose_cases.json"
@@ -84,6 +98,8 @@ JPEG_QUALITY = 85
 # The candidate's ratio, as the server's `ASPECT_RATIOS` in poses/generator.py: the app's frame closest to the scene's.
 ASPECT_RATIOS = {"3:4": 3 / 4, "9:16": 9 / 16, "1:1": 1.0}
 MODES = ("described", "suggested")
+# The server's situations (`Situation` in poses/prompts.py).
+SITUATIONS = ("default", "background", "half_body", "full_body", "landmark", "selfie")
 
 # The judge (Testing Documentation 3.1). Opus 5.5 always thinks; effort sets how much.
 JUDGE_MODEL = "claude-opus-5-5"
@@ -105,6 +121,10 @@ RULE_NAMES = {
     "no_artifacts_or_text": "No artifacts or text",
     "selfie_stays_selfie": "Selfie stays a selfie",
     "follows_request": "Follows the request",
+    "distance": "Distance",
+    "phone": "Phone's height and tilt",
+    "frame": "Side of the frame and room above the head",
+    "rest": "A leaning line",
 }
 DIGIT = re.compile(r"[0-9０-９]")
 
@@ -120,12 +140,23 @@ class Case:
     selfie: bool
     language: str
     description: str
+    situation: str  # `default` when the case names none, `selfie` for a selfie
 
 
 def load_cases(path: Path) -> list[Case]:
     raw = json.loads(path.read_text(encoding="utf-8"))
     scenes = path.parent / "scenes"
-    cases = [Case(c["id"], scenes / c["file"], bool(c["selfie"]), c["language"], c["description"]) for c in raw]
+    cases = [
+        Case(
+            c["id"],
+            scenes / c["file"],
+            bool(c["selfie"]),
+            c["language"],
+            c["description"],
+            c.get("situation", "selfie" if c["selfie"] else "default"),
+        )
+        for c in raw
+    ]
     ids = [case.id for case in cases]
     if len(set(ids)) != len(ids):
         sys.exit(f"{path}: duplicate case ids")
@@ -134,6 +165,8 @@ def load_cases(path: Path) -> list[Case]:
             sys.exit(f"{path}: case {case.id} needs language en or ko and a description of 1-100 characters")
         if not case.scene.is_file():
             sys.exit(f"{path}: case {case.id}: no scene {case.scene}")
+        if case.situation not in SITUATIONS or case.selfie != (case.situation == "selfie"):
+            sys.exit(f"{path}: case {case.id}: situation must be one of {', '.join(SITUATIONS)}, selfie for a selfie")
     return cases
 
 
@@ -212,12 +245,20 @@ def error_code(response: httpx2.Response) -> str:
         return f"HTTP {response.status_code}"
 
 
+def situation_fields(case: Case) -> dict[str, str]:
+    """The form fields that name the case's situation: `selfie`, as every app sends it for a selfie, and `situation`,
+    left out for `default` as an app from before Iteration 4 leaves it out."""
+    fields = {"selfie": "true"} if case.selfie else {}
+    if case.situation != "default":
+        fields["situation"] = case.situation
+    return fields
+
+
 async def suggestions(
-    client: httpx2.AsyncClient, server: str, scene: bytes, selfie: bool, description: str | None, seconds: float
+    client: httpx2.AsyncClient, server: str, scene: bytes, case: Case, description: str | None, seconds: float
 ) -> tuple[list[str], dict]:
     data = {"description": description} if description is not None else {}
-    if selfie:
-        data["selfie"] = "true"
+    data |= situation_fields(case)
     started = time.perf_counter()
     try:
         response = await client.post(
@@ -238,11 +279,9 @@ async def suggestions(
 
 
 async def pose(
-    client: httpx2.AsyncClient, server: str, scene: bytes, selfie: bool, text: str, seed: int, started: float
+    client: httpx2.AsyncClient, server: str, scene: bytes, case: Case, text: str, seed: int, started: float
 ) -> tuple[bytes | None, dict]:
-    data = {"description": text, "seed": str(seed)}
-    if selfie:
-        data["selfie"] = "true"
+    data = {"description": text, "seed": str(seed)} | situation_fields(case)
     record: dict = {"pose": text, "seed": seed}
     try:
         response = await client.post(
@@ -310,7 +349,8 @@ async def tip(
     body = response.json()
     sentence = body.get("text", "")
     measured = bool(MEASURE.search(sentence) or DIGIT.search(sentence))
-    return {**record, **{k: body.get(k) for k in ("text", "framing", "hold", "height", "angle")}, "measure": measured}
+    fields = ("text", "framing", "hold", "height", "angle")
+    return {**record, **{k: body.get(k) for k in fields}, "measure": measured}
 
 
 def stable_int(*parts: object) -> int:
@@ -328,23 +368,19 @@ async def run_set(client: httpx2.AsyncClient, server: str, case: Case, mode: str
     suggestion_record: dict
     if mode == "described":
         texts = [case.description]
-        tasks.append(
-            asyncio.create_task(pose(client, server, scene, case.selfie, texts[0], seeds.randrange(2**63), started))
-        )
+        tasks.append(asyncio.create_task(pose(client, server, scene, case, texts[0], seeds.randrange(2**63), started)))
         variations, suggestion_record = await suggestions(
-            client, server, scene, case.selfie, case.description, VARIATION_SECONDS
+            client, server, scene, case, case.description, VARIATION_SECONDS
         )
         variations = variations[1:][: POSE_COUNT - 1]
         suggestion_record["usable"] = len(variations)
         texts += variations + [case.description] * (POSE_COUNT - 1 - len(variations))
     else:
-        texts, suggestion_record = await suggestions(client, server, scene, case.selfie, None, REQUEST_SECONDS)
+        texts, suggestion_record = await suggestions(client, server, scene, case, None, REQUEST_SECONDS)
         texts = texts[:POSE_COUNT]
         suggestion_record["usable"] = len(texts)
     for text in texts[len(tasks) :]:
-        tasks.append(
-            asyncio.create_task(pose(client, server, scene, case.selfie, text, seeds.randrange(2**63), started))
-        )
+        tasks.append(asyncio.create_task(pose(client, server, scene, case, text, seeds.randrange(2**63), started)))
     results = await asyncio.gather(*tasks)
 
     candidates = []
@@ -359,6 +395,7 @@ async def run_set(client: httpx2.AsyncClient, server: str, case: Case, mode: str
         "case": case.id,
         "mode": mode,
         "selfie": case.selfie,
+        "situation": case.situation,
         "language": case.language,
         "description": case.description if mode == "described" else None,
         "poses": texts,
@@ -386,6 +423,9 @@ async def generate(args: argparse.Namespace) -> None:
         cases = [case for case in cases if case.id in set(args.only)]
     if args.limit:
         cases = cases[: args.limit]
+    if args.situation:
+        # A selfie keeps the selfie situation: the others turn a selfie into a photo someone else took.
+        cases = [case if case.selfie else replace(case, situation=args.situation) for case in cases]
     out = run_dir(args.run)
     out.mkdir(parents=True, exist_ok=True)
     server = args.server.rstrip("/")
@@ -406,6 +446,7 @@ async def generate(args: argparse.Namespace) -> None:
             cases=f"{Path(args.cases).name} {sha(Path(args.cases))}",
             prompts=sha(PROMPTS),
             sets_at_once=args.sets_at_once,
+            situation=args.situation,
             # What the server was started with, when it reads the same .env and environment as this script.
             settings={k: v for k, v in os.environ.items() if k.startswith("PIX_") and "SECRET" not in k},
         )
@@ -436,6 +477,93 @@ async def generate(args: argparse.Namespace) -> None:
                 )
 
         await asyncio.gather(*(one(case, mode) for case, mode in todo))
+
+
+async def retip(args: argparse.Namespace) -> None:
+    """Asks the server for each set's tip again, for the candidate it had one for: after a change to the tip's prompt
+    or rules the tips are new, while the images, which cost the most, stay. The tip it replaces is kept in the set's
+    `tips_before`, and its judgments move to judgments.retipped.jsonl, so a tip is never reported with the verdicts
+    of the one before it."""
+    out = run_dir(args.run)
+    server = args.server.rstrip("/")
+    paths = sorted((out / "sets").glob("*/set.json"))
+    limit = asyncio.Semaphore(args.at_once)
+    replaced: set[str] = set()
+
+    async def one(client: httpx2.AsyncClient, path: Path) -> None:
+        record = json.loads(path.read_text(encoding="utf-8"))
+        old = record.get("tip")
+        if not old or (args.failed and old.get("text")):
+            return
+        folder = path.parent
+        chosen = record["candidates"][old["candidate"] - 1]
+        candidate = (folder / f"c{old['candidate']}.jpg").read_bytes()
+        scene = (folder / "scene.jpg").read_bytes()
+        async with limit:
+            new = await tip(client, server, scene, candidate, chosen["pose"], record["language"])
+        record.setdefault("tips_before", []).append(old)
+        record["tip"] = {"candidate": old["candidate"], **new}
+        path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+        replaced.add(f"tip-{record['case']}-{record['mode'][0]}")
+        print(f"{folder.name:<14} tip: {new.get('text') or new.get('code', '-')}")
+
+    async with httpx2.AsyncClient() as client:
+        try:
+            health = await client.get(f"{server}/health", timeout=5)
+        except httpx2.HTTPError as exc:
+            sys.exit(f"{server}/health: {exc!r}; start the server first (README, Evaluate the AI modules)")
+        if health.status_code != 200:
+            sys.exit(f"{server}/health answered {health.status_code}")
+        await asyncio.gather(*(one(client, path) for path in paths))
+
+    judged = out / "judgments.jsonl"
+    rows = read_jsonl(judged)
+    stale = [row for row in rows if row.get("id") in replaced]
+    if stale:
+        append_jsonl(out / "judgments.retipped.jsonl", stale)
+        kept = [row for row in rows if row.get("id") not in replaced]
+        judged.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in kept), encoding="utf-8")
+    pending = set_aside_pending(out / "batches.json", replaced)
+    meta_path = out / "run.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
+    meta.setdefault("retipped", []).append(
+        {
+            "at": datetime.now().isoformat(timespec="seconds"),
+            "commit": git("rev-parse", "--short", "HEAD"),
+            "changed": git("status", "--porcelain", "--", "src", "eval"),
+            "prompts": sha(PROMPTS),
+            "tips": len(replaced),
+            "judgments_set_aside": len(stale),
+            "pending_set_aside": pending,
+        }
+    )
+    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(
+        f"{len(replaced)} tips asked again in {out}; {len(stale)} judgments of the tips before set aside, "
+        f"and {pending} still on their way"
+    )
+
+
+def set_aside_pending(batches_path: Path, replaced: set[str]) -> int:
+    """Marks the requests of `replaced` items in the batches not collected yet as stale, and says how many: a batch
+    sent with `judge --no-wait` before a retip still holds the tip before, and its verdict, collected under the same
+    id and rubric, would be reported for the new tip. A stale request's verdict goes to judgments.retipped.jsonl when
+    its batch is collected, and the item is sent again."""
+    if not batches_path.exists():
+        return 0
+    batches = json.loads(batches_path.read_text(encoding="utf-8"))
+    count = 0
+    for entry in batches:
+        if entry.get("collected"):
+            continue
+        known = set(entry.get("stale", ()))
+        stale = [cid for cid in entry["ids"] if split_custom_id(cid)[0] in replaced and cid not in known]
+        if stale:
+            entry["stale"] = [*entry.get("stale", ()), *stale]
+            count += len(stale)
+    if count:
+        batches_path.write_text(json.dumps(batches, indent=2), encoding="utf-8")
+    return count
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -507,9 +635,10 @@ def items_of(out: Path, rubrics: dict) -> list[Item]:
             with Image.open(folder / f"c{tip_record['candidate']}.jpg") as image:
                 sent = jpeg(image, TIP_CANDIDATE_LONG_SIDE)
             pose_text = record["candidates"][tip_record["candidate"] - 1]["pose"]
+            said = tip_record["text"]
             text = (
-                f'The pose: "{pose_text}"\nThe tip ({"Korean" if tip_record["language"] == "ko" else "English"}):'
-                f' "{tip_record["text"]}"\n\nJudge:\n- matches_pose: {rubrics["tip"]["matches_pose"]}'
+                f'The pose: "{pose_text}"\nThe tip ({"Korean" if tip_record["language"] == "ko" else "English"}):\n'
+                f"{said}\n\nJudge each rule:\n" + "\n".join(f"- {name}: {rubrics['tip'][name]}" for name in TIP_RULES)
             )
             content = [
                 {"type": "text", "text": rubrics["tip"]["intro"] + "\n\nPhoto 1:"},
@@ -518,7 +647,7 @@ def items_of(out: Path, rubrics: dict) -> list[Item]:
                 image_block(sent),
                 {"type": "text", "text": text},
             ]
-            items.append(Item(f"tip-{key}", "tip", content, ["matches_pose"], "shot_and_pose_seen"))
+            items.append(Item(f"tip-{key}", "tip", content, list(TIP_RULES), "photos_seen"))
     return items
 
 
@@ -609,7 +738,8 @@ def judge_batch(
     client = anthropic.Anthropic(max_retries=4)
     path, batches_path = out / "judgments.jsonl", out / "batches.json"
     batches = json.loads(batches_path.read_text(encoding="utf-8")) if batches_path.exists() else []
-    pending = {cid for b in batches if not b.get("collected") for cid in b["ids"]}
+    # A request set aside by `retip` is of the tip before, so it does not stand for its item, which is sent again.
+    pending = {cid for b in batches if not b.get("collected") for cid in b["ids"] if cid not in b.get("stale", ())}
     # Every item of the run, so a batch sent by an earlier call with other options is still collected.
     by_item = {item.id: item for item in items}
     fresh = [custom_id(item.id, rep) for item, rep in todo if custom_id(item.id, rep) not in pending]
@@ -633,15 +763,19 @@ def judge_batch(
             batch = client.messages.batches.retrieve(entry["id"])
             if batch.processing_status != "ended":
                 continue
-            rows = []
+            rows, stale = [], []
             for result in client.messages.batches.results(entry["id"]):
                 item_id, rep = split_custom_id(result.custom_id)
                 item = by_item.get(item_id)
                 if result.result.type == "succeeded" and item is not None:
-                    rows.append(judgment_row(item, rep, result.result.message, True, entry["rubric"]))
+                    row = judgment_row(item, rep, result.result.message, True, entry["rubric"])
+                    (stale if result.custom_id in entry.get("stale", ()) else rows).append(row)
                 else:
                     print(f"{result.custom_id}: {result.result.type}; it is sent again next time")
             append_jsonl(path, rows)
+            if stale:
+                append_jsonl(out / "judgments.retipped.jsonl", stale)
+                print(f"batch {entry['id']}: {len(stale)} verdicts of tips asked again since, set aside")
             entry["collected"] = True
             batches_path.write_text(json.dumps(batches, indent=2), encoding="utf-8")
             print(f"batch {entry['id']}: {len(rows)} verdicts, about ${sum(r['cost'] for r in rows):.2f}")
@@ -663,7 +797,9 @@ def judge(args: argparse.Namespace) -> None:
     rubrics = load_rubrics()
     rubric = sha(RUBRICS)
     every = items_of(out, rubrics)
-    items = [item for item in every if not args.kinds or item.kind in args.kinds]
+    # The tips are checked by us (`agree --kind tip`), so Claude reads them only when asked to.
+    kinds = args.kinds or ("pose", "suggestions")
+    items = [item for item in every if item.kind in kinds]
     reps = [0]
     if args.repeat > 1 or args.sample:
         sample = json.loads((out / "sample.json").read_text(encoding="utf-8"))
@@ -723,7 +859,27 @@ def percentile(values: list[float], q: float) -> float:
     return ordered[min(len(ordered) - 1, max(0, math.ceil(q * len(ordered)) - 1))]
 
 
-def metrics(sets: list[dict], verdicts: dict[str, dict]) -> list[tuple[str, str]]:
+def tip_checks(out: Path, name: str = "tip-check.json") -> dict[str, dict]:
+    """Our check of the run's tips, by tip id: the sentences that were checked and whether most of us found every
+    one of them right (`agree --kind tip`). Empty before that. `tip-check-rest.json` holds, in the same shape, the
+    reading of the tips outside our sample."""
+    path = out / name
+    if not path.exists():
+        return {}
+    return {entry["id"]: entry for entry in json.loads(path.read_text(encoding="utf-8"))["tips"]}
+
+
+def tip_verdict(tip_record: dict, check: dict | None) -> str | None:
+    """Our verdict on this tip, pass or fail, or None when we have not checked it: a check of other sentences is of
+    the tip before a retip, and one we did not answer whole has no verdict."""
+    if not check or check["lines"] != (tip_record.get("text") or "").split("\n"):
+        return None
+    return check.get("verdict")
+
+
+def metrics(
+    sets: list[dict], verdicts: dict[str, dict], checks: dict[str, dict], rest: dict[str, dict]
+) -> list[tuple[str, str]]:
     lines: list[tuple[str, str]] = []
     candidates = [(s, c) for s in sets for c in s["candidates"]]
     made = [(s, c) for s, c in candidates if c["ok"]]
@@ -791,12 +947,27 @@ def metrics(sets: list[dict], verdicts: dict[str, dict]) -> list[tuple[str, str]
     tips = [s["tip"] for s in sets if s.get("tip")]
     answered = [t for t in tips if t.get("text")]
     lines.append(("  tips answered", share(len(answered), len(tips))))
-    rows = [
-        verdicts[f"tip-{s['case']}-{s['mode'][0]}"]["verdicts"]
+    # Ours, not the judge's (3.1): the tips most of us found right in every sentence.
+    ours = [
+        verdict
         for s in sets
-        if f"tip-{s['case']}-{s['mode'][0]}" in verdicts
+        if s.get("tip") and (verdict := tip_verdict(s["tip"], checks.get(f"tip-{s['case']}-{s['mode'][0]}")))
     ]
-    lines.append(("  match their pose", share(sum(v["matches_pose"] == "pass" for v in rows), len(rows))))
+    lines.append(("  checked by us", f"{len(ours)} of {len(answered)}"))
+    lines.append(
+        (
+            "  match their pose, by most of us",
+            share(ours.count("pass"), len(ours)) if ours else "not checked yet (sample and agree with --kind tip)",
+        )
+    )
+    # The tips outside our sample, when they were read through Claude Code: beside ours, never among them.
+    others = [
+        verdict
+        for s in sets
+        if s.get("tip") and (verdict := tip_verdict(s["tip"], rest.get(f"tip-{s['case']}-{s['mode'][0]}")))
+    ]
+    if others:
+        lines.append(("  the rest, read through Claude Code", share(others.count("pass"), len(others))))
     lines.append(
         ("  with numbers or units (should be 0)", share(sum(bool(t.get("measure")) for t in answered), len(answered)))
     )
@@ -807,7 +978,8 @@ def report(args: argparse.Namespace) -> None:
     runs = [run_dir(name) for name in args.runs]
     sections = []
     for out in runs:
-        sections.append((out.name, metrics(load_sets(out), latest_verdicts(out))))
+        rest = tip_checks(out, "tip-check-rest.json")
+        sections.append((out.name, metrics(load_sets(out), latest_verdicts(out), tip_checks(out), rest)))
     if len(runs) > 1:
         sections.append(("all runs", pooled_metrics(runs)))
     text = []
@@ -831,14 +1003,18 @@ def report(args: argparse.Namespace) -> None:
 
 def pooled_metrics(runs: list[Path]) -> list[tuple[str, str]]:
     """Every run's sets and verdicts together, each case named after its run so the keys stay apart."""
-    sets, verdicts = [], {}
+    sets, verdicts, checks, rest = [], {}, {}, {}
     for out in runs:
         for s in load_sets(out):
             sets.append({**s, "case": f"{out.name}.{s['case']}"})
         for key, row in latest_verdicts(out).items():
-            kind, case, rest = key.split("-", 2)
-            verdicts[f"{kind}-{out.name}.{case}-{rest}"] = row
-    return metrics(sets, verdicts)
+            kind, case, tail = key.split("-", 2)
+            verdicts[f"{kind}-{out.name}.{case}-{tail}"] = row
+        for mine, name in ((checks, "tip-check.json"), (rest, "tip-check-rest.json")):
+            for key, check in tip_checks(out, name).items():
+                kind, case, tail = key.split("-", 2)
+                mine[f"{kind}-{out.name}.{case}-{tail}"] = check
+    return metrics(sets, verdicts, checks, rest)
 
 
 def thumbnail(path: Path, long_side: int = 360) -> str:
@@ -847,10 +1023,11 @@ def thumbnail(path: Path, long_side: int = 360) -> str:
 
 
 def write_report_html(target: Path, runs: list[Path]) -> None:
-    """Every candidate with its verdicts, the failures first, to read what the judge saw."""
+    """Every candidate with its verdicts, the failures first, to read what the judge saw; each tip with ours."""
     rows = []
     for out in runs:
         verdicts = latest_verdicts(out)
+        checks = tip_checks(out) | tip_checks(out, "tip-check-rest.json")
         for s in load_sets(out):
             folder = out / "sets" / f"{s['case']}-{s['mode']}"
             key = f"{s['case']}-{s['mode'][0]}"
@@ -879,12 +1056,10 @@ def write_report_html(target: Path, runs: list[Path]) -> None:
             if sug:
                 extra += f"<p class={sug['verdicts']['all_different']}>All four different: {html.escape(sug['answer']['all_different']['reason'])}</p>"
             tip_record = s.get("tip") or {}
-            tip_row = verdicts.get(f"tip-{key}")
             if tip_record:
                 said = tip_record.get("text") or tip_record.get("code", "")
-                judged = f" — {html.escape(tip_row['answer']['matches_pose']['reason'])}" if tip_row else ""
-                cls = tip_row["verdicts"]["matches_pose"] if tip_row else ""
-                extra += f"<p class={cls}>Tip for {tip_record.get('candidate')}: {html.escape(said)}{judged}</p>"
+                cls = tip_verdict(tip_record, checks.get(f"tip-{key}")) or ""
+                extra += f"<p class={cls}>Tip for {tip_record.get('candidate')}: {html.escape(said)}</p>"
             bad_set = any("c bad" in cell for cell in cells)
             title = [out.name, s["case"], s["mode"]]
             if s["selfie"]:
@@ -917,7 +1092,86 @@ def write_report_html(target: Path, runs: list[Path]) -> None:
 # sample, agree, and the consistency check: how far to trust the judge
 
 
+def sample_stamp(answered: list[dict]) -> str:
+    """A short hash of what a label page asks: its items with their sentences or rules. The page keeps a labeler's
+    answers under it and writes it into the download, so answers given to one sample are never shown on, counted
+    for, or read as another: after a retip the same tip id has other sentences."""
+    return hashlib.sha256(json.dumps(answered, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:12]
+
+
+def check_labels(path: str, person: dict, run: str, kind: str, stamp: str | None) -> None:
+    """Stops on a label file that is not of this run's page: another run, the other kind of page, or another sample
+    of the run, as after a retip. An older file without these fields is taken as it is when `stamp` is None."""
+    for field, expected in (("run", run), ("kind", kind), ("sample", stamp)):
+        got = person.get(field)
+        if expected is not None and got != expected and (got is not None or stamp is not None):
+            sys.exit(
+                f"{path}: its {field} is {got!r}, not {expected!r}; the labels must come from this run's current "
+                f"page (sample again and download them from it)"
+            )
+
+
+def sample_tips(args: argparse.Namespace) -> None:
+    """The run's tips for us to check, in label-tips.html: each with the scene, the candidate, and the tip's
+    sentences as the app shows them, to answer one sentence at a time, and then whether the tip leaves out something
+    important. People check the tips (3.1): a tip matches its pose when every sentence of it is right, which
+    `agree --kind tip` counts from the labels."""
+    out = run_dir(args.run)
+    tips = [(f"tip-{s['case']}-{s['mode'][0]}", s) for s in load_sets(out) if (s.get("tip") or {}).get("text")]
+    rng = random.Random(args.seed)
+    rng.shuffle(tips)
+    rubrics = load_rubrics()
+    entries = []
+    for item_id, s in tips[: args.size]:
+        folder = out / "sets" / f"{s['case']}-{s['mode']}"
+        tip_record = s["tip"]
+        pose_text = s["candidates"][tip_record["candidate"] - 1]["pose"]
+        entries.append(
+            {
+                "id": item_id,
+                "heading": f"The pose: “{pose_text}”",
+                "lines": tip_record["text"].split("\n"),
+                "captions": ["1 · The scene as it was taken", "2 · The photo to take"],
+                "scene": thumbnail(folder / "scene.jpg", 520),
+                "candidate": thumbnail(folder / f"c{tip_record['candidate']}.jpg", 520),
+            }
+        )
+    answered = [{"id": e["id"], "lines": e["lines"]} for e in entries]
+    stamp = sample_stamp(answered)
+    (out / "tip-sample.json").write_text(
+        json.dumps({"seed": args.seed, "sample": stamp, "items": answered}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    rules_html = f"<dt>What a tip is</dt><dd>{html.escape(rubrics['tip']['intro'])}</dd>" + "".join(
+        f"<dt>{RULE_NAMES[r]}</dt><dd>{html.escape(rubrics['tip'][r])}</dd>" for r in TIP_RULES
+    )
+    intro = (
+        "Photo 1 is the scene as the photographer took it, photo 2 the photo they want to take. Under the photos is "
+        "the tip Pix showed them, a sentence on each line. For each sentence, answer pass when it is right for "
+        "getting from photo 1 to photo 2, and fail when it is wrong. The last row is about the tip as a whole: pass "
+        "when it leaves out nothing the photographer needs for photo 2, fail when something important is missing, "
+        "and say what in the note under it. Answer on your own, without looking at anyone's answers."
+    )
+    page = (
+        LABEL_PAGE.replace("{{ITEMS}}", json.dumps(entries).replace("</", "<\\/"))
+        .replace("{{NAMES}}", json.dumps(RULE_NAMES))
+        .replace("{{RULES}}", rules_html)
+        .replace("{{RUN}}", html.escape(out.name))
+        .replace("{{TITLE}}", "Check tips")
+        .replace("{{INTRO}}", intro)
+        .replace("{{KIND}}", "tips")
+        .replace("{{SAMPLE}}", stamp)
+        .replace("{{RULES_TITLE}}", "When a sentence is right, in full")
+    )
+    (out / "label-tips.html").write_text(page, encoding="utf-8")
+    print(
+        f"{len(entries)} tips in {out / 'label-tips.html'}; each of us opens it, answers every sentence, and downloads the labels"
+    )
+
+
 def sample(args: argparse.Namespace) -> None:
+    if args.kind == "tip":
+        return sample_tips(args)
     out = run_dir(args.run)
     verdicts = latest_verdicts(out, rubric=args.by_rubric)
     pose_ids = []
@@ -957,8 +1211,10 @@ def sample(args: argparse.Namespace) -> None:
                 "candidate": thumbnail(folder / f"c{c['index']}.jpg", 640),
             }
         )
+    stamp = sample_stamp([{"id": e["id"], "rules": e["rules"]} for e in entries])
     (out / "sample.json").write_text(
-        json.dumps({"seed": args.seed, "items": [{"id": e["id"]} for e in entries]}, indent=2), encoding="utf-8"
+        json.dumps({"seed": args.seed, "sample": stamp, "items": [{"id": e["id"]} for e in entries]}, indent=2),
+        encoding="utf-8",
     )
     rules_html = "".join(
         f"<dt>{RULE_NAMES[r]}</dt><dd>{html.escape(rubrics['pose'][r])}</dd>" for r in (*KEEP_RULES, "follows_request")
@@ -968,6 +1224,15 @@ def sample(args: argparse.Namespace) -> None:
         .replace("{{NAMES}}", json.dumps(RULE_NAMES))
         .replace("{{RULES}}", rules_html)
         .replace("{{RUN}}", html.escape(out.name))
+        .replace("{{TITLE}}", "Label poses")
+        .replace(
+            "{{INTRO}}",
+            "For each edit, answer every rule pass or fail on your own, without looking at anyone's answers. Photo 1 "
+            "is the original, photo 2 the AI's edit. The rules:",
+        )
+        .replace("{{KIND}}", "poses")
+        .replace("{{SAMPLE}}", stamp)
+        .replace("{{RULES_TITLE}}", "The rules in full (the same text the judge reads)")
     )
     (out / "label.html").write_text(page, encoding="utf-8")
     print(
@@ -975,42 +1240,153 @@ def sample(args: argparse.Namespace) -> None:
     )
 
 
-LABEL_PAGE = """<!doctype html><meta charset=utf-8><title>Label poses</title><style>
+LABEL_PAGE = """<!doctype html><meta charset=utf-8><title>{{TITLE}}</title><style>
 body{font:15px/1.45 -apple-system,system-ui,sans-serif;margin:24px auto;max-width:1100px;padding:0 16px;color:#16171a;background:#fff}
 .item{border-top:1px solid #ddd;padding:18px 0}.photos{display:flex;gap:12px}.photos img{width:48%;max-width:420px;border-radius:6px}
-.rule{display:flex;gap:10px;align-items:center;margin:6px 0}.rule span{width:190px}button{font:inherit;padding:4px 14px;border:1px solid #bbb;border-radius:6px;background:#fff;cursor:pointer}
+.photos figure{margin:0;width:48%;max-width:420px}.photos figure img{width:100%;max-width:none;display:block}
+figcaption{margin-top:4px;color:#666;font-size:13px}textarea{font:inherit;width:100%;max-width:852px;box-sizing:border-box;margin-top:4px;padding:6px 10px;border:1px solid #bbb;border-radius:6px}
+.rule{display:flex;gap:10px;align-items:center;margin:6px 0}.rule span{width:190px}
+.rule.line{margin:8px 0;padding:8px 12px;border-radius:8px;background:#f3f1ea}.rule.line span{flex:1;width:auto;font-weight:600}
+.rule.whole{margin:8px 0;padding:0 12px}.rule.whole span{flex:1;width:auto;color:#444}
+button{font:inherit;padding:4px 14px;border:1px solid #bbb;border-radius:6px;background:#fff;cursor:pointer}
 button.on.pass{background:#3a7d44;color:#fff;border-color:#3a7d44}button.on.fail{background:#c2463f;color:#fff;border-color:#c2463f}
 #bar{position:sticky;top:0;background:#fff;padding:10px 0;border-bottom:1px solid #ddd;display:flex;gap:12px;align-items:center;z-index:1}
 dt{font-weight:700;margin-top:8px}dd{margin:2px 0 0 0;color:#444}</style>
-<h1>Label poses · {{RUN}}</h1>
-<p>For each edit, answer every rule pass or fail on your own, without looking at anyone's answers. Photo 1 is the original, photo 2 the AI's edit. The rules:</p>
-<details><summary>The rules in full (the same text the judge reads)</summary><dl>{{RULES}}</dl></details>
+<h1>{{TITLE}} · {{RUN}}</h1>
+<p>{{INTRO}}</p>
+<details><summary>{{RULES_TITLE}}</summary><dl>{{RULES}}</dl></details>
 <div id=bar><label>Your name <input id=who size=12></label><span id=count></span><button id=save>Download labels</button></div>
 <div id=items></div>
 <script>
-const ITEMS={{ITEMS}}, NAMES={{NAMES}}, KEY="pix-labels-{{RUN}}";
+const ITEMS={{ITEMS}}, NAMES={{NAMES}}, KEY="pix-labels-{{KIND}}-{{RUN}}-{{SAMPLE}}";
+const esc=t=>t.replace(/&/g,"&amp;").replace(/</g,"&lt;");
 let labels={}; try{labels=JSON.parse(localStorage.getItem(KEY)||"{}")}catch(e){}
 const who=document.getElementById("who"); try{who.value=localStorage.getItem(KEY+"-who")||""}catch(e){}
 who.oninput=()=>{try{localStorage.setItem(KEY+"-who",who.value)}catch(e){}};
-function count(){let need=0,done=0;for(const it of ITEMS)for(const r of it.rules){need++;if(labels[it.id]&&labels[it.id][r])done++}
+// What is answered for an item: each rule of a candidate; or each sentence of a tip, by its number, and the tip as a whole.
+const rowsOf=it=>it.lines?[...it.lines.map((l,i)=>[String(i+1),l,"rule line"]),["whole","The tip as a whole: nothing important is missing","rule whole"]]:it.rules.map(r=>[r,NAMES[r],"rule"]);
+function count(){let need=0,done=0;for(const it of ITEMS)for(const [r] of rowsOf(it)){need++;if(labels[it.id]&&labels[it.id][r])done++}
 document.getElementById("count").textContent=done+" / "+need+" answered"}
 const box=document.getElementById("items");
 ITEMS.forEach((it,i)=>{const d=document.createElement("div");d.className="item";
-d.innerHTML=`<h3>${i+1}. ${it.selfie?"Selfie · ":""}Request: “${it.request.replace(/</g,"&lt;")}”</h3><div class=photos><img src="${it.scene}"><img src="${it.candidate}"></div>`;
-for(const r of it.rules){const row=document.createElement("div");row.className="rule";row.innerHTML=`<span>${NAMES[r]}</span>`;
+const head=it.heading?esc(it.heading):`${it.selfie?"Selfie · ":""}Request: “${esc(it.request)}”`;
+const shot=(src,n)=>it.captions?`<figure><img src="${src}"><figcaption>${esc(it.captions[n])}</figcaption></figure>`:`<img src="${src}">`;
+d.innerHTML=`<h3>${i+1}. ${head}</h3><div class=photos>${shot(it.scene,0)}${shot(it.candidate,1)}</div>`;
+for(const [r,name,cls] of rowsOf(it)){const row=document.createElement("div");row.className=cls;row.innerHTML=`<span>${esc(name)}</span>`;
 for(const v of ["pass","fail"]){const b=document.createElement("button");b.textContent=v;b.className=v+((labels[it.id]||{})[r]===v?" on":"");
 b.onclick=()=>{labels[it.id]=labels[it.id]||{};labels[it.id][r]=v;row.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));
-try{localStorage.setItem(KEY,JSON.stringify(labels))}catch(e){}count()};row.appendChild(b)}d.appendChild(row)}box.appendChild(d)});
+try{localStorage.setItem(KEY,JSON.stringify(labels))}catch(e){}count()};row.appendChild(b)}d.appendChild(row)}
+if(it.lines){const note=document.createElement("textarea");note.rows=1;note.placeholder="Anything else about this tip (optional): what it should also say, what reads oddly";
+note.value=(labels[it.id]||{}).note||"";note.oninput=()=>{labels[it.id]=labels[it.id]||{};labels[it.id].note=note.value;
+try{localStorage.setItem(KEY,JSON.stringify(labels))}catch(e){}};d.appendChild(note)}box.appendChild(d)});
 count();
-document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify({labeler:who.value,run:"{{RUN}}",labels},null,2)],{type:"application/json"});
-const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="labels-"+(who.value||"me")+".json";a.click()};
+document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify({labeler:who.value,run:"{{RUN}}",kind:"{{KIND}}",sample:"{{SAMPLE}}",labels},null,2)],{type:"application/json"});
+const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="labels-{{KIND}}-"+(who.value||"me")+".json";a.click()};
 </script>"""
 
 
-def agree(args: argparse.Namespace) -> None:
+def tip_check(args: argparse.Namespace) -> None:
+    """The tips as we checked them (label-tips.html): a tip matches its pose when every sentence of it is right. For
+    each of us, and by the most of us, a sentence without a majority counting as not right and one that any of us
+    left out having no verdict; then how often two of us agree on a sentence, the sentences most of us found wrong,
+    the tips most of us found something missing from, and the notes we left. The labels must be of this run's
+    current page."""
     out = run_dir(args.run)
-    ids = [entry["id"] for entry in json.loads((out / "sample.json").read_text(encoding="utf-8"))["items"]]
+    sample = json.loads((out / "tip-sample.json").read_text(encoding="utf-8"))
+    items = sample["items"]
+    stamp = sample.get("sample") or sample_stamp(items)
     people = [json.loads(Path(p).read_text(encoding="utf-8")) for p in args.labels]
+    for path, person in zip(args.labels, people, strict=True):
+        check_labels(path, person, out.name, "tips", stamp)
+    names = [p.get("labeler") or "?" for p in people]
+    sentences = [(item["id"], str(n), line) for item in items for n, line in enumerate(item["lines"], start=1)]
+    lines = [f"{len(items)} tips, {len(sentences)} sentences; checked by: {', '.join(names)}"]
+
+    def answer(person: dict, item_id: str, key: str) -> str | None:
+        return person["labels"].get(item_id, {}).get(key)
+
+    def by_most(item_id: str, key: str) -> str | None:
+        """What most of us answered, a tie counting as fail; None unless every one of us answered, so that one
+        answer never stands for all."""
+        answers = [answer(p, item_id, key) for p in people]
+        if not all(answers):
+            return None
+        return "pass" if answers.count("pass") * 2 > len(answers) else "fail"
+
+    def matching(verdict) -> tuple[int, int]:
+        """The tips every sentence of which `verdict` passes, among those it answered whole."""
+        hits = total = 0
+        for item in items:
+            answers = [verdict(item["id"], str(n)) for n in range(1, len(item["lines"]) + 1)]
+            if all(answers):
+                total += 1
+                hits += all(a == "pass" for a in answers)
+        return hits, total
+
+    lines.append(f"{'tips that match their pose, by most of us':<44} {share(*matching(by_most))}")
+
+    def verdict_of(item: dict) -> str | None:
+        answers = [by_most(item["id"], str(n)) for n in range(1, len(item["lines"]) + 1)]
+        return None if not all(answers) else "pass" if all(a == "pass" for a in answers) else "fail"
+
+    checked = [{"id": item["id"], "lines": item["lines"], "verdict": verdict_of(item)} for item in items]
+    (out / "tip-check.json").write_text(
+        json.dumps({"labelers": names, "tips": checked}, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    for name, person in zip(names, people, strict=True):
+        hits, total = matching(lambda item_id, key, person=person: answer(person, item_id, key))
+        lines.append(f"{'    by ' + name:<44} {share(hits, total)}")
+    right = [by_most(item_id, key) for item_id, key, _ in sentences]
+    answered = [a for a in right if a]
+    if len(answered) < len(right):
+        lines.append(f"sentences not answered by every one of us, without a verdict: {len(right) - len(answered)}")
+    lines.append(f"{'sentences that are right, by most of us':<44} {share(answered.count('pass'), len(answered))}")
+    for (first, a), (second, b) in itertools.combinations(zip(names, people, strict=True), 2):
+        both = [(x, y) for i, k, _ in sentences if (x := answer(a, i, k)) and (y := answer(b, i, k))]
+        lines.append(
+            f"{'    ' + first + ' and ' + second + ' agree':<44} {share(sum(x == y for x, y in both), len(both))}"
+        )
+    wrong = [
+        (item_id, text) for (item_id, key, text), verdict in zip(sentences, right, strict=True) if verdict == "fail"
+    ]
+    lines.append(f"sentences most of us found wrong: {len(wrong)}")
+    for text, count in collections.Counter(text for _, text in wrong).most_common():
+        said = sum(text == other for _, _, other in sentences)
+        where = " ".join(item_id for item_id, other in wrong if other == text)
+        lines.append(f"    {count} of {said}  {text}  ({where})")
+
+    def complete(verdict) -> tuple[int, int]:
+        answers = [a for item in items if (a := verdict(item["id"], "whole"))]
+        return answers.count("pass"), len(answers)
+
+    lines.append(f"{'tips with nothing important missing, by most':<44} {share(*complete(by_most))}")
+    for name, person in zip(names, people, strict=True):
+        hits, total = complete(lambda item_id, key, person=person: answer(person, item_id, key))
+        lines.append(f"{'    by ' + name:<44} {share(hits, total)}")
+    lacking = [item["id"] for item in items if by_most(item["id"], "whole") == "fail"]
+    lines.append(f"tips most of us found something missing from: {len(lacking)}  {' '.join(lacking)}")
+    notes = [
+        (item["id"], name, note.strip())
+        for item in items
+        for name, person in zip(names, people, strict=True)
+        if (note := person["labels"].get(item["id"], {}).get("note") or "").strip()
+    ]
+    lines.append(f"notes: {len(notes)}")
+    lines.extend(f"    {item_id}  {name}: {note}" for item_id, name, note in notes)
+    text = "\n".join(lines)
+    print(text)
+    (out / "tip-check.txt").write_text(text + "\n", encoding="utf-8")
+
+
+def agree(args: argparse.Namespace) -> None:
+    if args.kind == "tip":
+        return tip_check(args)
+    out = run_dir(args.run)
+    sample = json.loads((out / "sample.json").read_text(encoding="utf-8"))
+    ids = [entry["id"] for entry in sample["items"]]
+    people = [json.loads(Path(p).read_text(encoding="utf-8")) for p in args.labels]
+    for path, person in zip(args.labels, people, strict=True):
+        check_labels(path, person, out.name, "poses", sample.get("sample"))
     claude = latest_verdicts(out)
     rules = (*KEEP_RULES, "follows_request")
     lines = [f"{len(ids)} candidates; labelers: {', '.join(p.get('labeler') or '?' for p in people)}"]
@@ -1144,12 +1520,28 @@ def main() -> None:
     g.add_argument("--only", nargs="+", help="case ids")
     g.add_argument("--limit", type=int, help="only the first N cases, for a pilot")
     g.add_argument("--sets-at-once", type=int, default=1)
+    g.add_argument(
+        "--situation",
+        choices=[name for name in SITUATIONS if name != "selfie"],
+        help="send every case but the selfies with this situation instead of its own",
+    )
+
+    t = commands.add_parser("retip", help="ask for a run's tips again, for the same candidates")
+    t.add_argument("run")
+    t.add_argument("--server", default="http://127.0.0.1:8765")
+    t.add_argument("--at-once", type=int, default=4)
+    t.add_argument("--failed", action="store_true", help="only the sets whose tip request failed")
 
     j = commands.add_parser("judge", help="have Claude judge a run")
     j.add_argument("run")
     j.add_argument("--now", action="store_true", help="direct calls at full price instead of the Batch API")
     j.add_argument("--no-wait", action="store_true", help="send the batches and stop; run again to collect")
-    j.add_argument("--kinds", nargs="+", choices=("pose", "suggestions", "tip"))
+    j.add_argument(
+        "--kinds",
+        nargs="+",
+        choices=("pose", "suggestions", "tip"),
+        help="default: pose and suggestions; the tips are checked by us, and Claude's verdicts on them are not reported",
+    )
     j.add_argument("--repeat", type=int, default=1, help="judge the sample of `sample` this many times in all")
     j.add_argument("--sample", action="store_true", help="only the sample of `sample`, to try a changed rubric on it")
     j.add_argument("--limit", type=int, help="at most N judgments, for a pilot")
@@ -1162,10 +1554,12 @@ def main() -> None:
     s.add_argument("--size", type=int, default=60)
     s.add_argument("--seed", type=int, default=3)
     s.add_argument("--by-rubric", metavar="HASH", help="split failed and passed by an earlier rubric's verdicts")
+    s.add_argument("--kind", choices=("pose", "tip"), default="pose", help="tip: the run's tips, in label-tips.html")
 
     a = commands.add_parser("agree", help="our labels against Claude's verdicts")
     a.add_argument("run")
     a.add_argument("--labels", nargs="+", required=True)
+    a.add_argument("--kind", choices=("pose", "tip"), default="pose", help="tip: what we answered in label-tips.html")
     a.add_argument("--repeat", type=int, default=3, help="also count changes across this many judgments")
 
     p = commands.add_parser("person", help="the phone's and the server's person checks on labeled photos")
@@ -1178,6 +1572,8 @@ def main() -> None:
     args = parser.parse_args()
     if args.command == "generate":
         asyncio.run(generate(args))
+    elif args.command == "retip":
+        asyncio.run(retip(args))
     elif args.command == "judge":
         judge(args)
     elif args.command == "report":

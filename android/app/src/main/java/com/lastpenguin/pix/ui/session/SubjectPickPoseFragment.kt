@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -17,6 +17,7 @@ import androidx.navigation.fragment.findNavController
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentPickPoseBinding
 import com.lastpenguin.pix.generation.CandidateEvent
+import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.PlannedPose
 import com.lastpenguin.pix.session.PoseSetEnd
 import com.lastpenguin.pix.session.Role
@@ -27,6 +28,7 @@ import com.lastpenguin.pix.ui.generation.PoseKey
 import com.lastpenguin.pix.ui.generation.PosePageAdapter
 import com.lastpenguin.pix.ui.generation.PoseSaveViewModel
 import com.lastpenguin.pix.ui.generation.PoseSlot
+import com.lastpenguin.pix.ui.generation.failureMessage
 import com.lastpenguin.pix.ui.generation.inSet
 import com.lastpenguin.pix.ui.generation.setupPosePager
 import com.lastpenguin.pix.ui.generation.showPosePages
@@ -34,8 +36,8 @@ import com.lastpenguin.pix.ui.generation.showPoseSaveNotice
 import kotlinx.coroutines.launch
 
 /**
- * *Pick a pose* on the subject's phone (R&S 6.6, FR-6.15): the photographer's candidates, as on their phone, without
- * *Try other poses*. The swipe stays on this phone; *Use this pose* asks the photographer's phone, whose first choice
+ * *Pick a pose* on the subject's phone (R&S 6.6, FR-6.15): the photographer's candidates, as on their phone in a
+ * session, without *Regenerate*. The swipe stays on this phone; *Select* asks the photographer's phone, whose first choice
  * decides, and the screen closes when the set ends, saying so when the photographer decided. It covers Subject view,
  * so it follows the session itself, like the guide screens (Design 2.6.5). The ♥ keeps a candidate in this phone's own
  * library (FR-4.14) and sends nothing to the photographer's phone.
@@ -49,10 +51,9 @@ class SubjectPickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentPickPoseBinding.bind(view)
-        binding.tryOtherButton.isVisible = false
         val pages = PosePageAdapter(::onHeart)
         binding.setupPosePager(pages, viewModel::select)
-        binding.usePoseButton.setOnClickListener { viewModel.usePose() }
+        binding.selectButton.setOnClickListener { viewModel.usePose() }
         binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
         // Back leaves the photographer's set as it is; Subject view's *Pick a pose* opens it again.
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { backToSubject() }
@@ -90,11 +91,15 @@ class SubjectPickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         }
     }
 
-    /** The ♥ on a candidate (FR-4.14): this phone's own library, which the photographer's phone never hears of. */
+    /**
+     * The ♥ on a candidate (FR-4.14): this phone's own library, which the photographer's phone never hears of, turned as
+     * the photographer held the scene photo.
+     */
     private fun onHeart(slot: PoseSlot) {
-        val setId = viewModel.uiState.value.setId ?: return
+        val ui = viewModel.uiState.value
+        val setId = ui.setId ?: return
         val image = (slot.event as? CandidateEvent.Ready)?.image ?: return
-        saves.toggle(PoseKey(setId, slot.pose.id), image)
+        saves.toggle(PoseKey(setId, slot.pose.id), image, ui.sceneTurn)
     }
 
     private fun render(binding: FragmentPickPoseBinding, pages: PosePageAdapter, ui: SubjectPickUiState) {
@@ -106,7 +111,7 @@ class SubjectPickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         binding.sharedHint.isVisible = name != null
         if (name != null) binding.sharedHint.text = getString(R.string.shared_hint, name)
         showPages(binding, pages, ui)
-        binding.usePoseButton.isEnabled = ui.selectedPoseId != null && !ui.waiting && !ui.reconnecting
+        binding.selectButton.isEnabled = ui.selectedPoseId != null && !ui.waiting && !ui.reconnecting
     }
 
     private fun showPages(binding: FragmentPickPoseBinding, pages: PosePageAdapter, ui: SubjectPickUiState) {
@@ -128,11 +133,18 @@ class SubjectPickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
 }
 
 /**
- * What the subject's phone says when the photographer's set [end]ed (Design 2.6.5): that the photographer chose or
- * closed it, once *Pick a pose* had it; nothing for this phone's own pick, which the guide answers.
+ * What the subject's phone says when the photographer's set [end]ed (Design 2.6.5): why it failed, as the
+ * photographer's phone says it (#203); that the photographer chose or closed it, once *Pick a pose* had it; nothing
+ * for this phone's own pick, which the guide answers.
  */
 internal fun poseSetEndNotice(context: Context, end: PoseSetEnd, photographer: String?): String? {
-    if (!end.wasPicking || end.by == Role.SUBJECT || photographer == null) return null
+    if (photographer == null) return null
+    end.failure?.let { return poseFailureNotice(context, it, photographer) }
+    if (!end.wasPicking || end.by == Role.SUBJECT) return null
     val text = if (end.step == PoseSetStep.CHOSEN) R.string.peer_chose_pose else R.string.peer_closed_poses
     return context.getString(text, photographer)
 }
+
+/** The photographer's set failed: whose poses, and why, in the line Couldn't create poses shows (FR-4.7, #203). */
+internal fun poseFailureNotice(context: Context, failure: GenerationError, photographer: String): String =
+    context.getString(R.string.peer_poses_failed, photographer) + "\n" + context.getString(failureMessage(failure))

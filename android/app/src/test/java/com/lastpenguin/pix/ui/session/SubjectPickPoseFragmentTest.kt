@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -32,6 +32,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -47,12 +48,13 @@ import org.robolectric.shadows.ShadowToast
 /*
  * The subject's Pick a pose (R&S 6.6, FR-6.15, Design 2.6.5) on the real Fragment, with the photographer's set
  * delivered to the container's PoseSyncer. Partitions: the candidates shown as on the photographer's phone, with the
- * hint and without Try other poses; Use this pose sent as a pick and waiting; the set's end by the photographer's
+ * hint and without Regenerate; Select sent as a pick and waiting; the set's end by the photographer's
  * choice or close (a notice and back to Subject view), by this phone's own pick (back without a notice), and an end
  * kept from an earlier set (nothing); a pick no step answers in 5 s (a notice, and it can be tapped again); Back
- * (Subject view, the set kept); the link reconnecting (the candidates kept, Use this pose waiting until it is back);
+ * (Subject view, the set kept); the link reconnecting (the candidates kept, Select waiting until it is back);
  * the session ending (back to Subject view, which shows what ended it); a 9:16 candidate in its own shape (FR-4.3);
- * the ♥ (FR-4.14), which saves the candidate in this phone's library and sends nothing to the photographer's phone.
+ * the ♥ (FR-4.14), which saves the candidate in this phone's library and sends nothing to the photographer's phone,
+ * and on a set from a scene held sideways saves it turned back into the frame by the photographer's quarter (#206).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -66,13 +68,17 @@ class SubjectPickPoseFragmentTest {
         receiving.cancel()
     }
 
-    /** A subject's phone whose syncer has the photographer's set1, PICKING with pose-1 and pose-2. */
-    private fun picking(modules: TestAppContainer = TestAppContainer()): TestAppContainer {
+    /**
+     * A subject's phone whose syncer has the photographer's set1, PICKING with pose-1 and pose-2, from a scene photo
+     * held at [sceneTurn].
+     */
+    private fun picking(modules: TestAppContainer = TestAppContainer(), sceneTurn: Int = 0): TestAppContainer {
         modules.install()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
         modules.poses.startAsReceiver(receiving)
         idle()
-        step(modules, PoseSetStep.GENERATING)
+        modules.session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.GENERATING, sceneTurn = sceneTurn))
+        idle()
         candidate(modules, "pose-1")
         candidate(modules, "pose-2")
         step(modules, PoseSetStep.PICKING, poseIds = listOf("pose-1", "pose-2"))
@@ -132,9 +138,9 @@ class SubjectPickPoseFragmentTest {
         onScreen { binding ->
             assertEquals(2, binding.candidatePager.adapter?.itemCount)
             assertEquals("1 / 2", binding.pageCounter.text.toString())
-            assertEquals(View.GONE, binding.tryOtherButton.visibility)
+            assertEquals(View.GONE, binding.regenerateButton.visibility)
             assertEquals(string(R.string.shared_hint, "Dongje"), binding.sharedHint.text.toString())
-            assertTrue(binding.usePoseButton.isEnabled)
+            assertTrue(binding.selectButton.isEnabled)
         }
     }
 
@@ -163,13 +169,13 @@ class SubjectPickPoseFragmentTest {
         onScreen { it.candidatePager.setCurrentItem(1, false) }
         idle()
 
-        onScreen { it.usePoseButton.performClick() }
+        onScreen { it.selectButton.performClick() }
         idle()
 
         assertEquals(listOf(SessionMessage.PosePick("set1", "pose-2")), picks(modules))
         onScreen { binding ->
-            assertFalse(binding.usePoseButton.isEnabled)
-            binding.usePoseButton.performClick()
+            assertFalse(binding.selectButton.isEnabled)
+            binding.selectButton.performClick()
         }
         idle()
         assertEquals(1, picks(modules).size)
@@ -201,7 +207,7 @@ class SubjectPickPoseFragmentTest {
     fun thisPhonesPickChosen_closesItWithoutANotice() {
         val modules = picking()
         val nav = launch()
-        onScreen { it.usePoseButton.performClick() }
+        onScreen { it.selectButton.performClick() }
         idle()
 
         step(modules, PoseSetStep.CHOSEN, poseId = "pose-1", by = Role.SUBJECT)
@@ -228,22 +234,22 @@ class SubjectPickPoseFragmentTest {
 
         assertEquals(R.id.subjectPickPoseFragment, nav.currentDestination?.id)
         assertEquals(0, ShadowToast.shownToastCount())
-        assertTrue(onScreen { it.usePoseButton.isEnabled })
+        assertTrue(onScreen { it.selectButton.isEnabled })
     }
 
     @Test
     fun aPickNotAnsweredInTime_saysSo_andCanBeTappedAgain() {
         val modules = picking()
         launch()
-        onScreen { it.usePoseButton.performClick() }
+        onScreen { it.selectButton.performClick() }
         idle()
 
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(PoseSyncer.PICK_TIMEOUT_MS + 100))
 
         assertEquals(string(R.string.pose_pick_failed), ShadowToast.getTextOfLatestToast())
         onScreen { binding ->
-            assertTrue(binding.usePoseButton.isEnabled)
-            binding.usePoseButton.performClick()
+            assertTrue(binding.selectButton.isEnabled)
+            binding.selectButton.performClick()
         }
         idle()
         assertEquals(2, picks(modules).size)
@@ -273,8 +279,8 @@ class SubjectPickPoseFragmentTest {
         assertEquals(R.id.subjectPickPoseFragment, nav.currentDestination?.id)
         onScreen { binding ->
             assertEquals(2, binding.candidatePager.adapter?.itemCount)
-            assertFalse(binding.usePoseButton.isEnabled)
-            binding.usePoseButton.performClick()
+            assertFalse(binding.selectButton.isEnabled)
+            binding.selectButton.performClick()
         }
         idle()
         assertTrue(picks(modules).isEmpty())
@@ -282,8 +288,8 @@ class SubjectPickPoseFragmentTest {
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
         idle()
         onScreen { binding ->
-            assertTrue(binding.usePoseButton.isEnabled)
-            binding.usePoseButton.performClick()
+            assertTrue(binding.selectButton.isEnabled)
+            binding.selectButton.performClick()
         }
         idle()
         assertEquals(1, picks(modules).size)
@@ -323,7 +329,27 @@ class SubjectPickPoseFragmentTest {
             },
         )
         assertEquals(string(R.string.pose_saved_notice), ShadowToast.getTextOfLatestToast())
-        // Neither a pick nor anything else: the ♥ stays on this phone, and the first Use this pose still decides.
+        // Neither a pick nor anything else: the ♥ stays on this phone, and the first Select still decides.
         assertEquals(sent, modules.session.sent.size)
+    }
+
+    @Test
+    fun aHeart_onASetFromASceneHeldSideways_savesTheGuideAsItGoesOnTheCamera() {
+        val modules = picking(sceneTurn = 90)
+        launch()
+
+        onScreen { binding ->
+            val pages = binding.candidatePager.getChildAt(0) as RecyclerView
+            checkNotNull(pages.findViewHolderForAdapterPosition(0)).itemView.findViewById<View>(R.id.heartButton)
+                .performClick()
+        }
+        idle()
+        val cut = guide().copy(id = "saved-pose", mask = bitmap(40, 30), outline = bitmap(40, 30), aspect = 4f / 3f)
+        modules.maker.finish(Result.success(cut))
+        idle()
+
+        // Turned back into the photographer's portrait frame by the scene's quarter, as the photographer's camera has it.
+        val (kept, _) = runBlocking { modules.saved.load("saved-pose") }.getOrThrow()
+        assertEquals(30 to 40, kept.mask.width to kept.mask.height)
     }
 }

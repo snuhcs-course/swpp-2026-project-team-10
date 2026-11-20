@@ -1,7 +1,8 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.core
 
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -25,7 +26,11 @@ import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraXController
 import com.lastpenguin.pix.camera.DataStoreCameraSettings
 import com.lastpenguin.pix.camera.NARROWEST_FRAME_ASPECT
+import com.lastpenguin.pix.camera.PhoneTurns
+import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.camera.PhotoSaver
+import com.lastpenguin.pix.camera.PixAlbumPhotos
+import com.lastpenguin.pix.camera.SensorPhoneTurns
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.network.PixAccountApi
 import com.lastpenguin.pix.core.network.PixApi
@@ -73,6 +78,7 @@ import com.lastpenguin.pix.session.RtcSessionManager
 import com.lastpenguin.pix.session.SessionIdentity
 import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.TipSyncer
 import com.lastpenguin.pix.session.WebRtcRuntime
 import com.lastpenguin.pix.session.protocol.ChannelRouter
 import com.lastpenguin.pix.session.protocol.MessageCodec
@@ -81,12 +87,18 @@ import com.lastpenguin.pix.settings.AndroidAppLanguage
 import com.lastpenguin.pix.settings.AppLanguage
 import com.lastpenguin.pix.settings.AppSettings
 import com.lastpenguin.pix.settings.DataStoreAppSettings
+import com.lastpenguin.pix.telemetry.FirebaseTelemetry
+import com.lastpenguin.pix.telemetry.GatedTelemetry
+import com.lastpenguin.pix.telemetry.Telemetry
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -103,6 +115,10 @@ class AppContainer(
     // ---- Camera (#3) ----------------------------------------------------------
     val cameraController: CameraController,
     val cameraSettings: CameraSettings,
+    /** The newest photo in Pix's album, taken here or received in a session, for Camera's thumbnail (FR-1.6). */
+    val albumPhotos: StateFlow<List<Uri>>,
+    /** Deletes a photo from the viewer: from Pix's album, and from the session's photos too (FR-1.6). */
+    val photoDeleter: PhotoDeleter,
     // ---- Guide (#5, #6) -------------------------------------------------------
     /** The photographer's guide, clamped to the frame of the chosen aspect ratio (AD-10). */
     val guideRepository: GuideRepository,
@@ -148,6 +164,8 @@ class AppContainer(
     val descriptionSyncer: DescriptionSyncer,
     /** Each photo taken in a session, for the subject's "Pix" album (FR-6.14, Design 2.6.5). */
     val photoSyncer: PhotoSyncer,
+    /** The tip of the guide on the photographer's camera, on Subject view at a tap (FR-4.10, #213). */
+    val tipSyncer: TipSyncer,
     val remoteControlHandler: RemoteControlHandler,
     /** Whether this phone has said once that a session uses mobile data (FR-6.13). */
     val mobileDataNotice: MobileDataNotice,
@@ -160,6 +178,8 @@ class AppContainer(
     val screenLanguages: ScreenLanguages? = null,
     /** Registers this phone's push token; none in tests, which have no Firebase. */
     val pushTokenRegistrar: PushTokenRegistrar? = null,
+    /** How the phone is held, for photos saved as taken (FR-1.5) and the controls that turn (FR-1.15). */
+    val phoneTurns: PhoneTurns = PhoneTurns.Fixed(),
 ) {
     companion object {
         /** Like the session's socket, so the course's proxy never sees it idle. */
@@ -176,6 +196,13 @@ class AppContainer(
 
             /** Work that outlives every screen: loading the sign-in, presence, reading the saved guides. */
             val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            val appSettings = DataStoreAppSettings(appContext, appScope)
+            // Crash reports and usage events (Design 2.8, Telemetry): only while Settings allows them (FR-10.6), from
+            // the stored answer on, and never from a debug build unless pix.telemetry is set.
+            val telemetry = GatedTelemetry(FirebaseTelemetry(appContext), buildAllows = BuildConfig.TELEMETRY)
+            Telemetry.install(telemetry)
+            appScope.launch { appSettings.shareUsage.filterNotNull().collect(telemetry::setAllowed) }
+
             val json = Json { ignoreUnknownKeys = true }
             fun retrofit(client: OkHttpClient): Retrofit = Retrofit.Builder()
                 .baseUrl(BuildConfig.SERVER_URL)
@@ -258,9 +285,19 @@ class AppContainer(
             // As the subject, each set the photographer starts is this phone's history too (FR-4.11), whichever
             // screen is in front, once the server accepted its description.
             val promptHistory = DataStorePromptHistory(appContext, appScope)
-            promptHistory.followSubjectSets(descriptionSyncer.started, poseSyncer.mirror, appScope)
+            promptHistory.followSubjectSets(descriptionSyncer.started, poseSyncer.mirror, poseSyncer.verdicts, appScope)
+            val poseTips = PoseTips(poseTipper, guideRepository.guide, appScope, screenLanguage)
+            val album = PixAlbumPhotos(appContext.contentResolver, appScope)
+            val photoSyncer = PhotoSyncer(
+                rtcSessionManager,
+                ContentPhotoReader(appContext.contentResolver),
+                PhotoSaver(appContext),
+                File(appContext.cacheDir, "session-photos"),
+            )
             return AppContainer(
                 cameraController = cameraController,
+                albumPhotos = album.photos,
+                photoDeleter = PhotoDeleter { uri -> photoSyncer.delete(uri, album, appScope) },
                 cameraSettings = DataStoreCameraSettings(appContext),
                 guideRepository = guideRepository,
                 mirrorGuideRepository = mirrorGuideRepository,
@@ -270,7 +307,7 @@ class AppContainer(
                 poseGenerator = RemotePoseGenerator(pixApi),
                 personDetector = RuleBasedPersonDetector(MlKitPersonSignals()),
                 poseTipper = poseTipper,
-                poseTips = PoseTips(poseTipper, guideRepository.guide, appScope, screenLanguage),
+                poseTips = poseTips,
                 generationConsent = DataStoreGenerationConsent(appContext),
                 promptHistory = promptHistory,
                 authRepository = authRepository,
@@ -283,12 +320,8 @@ class AppContainer(
                 poseSyncer = poseSyncer,
                 confirmSyncer = ConfirmSyncer(rtcSessionManager, MaskGuideImageCodec()),
                 descriptionSyncer = descriptionSyncer,
-                photoSyncer = PhotoSyncer(
-                    rtcSessionManager,
-                    ContentPhotoReader(appContext.contentResolver),
-                    PhotoSaver(appContext),
-                    File(appContext.cacheDir, "session-photos"),
-                ),
+                tipSyncer = TipSyncer(rtcSessionManager, poseTips.onCamera),
+                photoSyncer = photoSyncer,
                 remoteControlHandler = RemoteControlHandler(
                     rtcSessionManager,
                     cameraController,
@@ -296,10 +329,11 @@ class AppContainer(
                     attributeGuideChanges = guideSyncer::attribute,
                 ),
                 mobileDataNotice = DataStoreMobileDataNotice(appContext),
-                appSettings = DataStoreAppSettings(appContext, appScope),
+                appSettings = appSettings,
                 appLanguage = AndroidAppLanguage(),
                 screenLanguages = screenLanguages,
                 pushTokenRegistrar = pushTokenRegistrar,
+                phoneTurns = SensorPhoneTurns(appContext),
             )
         }
     }

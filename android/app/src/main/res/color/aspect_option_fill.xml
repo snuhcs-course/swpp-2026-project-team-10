@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The inside of the chosen ratio's shape. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:color="#29FFFFFF" android:state_selected="true" />
+    <item android:color="@color/camera_option_selected" android:state_selected="true" />
     <item android:color="@android:color/transparent" />
 </selector>

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -15,6 +15,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
@@ -35,7 +36,10 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
+import com.lastpenguin.pix.ui.camera.REFERENCE_HIDDEN_ALPHA
+import com.lastpenguin.pix.ui.camera.REFERENCE_PEEK_DP
 import java.time.Duration
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -52,6 +56,8 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadow.api.Shadow
+import org.robolectric.shadows.ShadowChoreographer
 import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowToast
 
@@ -59,9 +65,13 @@ import org.robolectric.shadows.ShadowToast
  * Subject view's render paths (R&S 6.6, Testing Documentation 2.1.6), on the real Fragment under FragmentScenario
  * with a container of fakes. Partitions: not connected / connected before the first frame / streaming / frames
  * stopped for 2 s ("camera paused") / streaming again / reconnecting; the photographer's capabilities with and
- * without a flash and an exposure range; the camera state's zoom, flash, and ratio; a guide arriving, the edit-mode
+ * without a flash and an exposure range; the camera state's zoom, flash, and ratio; the mirror (#201): the rear
+ * camera's video, grid, guide, and reference photo shown as a mirror, the front camera's as sent, and a drag on the
+ * mirrored guide moving it the way the finger goes; a guide arriving, the edit-mode
  * toggle, a hidden guide; the photographer's reference photo with its guide, enlarged, kept while the guide is hidden,
- * gone with a replaced or removed guide, and moved to another corner on this phone only; the brightness panel and a
+ * gone with a replaced or removed guide, moved to another corner on this phone only, and hidden at the video's side
+ * by a flick and shown again by a tap on its handle, on this phone only, and hidden while enlarged (the small strip,
+ * and small when it is back; #237), a mirror through each change of its size; the brightness panel and a
  * flash tap; the live view on mobile data (FR-6.13); the Guide button (FR-6.15) disabled until connected, adding or
  * changing the guide, opening Add a pose guide, and "Couldn't send the guide" for a guide that did not go; Leave, the
  * back button's question, and the session ending by a lost connection (also with Add a pose guide open over it) or
@@ -75,7 +85,8 @@ import org.robolectric.shadows.ShadowToast
  * button, a set still picking shown before the confirm that follows it, and a guide the photographer uses after Back,
  * which says so; the photographer's Generate poses (FR-6.15): "describing a pose" in place of "camera paused", Generate
  * poses opened once per description and then by the same button, opened once Add a pose guide closes when it came
- * under the sheet, a set held here shown before it, and a close after Back, which says so.
+ * under the sheet, a set held here shown before it, and a close after Back, which says so. A tap on the readout while
+ * the photographer's pinch holds the zoom: nothing sent, and the label names the photographer (FR-7.6, #236).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -88,6 +99,7 @@ class SubjectFragmentRenderTest {
 
     @After
     fun tearDown() {
+        ShadowChoreographer.setPaused(false)
         scenario?.close()
         receiving.cancel()
     }
@@ -238,6 +250,99 @@ class SubjectFragmentRenderTest {
         }
     }
 
+    // ---- The mirror (#201) ------------------------------------------------------------------------------------
+
+    private fun cameraState(facing: CameraFacing) =
+        SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, facing = facing)
+
+    private fun FragmentSubjectBinding.mirrorShown(): List<Any> = listOf(
+        Shadow.extract<ShadowSurfaceViewRenderer>(liveView).mirror,
+        compositionOverlay.scaleX,
+        guideOverlay.scaleX,
+        referenceThumbnail.scaleX,
+    )
+
+    @Test
+    fun theRearCamera_showsAMirror_andTheFrontOne_asSent() {
+        val modules = launch()
+        connect(modules)
+        modules.session.deliver(cameraState(CameraFacing.BACK))
+        idle()
+        onScreen { binding, _ -> assertEquals(listOf(true, -1f, -1f, -1f), binding.mirrorShown()) }
+
+        // The photographer switches to the front camera, whose video is a mirror already.
+        modules.session.deliver(cameraState(CameraFacing.FRONT))
+        idle()
+        onScreen { binding, _ -> assertEquals(listOf(false, 1f, 1f, 1f), binding.mirrorShown()) }
+    }
+
+    @Test
+    fun theMirroredReferencePhoto_staysAMirror_shownEnlargedAndWhileItChangesSize() {
+        val modules = launch()
+        connect(modules)
+        modules.session.deliver(cameraState(CameraFacing.BACK))
+        modules.mirror.setGuide(guide(withReference = false))
+        showReference(modules)
+        var small = 0
+        var left = 0f
+        onScreen { binding, _ ->
+            val thumbnail = binding.referenceThumbnail
+            assertEquals(-1f, thumbnail.scaleX)
+            small = thumbnail.width
+            left = thumbnail.translationX
+            ShadowChoreographer.setPaused(true)
+            thumbnail.performClick()
+        }
+        idle()
+        // The first frame of growing: drawn as small as it was, flipped, with its left side where it was.
+        onScreen { binding, _ ->
+            val thumbnail = binding.referenceThumbnail
+            val large = thumbnail.layoutParams.width
+            assertTrue(large > small * 2)
+            assertEquals(-small.toFloat() / large, thumbnail.scaleX, 0.001f)
+            assertEquals(left, thumbnail.translationX + (large - small) / 2f, 0.5f)
+        }
+        ShadowChoreographer.setPaused(false)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+        onScreen { binding, _ ->
+            assertEquals(-1f, binding.referenceThumbnail.scaleX)
+            assertEquals(left, binding.referenceThumbnail.translationX)
+        }
+
+        // The front camera's video is a mirror already: the photo is as sent, at once.
+        modules.session.deliver(cameraState(CameraFacing.FRONT))
+        idle()
+        onScreen { binding, _ -> assertEquals(1f, binding.referenceThumbnail.scaleX) }
+    }
+
+    @Test
+    fun aDragOnTheMirroredGuide_movesItTheWayTheFingerGoes() {
+        val modules = launch()
+        connect(modules)
+        modules.session.deliver(cameraState(CameraFacing.BACK))
+        modules.mirror.setGuide(guide(withReference = false))
+        idle()
+        onScreen { binding, _ -> binding.editGuideButton.performClick() }
+        idle()
+
+        val moves = mutableListOf<Float>()
+        onScreen { binding, _ ->
+            binding.guideOverlay.onGesture = { dx, _, _, _ -> moves += dx }
+            val container = binding.videoContainer
+            val x = container.width / 2f
+            val y = container.height / 2f
+            val down = SystemClock.uptimeMillis()
+            for ((action, at) in listOf(MotionEvent.ACTION_DOWN to x, MotionEvent.ACTION_MOVE to x + 40f)) {
+                val event = MotionEvent.obtain(down, down, action, at, y, 0)
+                container.dispatchTouchEvent(event)
+                event.recycle()
+            }
+        }
+
+        // To the right on this mirror is to the photographer's left: the guide's x goes down.
+        assertTrue(moves.toString(), moves.isNotEmpty() && moves.sum() < 0f)
+    }
+
     // ---- The photographer's reference photo (FR-3.9) -------------------------------------------------------
 
     private fun showReference(modules: TestAppContainer, id: String = "guide-1"): Bitmap {
@@ -328,6 +433,85 @@ class SubjectFragmentRenderTest {
         assertEquals(sent, modules.session.sent.size)
     }
 
+    @Test
+    fun theReferenceThumbnail_hidesAtTheVideosSide_andComesBackAtATap_onThisPhoneOnly() {
+        val modules = launch()
+        connect(modules)
+        modules.mirror.setGuide(guide(withReference = false))
+        showReference(modules)
+        val sent = modules.session.sent.size
+
+        // A flick to the left, from its corner at the top left.
+        onScreen { binding, _ ->
+            val thumbnail = binding.referenceThumbnail
+            drag(thumbnail, -thumbnail.width - ViewConfiguration.get(thumbnail.context).scaledTouchSlop * 4f, 0f)
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+        onScreen { binding, _ ->
+            val thumbnail = binding.referenceThumbnail
+            val peek = (REFERENCE_PEEK_DP * thumbnail.resources.displayMetrics.density).roundToInt()
+            // Only its peek is in the video, see-through, under a handle a touch target wide.
+            assertEquals((peek - thumbnail.width).toFloat(), thumbnail.translationX)
+            assertEquals(REFERENCE_HIDDEN_ALPHA, thumbnail.alpha)
+            assertTrue(binding.referenceHandle.isShown)
+            assertEquals(0f, binding.referenceHandle.translationX)
+            // A tap on the handle is a tap on the strip.
+            drag(binding.referenceHandle, 0f, 0f)
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+        onScreen { binding, _ ->
+            assertTrue(binding.referenceThumbnail.translationX > 0f)
+            assertEquals(1f, binding.referenceThumbnail.alpha)
+            assertFalse(binding.referenceHandle.isShown)
+        }
+        // Nothing goes to the photographer: hidden is this phone's alone, like the corner.
+        assertEquals(sent, modules.session.sent.size)
+    }
+
+    @Test
+    fun theReferenceThumbnail_hiddenWhileEnlarged_leavesTheSmallStrip_andComesBackSmall() {
+        val modules = launch()
+        connect(modules)
+        modules.mirror.setGuide(guide(withReference = false))
+        showReference(modules)
+        var small = 0 to 0
+        onScreen { binding, _ ->
+            small = binding.referenceThumbnail.width to binding.referenceThumbnail.height
+            binding.referenceThumbnail.performClick()
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+
+        // Enlarged in the top-left corner, dragged to the left until most of it is out of the video.
+        onScreen { binding, _ ->
+            val thumbnail = binding.referenceThumbnail
+            assertTrue(thumbnail.width > small.first * 2)
+            drag(thumbnail, -thumbnail.width - ViewConfiguration.get(thumbnail.context).scaledTouchSlop * 4f, 0f)
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+        onScreen { binding, fragment ->
+            val thumbnail = binding.referenceThumbnail
+            val peek = (REFERENCE_PEEK_DP * thumbnail.resources.displayMetrics.density).roundToInt()
+            // What stays is the small thumbnail's strip, and TalkBack hears a hidden thumbnail.
+            assertEquals(small, thumbnail.width to thumbnail.height)
+            // Still the rear camera's mirror, like the video, at its full size.
+            assertEquals(-1f, thumbnail.scaleX)
+            assertEquals(1f, thumbnail.scaleY)
+            assertEquals((peek - small.first).toFloat(), thumbnail.translationX)
+            assertEquals(REFERENCE_HIDDEN_ALPHA, thumbnail.alpha)
+            assertEquals(
+                fragment.getString(R.string.reference_hidden),
+                thumbnail.createAccessibilityNodeInfo().stateDescription?.toString(),
+            )
+            drag(binding.referenceHandle, 0f, 0f)
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+        onScreen { binding, _ ->
+            assertEquals(small, binding.referenceThumbnail.width to binding.referenceThumbnail.height)
+            assertEquals(1f, binding.referenceThumbnail.alpha)
+            assertFalse(binding.referenceHandle.isShown)
+        }
+    }
+
     private fun drag(view: View, dx: Float, dy: Float) {
         val down = SystemClock.uptimeMillis()
         fun event(action: Int, x: Float, y: Float, at: Long) =
@@ -350,6 +534,8 @@ class SubjectFragmentRenderTest {
             assertEquals(View.VISIBLE, binding.editGuideButton.visibility)
             assertTrue(binding.editGuideButton.isEnabled)
             assertFalse(binding.editGuideButton.isChecked)
+            // The toggle shows its mode: the camera while a pinch zooms (E2, #204).
+            assertEquals(R.drawable.ic_camera, shadowOf(binding.editGuideButton.plainIcon).createdFromResId)
             assertFalse(binding.guideOverlay.editable)
             binding.editGuideButton.performClick()
         }
@@ -357,6 +543,7 @@ class SubjectFragmentRenderTest {
 
         onScreen { binding, _ ->
             assertTrue(binding.editGuideButton.isChecked)
+            assertEquals(R.drawable.ic_guide_mode, shadowOf(binding.editGuideButton.plainIcon).createdFromResId)
             assertTrue(binding.guideOverlay.editable)
         }
 
@@ -470,6 +657,23 @@ class SubjectFragmentRenderTest {
         }
     }
 
+    @Test
+    fun aTapOnTheReadout_whileThePhotographerZooms_namesThePhotographer() {
+        val modules = launch()
+        connect(modules)
+        modules.session.deliver(SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER))
+        idle()
+
+        onScreen { binding, _ -> binding.zoomReadout.performClick() }
+        idle()
+
+        onScreen { binding, _ ->
+            assertTrue(binding.toggleLabel.isShown)
+            assertEquals(string(R.string.zoom_held_label, "Dongje"), binding.toggleLabel.text.toString())
+        }
+        assertTrue(modules.session.sent.none { it is SessionMessage.ZoomSet })
+    }
+
     private fun poseStep(modules: TestAppContainer, step: PoseSetStep, poseIds: List<String> = emptyList()) {
         modules.session.deliver(SessionMessage.PoseStep("set1", step, poseIds))
         // The status check runs every 500 ms on the main looper.
@@ -553,6 +757,25 @@ class SubjectFragmentRenderTest {
     }
 
     @Test
+    fun aSetThatFailsWhileSubjectViewIsInFront_saysWhy() {
+        val modules = launch()
+        scenario!!.attachNav(R.id.subjectFragment)
+        connect(modules)
+        modules.poses.startAsReceiver(receiving)
+        idle()
+        poseStep(modules, PoseSetStep.GENERATING)
+
+        modules.session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.CLOSED, failure = "OFFLINE"))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+
+        // The same reason as on the photographer's phone, though the subject left its Generating poses (#203).
+        assertEquals(
+            string(R.string.peer_poses_failed, "Dongje") + "\n" + string(R.string.generation_offline_message),
+            ShadowToast.getTextOfLatestToast(),
+        )
+    }
+
+    @Test
     fun aSetThePhotographerClosesAfterBack_saysSo_andTheStatusGoes() {
         val modules = launch()
         val nav = scenario!!.attachNav(R.id.subjectFragment)
@@ -619,8 +842,8 @@ class SubjectFragmentRenderTest {
         onScreen { binding, _ ->
             assertEquals(string(R.string.peer_checking_guide, "Dongje"), binding.connectingText.text.toString())
             assertEquals(View.VISIBLE, binding.pickPoseButton.visibility)
-            assertEquals(string(R.string.reference_title), binding.pickPoseLabel.text.toString())
-            assertEquals(string(R.string.reference_title), binding.pickPoseButton.contentDescription)
+            assertEquals(string(R.string.pose_guide_title), binding.pickPoseLabel.text.toString())
+            assertEquals(string(R.string.pose_guide_title), binding.pickPoseButton.contentDescription)
         }
 
         // Back keeps it closed, though Subject view renders again; its button opens it again.

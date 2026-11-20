@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- One row on Settings: what it is, its current value, and a chevron when a tap opens something (FR-10.1). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -32,10 +31,6 @@
 
     <ImageView
         android:id="@+id/settingChevron"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:layout_marginStart="4dp"
-        android:importantForAccessibility="no"
-        android:src="@drawable/ic_chevron_right"
-        app:tint="@color/pix_text_faint" />
+        style="@style/Widget.Pix.Chevron"
+        android:layout_marginStart="4dp" />
 </LinearLayout>

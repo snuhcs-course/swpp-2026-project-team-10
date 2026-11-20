@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -36,11 +36,13 @@ import retrofit2.HttpException
 import retrofit2.Response
 
 // Partitions (Testing Documentation 2.1.6). Request: a description (Korean), and suggestions. Suggestions: four, more
-// than four, some blank, none, a failing status, no connection, no answer in time. Variations of a description: three,
+// than four, some blank, none, a failing status, no connection, no answer in time, each failure ending the run with its
+// error (#203). Variations of a description: three,
 // more, fewer, blank, none, a failing status, no connection, no answer in time, and slower than the description's own
 // request. Each pose: an image, each failing status, no connection, no answer in time, an answer that is not an
 // image. The collector cancelled. Selfie (FR-1.14): a selfie's scene, with suggestions and with a description, and
-// another scene.
+// another scene. Situation (FR-4.8): one named, in every request; none; a selfie with another, and a rear scene with
+// the selfie's.
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemotePoseGeneratorTest {
     private val api = FakeApi()
@@ -171,20 +173,23 @@ class RemotePoseGeneratorTest {
     }
 
     @Test
-    fun suggestionsThatCannotBeHadEndTheRunWithoutAPoseRequest() = runTest {
+    fun suggestionsThatCannotBeHad_endTheRunSayingWhy_withoutAPoseRequest() = runTest {
         val generator = generator()
 
-        suspend fun failsWith(expected: Class<out Exception>, answer: suspend () -> PoseSuggestionsDto) {
+        suspend fun failsWith(expected: GenerationError, answer: suspend () -> PoseSuggestionsDto) {
             api.suggestions = { answer() }
             val error = runCatching { generator.generate(testBitmap(), PoseRequest.Suggested, seed = 7).toList() }
                 .exceptionOrNull()
-            assertTrue("$error", expected.isInstance(error))
+            assertEquals("$error", expected, (error as? GenerationFailedException)?.error)
         }
 
-        failsWith(HttpException::class.java) { throw http(429, "RATE_LIMITED") }
-        failsWith(HttpException::class.java) { throw http(400, "INVALID_IMAGE") }
-        failsWith(UnknownHostException::class.java) { throw UnknownHostException("pix.example") }
-        failsWith(IOException::class.java) { PoseSuggestionsDto(emptyList()) }
+        // The suggestions are the first request to reach a limit: the screen says which (FR-4.7).
+        failsWith(GenerationError.RATE_LIMITED) { throw http(429, "RATE_LIMITED") }
+        failsWith(GenerationError.DAILY_LIMITED) { throw http(429, "DAILY_LIMITED") }
+        failsWith(GenerationError.SERVER) { throw http(400, "INVALID_IMAGE") }
+        failsWith(GenerationError.OFFLINE) { throw UnknownHostException("pix.example") }
+        // An answer without poses is the server's fault, not the connection's.
+        failsWith(GenerationError.SERVER) { PoseSuggestionsDto(emptyList()) }
         assertTrue(api.requests.isEmpty())
     }
 
@@ -195,7 +200,7 @@ class RemotePoseGeneratorTest {
         val error = runCatching { generator().generate(testBitmap(), PoseRequest.Suggested, seed = 7).toList() }
             .exceptionOrNull()
 
-        assertTrue("$error", error is SocketTimeoutException)
+        assertEquals("$error", GenerationError.TIMEOUT, (error as? GenerationFailedException)?.error)
         assertEquals(RemotePoseGenerator.TIMEOUT_MS, currentTime)
         assertTrue(api.requests.isEmpty())
     }
@@ -222,6 +227,35 @@ class RemotePoseGeneratorTest {
 
         assertEquals(listOf<String?>(null), api.suggestionSelfies)
         assertEquals(List<String?>(POSE_COUNT) { null }, api.poseSelfies)
+    }
+
+    @Test
+    fun everyRequest_namesTheSituation() = runTest {
+        generator().generate(
+            testBitmap(),
+            PoseRequest.Described(DESCRIPTION),
+            seed = 7,
+            situation = Situation.LANDMARK,
+        ).toList()
+
+        assertEquals(listOf("landmark"), api.suggestionSituations)
+        assertEquals(List(POSE_COUNT) { "landmark" }, api.poseSituations)
+    }
+
+    @Test
+    fun aSelfie_isAlwaysTheSelfieSituation_andARearScene_neverIs() = runTest {
+        generator().generate(testBitmap(), PoseRequest.Suggested, seed = 7, selfie = true, Situation.FULL_BODY).toList()
+        generator().generate(testBitmap(), PoseRequest.Suggested, seed = 7, selfie = false, Situation.SELFIE).toList()
+
+        assertEquals(listOf("selfie", "default"), api.suggestionSituations)
+    }
+
+    @Test
+    fun withoutASituation_aSceneIsDefault_andASelfieIsSelfie() = runTest {
+        generator().generate(testBitmap(), PoseRequest.Suggested, seed = 7).toList()
+        generator().generate(testBitmap(), PoseRequest.Suggested, seed = 7, selfie = true).toList()
+
+        assertEquals(listOf("default", "selfie"), api.suggestionSituations)
     }
 
     @Test
@@ -281,7 +315,14 @@ class RemotePoseGeneratorTest {
         }
 
         failsWith(GenerationError.RATE_LIMITED) { throw http(429, "RATE_LIMITED") }
+        // Everyone's day used up, and a 429 without a readable code, which is this phone's hour.
+        failsWith(GenerationError.DAILY_LIMITED) { throw http(429, "DAILY_LIMITED") }
+        failsWith(GenerationError.RATE_LIMITED) {
+            throw HttpException(Response.error<PoseResponseDto>(429, "Too Many Requests".toResponseBody(null)))
+        }
         failsWith(GenerationError.REJECTED) { throw http(422, "REJECTED") }
+        // The image service's own refusal, apart from the description filter's (#203).
+        failsWith(GenerationError.DECLINED) { throw http(422, "DECLINED") }
         // The server found no one in the scene photo (FR-4.13); a 422 without a readable code is a refusal.
         failsWith(GenerationError.NO_PERSON) { throw http(422, "NO_PERSON") }
         failsWith(GenerationError.REJECTED) {
@@ -348,6 +389,10 @@ class RemotePoseGeneratorTest {
         /** The `selfie` part of each request, suggestions first in [suggestionSelfies], then poses; null when left out. */
         val suggestionSelfies = mutableListOf<String?>()
         val poseSelfies = mutableListOf<String?>()
+
+        /** The `situation` part of each request, suggestions first, then poses. */
+        val suggestionSituations = mutableListOf<String?>()
+        val poseSituations = mutableListOf<String?>()
         var suggestionDescriptionType: String? = null
         var suggestionImage: ByteArray? = null
         val requests = mutableListOf<Request>()
@@ -360,10 +405,12 @@ class RemotePoseGeneratorTest {
             image: MultipartBody.Part,
             description: RequestBody?,
             selfie: RequestBody?,
+            situation: RequestBody?,
         ): PoseSuggestionsDto {
             val text = description?.text()
             suggestionDescriptions += text
             suggestionSelfies += selfie?.text()
+            suggestionSituations += situation?.text()
             suggestionDescriptionType = description?.contentType()?.toString()
             suggestionImage = Buffer().also(image.body::writeTo).readByteArray()
             return suggestions(text)
@@ -374,9 +421,11 @@ class RemotePoseGeneratorTest {
             description: RequestBody,
             seed: RequestBody,
             selfie: RequestBody?,
+            situation: RequestBody?,
         ): PoseResponseDto {
             val text = description.text()
             poseSelfies += selfie?.text()
+            poseSituations += situation?.text()
             requests += Request(
                 description = text,
                 descriptionType = description.contentType()?.toString(),

@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-31, reviewed by Jaewan Park and Dongje Park
+# AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 """Try the pose tip prompt on scene photos and candidates made once (Design Documentation 2.6.3).
 
 It does not import pix_server. Run it through uv from server/ with OPENROUTER_API_KEY in server/.env:
@@ -17,13 +17,14 @@ already has a candidate is skipped, so the image model is billed once per scene.
 again. `set` makes the four candidates of one scene, as the app gets them without a description, into
 pairs/<name>-1 to -4, also once, with a sheet (sets/<name>.png) to pick one.
 
-`tips` sends every pair to the vision model with the server's tip prompt from src/pix_server/poses/prompts.toml, or
-the one in --prompt-file, the scene first and the candidate second, the candidate as the app would send it (long side
-768 px, JPEG 85), with the server's schema and reasoning effort (keep TIP_SCHEMA in step with poses/tips.py). It
-writes results.json, report.html, and contact sheets (sheet-<n>.png) to scripts/out/tips/runs/<timestamp>[-label]/,
-with the prompt it sent (the Korean instruction included) and the language; with --rounds, it also counts the pairs
-that got the same decisions every time. With --language ko, a sentence is checked against tip_korean's 80 characters
-and for being in Korean. Every call is billed to the OpenRouter key, at a fraction of a cent.
+`tips` sends every pair to the vision model as the server does, in two requests at once: the scene with the server's
+tip prompt from src/pix_server/poses/prompts.toml, or the one in --prompt-file, and the candidate with that prompt, the
+candidate's addition, and its pose, the candidate as the app would send it (long side 768 px, JPEG 85), each with the
+server's schema and reasoning effort. It writes the tip's sentences from the two answers as the server does (keep
+PHOTO_FIELDS, `seen`, and `tip_lines` in step with poses/tips.py). It writes results.json, report.html, and contact
+sheets (sheet-<n>.png) to scripts/out/tips/runs/<timestamp>[-label]/, with the prompt it sent and the language; with
+--rounds, it also counts the pairs that got the same decisions every time. Every call is billed to the OpenRouter
+key, at a fraction of a cent.
 """
 
 import argparse
@@ -62,11 +63,10 @@ CANDIDATE_LONG_SIDE = 768
 JPEG_QUALITY = 85
 CONCURRENCY = 4
 # The candidate's ratio, as the server's `ASPECT_RATIOS` in poses/generator.py: the app's frame closest to the scene's.
-ASPECT_RATIOS = {"3:4": 3 / 4, "9:16": 9 / 16, "1:1": 1.0}
-TEXT_MAX_LENGTH = 140
-KOREAN_TEXT_MAX_LENGTH = 80  # what tip_korean asks for
-# A tip says how to hold the camera in words; a number, a unit, or a degree is hard to follow while shooting. The same
-# check as the server's `MEASURE` in poses/tips.py.
+ASPECT_RATIOS = {"3:4": 3 / 4, "9:16": 9 / 16, "1:1": 1.0, "4:3": 4 / 3, "16:9": 16 / 9}
+# A tip says what to do in words; a number, a unit, or a degree is hard to follow while shooting. The server writes
+# every sentence itself and its words hold none (tests/test_prompts.py), so this only confirms it: the evaluation
+# counts the tips it finds one in (eval_poses.py).
 NUMBER_WORDS = (
     "two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|hundred|dozen"
 )
@@ -106,28 +106,129 @@ KOREAN_MEASURES = (
     rf"{WORD_START}(?:영|{DIGIT})\s+도{PARTICLES}{WORD_END}",
 )
 MEASURE = re.compile("|".join(ENGLISH_MEASURES + KOREAN_MEASURES), re.IGNORECASE)
-# The server refuses a sentence with a letter not of the language asked for, or with none, as poses/tips.py does.
-SCRIPTS = {"en": re.compile("[A-Za-z]"), "ko": re.compile("[가-힣]")}
-
-# Where the photographer holds the camera, by their own posture, lowest first. The model places the camera of photo 1
-# and the best one for the pose, in the order of the schema, so it decides the shot and the pose first; the script
-# compares the two for the height move instead of asking for it.
+# Where the photographer holds the phone, by their own posture, lowest first, and the rest of the server's schemas and
+# of what it makes of the answers (poses/tips.py): the model describes the scene and the candidate, each in a request
+# of its own, and the script compares the two and writes the sentences as the server does.
 LEVELS = ["crouching", "waist", "chest", "eye", "above head"]
-TIP_SCHEMA = {
+ANGLES = ["up", "level", "down"]
+SHOTS = ["full body", "knees up", "waist up", "chest up"]
+BODY_SHARE = {"full body": 1.0, "knees up": 0.75, "waist up": 0.5, "chest up": 0.3}
+CLOSE_SHOTS = ("waist up", "chest up")
+POSTURES = ["standing", "seated", "on the ground"]
+PARTS = ["knees", "waist", "chest", "face", "above"]
+HOLDS = {
+    "standing": ["crouching", "waist", "chest", "eye", "above head"],
+    "seated": ["crouching", "crouching", "waist", "chest", "eye"],
+    "on the ground": ["crouching", "crouching", "crouching", "waist", "chest"],
+}
+HORIZONS = ["none", "level", "tilted"]
+BOX_EDGE = 1000
+CLOSER_RATIO = 1.18
+MUCH_RATIO = 1.4
+SIDE_SHARE = 0.12
+TIGHT_ROOM = 0.06
+PLENTY_ROOM = 0.25
+BOX_SCHEMA = {"type": "array", "items": {"type": "integer"}, "minItems": 4, "maxItems": 4}
+PHOTO_FIELDS = {
+    "box": BOX_SCHEMA,
+    "head": BOX_SCHEMA,
+    "shot": {"type": "string", "enum": SHOTS},
+    "posture": {"type": "string", "enum": POSTURES},
+    "level": {"type": "string", "enum": PARTS},
+    "tilt": {"type": "string", "enum": ANGLES},
+    "horizon": {"type": "string", "enum": HORIZONS},
+}
+PHOTO_SCHEMA = {
     "type": "object",
-    "properties": {
-        "shot": {"type": "string", "enum": ["full body", "knees up", "waist up", "chest up"]},
-        "pose": {"type": "string", "enum": ["standing", "walking", "leaning", "sitting", "crouching", "other"]},
-        "camera_now": {"type": "string", "enum": LEVELS},
-        "camera_best": {"type": "string", "enum": LEVELS},
-        "angle": {"type": "string", "enum": ["up", "level", "down"]},
-        "framing": {"type": "string", "enum": ["closer", "back", "keep"]},
-        "text": {"type": "string"},
-    },
-    "required": ["shot", "pose", "camera_now", "camera_best", "angle", "framing", "text"],
+    "properties": PHOTO_FIELDS,
+    "required": list(PHOTO_FIELDS),
     "additionalProperties": False,
 }
-ANGLE_WORDS = re.compile(r"\b(tilt|tilted|tilting|level|angle|straight)\b|기울|수평|똑바로|각도", re.IGNORECASE)
+
+
+def box_of(value: object) -> tuple[float, float, float, float] | None:
+    if not isinstance(value, list) or len(value) != 4:
+        return None
+    if not all(
+        isinstance(edge, int | float) and not isinstance(edge, bool) and 0 <= edge <= BOX_EDGE for edge in value
+    ):
+        return None
+    top, left, bottom, right = (edge / BOX_EDGE for edge in value)
+    return None if top >= bottom or left >= right else (top, left, bottom, right)
+
+
+def seen(photo: object) -> dict | None:
+    """A photo's description with what the server reads from it: how tall the whole person would be against the
+    photo, their head's height and top edge, the side they are on, where the phone is held, and the level line; None when the server would not read it."""
+    if not isinstance(photo, dict):
+        return None
+    box, shot, posture, level = box_of(photo.get("box")), photo.get("shot"), photo.get("posture"), photo.get("level")
+    if box is None or shot not in SHOTS or posture not in POSTURES or level not in PARTS:
+        return None
+    if photo.get("tilt") not in ANGLES or photo.get("horizon") not in HORIZONS:
+        return None
+    top, left, bottom, right = box
+    head = box_of(photo.get("head"))
+    middle = (left + right) / 2
+    side = "left" if middle < 0.5 - SIDE_SHARE else "right" if middle > 0.5 + SIDE_SHARE else "middle"
+    return {
+        "body": (bottom - top) / BODY_SHARE[shot],
+        "shot": shot,
+        "head": head[2] - head[0] if head else None,
+        "head_top": head[0] if head else None,
+        "side": side,
+        "camera": HOLDS[posture][PARTS.index(level)],
+        "tilt": photo["tilt"],
+        "horizon": photo["horizon"],
+    }
+
+
+def move(ratio: float) -> str:
+    return "closer" if ratio >= CLOSER_RATIO else "back" if ratio <= 1 / CLOSER_RATIO else "keep"
+
+
+def tip_lines(answer: dict, language: str, words: dict) -> dict | None:
+    """The decisions and the sentences the server makes of the model's two answers, `now` for the scene and `want` for
+    the candidate; None when it would refuse them. As on the server, a tip always says the distance and
+    the phone, and the rest only when it applies."""
+    now, want = seen(answer.get("now")), seen(answer.get("want"))
+    if now is None or want is None:
+        return None
+    framing, much = "unsure", False
+    if now["head"] is not None and want["head"] is not None:
+        by_head, by_body = want["head"] / now["head"], want["body"] / now["body"]
+        if move(by_head) == move(by_body):
+            framing = move(by_head)
+            much = {
+                "closer": min(by_head, by_body) >= MUCH_RATIO,
+                "back": max(by_head, by_body) <= 1 / MUCH_RATIO,
+            }.get(framing, False)
+    hold, angle = want["camera"], want["tilt"]
+    step = LEVELS.index(hold) - LEVELS.index(now["camera"])
+    lines = []
+    if framing == "closer":
+        lines.append(words[("zoom" if want["shot"] in CLOSE_SHOTS else "closer") + ("_much" if much else "")])
+    elif framing == "back":
+        lines.append(words["back_much" if much else "back"])
+    elif framing == "unsure":
+        lines.append(words["guide"])
+    else:
+        lines.append(words["same"])
+    lines.append(words["phone"].format(hold=words[hold.replace(" ", "_")], tilt=words[angle]))
+    if want["side"] != "middle":
+        lines.append(words[want["side"]])
+    if want["head_top"] is not None and not TIGHT_ROOM <= want["head_top"] <= PLENTY_ROOM:
+        lines.append(words["room_none" if want["head_top"] < TIGHT_ROOM else "room_plenty"])
+    if now["horizon"] == "tilted" and want["horizon"] != "tilted":
+        lines.append(words["upright"])
+    return {
+        "framing": framing,
+        "much": much,
+        "hold": hold,
+        "height": "raise" if step > 0 else "lower" if step < 0 else "keep",
+        "angle": angle,
+        "lines": lines,
+    }
 
 
 def one_line(text: str) -> str:
@@ -320,21 +421,12 @@ class Tip:
     flags: list[str] = field(default_factory=list)
 
 
-def check(tip: Tip, language: str) -> None:
-    now, best = (tip.answer.get(key) for key in ("camera_now", "camera_best"))
-    if now in LEVELS and best in LEVELS:
-        step = LEVELS.index(best) - LEVELS.index(now)
-        tip.answer["height"] = "raise" if step > 0 else "lower" if step < 0 else "keep"
-    text = tip.answer.get("text", "")
-    if not ANGLE_WORDS.search(text):
-        tip.flags.append("no angle in text")
-    if not 0 < len(text) <= (KOREAN_TEXT_MAX_LENGTH if language == "ko" else TEXT_MAX_LENGTH):
-        tip.flags.append(f"text length {len(text)}")
-    if MEASURE.search(text):
-        tip.flags.append("number or unit")
-    letters = [char for char in text if char.isalpha()]
-    if not letters or not all(SCRIPTS[language].fullmatch(char) for char in letters):
-        tip.flags.append("not in Korean" if language == "ko" else "not in English")
+def check(tip: Tip, language: str, words: dict) -> None:
+    made = tip_lines(tip.answer, language, words)
+    if made is None:
+        tip.flags.append("description the server refuses")
+        return
+    tip.answer |= made
 
 
 async def ask_tip(client: httpx2.AsyncClient, folder: Path, prompt: str, number: int, args) -> Tip:
@@ -343,32 +435,60 @@ async def ask_tip(client: httpx2.AsyncClient, folder: Path, prompt: str, number:
     scene = (folder / "scene.jpg").read_bytes()
     with Image.open(folder / "candidate.jpg") as image:
         candidate = jpeg(image, CANDIDATE_LONG_SIDE)
-    # The server adds the Korean instruction right after the tip prompt when the phone's screens are in Korean.
-    korean = [{"type": "text", "text": args.korean}] if args.korean else []
-    parts = [
-        *korean,
-        {"type": "text", "text": "Photo 1, the scene:"},
-        {"type": "image_url", "image_url": {"url": data_url(scene)}},
-        {"type": "text", "text": f'Photo 2, the photo they want, with the pose "{pose}":'},
-        {"type": "image_url", "image_url": {"url": data_url(candidate)}},
-    ]
+    # The server asks about each photo by itself: the scene with the tip prompt alone, the candidate with its addition
+    # and the pose with the photo.
+    added = [{"type": "text", "text": args.candidate}]
+    asked = (
+        ("tip_scene", PHOTO_SCHEMA, [{"type": "text", "text": "The photo:"}], scene),
+        (
+            "tip_candidate",
+            PHOTO_SCHEMA,
+            [*added, {"type": "text", "text": f'The photo, made for the pose "{pose}":'}],
+            candidate,
+        ),
+    )
     start = time.perf_counter()
     try:
-        payload = chat_payload(prompt, parts, TIP_SCHEMA, "tip", args.max_tokens, args.reasoning)
-        response = await client.post(CHAT_URL, json=payload)
-        body = response.json()
-        if response.status_code != 200 or "error" in body:
+        responses = await asyncio.gather(
+            *(
+                client.post(
+                    CHAT_URL,
+                    json=chat_payload(
+                        prompt,
+                        [*parts, {"type": "image_url", "image_url": {"url": data_url(photo)}}],
+                        schema,
+                        name,
+                        args.max_tokens,
+                        args.reasoning,
+                    ),
+                )
+                for name, schema, parts, photo in asked
+            )
+        )
+        bodies = [response.json() for response in responses]
+        # What each request cost, also when the other one failed: a request that answered is billed either way.
+        usages = [body.get("usage") or {} for body in bodies if isinstance(body, dict)]
+        tip.cost = sum(usage.get("cost") or 0 for usage in usages)
+        tip.reasoning_tokens = sum(
+            (usage.get("completion_tokens_details") or {}).get("reasoning_tokens") or 0 for usage in usages
+        )
+        failed = [
+            (response, body)
+            for response, body in zip(responses, bodies, strict=True)
+            if response.status_code != 200 or "error" in body
+        ]
+        if failed:
+            response, body = failed[0]
             tip.error = f"{response.status_code} {json.dumps(body.get('error') or body)[:200]}"
         else:
-            tip.answer = answer_json(body)
-            usage = body.get("usage") or {}
-            tip.cost = usage.get("cost")
-            tip.reasoning_tokens = (usage.get("completion_tokens_details") or {}).get("reasoning_tokens")
-            check(tip, args.language)
-    except (httpx2.HTTPError, ValueError, KeyError, IndexError, TypeError) as error:
+            now, want = (answer_json(body) for body in bodies)
+            tip.answer = {"now": now, "want": want}
+            check(tip, args.language, args.words)
+    except (httpx2.HTTPError, ValueError, KeyError, IndexError, TypeError, AttributeError) as error:
         tip.error = f"{type(error).__name__}: {error}"
     tip.seconds = time.perf_counter() - start
-    print(f"{tip.scene}  round {number}  {tip.seconds:4.1f} s  {tip.error or tip.answer.get('text', '')}")
+    said = " | ".join(tip.answer.get("lines", []))
+    print(f"{tip.scene}  round {number}  {tip.seconds:4.1f} s  {tip.error or said or tip.flags}")
     return tip
 
 
@@ -381,12 +501,18 @@ def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
 
 
 def axes(answer: dict) -> str:
-    """The moves as the app would list them: closer or back, the height, and always the angle."""
-    framing = {"closer": "get closer", "back": "step back"}.get(answer.get("framing", ""), "")
-    best = answer.get("camera_best", "")
-    height = {"raise": f"raise to {best}", "lower": f"lower to {best}"}.get(answer.get("height", ""), f"keep at {best}")
+    """What the server decided: closer or back, the height move, and the tilt."""
+    said = {"closer": "get closer", "back": "step back", "keep": "same distance"}
+    framing = said.get(answer.get("framing", ""), "no distance (the measures differ)")
+    hold = answer.get("hold", "")
+    height = {"raise": f"raise to {hold}", "lower": f"lower to {hold}"}.get(answer.get("height", ""), f"keep at {hold}")
     angle = {"up": "tilt up", "down": "tilt down", "level": "hold level"}.get(answer.get("angle", ""), "")
-    return " · ".join(move for move in (framing, height, angle) if move)
+    return " · ".join(part for part in (framing, height, angle) if part)
+
+
+def lines_text(answer: dict) -> list[str]:
+    """The tip's sentences as the app shows them, one on a line."""
+    return list(answer.get("lines", []))
 
 
 def write_sheets(out: Path, tips: list[Tip], per_sheet: int = 8) -> None:
@@ -405,8 +531,8 @@ def write_sheets(out: Path, tips: list[Tip], per_sheet: int = 8) -> None:
                 thumb.thumbnail((box, box))
                 canvas.paste(thumb, (15 + column * (box + 15) + (box - thumb.width) // 2, top))
             left, y = 2 * (box + 15) + 25, top
-            seen = " · ".join(str(tip.answer.get(key, "")) for key in ("shot", "pose", "camera_now", "camera_best"))
-            header = f"{tip.scene}   round {tip.round}   {tip.seconds:.1f} s   {seen}"
+            shots = " -> ".join(str((tip.answer.get(key) or {}).get("shot", "")) for key in ("now", "want"))
+            header = f"{tip.scene}   round {tip.round}   {tip.seconds:.1f} s   {shots} · {tip.answer.get('pose', '')}"
             draw.text((left, y), header, font=small, fill="#666")
             y += 26
             for line in textwrap.wrap(f"Pose: {tip.pose}", 78):
@@ -418,9 +544,10 @@ def write_sheets(out: Path, tips: list[Tip], per_sheet: int = 8) -> None:
                 continue
             draw.text((left, y), axes(tip.answer), font=bold, fill="#0a58ca")
             y += 34
-            for line in textwrap.wrap(tip.answer.get("text", ""), 64):
-                draw.text((left, y), line, font=regular, fill="black")
-                y += 27
+            for said in lines_text(tip.answer):
+                for line in textwrap.wrap(said, 64):
+                    draw.text((left, y), line, font=regular, fill="black")
+                    y += 27
             if tip.flags:
                 draw.text((left, y + 6), "Flags: " + ", ".join(tip.flags), font=small, fill="#c00")
             draw.line((0, top + row_height - 15, width, top + row_height - 15), fill="#ddd", width=2)
@@ -435,7 +562,7 @@ def write_report(out: Path, prompt: str, tips: list[Tip]) -> None:
             html.escape(tip.error)
             if tip.error
             else (
-                f"<b>{html.escape(axes(tip.answer))}</b><br>{html.escape(tip.answer.get('text', ''))}"
+                f"<b>{html.escape(axes(tip.answer))}</b><br>{'<br>'.join(map(html.escape, lines_text(tip.answer)))}"
                 + (f'<br><span class="bad">{html.escape(", ".join(tip.flags))}</span>' if tip.flags else "")
             )
         )
@@ -456,7 +583,8 @@ async def run_tips(args: argparse.Namespace, client: httpx2.AsyncClient) -> None
     prompt = one_line(
         args.prompt_file.read_text(encoding="utf-8") if args.prompt_file else server_prompts()["tip_prompt"]
     )
-    args.korean = one_line(server_prompts()["tip_korean"]) if args.language == "ko" else None
+    args.candidate = one_line(server_prompts()["tip_candidate"])
+    args.words = {name: one_line(text) for name, text in server_prompts()["tip_words"][args.language].items()}
     folders = sorted(folder for folder in PAIRS.glob("*") if (folder / "candidate.jpg").is_file())
     if args.only:
         folders = [folder for folder in folders if folder.name in args.only]
@@ -465,8 +593,9 @@ async def run_tips(args: argparse.Namespace, client: httpx2.AsyncClient) -> None
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     out = OUT / "runs" / (f"{stamp}-{args.label}" if args.label else stamp)
     out.mkdir(parents=True, exist_ok=True)
-    # What the model is sent, the Korean instruction included, so the run can be repeated from its folder.
-    sent = f"{prompt}\n\n{args.korean}" if args.korean else prompt
+    # What the model is sent with the candidate, so the run can be repeated from its folder; the scene gets the first
+    # paragraph alone.
+    sent = "\n\n".join((prompt, args.candidate))
     (out / "prompt.txt").write_text(sent + "\n", encoding="utf-8")
 
     gate = asyncio.Semaphore(CONCURRENCY)
@@ -496,14 +625,16 @@ async def run_tips(args: argparse.Namespace, client: httpx2.AsyncClient) -> None
             f"90th pct. {ninetieth:.1f} s, slowest {seconds[-1]:.1f} s"
         )
     if args.rounds > 1:
-        # The same pair should get the same decisions every time; the sentence may differ.
-        decided = ("shot", "pose", "camera_best", "angle", "framing")
+        # The same pair should get the same tip every time: the decisions the server returns, and the sentences,
+        # which also hold the side, the room above the head, and the leaning line.
+        decided = ("framing", "much", "hold", "angle")
         rounds: dict[str, set[tuple]] = {}
         for tip in tips:
             if not tip.error:
-                rounds.setdefault(tip.scene, set()).add(tuple(tip.answer.get(key) for key in decided))
+                said = tuple(tip.answer.get("lines") or ())
+                rounds.setdefault(tip.scene, set()).add((*(tip.answer.get(key) for key in decided), said))
         same = sum(len(answers) == 1 for answers in rounds.values())
-        print(f"Same decisions in every round: {same}/{len(rounds)} pairs")
+        print(f"Same tip in every round: {same}/{len(rounds)} pairs")
     thinking = [tip.reasoning_tokens for tip in tips if tip.reasoning_tokens is not None]
     if thinking:
         print(f"Reasoning tokens: median {statistics.median(thinking):.0f}, most {max(thinking)}")
@@ -534,9 +665,7 @@ def main() -> None:
     tips.add_argument("--prompt-file", type=Path, help="tip prompt (default: the server's)")
     tips.add_argument("--label", help="appended to the run folder's name")
     tips.add_argument("--rounds", type=int, default=1, help="calls per pair, to see the spread")
-    tips.add_argument(
-        "--language", default="en", choices=["en", "ko"], help="the sentence's language, as the app sends"
-    )
+    tips.add_argument("--language", default="en", choices=["en", "ko"], help="the tip's language, as the app sends")
     tips.add_argument("--only", nargs="+", metavar="SCENE", help="only these pairs, by folder name")
     reasoning = ["minimal", "low", "medium", "high"]
     tips.add_argument("--reasoning", default="low", choices=reasoning, help="default: the server's")

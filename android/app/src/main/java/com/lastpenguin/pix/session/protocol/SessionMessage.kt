@@ -1,8 +1,9 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
@@ -134,9 +135,27 @@ sealed interface SessionMessage {
     data object GuideClear : SessionMessage
 
     /**
+     * P→S: the tip of the guide on the photographer's camera (FR-4.10, #213), which Subject view shows on a tap while
+     * the guide [guideId] is on its video: [text] as the server wrote it, a sentence on each line.
+     */
+    @Serializable
+    @SerialName("guide.tip")
+    data class GuideTip(val guideId: String, val text: String) : SessionMessage
+
+    /** P→S: the guide on the camera has no tip, or none any more. */
+    @Serializable
+    @SerialName("guide.tip.clear")
+    data object GuideTipClear : SessionMessage
+
+    /**
      * Where the photographer's set of candidates [setId] is (Design 2.5.1, 2.6.5, Iter3-P16): the subject's *Pick a
      * pose* follows it. [poseIds] are the created candidates in the photographer's order, with PICKING; [poseId] and
-     * [by] say whose *Use this pose* decided, with CHOSEN. A set ends once, with CHOSEN or CLOSED.
+     * [by] say whose *Use this pose* decided, with CHOSEN. With CLOSED, [failure] names why the set failed (FR-4.7,
+     * #203), a `GenerationError` by name: a string, so a name this phone does not know drops no message, and reads as
+     * a server error; none when the user closed it, and none from a photographer of an older version. With GENERATING,
+     * [sceneTurn] is how the photographer held the scene photo (`PhoneTurns`: 0, 90, 180, or 270; #206), so a ♥ on the
+     * subject's *Pick a pose* saves the guide as it goes on the camera; 0 is left out, and a subject reads anything
+     * else, or none from an older photographer, as 0. A set ends once, with CHOSEN or CLOSED.
      */
     @Serializable
     @SerialName("pose.step")
@@ -146,6 +165,8 @@ sealed interface SessionMessage {
         @EncodeDefault(EncodeDefault.Mode.NEVER) val poseIds: List<String> = emptyList(),
         @EncodeDefault(EncodeDefault.Mode.NEVER) val poseId: String? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val by: Role? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val failure: String? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val sceneTurn: Int = 0,
     ) : SessionMessage
 
     /**
@@ -185,10 +206,16 @@ sealed interface SessionMessage {
     /**
      * The candidate [poseId] of the set [setId] could not be created (Iter3-A13), so the subject's slot says so as the
      * photographer's does, which shows every failure alike; no reason travels, so a new one breaks no older phone.
+     * [descriptionRejected] says that the service refused the set's description itself, so the subject's history does
+     * not keep it either (FR-4.11); a photographer of an older version sends none, and an older subject ignores it.
      */
     @Serializable
     @SerialName("pose.candidate.failed")
-    data class PoseCandidateFailed(val setId: String, val poseId: String) : SessionMessage
+    data class PoseCandidateFailed(
+        val setId: String,
+        val poseId: String,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val descriptionRejected: Boolean = false,
+    ) : SessionMessage
 
     /**
      * The subject's *Use this pose* on the candidate [poseId] (FR-6.15), a request like its others (AD-7): the
@@ -205,7 +232,9 @@ sealed interface SessionMessage {
      * when a set starts from it, or CLOSED. With STARTED, [text] is the set's description as its request has it,
      * empty for suggested poses (FR-4.11); a photographer of an older version sends none, so it is null then. With
      * STARTED, [setId] names the set that started, as `pose.step` names it, so the subject's history waits for that
-     * set's answer and no other (FR-4.11); null from an older photographer.
+     * set's answer and no other (FR-4.11); null from an older photographer. With OPEN, [situation] is the situation the
+     * scene photo was taken for, by its `situation` name on the server (FR-4.8, It 4); a string, so a name this phone does
+     * not know is shown as none rather than dropping the message; null from an older photographer.
      */
     @Serializable
     @SerialName("pose.description")
@@ -216,6 +245,7 @@ sealed interface SessionMessage {
         @EncodeDefault(EncodeDefault.Mode.NEVER) val writer: Role? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val rejected: Boolean = false,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val setId: String? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val situation: String? = null,
     ) : SessionMessage
 
     /**
@@ -362,7 +392,22 @@ sealed interface SessionMessage {
         val ratio: Float,
         /** True for the last value of a pinch (or a single tap). Only it travels reliably and gets a notice. */
         val final: Boolean = false,
+        /**
+         * True, with [final], for a pinch that stopped without a value of its own, held back by the photographer's
+         * (FR-7.6, #236): [ratio] is the photographer's zoom as last echoed and is not applied. As a `camera.zoom.set`,
+         * it makes a step sent before it stale. Only a photographer that sends `camera.zoom.hold` gets one.
+         */
+        val cancel: Boolean = false,
     ) : SessionMessage
+
+    /**
+     * Photographer → subject: whose pinch holds the zoom now, [by], or null when it is free (FR-7.6, #236). Sent at each
+     * change and when the session connects. While the photographer holds it, the subject's pinch sends nothing and its
+     * readout follows the echo; an older phone ignores the message, and the photographer drops its requests anyway.
+     */
+    @Serializable
+    @SerialName("camera.zoom.hold")
+    data class ZoomHoldUpdate(val by: Role? = null) : SessionMessage
 
     /** A step of the subject's brightness slider, an exposure-compensation index, or its final value (FR-7.3). */
     @Serializable
@@ -387,6 +432,8 @@ sealed interface SessionMessage {
     /**
      * The camera values actually applied, and who changed them. Iteration 2 adds [exposure], [flash], and [aspect],
      * so the subject always has the whole camera state and fits its video, grid, and guide to [aspect] (AD-10).
+     * [facing] is the camera in use (#201): the subject shows the rear camera's video as a mirror. An older phone
+     * sends none, which means the rear camera.
      */
     @Serializable
     @SerialName("camera.state")
@@ -397,6 +444,7 @@ sealed interface SessionMessage {
         val exposure: Int = 0,
         val flash: FlashMode = FlashMode.OFF,
         val aspect: AspectRatio = AspectRatio.R4_3,
+        val facing: CameraFacing = CameraFacing.BACK,
     ) : SessionMessage
 
     @Serializable

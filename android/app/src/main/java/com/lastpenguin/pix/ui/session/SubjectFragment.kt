@@ -1,8 +1,10 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.animation.Animator
 import android.animation.ValueAnimator
+import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
@@ -10,6 +12,7 @@ import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.annotation.ColorRes
 import androidx.annotation.DrawableRes
+import androidx.annotation.VisibleForTesting
 import androidx.core.animation.doOnEnd
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
@@ -40,29 +43,40 @@ import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.camera.ExposureScale
 import com.lastpenguin.pix.ui.camera.FramePlace
 import com.lastpenguin.pix.ui.camera.GuideSaveNotice
+import com.lastpenguin.pix.ui.camera.PhotoViewer
 import com.lastpenguin.pix.ui.camera.PinchZoomController
 import com.lastpenguin.pix.ui.camera.PreviewArea
+import com.lastpenguin.pix.ui.camera.REFERENCE_FLING_DP
 import com.lastpenguin.pix.ui.camera.REFERENCE_MARGIN_DP
+import com.lastpenguin.pix.ui.camera.REFERENCE_PEEK_DP
 import com.lastpenguin.pix.ui.camera.REFERENCE_SMALL_DP
 import com.lastpenguin.pix.ui.camera.ReferenceArea
 import com.lastpenguin.pix.ui.camera.ReferenceDragController
+import com.lastpenguin.pix.ui.camera.ReferencePlacement
 import com.lastpenguin.pix.ui.camera.TOP_BAR_OVERHANG_DP
 import com.lastpenguin.pix.ui.camera.ToggleLabel
 import com.lastpenguin.pix.ui.camera.TrackedSliderController
+import com.lastpenguin.pix.ui.camera.TurningIcons
 import com.lastpenguin.pix.ui.camera.ZOOM_ROW_MARGIN_DP
 import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
 import com.lastpenguin.pix.ui.camera.framePlace
 import com.lastpenguin.pix.ui.camera.guideSaveIcon
 import com.lastpenguin.pix.ui.camera.guideSaveTint
+import com.lastpenguin.pix.ui.camera.isUnder
 import com.lastpenguin.pix.ui.camera.lerp
+import com.lastpenguin.pix.ui.camera.photoThumbnail
+import com.lastpenguin.pix.ui.camera.photoToView
 import com.lastpenguin.pix.ui.camera.placeReference
 import com.lastpenguin.pix.ui.camera.placeZoomRow
 import com.lastpenguin.pix.ui.camera.previewArea
 import com.lastpenguin.pix.ui.camera.previewAspect
 import com.lastpenguin.pix.ui.camera.setLabelIcon
 import com.lastpenguin.pix.ui.camera.setReferenceActions
+import com.lastpenguin.pix.ui.camera.showGuideEditing
+import com.lastpenguin.pix.ui.camera.showPhotoThumbnails
 import com.lastpenguin.pix.ui.camera.showPinchModeLabel
 import com.lastpenguin.pix.ui.camera.showReference
+import com.lastpenguin.pix.ui.camera.showReferenceHandle
 import com.lastpenguin.pix.ui.fadeTo
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.TutorialFragment
@@ -93,10 +107,13 @@ import org.webrtc.VideoSink
  * goes to the photographer (FR-6.15, Design 2.6.5), and *Save guide* keeps the guide on this phone (FR-6.16). While
  * the photographer describes or creates poses, picks one, or checks its guide, the video says so, and their *Generate
  * poses*, candidates, and the chosen pose's outline open on this phone's screens of the same steps (Design 2.6.5).
- * System back asks first (R&S 6.9). The first time the video shows, the tutorial's tips of this screen come over it
- * (FR-10.4). The video fades in, dims under a text, moves to the photographer's new ratio as their frame does, and
- * blinks at their shutter (Design 2.6.4). Leaving for another screen, the video goes at once and the rest fades
- * (Design 2.1).
+ * The bottom row is Camera's: *Guide* at the left, and the session's newest photo as a thumbnail at the right, empty
+ * until the first, which opens the session's photos in a viewer over the screen, inside Pix, so the session goes on
+ * (FR-6.14).
+ * System back closes the viewer, or else asks first (R&S 6.9). The first time the video shows, the tutorial's tips of
+ * this screen come over it (FR-10.4). The video fades in, dims under a text, moves to the photographer's new ratio as
+ * their frame does, and blinks at their shutter (Design 2.6.4). Leaving for another screen, the video goes at once and
+ * the rest fades (Design 2.1).
  * Owner: Real-time (#8, #10, #57), with the guide from #9 and Iter3-P9; *Save guide*, the candidates, and the outline
  * Iter3-P16.
  */
@@ -111,6 +128,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private var renderer: SurfaceViewRenderer? = null
     private var watchdog: FrameWatchdog? = null
     private var referenceDrag: ReferenceDragController? = null
+    private var turningIcons: TurningIcons? = null
+    private var photoViewer: PhotoViewer? = null
     private var toggleLabelJob: Job? = null
     private var pinchModeJob: Job? = null
 
@@ -135,6 +154,14 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
     // Whether the photographer's video shows: connected, with frames coming.
     private val videoShowing = MutableStateFlow(false)
+
+    // The session photo's thumbnail and the viewer's picture, off the main thread; a test stands in for MediaStore,
+    // which has no photos on the JVM.
+    @VisibleForTesting
+    internal var thumbnailOf: (Uri) -> Bitmap? = { uri -> requireContext().photoThumbnail(uri) }
+
+    @VisibleForTesting
+    internal var photoOf: (Uri) -> Bitmap? = { uri -> requireContext().photoToView(uri) }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentSubjectBinding.bind(view)
@@ -173,6 +200,21 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             onZoom = viewModel::onZoomGesture,
         )
         setupZoomAccessibility(binding.zoomReadout)
+        // The icons turn with this phone, held as the subject holds it, and so do the zoom readout and Guide and Pick a
+        // pose with their labels (FR-1.15); the other texts and the layout stay.
+        viewModel.watchPhoneTurn(viewLifecycleOwner)
+        turningIcons = TurningIcons(
+            controls = listOf(
+                binding.flashButton,
+                binding.settingsButton,
+                binding.brightnessButton,
+                binding.tipButton,
+                binding.saveGuideButton,
+                binding.editGuideButton,
+                binding.zoomReadout,
+            ),
+            views = listOf(binding.guideButton, binding.pickPoseButton, binding.galleryThumbnail),
+        )
         binding.editGuideButton.setOnClickListener {
             viewModel.setGuideEditing(!viewModel.uiState.value.guideEditing)
             showPinchMode(binding, viewModel.uiState.value.guideEditing)
@@ -186,8 +228,21 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             viewModel.setBrightnessOpen(!viewModel.uiState.value.brightnessOpen)
         }
         binding.flashButton.setOnClickListener { viewModel.onFlashTap() }
+        // The session's photos open over the video, inside Pix, so the session goes on (FR-6.14).
+        binding.galleryButton.setOnClickListener { viewModel.openPhotos() }
+        val photoViewer =
+            PhotoViewer(
+                binding.photoViewerHolder,
+                viewLifecycleOwner.lifecycleScope,
+                load = { photoOf(it) },
+                thumbnail = { thumbnailOf(it) },
+                onBack = viewModel::closePhotos,
+                onDelete = viewModel::deletePhoto,
+            )
+        this.photoViewer = photoViewer
         binding.guideButton.setOnClickListener { findNavController().navigate(R.id.action_subject_to_addGuide) }
         binding.saveGuideButton.setOnClickListener { viewModel.onSaveGuide() }
+        setupTip(binding)
         binding.pickPoseButton.setOnClickListener {
             val ui = viewModel.uiState.value
             when {
@@ -204,13 +259,31 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         (sessionViewModel.state.value as? SessionState.Ended)?.let { view.post { onTransition(it) } }
 
         binding.leaveButton.setOnClickListener { leaveNow() }
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { confirmLeave() }
+        // Settings in a session (#204): it covers this screen and comes back to it when the session ends.
+        binding.settingsButton.setOnClickListener {
+            val nav = findNavController()
+            if (nav.currentDestination?.id == R.id.subjectFragment) nav.navigate(R.id.action_subject_to_settings)
+        }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) {
+            if (viewModel.uiState.value.photosOpen) viewModel.closePhotos() else confirmLeave()
+        }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    viewModel.phoneTurn.collect { turn ->
+                        turningIcons?.turnTo(turn)
+                        photoViewer.turnTo(turn)
+                    }
+                }
                 // The photographer's guide in this phone's own color and thickness (FR-3.10).
                 launch {
                     binding.guideOverlay.followLook(settingsViewModel.guideLook, viewModel.uiState.map { it.guide })
+                }
+                launch {
+                    viewModel.photoNotDeleted.collect {
+                        Toast.makeText(requireContext(), R.string.photo_not_deleted, Toast.LENGTH_SHORT).show()
+                    }
                 }
                 launch {
                     combine(settingsViewModel.showLatency, sessionViewModel.state, sessionViewModel.latencyMs, ::Triple)
@@ -222,6 +295,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                             ?.let { getString(R.string.subject_title, it) }
                             ?: getString(R.string.subject_title_placeholder)
                         reshape(binding, ui.aspect)
+                        renderMirror(binding, ui.mirrored)
                         renderReference(binding, ui)
                         // The video fits itself to the stream; the grid and the guide fit to the same frame (AD-10).
                         binding.compositionOverlay.frameAspect = ui.aspect.frameAspect
@@ -236,6 +310,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         // Checked before enabled: MaterialButton ignores setChecked while it is disabled, so a
                         // hidden guide would leave the toggle drawn as on (found by SubjectFragmentRenderTest).
                         binding.editGuideButton.isChecked = ui.guideEditing
+                        binding.editGuideButton.showGuideEditing(ui.guideEditing)
                         binding.editGuideButton.isEnabled = ui.connected && ui.guideState.visible
                         if (ui.guide == null) binding.pinchModeLabel.isVisible = false
                         // Guide-colored once a guide is on the video; it then replaces the guide on both phones.
@@ -245,6 +320,9 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                             if (ui.guide == null) R.string.guide_add_description else R.string.guide_change_description,
                         )
                         renderSaveGuide(binding, ui)
+                        renderTip(binding, ui)
+                        binding.galleryButton.isEnabled = ui.lastPhoto != null
+                        photoViewer.render(ui.photos, ui.photosOpen)
                         renderPoses(binding, ui)
                         renderCameraControls(binding, ui)
                         val ratio = zoomFormat.format(ui.zoom)
@@ -252,6 +330,11 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         binding.zoomReadout.contentDescription = getString(R.string.camera_zoom_description, ratio)
                         binding.zoomReadout.isEnabled = ui.canZoom
                         if (!ui.canZoom) pinchZoom?.finishInteraction()
+                    }
+                }
+                launch {
+                    showPhotoThumbnails(viewModel.uiState.map { it.lastPhoto }, binding.galleryThumbnail) {
+                        thumbnailOf(it)
                     }
                 }
                 // Its tutorial tips once the photographer's video shows, a moment later so the video comes first, and not
@@ -295,13 +378,26 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                 }
                 launch {
                     viewModel.toggleLabels.collect { label ->
-                        if (label is ToggleLabel.Zoom) {
-                            showToggleLabel(
+                        when (label) {
+                            is ToggleLabel.Zoom -> showToggleLabel(
                                 binding,
                                 getString(R.string.zoom_ratio, DecimalFormat("0.#").format(label.ratio)),
                                 R.drawable.ic_zoom_small,
                                 R.color.pix_accent,
                             )
+
+                            // The photographer's pinch holds the zoom (FR-7.6, #236).
+                            ToggleLabel.ZoomHeld -> {
+                                val name = viewModel.uiState.value.photographerName ?: return@collect
+                                showToggleLabel(
+                                    binding,
+                                    getString(R.string.zoom_held_label, name),
+                                    R.drawable.ic_zoom_small,
+                                    R.color.pix_text,
+                                )
+                            }
+
+                            else -> Unit
                         }
                     }
                 }
@@ -423,6 +519,22 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         renderVideo(binding)
     }
 
+    /**
+     * The rear camera's video as a mirror (#201), so the subject moves to the guide the way they see themselves. The
+     * renderer flips the video, since a SurfaceView ignores its own scale; the grid, the guide, and the reference photo
+     * flip as views. A touch reaches the flipped guide in its own coordinates, so a drag still moves it under the
+     * finger, and the guide sent and received stays in the photographer's coordinates. The reference photo's drag
+     * reads the screen's coordinates, which the flip leaves alone.
+     */
+    private fun renderMirror(binding: FragmentSubjectBinding, mirrored: Boolean) {
+        renderer?.setMirror(mirrored)
+        val scale = if (mirrored) -1f else 1f
+        // The reference photo's flip is set with its size, which is its scale too (showReference).
+        for (view in listOf(binding.compositionOverlay, binding.guideOverlay)) {
+            view.scaleX = scale
+        }
+    }
+
     /** The grid while connected and the guide, except while the photographer's new ratio comes. */
     private fun renderOverlays(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         binding.compositionOverlay.isVisible = ui.connected && !reshaping
@@ -487,8 +599,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         val text = !streaming || stalled || poses != null
         binding.connectingText.isVisible = text
         binding.liveDot.isVisible = streaming && !stalled
-        // Not while a pose step's text covers the video, which then is not what the tips show.
-        videoShowing.value = streaming && !stalled && poses == null
+        // Not while a pose step's text or the session photo covers the video, which then is not what the tips show.
+        videoShowing.value = streaming && !stalled && poses == null && !viewModel.uiState.value.photosOpen
         binding.connectingText.text = when {
             reconnecting -> getString(R.string.reconnecting)
             !connected || (!frames.hasFrame() && poses == null) -> getString(R.string.connecting)
@@ -528,22 +640,29 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
     /**
      * The photographer's reference photo (FR-3.9), as on their Camera screen: a tap enlarges it or makes it small,
-     * and a drag drops it into the nearest corner of this phone's video, which the photographer never sees.
+     * and a drag drops it into the nearest corner of this phone's video, or hides it at that corner's side (#237),
+     * none of which the photographer sees.
      */
     private fun setupReference(binding: FragmentSubjectBinding) {
         val thumbnail = binding.referenceThumbnail
+        val density = resources.displayMetrics.density
         referenceDrag = ReferenceDragController(
             thumbnail,
             area = { referenceArea(binding) },
-            onTap = { viewModel.setReferenceExpanded(!viewModel.uiState.value.referenceExpanded) },
-        ) { corner ->
-            corner?.let(viewModel::setReferenceCorner)
+            previewWidth = { binding.videoContainer.width },
+            peek = (REFERENCE_PEEK_DP * density).roundToInt(),
+            flingSpeed = REFERENCE_FLING_DP * density,
+            onTap = viewModel::onReferenceTap,
+        ) { drop ->
+            drop?.let(viewModel::onReferenceDropped)
             renderReference(binding, viewModel.uiState.value)
-        }
+        }.also { it.listenOn(binding.referenceHandle) }
         thumbnail.setReferenceActions(
             expanded = { viewModel.uiState.value.referenceExpanded },
             corner = { viewModel.uiState.value.referenceCorner },
+            hidden = { viewModel.uiState.value.referenceHidden },
             moveTo = viewModel::setReferenceCorner,
+            setHidden = viewModel::setReferenceHidden,
         )
         // The corners follow the video's size and the slider above Guide, known only after layout.
         val relayout = View.OnLayoutChangeListener {
@@ -565,22 +684,39 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         binding.bottomOverlays.addOnLayoutChangeListener(relayout)
     }
 
-    /** The thumbnail in its corner, small or enlarged, while the photographer's reference photo is here. */
+    /**
+     * The thumbnail in its corner, small or enlarged, or hidden at that corner's side with its handle over the strip
+     * (#237), while the photographer's reference photo is here.
+     */
     private fun renderReference(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         val container = binding.videoContainer
-        binding.referenceThumbnail.showReference(ui.reference) { photo ->
-            if (referenceDrag?.isDragging == true || container.width == 0) {
+        val dragging = referenceDrag?.isDragging == true
+        var placed: ReferencePlacement? = null
+        binding.referenceThumbnail.showReference(ui.reference, mirrored = ui.mirrored) { photo ->
+            if (dragging || container.width == 0) {
                 null
             } else {
+                val density = resources.displayMetrics.density
                 placeReference(
                     aspect = photo.width.toFloat() / photo.height,
                     expanded = ui.referenceExpanded,
                     corner = ui.referenceCorner,
-                    smallLongSide = (REFERENCE_SMALL_DP * resources.displayMetrics.density).roundToInt(),
+                    smallLongSide = (REFERENCE_SMALL_DP * density).roundToInt(),
                     previewWidth = container.width,
                     area = referenceArea(binding),
-                )
+                    hidden = ui.referenceHidden,
+                    peek = (REFERENCE_PEEK_DP * density).roundToInt(),
+                ).also { placed = it }
             }
+        }
+        // The handle stays as it is through a drag, which may have begun on it.
+        if (!dragging) {
+            binding.referenceHandle.showReferenceHandle(
+                placement = placed.takeIf { ui.reference != null && ui.referenceHidden },
+                corner = ui.referenceCorner,
+                previewWidth = container.width,
+                area = referenceArea(binding),
+            )
         }
     }
 
@@ -594,6 +730,10 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     }
 
     override fun onDestroyView() {
+        turningIcons?.stop()
+        turningIcons = null
+        photoViewer?.stop()
+        photoViewer = null
         move?.let {
             move = null
             it.cancel()
@@ -621,6 +761,39 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     override fun onCreateAnimator(transit: Int, enter: Boolean, nextAnim: Int): Animator? {
         if (!enter && nextAnim != 0) renderer?.isInvisible = true
         return super.onCreateAnimator(transit, enter, nextAnim)
+    }
+
+    /**
+     * The photographer's tip (FR-4.10, #213): the tip button opens and closes it, a touch anywhere closes it and still
+     * does what it does where it lands, and the banner is clickable as well, so TalkBack can close it.
+     */
+    private fun setupTip(binding: FragmentSubjectBinding) {
+        binding.root.onTouchEnd = { event ->
+            // The tip button opens and closes the tip itself; closed here first, its tap would only open it again.
+            if (!binding.tipButtonFrame.isUnder(event, binding.root)) viewModel.onAnyTouch()
+        }
+        binding.tipButton.setOnClickListener { viewModel.onTipButton() }
+        binding.tipBanner.setOnClickListener { viewModel.onAnyTouch() }
+        ViewCompat.replaceAccessibilityAction(
+            binding.tipBanner,
+            AccessibilityActionCompat.ACTION_CLICK,
+            getString(R.string.close_tip),
+        ) { _, _ ->
+            viewModel.onAnyTouch()
+            true
+        }
+    }
+
+    /**
+     * The photographer's tip of the guide on the video (FR-4.10, #213): its button while that guide has one and shows,
+     * with a dot until the tip was opened, and the banner only once the button opened it.
+     */
+    private fun renderTip(binding: FragmentSubjectBinding, ui: SubjectUiState) {
+        val tip = ui.tip?.takeIf { ui.guide != null && ui.guideState.visible }
+        binding.tipButtonFrame.isVisible = tip != null
+        binding.tipDot.isVisible = tip?.unseen == true
+        binding.tipBanner.isVisible = tip?.open == true
+        binding.tipText.text = tip?.tip?.text
     }
 
     /** *Save guide* (FR-6.16): beside the guide-edit toggle while a guide is on the video, filled once saved here. */
@@ -652,13 +825,15 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         val describing = describing(ui)
         binding.pickPoseButton.isVisible = picking || generating || confirming || describing
         val label = when {
-            confirming -> R.string.reference_title
+            confirming -> R.string.pose_guide_title
             describing -> R.string.describe_title
             generating -> R.string.generating_title
             else -> R.string.pick_pose_title
         }
         binding.pickPoseLabel.setText(label)
         binding.pickPoseButton.contentDescription = getString(label)
+        // A step that starts while the session photo is open here waits, and opens as the viewer closes.
+        if (ui.photosOpen) return
         val confirmId = ui.confirmId
         val setId = ui.poseSetId
         val describeId = ui.describeId

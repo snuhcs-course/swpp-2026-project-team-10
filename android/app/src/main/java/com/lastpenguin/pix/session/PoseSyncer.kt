@@ -1,9 +1,10 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
 import android.util.Log
 import com.lastpenguin.pix.core.Timings
+import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.CoroutineDispatcher
@@ -34,8 +35,11 @@ interface PoseShare {
     /** The subject's picks while the set is PICKING, in the order they came; the first unchosen one decides. */
     val picks: Flow<SubjectPick>
 
-    /** *Generate 4 poses* or *Skip* started the set [setId], in place of any other. */
-    fun open(setId: String)
+    /**
+     * *Generate 4 poses* or *Skip* started the set [setId], in place of any other, from a scene photo held at
+     * [sceneTurn] (`PhoneTurns`).
+     */
+    fun open(setId: String, sceneTurn: Int = 0)
 
     /** The candidates [setId] plans, [poseIds] in the order of their slots. */
     fun planned(setId: String, poseIds: List<String>)
@@ -43,8 +47,11 @@ interface PoseShare {
     /** The candidate [poseId] of [setId] arrived. */
     fun candidate(setId: String, poseId: String, image: Bitmap)
 
-    /** The candidate [poseId] of [setId] could not be created. */
-    fun failed(setId: String, poseId: String)
+    /**
+     * The candidate [poseId] of [setId] could not be created; with [descriptionRejected], because the service refused
+     * the set's description itself, which the subject's phone then does not keep either (FR-4.11).
+     */
+    fun failed(setId: String, poseId: String, descriptionRejected: Boolean = false)
 
     /** *Pick a pose* opened with the created candidates [poseIds], in its order. */
     fun picking(setId: String, poseIds: List<String>)
@@ -52,26 +59,29 @@ interface PoseShare {
     /** The first *Use this pose*, [by] whom. */
     fun chosen(setId: String, poseId: String, by: Role)
 
-    /** The set ended without a choice: Back, *Try other poses*, *Cancel*, or no candidate. */
-    fun close(setId: String)
+    /**
+     * The set ended without a choice: Back, *Regenerate*, *Cancel*, or no candidate, which says why in [failure], so
+     * the subject's phone says it too (FR-4.7).
+     */
+    fun close(setId: String, failure: GenerationError? = null)
 
     /** For a phone with nothing to share, such as the ViewModel's tests. */
     object None : PoseShare {
         override val picks: Flow<SubjectPick> = emptyFlow()
 
-        override fun open(setId: String) = Unit
+        override fun open(setId: String, sceneTurn: Int) = Unit
 
         override fun planned(setId: String, poseIds: List<String>) = Unit
 
         override fun candidate(setId: String, poseId: String, image: Bitmap) = Unit
 
-        override fun failed(setId: String, poseId: String) = Unit
+        override fun failed(setId: String, poseId: String, descriptionRejected: Boolean) = Unit
 
         override fun picking(setId: String, poseIds: List<String>) = Unit
 
         override fun chosen(setId: String, poseId: String, by: Role) = Unit
 
-        override fun close(setId: String) = Unit
+        override fun close(setId: String, failure: GenerationError?) = Unit
     }
 }
 
@@ -84,6 +94,8 @@ data class MirrorPoseSet(
     val step: PoseSetStep,
     /** With PICKING: the photographer's created candidates, in its order. */
     val poseIds: List<String> = emptyList(),
+    /** How the photographer held the scene photo, 0, 90, 180, or 270, for a ♥ on the subject's *Pick a pose*. */
+    val sceneTurn: Int = 0,
     /** In the order they arrived. */
     val candidates: Map<String, Bitmap> = emptyMap(),
     /** The set's planned candidates in the order of their slots; empty until planned, and from a photographer of
@@ -97,10 +109,26 @@ data class MirrorPoseSet(
 }
 
 /**
+ * What the photographer's sets said of their descriptions, for the subject's history (FR-4.11): the sets the server
+ * [accepted], with a candidate or PICKING, and the sets whose description the service [refused] itself. Both only grow,
+ * and stay when a set or its session ends, so a reader that looks late misses nothing: a set's id is never used again,
+ * and each set adds its id at most twice. [PoseSyncer.mirror] drops an ended set, and a reader of it can miss what
+ * came with the set's end.
+ */
+data class DescriptionVerdicts(val accepted: Set<String> = emptySet(), val refused: Set<String> = emptySet())
+
+/**
  * How a set the subject knew ended: [step] is CHOSEN, with [by] whose *Use this pose* it was, or CLOSED. [wasPicking]
  * says whether the subject's *Pick a pose* had the set, so whether a notice is worth showing.
  */
-data class PoseSetEnd(val setId: String, val step: PoseSetStep, val by: Role?, val wasPicking: Boolean)
+data class PoseSetEnd(
+    val setId: String,
+    val step: PoseSetStep,
+    val by: Role?,
+    val wasPicking: Boolean,
+    /** Why a CLOSED set failed (FR-4.7); null when the photographer closed it, or did not say. */
+    val failure: GenerationError? = null,
+)
 
 /**
  * Shows the photographer's candidates on the subject's *Pick a pose* (Design 2.5.1: pose.step, pose.candidate.*,
@@ -110,10 +138,12 @@ data class PoseSetEnd(val setId: String, val step: PoseSetStep, val by: Role?, v
  * session is connected, sends what the subject does not have yet, in order: the step, the planned slots and each
  * failed candidate (Iter3-A13), each candidate's copy, one at a time, then PICKING or the set's end. A sender started again after the link reconnects (Design 2.6.7) sends the
  * open set again, or only the end of a set that ended during the drop, which closes it on a subject that still holds
- * it. The subject's picks of the PICKING set go to [picks]; deciding is GenerationViewModel's, which calls [chosen].
+ * it. A failure that refuses the set's description (FR-4.11) goes out even when the set has ended, before its end. The
+ * subject's picks of the PICKING set go to [picks]; deciding is GenerationViewModel's, which calls [chosen].
  *
  * Subject ([startAsReceiver]): keeps the set in [mirror], in memory only, through a reconnect, and drops it at its end,
- * at another set, and when the session ends, saying in [ended] how it ended. [pick] sends `pose.pick` and waits
+ * at another set, and when the session ends, saying in [ended] how it ended. What each set said of its description
+ * stays in [verdicts] past the set's end and the session's, for this phone's history. [pick] sends `pose.pick` and waits
  * [PICK_TIMEOUT_MS] for a step that answers it; otherwise [pickFailed].
  * Owner: Shared steps (Iter3-P16).
  */
@@ -137,6 +167,12 @@ class PoseSyncer(
         val slots: List<String> = emptyList(),
         /** In the order they failed. */
         val failed: List<String> = emptyList(),
+        /** Of [failed], those whose failure was the service refusing the set's description itself (FR-4.11). */
+        val refusals: Set<String> = emptySet(),
+        /** Why a CLOSED set failed, which its end says (FR-4.7). */
+        val failure: GenerationError? = null,
+        /** How the scene photo was held, which the set's start says. */
+        val sceneTurn: Int = 0,
     ) {
         val open: Boolean get() = step == PoseSetStep.GENERATING || step == PoseSetStep.PICKING
     }
@@ -146,8 +182,8 @@ class PoseSyncer(
     private val subjectPicks = Channel<SubjectPick>(Channel.BUFFERED)
     override val picks: Flow<SubjectPick> = subjectPicks.receiveAsFlow()
 
-    override fun open(setId: String) {
-        shared.value = SharedSet(setId, PoseSetStep.GENERATING)
+    override fun open(setId: String, sceneTurn: Int) {
+        shared.value = SharedSet(setId, PoseSetStep.GENERATING, sceneTurn = sceneTurn)
     }
 
     override fun planned(setId: String, poseIds: List<String>) {
@@ -166,10 +202,13 @@ class PoseSyncer(
         }
     }
 
-    override fun failed(setId: String, poseId: String) {
+    override fun failed(setId: String, poseId: String, descriptionRejected: Boolean) {
         shared.update { set ->
             if (set?.setId == setId && set.step == PoseSetStep.GENERATING && poseId !in set.failed) {
-                set.copy(failed = set.failed + poseId)
+                set.copy(
+                    failed = set.failed + poseId,
+                    refusals = if (descriptionRejected) set.refusals + poseId else set.refusals,
+                )
             } else {
                 set
             }
@@ -196,9 +235,13 @@ class PoseSyncer(
         }
     }
 
-    override fun close(setId: String) {
+    override fun close(setId: String, failure: GenerationError?) {
         shared.update { set ->
-            if (set?.setId == setId && set.open) set.copy(step = PoseSetStep.CLOSED, candidates = emptyList()) else set
+            if (set?.setId == setId && set.open) {
+                set.copy(step = PoseSetStep.CLOSED, candidates = emptyList(), failure = failure)
+            } else {
+                set
+            }
         }
     }
 
@@ -215,6 +258,18 @@ class PoseSyncer(
             // The copies that went out; PICKING names only these, so the subject is never told of one it cannot have.
             // One that names none still says the photographer is picking; the subject then opens no Pick a pose.
             val delivered = mutableSetOf<String>()
+
+            // The failures not sent yet. Of a set that ended, only those that refuse its description: its slots are
+            // gone, but the subject's history still needs the refusal, which the answers and the end of a set whose
+            // every pose is refused reach this sender as one change (FR-4.11).
+            fun sendFailures(set: SharedSet) {
+                for (poseId in set.failed) {
+                    val refusal = poseId in set.refusals
+                    if ((set.open || refusal) && failuresSent.add(poseId)) {
+                        session.send(SessionMessage.PoseCandidateFailed(set.setId, poseId, refusal))
+                    }
+                }
+            }
             shared.collect { set ->
                 if (set == null) return@collect
                 if (set.setId != announced) {
@@ -223,10 +278,21 @@ class PoseSyncer(
                     delivered.clear()
                     slotsSent = false
                     failuresSent.clear()
-                    // A set that ended before this sender heard of it goes as its end alone: a subject that held it
-                    // through a reconnect closes it, and any other drops the set it holds or has nothing to drop.
+                    // A set that ended before this sender heard of it goes as its end alone, after any refusal of
+                    // its description: a subject that held it through a reconnect closes it, and any other drops the
+                    // set it holds or has nothing to drop.
                     val step = if (set.open) PoseSetStep.GENERATING else set.step
-                    send(SessionMessage.PoseStep(set.setId, step, poseId = set.chosen, by = set.by))
+                    if (!set.open) sendFailures(set)
+                    send(
+                        SessionMessage.PoseStep(
+                            set.setId,
+                            step,
+                            poseId = set.chosen,
+                            by = set.by,
+                            failure = set.failure?.name,
+                            sceneTurn = if (set.open) set.sceneTurn else 0,
+                        ),
+                    )
                     sentStep = step
                 }
                 // The slots and the failures before the copies, which take a while to encode, so the subject's
@@ -236,16 +302,7 @@ class PoseSyncer(
                     session.send(SessionMessage.PosePlanned(set.setId, set.slots))
                     Timings.mark("pose.sent", "planned ${set.setId} ${set.slots.size}")
                 }
-                if (set.open) {
-                    for (poseId in set.failed) {
-                        if (failuresSent.add(
-                                poseId,
-                            )
-                        ) {
-                            session.send(SessionMessage.PoseCandidateFailed(set.setId, poseId))
-                        }
-                    }
-                }
+                sendFailures(set)
                 for ((poseId, image) in set.candidates) {
                     // A set that ended or was replaced while an earlier copy was encoded sends no more of them.
                     if (shared.value?.let { it.setId == set.setId && it.open } != true) break
@@ -267,7 +324,15 @@ class PoseSyncer(
                     }
 
                     PoseSetStep.CHOSEN, PoseSetStep.CLOSED -> if (!ended) {
-                        send(SessionMessage.PoseStep(set.setId, set.step, poseId = set.chosen, by = set.by))
+                        send(
+                            SessionMessage.PoseStep(
+                                set.setId,
+                                set.step,
+                                poseId = set.chosen,
+                                by = set.by,
+                                failure = set.failure?.name,
+                            ),
+                        )
                         sentStep = set.step
                     }
                 }
@@ -312,6 +377,11 @@ class PoseSyncer(
     /** Subject: the photographer's open set; null when there is none. */
     val mirror: StateFlow<MirrorPoseSet?> = _mirror.asStateFlow()
 
+    private val _verdicts = MutableStateFlow(DescriptionVerdicts())
+
+    /** Subject: what the sets said of their descriptions; kept when the session ends, unlike [mirror]. */
+    val verdicts: StateFlow<DescriptionVerdicts> = _verdicts.asStateFlow()
+
     private val _pending = MutableStateFlow<SubjectPick?>(null)
 
     /** Subject: the pick no step has answered yet, while *Pick a pose* waits for the photographer. */
@@ -345,8 +415,15 @@ class PoseSyncer(
                             if (set?.setId == message.setId) set.copy(slots = message.poseIds) else set
                         }
 
-                        is SessionMessage.PoseCandidateFailed -> _mirror.update { set ->
-                            if (set?.setId == message.setId) set.copy(failed = set.failed + message.poseId) else set
+                        is SessionMessage.PoseCandidateFailed -> {
+                            // Whatever set this phone holds: the refusal of a set that ended while the link was
+                            // down comes with its end alone.
+                            if (message.descriptionRejected) {
+                                _verdicts.update { it.copy(refused = it.refused + message.setId) }
+                            }
+                            _mirror.update { set ->
+                                if (set?.setId == message.setId) set.copy(failed = set.failed + message.poseId) else set
+                            }
                         }
 
                         is SessionMessage.PoseCandidateBegin -> {
@@ -401,8 +478,11 @@ class PoseSyncer(
             Log.w(TAG, "Dropped candidate ${begin.poseId}: not a ${begin.format} image")
             return
         }
-        _mirror.update { set ->
-            if (set?.setId == begin.setId) set.copy(candidates = set.candidates + (begin.poseId to image)) else set
+        if (_mirror.value?.setId == begin.setId) {
+            _mirror.update { set ->
+                if (set?.setId == begin.setId) set.copy(candidates = set.candidates + (begin.poseId to image)) else set
+            }
+            accept(begin.setId)
         }
         Timings.mark("pose.applied", "candidate ${begin.poseId} ${bytes.size} B")
     }
@@ -412,11 +492,13 @@ class PoseSyncer(
         when (message.step) {
             PoseSetStep.GENERATING -> if (current?.setId != message.setId) {
                 answer(null)
-                _mirror.value = MirrorPoseSet(message.setId, PoseSetStep.GENERATING)
+                val turn = message.sceneTurn.takeIf { it in SCENE_TURNS } ?: 0
+                _mirror.value = MirrorPoseSet(message.setId, PoseSetStep.GENERATING, sceneTurn = turn)
             }
 
             PoseSetStep.PICKING -> if (current?.setId == message.setId) {
                 _mirror.value = current.copy(step = PoseSetStep.PICKING, poseIds = message.poseIds)
+                accept(message.setId)
             }
 
             PoseSetStep.CHOSEN, PoseSetStep.CLOSED -> when {
@@ -426,7 +508,13 @@ class PoseSyncer(
                     answer(message.setId)
                     _mirror.value = null
                     endings.trySend(
-                        PoseSetEnd(message.setId, message.step, message.by, current.step == PoseSetStep.PICKING),
+                        PoseSetEnd(
+                            message.setId,
+                            message.step,
+                            message.by,
+                            current.step == PoseSetStep.PICKING,
+                            failureNamed(message.failure),
+                        ),
                     )
                 }
 
@@ -439,6 +527,15 @@ class PoseSyncer(
             }
         }
         Timings.mark("pose.applied", "${message.step.name.lowercase()} ${message.setId}")
+    }
+
+    /** A failure as `pose.step` names it: null for none, and a server error for a name this phone does not know. */
+    private fun failureNamed(name: String?): GenerationError? =
+        name?.let { GenerationError.entries.firstOrNull { error -> error.name == it } ?: GenerationError.SERVER }
+
+    /** The server accepted the description of [setId]: a candidate of it arrived, or the photographer picks from it. */
+    private fun accept(setId: String) {
+        _verdicts.update { it.copy(accepted = it.accepted + setId) }
     }
 
     /** A step of [setId] answers the pick waiting for it; another set's start drops any (null). */
@@ -484,5 +581,8 @@ class PoseSyncer(
 
         /** How long the subject waits for the photographer's answer to its pick (Design 2.6.5), as for a guide. */
         const val PICK_TIMEOUT_MS = GuideSyncer.OFFER_TIMEOUT_MS
+
+        /** The turns a scene photo can be held at; anything else in `pose.step` reads as upright. */
+        val SCENE_TURNS = setOf(0, 90, 180, 270)
     }
 }

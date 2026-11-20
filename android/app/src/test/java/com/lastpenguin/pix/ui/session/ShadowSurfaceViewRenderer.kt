@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-11, reviewed by Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import org.robolectric.annotation.Implementation
@@ -11,7 +11,7 @@ import org.webrtc.SurfaceViewRenderer
 /**
  * WebRTC's renderer without its EGL thread, for screen tests under Robolectric: `init` would create an EGL context
  * from the fake session's context and fail, and there is no GPU to draw on. Layout, scaling, and the frame fit are
- * untouched (SubjectVideoFitTest covers them); a shadow of a View must extend the View's shadow. Use with
+ * untouched (SubjectVideoFitTest covers them). [mirror] keeps the last `setMirror` (#201). A shadow of a View must extend the View's shadow. Use with
  * `@Config(shadows = [ShadowSurfaceViewRenderer::class], instrumentedPackages = ["org.webrtc"])`.
  */
 @Implements(SurfaceViewRenderer::class)
@@ -21,4 +21,12 @@ class ShadowSurfaceViewRenderer : ShadowSurfaceView() {
 
     @Implementation
     fun release() = Unit
+
+    var mirror = false
+        private set
+
+    @Implementation
+    fun setMirror(mirror: Boolean) {
+        this.mirror = mirror
+    }
 }

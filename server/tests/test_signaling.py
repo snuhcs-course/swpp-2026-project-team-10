@@ -1,4 +1,5 @@
-# AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo and Dongje Park
+# AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+import asyncio
 import json
 import re
 import time
@@ -18,6 +19,19 @@ def create_room(photographer):
     assert isinstance(room["rejoinToken"], str) and len(room["rejoinToken"]) >= 16
     assert set(room) == {"type", "code", "sessionId", "iceServers", "rejoinToken"}
     return room
+
+
+def released(client):
+    """Waits until the server has freed the places of the sockets closed so far. The test client cancels a closed
+    socket's handler, and `SessionRegistry.disconnect` frees the place from a task of its own, which runs on after the
+    socket has closed and stamps the store with the clock's time when it runs: move the clock only after it."""
+    registry = client.app.state.signaling
+
+    async def wait():
+        while pending := [task for task in registry._releases if not task.done()]:
+            await asyncio.wait(pending)
+
+    client.portal.call(wait)
 
 
 def join_room(photographer, subject, room):
@@ -620,6 +634,7 @@ def test_a_session_waits_sixty_seconds_after_its_last_socket(client, clock, seco
     with client.websocket_connect("/ws") as photographer, client.websocket_connect("/ws") as subject:
         room = create_room(photographer)
         joined = join_room(photographer, subject, room)
+    released(client)
     clock.advance(seconds)
     with client.websocket_connect("/ws") as again:
         answer = session_join(again, room["sessionId"], joined["rejoinToken"])

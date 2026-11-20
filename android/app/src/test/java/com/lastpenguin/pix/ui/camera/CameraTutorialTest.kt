@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -125,7 +125,7 @@ class CameraTutorialTest {
         }
     }
 
-    /** Closes the tips over Camera with *Got it*. */
+    /** Closes the tips over Camera with a tap anywhere. */
     private fun gotIt() {
         scenario!!.onFragment { closeTips(it) }
         idle()

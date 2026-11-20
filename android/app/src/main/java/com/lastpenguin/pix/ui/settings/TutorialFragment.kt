@@ -1,23 +1,28 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.settings
 
 import android.app.Dialog
 import android.content.DialogInterface
+import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.RectF
 import android.os.Bundle
 import android.view.View
 import android.view.ViewTreeObserver
 import android.view.WindowManager
+import android.widget.HorizontalScrollView
+import android.widget.ScrollView
 import androidx.activity.ComponentDialog
 import androidx.activity.addCallback
 import androidx.annotation.IdRes
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatDialogFragment
 import androidx.core.os.bundleOf
+import androidx.core.view.ScrollingView
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
+import com.google.android.material.button.MaterialButton
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.guide.GuideOverlayView
 import com.lastpenguin.pix.settings.TutorialScreen
@@ -41,32 +46,100 @@ internal class TutorialTip(
     val align: CaptionAlign = CaptionAlign.CENTER,
     val overControls: Boolean = false,
     val locate: (root: View) -> Rect?,
+    /** The caption on the ring's edge, half over the control, with no arrow (`CoachMarkLayout.Mark.onEdge`, [#210]). */
+    val onEdge: Boolean = false,
 )
 
 /** A screen's tips: an optional title, and its controls. */
 internal class TutorialTips(@param:StringRes val title: Int?, val tips: List<TutorialTip>)
 
-/** Where [view] is on screen, if it shows. */
+/**
+ * Where [view] is on screen, if it shows: the box around it as drawn, through its own and its parents' moves, turns,
+ * and scales, so a ring follows a control that turns with the phone, or one inside a block that does (#207).
+ */
 internal fun boundsOnScreen(view: View): Rect? {
     if (!view.isShown || view.width <= 0 || view.height <= 0) return null
-    val at = IntArray(2).also(view::getLocationOnScreen)
-    return Rect(at[0], at[1], at[0] + view.width, at[1] + view.height)
+    val box = RectF(0f, 0f, view.width.toFloat(), view.height.toFloat())
+    var current = view
+    var parent = view.parent
+    while (parent is View) {
+        if (!current.matrix.isIdentity) current.matrix.mapRect(box)
+        box.offset((current.left - parent.scrollX).toFloat(), (current.top - parent.scrollY).toFloat())
+        current = parent
+        parent = current.parent
+    }
+    val at = IntArray(2).also(current::getLocationOnScreen)
+    box.offset(at[0].toFloat(), at[1].toFloat())
+    return Rect().also(box::round)
+}
+
+/**
+ * What [view] draws on screen, if it shows, so a ring hugs the control as seen rather than its touch area (#204): a
+ * button's shape inside its insets; for a button without one, its icon, or its text with a little room around it.
+ */
+internal fun drawnOnScreen(view: View): Rect? {
+    val bounds = boundsOnScreen(view) ?: return null
+    if (view !is MaterialButton) return bounds
+    val shape = Rect(bounds.left, bounds.top + view.insetTop, bounds.right, bounds.bottom - view.insetBottom)
+    if (view.drawsShape()) return shape
+    val density = view.resources.displayMetrics.density
+    val layout = view.layout
+    if (view.text.isNullOrEmpty() || layout == null) {
+        if (view.icon == null) return shape
+        val half = (ICON_SPOT_DP * density / 2).toInt()
+        val x = bounds.left + view.paddingLeft + (view.width - view.paddingLeft - view.paddingRight) / 2
+        return Rect(x - half, shape.centerY() - half, x + half, shape.centerY() + half)
+    }
+    val lines = 0 until layout.lineCount
+    val left = bounds.left + view.compoundPaddingLeft + lines.minOf { layout.getLineLeft(it) }
+    val right = bounds.left + view.compoundPaddingLeft + lines.maxOf { layout.getLineRight(it) }
+    val roomX = TEXT_ROOM_X_DP * density
+    val roomY = TEXT_ROOM_Y_DP * density
+    val top = shape.centerY() - layout.height / 2f - roomY
+    return Rect((left - roomX).toInt(), top.toInt(), (right + roomX).toInt(), (top + layout.height + 2 * roomY).toInt())
+}
+
+/** Whether [this] draws a shape: a fill or an outline that shows in its state. */
+private fun MaterialButton.drawsShape(): Boolean {
+    val fill = backgroundTintList?.getColorForState(drawableState, Color.TRANSPARENT) ?: Color.TRANSPARENT
+    val stroke = strokeColor?.getColorForState(drawableState, Color.TRANSPARENT) ?: Color.TRANSPARENT
+    return Color.alpha(fill) > 0 || (strokeWidth > 0 && Color.alpha(stroke) > 0)
+}
+
+/** The spot an icon without a shape is ringed by: with the ring's own room, a 36 dp ring. */
+private const val ICON_SPOT_DP = 26
+
+/** The room around a text without a shape inside its ring. */
+private const val TEXT_ROOM_X_DP = 8
+private const val TEXT_ROOM_Y_DP = 2
+
+/**
+ * What [view] draws on screen, cut to what the scrolling views around it and its window show: a sheet taller than the
+ * screen scrolls, and a control it has scrolled out of view, or shows less than half of, gets no ring ([#210]).
+ */
+private fun shownOnScreen(view: View): Rect? {
+    val drawn = drawnOnScreen(view) ?: return null
+    val shown = Rect(drawn)
+    var parent = view.parent
+    while (parent is View) {
+        if (parent is ScrollingView || parent is ScrollView || parent is HorizontalScrollView) {
+            val frame = boundsOnScreen(parent)
+            if (frame == null || !shown.intersect(frame)) return null
+        }
+        parent = parent.parent
+    }
+    val window = boundsOnScreen(view.rootView)
+    if (window != null && !shown.intersect(window)) return null
+    return shown.takeIf { it.width() * 2 >= drawn.width() && it.height() * 2 >= drawn.height() }
 }
 
 /** The control [id] of the screen, while it shows. */
-private fun control(@IdRes id: Int): (View) -> Rect? = { root -> root.findViewById<View>(id)?.let(::boundsOnScreen) }
+private fun control(@IdRes id: Int): (View) -> Rect? = { root -> root.findViewById<View>(id)?.let(::shownOnScreen) }
 
 /** The controls [ids] of the screen together, those it shows. */
 private fun controls(@IdRes vararg ids: Int): (View) -> Rect? = { root ->
-    ids.toList().mapNotNull { id -> root.findViewById<View>(id)?.let(::boundsOnScreen) }
+    ids.toList().mapNotNull { id -> root.findViewById<View>(id)?.let(::shownOnScreen) }
         .reduceOrNull { all, next -> Rect(all).apply { union(next) } }
-}
-
-/** The part of the control [id] that the scrolling [frame] around it shows, while some does. */
-private fun shownIn(@IdRes id: Int, @IdRes frame: Int): (View) -> Rect? = { root ->
-    val part = root.findViewById<View>(id)?.let(::boundsOnScreen)
-    val shown = root.findViewById<View>(frame)?.let(::boundsOnScreen)
-    part?.takeIf { shown != null && it.intersect(shown) }
 }
 
 /** A touch point on the middle of the guide as drawn on the camera image, while one is: where to drag it. */
@@ -94,7 +167,8 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
         tips = listOf(
             TutorialTip(R.string.tutorial_settings, CaptionSide.BELOW, locate = control(R.id.settingsButton)),
             TutorialTip(R.string.tutorial_together, CaptionSide.BELOW, locate = control(R.id.shootTogetherButton)),
-            TutorialTip(R.string.tutorial_guide, CaptionSide.ABOVE, locate = control(R.id.guideButton)),
+            // Rings around the button's icon, not its label, so the closing line fits below it (#204).
+            TutorialTip(R.string.tutorial_guide, CaptionSide.ABOVE, locate = control(R.id.guideButtonIcon)),
             TutorialTip(R.string.tutorial_switch, CaptionSide.ABOVE, locate = control(R.id.switchCameraButton)),
             TutorialTip(R.string.tutorial_shutter, CaptionSide.ABOVE, locate = control(R.id.shutterButton)),
         ),
@@ -102,20 +176,29 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
     TutorialScreen.ADD_GUIDE to TutorialTips(
         title = null,
         tips = listOf(
-            TutorialTip(R.string.tutorial_upload, CaptionSide.ABOVE, locate = control(R.id.addPhotoTile)),
-            // Below *Generate poses here*, the sheet's last card, only Cancel fits, so its caption goes above the library.
+            // The situations, each tile the button that takes the scene photo for it (FR-4.8).
             TutorialTip(
                 R.string.tutorial_generate,
                 CaptionSide.ABOVE,
                 overControls = true,
-                locate = control(R.id.generateButton),
+                locate = controls(R.id.situationRowTop, R.id.situationRowBottom),
             ),
+            // The whole row (#210), its caption on the ring's top edge at the right.
+            TutorialTip(
+                R.string.tutorial_upload,
+                CaptionSide.ABOVE,
+                CaptionAlign.END,
+                locate = control(R.id.galleryRow),
+                onEdge = true,
+            ),
+            // My library's whole row (FR-3.11), the sheet's last: its caption on the ring's top edge at the right, on
+            // the seam with the gallery's ring, since the closing line is under the row (#243).
             TutorialTip(
                 R.string.tutorial_saved,
                 CaptionSide.ABOVE,
                 CaptionAlign.END,
-                // The saved guides beside *Add photo* (FR-3.11), as far as the row shows them; none, no ring.
-                locate = shownIn(R.id.savedGuidesList, R.id.savedGuidesScroll),
+                locate = control(R.id.libraryRow),
+                onEdge = true,
             ),
         ),
     ),
@@ -125,6 +208,13 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
             TutorialTip(R.string.tutorial_move, CaptionSide.ABOVE, locate = guideOn(R.id.guideOverlay)),
             TutorialTip(R.string.tutorial_edit, CaptionSide.ABOVE, locate = control(R.id.editGuideButton)),
             TutorialTip(R.string.tutorial_save, CaptionSide.ABOVE, locate = control(R.id.saveGuideButton)),
+            // ✕ takes the guide off the camera (E3, #204); above it is Save's caption, so this one goes below.
+            TutorialTip(
+                R.string.tutorial_remove,
+                CaptionSide.BELOW,
+                CaptionAlign.END,
+                locate = control(R.id.removeGuideButton),
+            ),
             TutorialTip(
                 R.string.tutorial_fade,
                 CaptionSide.ABOVE,
@@ -135,16 +225,18 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
     TutorialScreen.GENERATE_POSES to TutorialTips(
         title = null,
         tips = listOf(
-            TutorialTip(R.string.tutorial_scene, CaptionSide.BELOW, locate = control(R.id.sceneImage)),
+            // Beside the photo, over its card, as on the reviewed drawing (#204): above it is the header.
+            TutorialTip(R.string.tutorial_scene, CaptionSide.END, locate = control(R.id.sceneImage)),
             TutorialTip(R.string.tutorial_describe, CaptionSide.ABOVE, locate = control(R.id.descriptionInput)),
-            // The one button (Iter3-A13): left empty, the field asks for suggested poses.
-            TutorialTip(R.string.tutorial_suggest, CaptionSide.ABOVE, locate = control(R.id.generateButton)),
+            // The one button (Iter3-A13), at the top right (#199): left empty, the field asks for suggested poses.
+            TutorialTip(R.string.tutorial_suggest, CaptionSide.BELOW, locate = control(R.id.generateButton)),
         ),
     ),
     TutorialScreen.SUBJECT_VIEW to TutorialTips(
         title = R.string.tutorial_friend_title,
         tips = listOf(
-            TutorialTip(R.string.tutorial_friend_guide, CaptionSide.START, locate = control(R.id.guideButton)),
+            // Guide is at the left, as on Camera, so its caption takes the empty middle.
+            TutorialTip(R.string.tutorial_friend_guide, CaptionSide.END, locate = control(R.id.guideButtonIcon)),
             TutorialTip(R.string.tutorial_friend_zoom, CaptionSide.ABOVE, locate = control(R.id.zoomReadout)),
             TutorialTip(
                 R.string.tutorial_friend_brightness,
@@ -159,9 +251,9 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
 /**
  * The first-use tutorial (FR-10.4, Design 2.6.8): over a screen, the first time it opens, a dimming with a ring and a
  * caption for each control of it the screen shows ([TUTORIAL_TIPS]), drawn by [CoachMarkLayout] over the live screen,
- * so it lines up on every phone and *Got it* leaves exactly what was under it. It is a full-screen dialog among the
+ * so it lines up on every phone and closing them leaves exactly what was under it. It is a full-screen dialog among the
  * screen's child fragments, not a destination of its own, so the camera and a session's video run on under it, a sheet
- * stays open, and the screen still navigates. *Got it* and Back close it, and the screen's tips count as seen. The
+ * stays open, and the screen still navigates. A tap anywhere and Back close it, and the screen's tips count as seen. The
  * tips fade in and out in 200 ms (Iter3-A14); while they fade out, touches and keys go to the screen already.
  * Owner: Settings (#123).
  */
@@ -192,7 +284,9 @@ class TutorialFragment : AppCompatDialogFragment(R.layout.fragment_tutorial) {
         val screenView = requireParentFragment().requireView()
         layout.show(
             tips.title?.let(::getString),
-            tips.tips.map { CoachMarkLayout.Mark(getString(it.caption), it.side, it.align, it.overControls) },
+            tips.tips.map {
+                CoachMarkLayout.Mark(getString(it.caption), it.side, it.align, it.overControls, it.onEdge)
+            },
         )
         layout.locate = {
             val at = IntArray(2).also(layout::getLocationOnScreen)
@@ -207,7 +301,9 @@ class TutorialFragment : AppCompatDialogFragment(R.layout.fragment_tutorial) {
         }
         screenView.viewTreeObserver.addOnPreDrawListener(follow)
         watch = screenView to follow
-        layout.findViewById<View>(R.id.gotItButton).setOnClickListener { close() }
+        // A tap anywhere closes them (#204); the closing line takes it too, so TalkBack can close them from it.
+        layout.setOnClickListener { close() }
+        layout.findViewById<View>(R.id.tutorialCloseHint).setOnClickListener { close() }
         (requireDialog() as ComponentDialog).onBackPressedDispatcher.addCallback(viewLifecycleOwner) { close() }
         // Recreated with the screen, they come at once, as they were.
         if (savedInstanceState == null) {
@@ -217,7 +313,7 @@ class TutorialFragment : AppCompatDialogFragment(R.layout.fragment_tutorial) {
     }
 
     /**
-     * *Got it* and Back: the tips count as seen at once, the screen under them takes touches and keys at once, and they
+     * A tap anywhere and Back: the tips count as seen at once, the screen under them takes touches and keys at once, and they
      * fade out, then close.
      */
     private fun close() {

@@ -1,10 +1,11 @@
-# AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
 """The prompts for the image, suggestion, and tip models, the description filter's and the person check's questions, and
 the default poses, read from prompts.toml (Design Documentation 2.6.3)."""
 
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal, get_args
 
 from pix_server.errors import ApiError
 
@@ -17,6 +18,39 @@ POSE_COUNT = 4  # candidates per set, so poses per suggestion (FR-4.3)
 FILTER_QUESTIONS = ("malicious", "injection")
 # The person check's yes/no question, by the name its answer comes back under (FR-4.13).
 PERSON_QUESTION = "person"
+# The situations a pose request can name (FR-4.8), as the app sends them: `default` is the prompts at the top of the
+# file, and each other one a [situations.<name>] table.
+Situation = Literal["default", "background", "half_body", "full_body", "landmark", "selfie"]
+SITUATIONS: tuple[Situation, ...] = get_args(Situation)
+# The languages a tip is written in, and the names of the sentences and words it is written with (prompts.toml,
+# [tip_words]): the move closer, by walking or with the zoom, or farther back, each also as a big one; the same
+# distance, and the guide's outline to match; where the phone is held, its tilt, and the sentence that joins them; the
+# side of the frame, the room above the head, and a leaning line.
+TIP_LANGUAGES = ("en", "ko")
+TIP_WORDS = (
+    "closer",
+    "closer_much",
+    "zoom",
+    "zoom_much",
+    "back",
+    "back_much",
+    "same",
+    "guide",
+    "crouching",
+    "waist",
+    "chest",
+    "eye",
+    "above_head",
+    "up",
+    "level",
+    "down",
+    "phone",
+    "left",
+    "right",
+    "room_none",
+    "room_plenty",
+    "upright",
+)
 # Double quotation marks, typographic and full-width ones included. In a prompt each becomes a single one, so the user's
 # words cannot close the quotation marks they are placed in.
 QUOTES = str.maketrans(dict.fromkeys('"“”„‟″＂«»', "'"))
@@ -31,8 +65,9 @@ class DefaultPose:
 
 
 @dataclass(frozen=True)
-class SelfiePrompts:
-    """The prompts for a scene photo that is a selfie (FR-1.14), and the poses that stand in for the suggestions."""
+class SituationPrompts:
+    """The prompts for one situation (FR-4.8), a selfie's included (FR-1.14), and the poses that stand in for the
+    suggestions."""
 
     pose: str
     suggestion: str
@@ -45,11 +80,15 @@ class Prompts:
     pose: str
     suggestion: str
     variation: str
+    # Asked of the scene and of the candidate, each by itself.
     tip: str
-    # Added after `tip` for a phone whose screens are in Korean (FR-10.2).
-    tip_korean: str
+    # Added after `tip` for the candidate, whose pose comes with it.
+    tip_candidate: str
+    # The sentences and words a tip is written with, by the language of the screens: {language: {TIP_WORDS name: text}}.
+    tip_words: dict[str, dict[str, str]]
     default_poses: dict[str, DefaultPose]
-    selfie: SelfiePrompts
+    # Every situation, `default` included, which holds the prompts above and the default poses' `pose`.
+    situations: dict[Situation, SituationPrompts]
     # The description filter's questions, as the Decisions API takes them: {name: {type, instructions, criteria}}.
     filter_questions: dict[str, dict]
     # The person check's question, as the Decisions API takes it: {PERSON_QUESTION: {type, instructions}}.
@@ -83,9 +122,10 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
         "suggestion_prompt",
         "variation_prompt",
         "tip_prompt",
-        "tip_korean",
+        "tip_candidate",
+        "tip_words",
         "default_poses",
-        "selfie",
+        "situations",
         "filter",
         "person",
     }
@@ -95,7 +135,7 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
     suggestion = text(data, "suggestion_prompt", "")
     variation = with_placeholder(data, "variation_prompt", "", DESCRIPTION_PLACEHOLDER)
     tip = text(data, "tip_prompt", "")
-    tip_korean = text(data, "tip_korean", "")
+    tip_candidate = text(data, "tip_candidate", "")
     entries = data.get("default_poses")
     if not isinstance(entries, list) or len(entries) != POSE_COUNT:
         raise ValueError(f"{path.name}: exactly {POSE_COUNT} [[default_poses]] are needed")
@@ -113,27 +153,74 @@ def load_prompts(path: Path = PROMPTS_FILE) -> Prompts:
         if len(default.pose) > DESCRIPTION_MAX_LENGTH:
             raise ValueError(f"{path.name}: {where}pose must be at most {DESCRIPTION_MAX_LENGTH} characters")
         poses[default.id] = default
-    selfie = load_selfie(data.get("selfie"), path)
+    situations = {"default": SituationPrompts(pose, suggestion, variation, tuple(p.pose for p in poses.values()))}
+    situations |= load_situations(data.get("situations"), path)
     filter_questions = load_filter(data.get("filter"), path)
     person = load_person(data.get("person"), path)
-    return Prompts(pose, suggestion, variation, tip, tip_korean, poses, selfie, filter_questions, person)
+    tip_words = load_tip_words(data.get("tip_words"), path)
+    return Prompts(
+        pose,
+        suggestion,
+        variation,
+        tip,
+        tip_candidate,
+        tip_words,
+        poses,
+        situations,
+        filter_questions,
+        person,
+    )
 
 
-def load_selfie(table: object, path: Path) -> SelfiePrompts:
-    """The [selfie] table of the prompts file: the three prompts and POSE_COUNT default poses, each a different string
-    of at most DESCRIPTION_MAX_LENGTH characters. Raises ValueError like load_prompts."""
+def load_tip_words(table: object, path: Path) -> dict[str, dict[str, str]]:
+    """The [tip_words] table of the prompts file: for each of TIP_LANGUAGES every name of TIP_WORDS, a phrase on one
+    line, and `phone` with {hold} and {tilt} once each. Raises ValueError like load_prompts."""
+    if not isinstance(table, dict) or set(table) != set(TIP_LANGUAGES):
+        raise ValueError(f"{path.name}: [tip_words] needs a table for each of {', '.join(TIP_LANGUAGES)} and no other")
+    words: dict[str, dict[str, str]] = {}
+    for language in TIP_LANGUAGES:
+        entries = table[language]
+        if not isinstance(entries, dict) or set(entries) != set(TIP_WORDS):
+            raise ValueError(f"{path.name}: tip_words.{language} needs exactly {', '.join(TIP_WORDS)}")
+        phrases: dict[str, str] = {}
+        for name in TIP_WORDS:
+            value = entries[name]
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{path.name}: tip_words.{language}.{name} must be a non-empty string")
+            phrases[name] = one_line(value)
+        if phrases["phone"].count("{hold}") != 1 or phrases["phone"].count("{tilt}") != 1:
+            raise ValueError(f"{path.name}: tip_words.{language}.phone must hold {{hold}} and {{tilt}} exactly once")
+        words[language] = phrases
+    return words
+
+
+def load_situations(table: object, path: Path) -> dict[Situation, SituationPrompts]:
+    """The [situations] table of the prompts file: one table for each of SITUATIONS but `default`, and no other.
+    Raises ValueError like load_prompts."""
     if not isinstance(table, dict):
-        raise ValueError(f"{path.name}: a [selfie] table is needed")
+        raise ValueError(f"{path.name}: a [situations] table is needed")
+    wanted = [name for name in SITUATIONS if name != "default"]
+    unknown = set(table) - set(wanted)
+    if unknown:
+        raise ValueError(f"{path.name}: situations: unknown keys {', '.join(sorted(unknown))}")
+    return {name: load_situation(table.get(name), name, path) for name in wanted}
+
+
+def load_situation(table: object, name: str, path: Path) -> SituationPrompts:
+    """A [situations.<name>] table of the prompts file: the three prompts and POSE_COUNT default poses, each a
+    different string of at most DESCRIPTION_MAX_LENGTH characters. Raises ValueError like load_prompts."""
+    if not isinstance(table, dict):
+        raise ValueError(f"{path.name}: a [situations.{name}] table is needed")
     unknown = set(table) - {"pose_prompt", "suggestion_prompt", "variation_prompt", "default_poses"}
     if unknown:
-        raise ValueError(f"{path.name}: selfie: unknown keys {', '.join(sorted(unknown))}")
+        raise ValueError(f"{path.name}: situations.{name}: unknown keys {', '.join(sorted(unknown))}")
 
     def prompt(key: str, placeholder: str | None = None) -> str:
         value = table.get(key)
         if not isinstance(value, str) or not value.strip():
-            raise ValueError(f"{path.name}: selfie.{key} must be a non-empty string")
+            raise ValueError(f"{path.name}: situations.{name}.{key} must be a non-empty string")
         if placeholder is not None and value.count(placeholder) != 1:
-            raise ValueError(f"{path.name}: selfie.{key} must hold {placeholder} exactly once")
+            raise ValueError(f"{path.name}: situations.{name}.{key} must hold {placeholder} exactly once")
         return one_line(value)
 
     pose = prompt("pose_prompt", PLACEHOLDER)
@@ -141,10 +228,10 @@ def load_selfie(table: object, path: Path) -> SelfiePrompts:
     variation = prompt("variation_prompt", DESCRIPTION_PLACEHOLDER)
     entries = table.get("default_poses")
     if not isinstance(entries, list) or len(entries) != POSE_COUNT:
-        raise ValueError(f"{path.name}: selfie.default_poses must be a list of {POSE_COUNT} poses")
+        raise ValueError(f"{path.name}: situations.{name}.default_poses must be a list of {POSE_COUNT} poses")
     defaults: list[str] = []
     for number, entry in enumerate(entries, 1):
-        where = f"{path.name}: selfie.default_poses #{number}"
+        where = f"{path.name}: situations.{name}.default_poses #{number}"
         default = one_line(entry) if isinstance(entry, str) else ""
         if not default:
             raise ValueError(f"{where} must be a non-empty string")
@@ -153,7 +240,7 @@ def load_selfie(table: object, path: Path) -> SelfiePrompts:
         if default.casefold() in {kept.casefold() for kept in defaults}:
             raise ValueError(f"{where} repeats another pose")
         defaults.append(default)
-    return SelfiePrompts(pose, suggestion, variation, tuple(defaults))
+    return SituationPrompts(pose, suggestion, variation, tuple(defaults))
 
 
 def load_filter(table: object, path: Path) -> dict[str, dict]:
@@ -222,14 +309,11 @@ def checked_pose(pose: str, field: str = "description") -> str:
     return text.translate(QUOTES)
 
 
-def pose_prompt(pose: str, selfie: bool = False) -> str:
-    """The image prompt for a pose (checked_pose), the selfie one for a selfie's scene (FR-1.14)."""
-    template = PROMPTS.selfie.pose if selfie else PROMPTS.pose
-    return template.replace(PLACEHOLDER, checked_pose(pose))
+def pose_prompt(pose: str, situation: Situation = "default") -> str:
+    """The situation's image prompt for a pose (checked_pose); a selfie's scene is the `selfie` situation (FR-1.14)."""
+    return PROMPTS.situations[situation].pose.replace(PLACEHOLDER, checked_pose(pose))
 
 
-def variation_prompt(description: str, selfie: bool = False) -> str:
-    """The suggestion model's prompt for three variations of a description (checked_pose), for a selfie's scene or
-    another."""
-    template = PROMPTS.selfie.variation if selfie else PROMPTS.variation
-    return template.replace(DESCRIPTION_PLACEHOLDER, checked_pose(description))
+def variation_prompt(description: str, situation: Situation = "default") -> str:
+    """The situation's prompt for the suggestion model's three variations of a description (checked_pose)."""
+    return PROMPTS.situations[situation].variation.replace(DESCRIPTION_PLACEHOLDER, checked_pose(description))

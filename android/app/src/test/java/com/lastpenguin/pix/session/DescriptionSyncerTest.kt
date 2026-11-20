@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.DescriptionStep
@@ -29,6 +29,7 @@ import org.junit.Test
  * while its photo is encoded sends no photo; a sender that stops frees a field the subject held (Gone).
  * Photographer, the subject's requests (equivalence partitioning): an edit and a Generate 4 poses or Skip of the open
  * description are passed on; any of another description or after the end is dropped.
+ * The situation (FR-4.8, It 4): sent with OPEN and kept in the subject's copy; none from an older photographer.
  * Subject, the copy (state-based): built from OPEN and the photo, updated by each OPEN, dropped at its end, which is
  * reported with whether a set started, at another description's start, at another one's end without a notice, and when
  * the session ends; kept through a reconnect, where the photo sent again is not read again. The scene a set started
@@ -288,6 +289,23 @@ class DescriptionSyncerTest {
             ),
             requests,
         )
+    }
+
+    @Test
+    fun `the situation goes with the open description, and the subject's copy keeps it`() = runTest {
+        connectedAs(Role.PHOTOGRAPHER)
+        val sender = syncer()
+        sender.startAsSender(backgroundScope)
+        runCurrent()
+        sender.open("d1", fakeBitmap(), "wave", rejected = false, situation = "landmark")
+        runCurrent()
+        assertEquals("landmark", session.sent.filterIsInstance<SessionMessage.PoseDescription>().first().situation)
+
+        val receiver = open()
+        assertNull(receiver.mirror.value?.situation)
+        session.deliver(SessionMessage.PoseDescription("d1", DescriptionStep.OPEN, "wave", situation = "landmark"))
+        runCurrent()
+        assertEquals("landmark", receiver.mirror.value?.situation)
     }
 
     // ---- subject: the copy --------------------------------------------------------------------------------------

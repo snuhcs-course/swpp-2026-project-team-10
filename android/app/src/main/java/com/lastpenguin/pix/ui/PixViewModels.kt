@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -41,7 +41,12 @@ object PixViewModels {
                 container.savedGuideStore,
                 container.poseTips.onCamera,
                 container.photoSyncer,
-                container.appSettings.baseBrightness,
+                albumPhotos = container.albumPhotos,
+                sessionPhotos = container.photoSyncer.sessionPhotos,
+                deleter = container.photoDeleter,
+                baseBrightness = container.appSettings.baseBrightness,
+                phoneTurns = container.phoneTurns,
+                zoomHold = container.remoteControlHandler.zoomHold,
             )
         }
         initializer {
@@ -64,6 +69,7 @@ object PixViewModels {
                 descriptions = container.descriptionSyncer,
                 history = container.promptHistory,
                 partner = { container.sessionManager.state.value.partner },
+                phoneTurn = container.phoneTurns.turn,
             )
         }
         initializer {
@@ -78,6 +84,7 @@ object PixViewModels {
                 container.confirmSyncer,
                 container.descriptionSyncer,
                 container.photoSyncer,
+                container.tipSyncer,
             )
         }
         initializer { InvitationViewModel(container.invitationManager, container.authRepository) }
@@ -92,6 +99,10 @@ object PixViewModels {
                 container.poseSyncer,
                 container.confirmSyncer,
                 container.descriptionSyncer,
+                container.tipSyncer,
+                sessionPhotos = container.photoSyncer.sessionPhotos,
+                deleter = container.photoDeleter,
+                phoneTurns = container.phoneTurns,
             )
         }
         initializer { SubjectPickViewModel(container.sessionManager, container.poseSyncer) }

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-02, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -17,12 +17,16 @@ import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.FrameSink
+import com.lastpenguin.pix.camera.PhoneTurns
+import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.session.PhotoShare
+import com.lastpenguin.pix.telemetry.TelemetryEvent
+import com.lastpenguin.pix.telemetry.TelemetryRecorder
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -30,6 +34,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
@@ -42,6 +47,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -49,6 +55,9 @@ import org.junit.runner.RunWith
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class CameraViewModelTest {
+    @get:Rule
+    val telemetry = TelemetryRecorder()
+
     private val dispatcher = StandardTestDispatcher()
     private val store = ViewModelStore()
     private val camera = FakeCamera()
@@ -103,12 +112,332 @@ class CameraViewModelTest {
         runCurrent()
         model.onShutter()
         runCurrent()
+        // The shutter is free again, and the photo is still being saved.
+        camera.captured.single()()
         assertTrue(model.uiState.value.isSaving)
 
         model.onSwitchCamera()
         runCurrent()
 
         assertTrue(camera.facingRequests.isEmpty())
+    }
+
+    // The shutter and the photos in flight (NFR-19, #208). The shutter: busy from the press until the camera took the
+    // photo, then free while the photo is saved. Photos in flight: none, one, or two, each saved or failed, in shutter
+    // order or the newer one first; the camera switch and the ratio wait for all of them. A late "taken" of an earlier
+    // photo frees nothing.
+    @Test
+    fun shutter_onceTheCameraTookThePhoto_isFreeWhileThePhotoIsSaved() = runTest {
+        runCurrent()
+        model.onShutter()
+        runCurrent()
+        assertTrue(model.uiState.value.shutterBusy)
+
+        camera.captured.single()()
+
+        assertFalse(model.uiState.value.shutterBusy)
+        assertTrue(model.uiState.value.isSaving)
+    }
+
+    @Test
+    fun shutter_pressedWhileAPhotoIsSaved_takesAnother_andEachPhotoKeepsItsSession() = runTest {
+        val share = RecordingShare()
+        val sharing = CameraViewModel(camera, guides, photos = share, clock = { 1_000 })
+        val first = camera.capture
+        val second = CompletableDeferred<Result<Uri>>()
+        val photo = Uri.parse("content://media/external/images/media/2")
+        sharing.onShutter()
+        runCurrent()
+        camera.captured[0]()
+        share.session = "s2"
+        camera.capture = second
+
+        val taken = sharing.onShutter()
+        runCurrent()
+        first.complete(Result.failure(IOException("Storage full")))
+        second.complete(Result.success(photo))
+        runCurrent()
+
+        assertTrue(taken)
+        assertEquals(2, camera.captureCount)
+        assertEquals(listOf("s1"), share.failed)
+        assertEquals(listOf(Triple("s2", photo, 1_000L)), share.shared)
+        assertEquals(photo, sharing.uiState.value.lastPhoto)
+    }
+
+    @Test
+    fun saving_withTwoPhotosInFlight_endsWithTheLastOne() = runTest {
+        val first = camera.capture
+        val second = CompletableDeferred<Result<Uri>>()
+        runCurrent()
+        model.onShutter()
+        runCurrent()
+        camera.captured[0]()
+        camera.capture = second
+        model.onShutter()
+        runCurrent()
+        camera.captured[1]()
+
+        first.complete(Result.success(Uri.parse("content://media/external/images/media/1")))
+        runCurrent()
+        assertTrue(model.uiState.value.isSaving)
+        model.onSwitchCamera()
+        model.onAspectChosen(AspectRatio.R16_9)
+        runCurrent()
+        assertTrue(camera.facingRequests.isEmpty())
+        assertTrue(camera.aspectRequests.isEmpty())
+
+        second.complete(Result.success(Uri.parse("content://media/external/images/media/2")))
+        runCurrent()
+        assertFalse(model.uiState.value.isSaving)
+    }
+
+    @Test
+    fun photos_savedOutOfOrder_arePublishedInShutterOrder() = runTest {
+        val share = RecordingShare()
+        val sharing = CameraViewModel(camera, guides, photos = share, clock = { 1_000 })
+        val first = camera.capture
+        val second = CompletableDeferred<Result<Uri>>()
+        val older = Uri.parse("content://media/external/images/media/1")
+        val newer = Uri.parse("content://media/external/images/media/2")
+        sharing.onShutter()
+        runCurrent()
+        camera.captured[0]()
+        camera.capture = second
+        sharing.onShutter()
+        runCurrent()
+
+        // The newer photo is saved first: it waits for the older one.
+        second.complete(Result.success(newer))
+        runCurrent()
+        assertTrue(share.shared.isEmpty())
+        assertNull(sharing.uiState.value.lastPhoto)
+        first.complete(Result.success(older))
+        runCurrent()
+
+        assertEquals(listOf(older, newer), share.shared.map { it.second })
+        assertEquals(newer, sharing.uiState.value.lastPhoto)
+        assertFalse(sharing.uiState.value.isSaving)
+    }
+
+    // Camera's thumbnail (FR-1.6; Iter4-A2): outside a session the newest in Pix's album, taken here or received, and a
+    // photo taken here at once; in a session only the session's newest, none until its first; after it, the album's
+    // newest again. The viewer (FR-1.6): outside a session Pix's album, with a photo just taken; in a session only the
+    // session's photos; none to open without photos, and it closes when a session starts or ends. A photo deleted from
+    // it leaves its pages and the thumbnail at once, before MediaStore tells of it, also one just taken; the last one
+    // closes it; a delete that fails keeps the photo and says so once.
+    private fun photo(id: Int): Uri = Uri.parse("content://media/external/images/media/$id")
+
+    @Test
+    fun lastPhoto_outsideASession_isTheAlbumsNewest_orThePhotoJustTaken() = runTest {
+        val album = MutableStateFlow(listOf(photo(10)))
+        val shooting = CameraViewModel(camera, guides, albumPhotos = album)
+        runCurrent()
+        assertEquals(photo(10), shooting.uiState.value.lastPhoto)
+
+        shooting.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.success(photo(11)))
+        runCurrent()
+        assertEquals(photo(11), shooting.uiState.value.lastPhoto)
+
+        // One received in a session, then the newest deleted in the gallery, then all of them.
+        album.value = listOf(photo(10), photo(12))
+        runCurrent()
+        assertEquals(photo(12), shooting.uiState.value.lastPhoto)
+        album.value = listOf(photo(10))
+        runCurrent()
+        assertEquals(photo(10), shooting.uiState.value.lastPhoto)
+        album.value = emptyList()
+        runCurrent()
+        assertNull(shooting.uiState.value.lastPhoto)
+    }
+
+    @Test
+    fun lastPhoto_inASession_isOnlyTheSessionsNewest_noneUntilItsFirst_andTheAlbumsAfterIt() = runTest {
+        val album = MutableStateFlow(listOf(photo(10)))
+        val session = MutableStateFlow<List<Uri>?>(null)
+        val shooting = CameraViewModel(camera, guides, albumPhotos = album, sessionPhotos = session)
+        runCurrent()
+
+        session.value = emptyList()
+        runCurrent()
+        assertNull(shooting.uiState.value.lastPhoto)
+        assertEquals(emptyList<Uri>(), shooting.uiState.value.sessionPhotos)
+
+        // A photo saved here that is not the session's, such as one pressed before it started, stays out of it.
+        shooting.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.success(photo(11)))
+        runCurrent()
+        assertNull(shooting.uiState.value.lastPhoto)
+
+        session.value = listOf(photo(12))
+        album.value = listOf(photo(10), photo(11), photo(12))
+        runCurrent()
+        assertEquals(photo(12), shooting.uiState.value.lastPhoto)
+
+        session.value = null
+        runCurrent()
+        assertEquals(photo(12), shooting.uiState.value.lastPhoto)
+        assertNull(shooting.uiState.value.sessionPhotos)
+    }
+
+    @Test
+    fun photos_outsideASession_openPixsAlbum_withThePhotoJustTaken_andCloseWhenASessionStarts() = runTest {
+        val album = MutableStateFlow(emptyList<Uri>())
+        val session = MutableStateFlow<List<Uri>?>(null)
+        val shooting = CameraViewModel(camera, guides, albumPhotos = album, sessionPhotos = session)
+        runCurrent()
+        shooting.openPhotos()
+        assertFalse(shooting.uiState.value.photosOpen)
+
+        album.value = listOf(photo(10), photo(11))
+        runCurrent()
+        shooting.openPhotos()
+        assertTrue(shooting.uiState.value.photosOpen)
+        assertEquals(listOf(photo(10), photo(11)), shooting.uiState.value.viewerPhotos)
+        shooting.closePhotos()
+        assertFalse(shooting.uiState.value.photosOpen)
+
+        // A photo just taken is a page at once, before MediaStore tells of it.
+        shooting.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.success(photo(12)))
+        runCurrent()
+        assertEquals(listOf(photo(10), photo(11), photo(12)), shooting.uiState.value.viewerPhotos)
+
+        shooting.openPhotos()
+        session.value = emptyList()
+        runCurrent()
+        assertFalse(shooting.uiState.value.photosOpen)
+    }
+
+    @Test
+    fun photos_inASession_openOnlyTheSessions_andCloseWhenItEnds() = runTest {
+        val album = MutableStateFlow(listOf(photo(10)))
+        val session = MutableStateFlow<List<Uri>?>(emptyList())
+        val shooting = CameraViewModel(camera, guides, albumPhotos = album, sessionPhotos = session)
+        runCurrent()
+        // The album has a photo, but none is the session's.
+        shooting.openPhotos()
+        assertFalse(shooting.uiState.value.photosOpen)
+
+        session.value = listOf(photo(11))
+        runCurrent()
+        shooting.openPhotos()
+        assertTrue(shooting.uiState.value.photosOpen)
+        assertEquals(listOf(photo(11)), shooting.uiState.value.viewerPhotos)
+        shooting.closePhotos()
+        assertFalse(shooting.uiState.value.photosOpen)
+
+        shooting.openPhotos()
+        session.value = null
+        runCurrent()
+        assertFalse(shooting.uiState.value.photosOpen)
+    }
+
+    @Test
+    fun deletePhoto_outsideASession_dropsItFromThePages_andTheThumbnail_atOnce_andTheLastClosesTheViewer() = runTest {
+        val album = MutableStateFlow(listOf(photo(10), photo(11)))
+        val deleted = mutableListOf<Uri>()
+        val shooting =
+            CameraViewModel(
+                camera,
+                guides,
+                albumPhotos = album,
+                deleter = PhotoDeleter {
+                    deleted += it
+                    true
+                },
+            )
+        runCurrent()
+        shooting.openPhotos()
+
+        // MediaStore tells of it later; the album here never does.
+        shooting.deletePhoto(photo(11))
+        runCurrent()
+        assertEquals(listOf(photo(11)), deleted)
+        assertEquals(listOf(photo(10)), shooting.uiState.value.viewerPhotos)
+        assertEquals(photo(10), shooting.uiState.value.lastPhoto)
+        assertTrue(shooting.uiState.value.photosOpen)
+
+        shooting.deletePhoto(photo(10))
+        runCurrent()
+        assertEquals(emptyList<Uri>(), shooting.uiState.value.viewerPhotos)
+        assertNull(shooting.uiState.value.lastPhoto)
+        assertFalse(shooting.uiState.value.photosOpen)
+    }
+
+    @Test
+    fun deletePhoto_thePhotoJustTaken_leavesThePages_beforeMediaStoreTellsOfIt() = runTest {
+        val album = MutableStateFlow(listOf(photo(10)))
+        val shooting = CameraViewModel(camera, guides, albumPhotos = album, deleter = PhotoDeleter { true })
+        runCurrent()
+        shooting.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.success(photo(12)))
+        runCurrent()
+
+        shooting.deletePhoto(photo(12))
+        runCurrent()
+
+        assertEquals(listOf(photo(10)), shooting.uiState.value.viewerPhotos)
+        assertEquals(photo(10), shooting.uiState.value.lastPhoto)
+    }
+
+    @Test
+    fun deletePhoto_thatFails_keepsThePhoto_andSaysSoOnce() = runTest {
+        val album = MutableStateFlow(listOf(photo(10)))
+        val shooting = CameraViewModel(camera, guides, albumPhotos = album, deleter = PhotoDeleter { false })
+        val notices = mutableListOf<Unit>()
+        backgroundScope.launch { shooting.photoNotDeleted.collect { notices += it } }
+        runCurrent()
+        shooting.openPhotos()
+
+        shooting.deletePhoto(photo(10))
+        runCurrent()
+
+        assertEquals(1, notices.size)
+        assertEquals(listOf(photo(10)), shooting.uiState.value.viewerPhotos)
+        assertTrue(shooting.uiState.value.photosOpen)
+    }
+
+    @Test
+    fun shutter_aLateTakenOfAnEarlierPhoto_doesNotFreeTheNextPress() = runTest {
+        runCurrent()
+        // A camera that never says "taken": the shutter is free once the photo is saved.
+        model.onShutter()
+        runCurrent()
+        camera.capture.complete(Result.success(Uri.parse("content://media/external/images/media/1")))
+        runCurrent()
+        assertFalse(model.uiState.value.shutterBusy)
+        camera.capture = CompletableDeferred()
+        model.onShutter()
+        runCurrent()
+
+        camera.captured[0]()
+
+        assertTrue(model.uiState.value.shutterBusy)
+    }
+
+    // Photos as held (FR-1.5, #206): each is saved at the turn of its own press, also when the phone turns before the
+    // camera takes it and while an earlier photo is saved.
+    @Test
+    fun shutter_savesEachPhotoAtTheTurnOfItsOwnPress() = runTest {
+        val turns = PhoneTurns.Fixed(90)
+        val held = CameraViewModel(camera, guides, phoneTurns = turns)
+        runCurrent()
+        held.onShutter()
+        turns.set(0)
+        runCurrent()
+        camera.captured[0]()
+        turns.set(270)
+
+        held.onShutter()
+        runCurrent()
+
+        assertEquals(listOf(90, 270), camera.turns)
     }
 
     @Test
@@ -178,6 +507,48 @@ class CameraViewModelTest {
         }
     }
 
+    // The `photo_taken` event (NFR-19; Design 2.8, Telemetry): a photo saved in a session, with the time the camera
+    // took it and the time it was saved, from the press, on the clock for durations while the wall clock jumps; a photo
+    // that failed before the camera took it, outside one.
+    @Test
+    fun aSavedPhoto_sendsWhenTheCameraTookIt_andWhenItWasSaved() = runTest {
+        var now = 1_000L
+        var wall = 5_000_000L
+        val sharing = CameraViewModel(camera, guides, photos = RecordingShare(), clock = { wall }, elapsed = { now })
+
+        sharing.onShutter()
+        runCurrent()
+        now = 1_150
+        wall -= 3_600_000
+        camera.captured.single()()
+        now = 1_900
+        camera.capture.complete(Result.success(Uri.parse("content://media/external/images/media/1")))
+        runCurrent()
+
+        assertEquals(
+            listOf(TelemetryEvent.PhotoTaken(saved = true, shutterMs = 150, ms = 900, inSession = true)),
+            telemetry.sent<TelemetryEvent.PhotoTaken>(),
+        )
+    }
+
+    @Test
+    fun aPhotoThatFailedBeforeTheCameraTookIt_sendsFailed_withoutAShutterTime() = runTest {
+        var now = 1_000L
+        val alone =
+            CameraViewModel(camera, guides, photos = RecordingShare().apply { session = null }, elapsed = { now })
+
+        alone.onShutter()
+        runCurrent()
+        now = 1_040
+        camera.capture.complete(Result.failure(IOException("Storage full")))
+        runCurrent()
+
+        assertEquals(
+            listOf(TelemetryEvent.PhotoTaken(saved = false, shutterMs = null, ms = 40, inSession = false)),
+            telemetry.sent<TelemetryEvent.PhotoTaken>(),
+        )
+    }
+
     @Test
     fun aPhotoOutsideASessionIsNotShared() = runTest {
         val share = RecordingShare().apply { session = null }
@@ -206,31 +577,17 @@ class CameraViewModelTest {
     }
 
     @Test
-    fun savedNoticeGoesAfterThreeSecondsAndANewPhotoRestartsIt() = runTest {
+    fun aSavedPhoto_updatesTheThumbnail_withNoNotice() = runTest {
         val photo = Uri.parse("content://media/external/images/media/1")
         model.onShutter()
         runCurrent()
         camera.capture.complete(Result.success(photo))
         runCurrent()
-        assertEquals(photo, model.uiState.value.lastPhoto)
-        assertEquals(CaptureNotice.SAVED, model.uiState.value.captureNotice)
 
-        // A second photo before the notice goes shows its own notice for the full time.
-        advanceTimeBy(2_000)
-        camera.capture = CompletableDeferred()
-        model.onShutter()
-        runCurrent()
-        assertNull(model.uiState.value.captureNotice)
-        camera.capture.complete(Result.success(photo))
-        runCurrent()
-        advanceTimeBy(CameraViewModel.NOTICE_MS - 1)
-        runCurrent()
-        assertEquals(CaptureNotice.SAVED, model.uiState.value.captureNotice)
-
-        advanceTimeBy(1)
-        runCurrent()
-        assertNull(model.uiState.value.captureNotice)
+        // No notice (FR-1.6, #204): the thumbnail shows the photo.
         assertEquals(photo, model.uiState.value.lastPhoto)
+        assertFalse(model.uiState.value.isSaving)
+        assertNull(model.uiState.value.captureNotice)
     }
 
     @Test
@@ -249,6 +606,7 @@ class CameraViewModelTest {
         camera.throwOnCapture = true
         model.onShutter()
         runCurrent()
+        assertFalse(model.uiState.value.shutterBusy)
         assertFalse(model.uiState.value.isSaving)
         assertEquals(CaptureNotice.SAVE_FAILED, model.uiState.value.captureNotice)
     }
@@ -387,10 +745,27 @@ class CameraViewModelTest {
         override fun setExposure(index: Int) = Unit
         override fun setFlash(mode: FlashMode) = Unit
         override fun setTorch(on: Boolean) = Unit
-        override fun setAspectRatio(ratio: AspectRatio) = Unit
-        override suspend fun takePhoto(): Result<Uri> {
+        val aspectRequests = mutableListOf<AspectRatio>()
+        override fun setAspectRatio(ratio: AspectRatio) {
+            aspectRequests += ratio
+        }
+
+        /** Each photo's "the camera took it" callback, in shutter order; a test calls one to say so. */
+        val captured = mutableListOf<() -> Unit>()
+
+        /** The turn each photo was saved at, in shutter order (FR-1.5). */
+        val turns = mutableListOf<Int>()
+        private var turn = 0
+
+        override fun setPhotoTurn(turn: Int) {
+            this.turn = turn
+        }
+
+        override suspend fun takePhoto(onCaptured: () -> Unit): Result<Uri> {
             captureCount++
+            turns += turn
             if (throwOnCapture) throw IllegalStateException("Camera closed")
+            captured += onCaptured
             return capture.await()
         }
         override suspend fun grabFrame(): Result<Bitmap> = Result.failure(IllegalStateException("No frame"))

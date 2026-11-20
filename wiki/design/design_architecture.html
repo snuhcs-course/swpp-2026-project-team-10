@@ -23,7 +23,7 @@
 <p>Open this file in a browser to see the drawing. The published image is <code>design_target_architecture.png</code>.</p>
 
 <h2>Figure 1 · <code>design_target_architecture.png</code> · architecture as built</h2>
-<svg data-image="design_target_architecture.png" viewBox="0 0 900 456" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica Neue, Arial, sans-serif" fill="#1c2433" style="width:100%;height:auto">
+<svg data-image="design_target_architecture.png" viewBox="0 0 900 508" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica Neue, Arial, sans-serif" fill="#1c2433" style="width:100%;height:auto">
 <defs>
   <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5d6677"/></marker>
   <marker id="ahb2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f5bd3"/></marker>
@@ -119,6 +119,15 @@
 <text x="450" y="408" text-anchor="middle" font-size="10.5" font-weight="700">TURN relay</text>
 <text x="450" y="423" text-anchor="middle" font-size="9.5" fill="#5d6677">Cloudflare, managed service</text>
 <text x="450" y="448" text-anchor="middle" font-size="9.5" fill="#5d6677">relays the encrypted media only when no direct path exists · the Pix server hands the phones short-lived credentials</text>
+<!-- crash reports and usage events from release builds, while the user allows it (AD-19) -->
+<g stroke="#5d6677" stroke-width="1.4" fill="none">
+  <path d="M60,360 V481 H372" marker-end="url(#ah2)"/>
+  <path d="M840,360 V481 H528" marker-end="url(#ah2)"/>
+</g>
+<rect x="375" y="462" width="150" height="38" rx="8" fill="#fff" stroke="#9aa3b2"/>
+<text x="450" y="478" text-anchor="middle" font-size="10.5" font-weight="700">Firebase</text>
+<text x="450" y="492" text-anchor="middle" font-size="9.5" fill="#5d6677">Crashlytics · Analytics</text>
+<text x="216" y="474" text-anchor="middle" font-size="9.5" fill="#5d6677">crash reports · usage events · HTTPS</text>
 </svg>
 </body>
 </html>

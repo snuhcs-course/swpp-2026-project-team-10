@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -10,6 +10,8 @@ import com.lastpenguin.pix.account.FakeFriendsRepository
 import com.lastpenguin.pix.account.FakeGoogleIdTokens
 import com.lastpenguin.pix.account.FakeInvitationManager
 import com.lastpenguin.pix.camera.CameraSettings
+import com.lastpenguin.pix.camera.PhoneTurns
+import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.AppContainer
 import com.lastpenguin.pix.generation.GenerationConsent
@@ -22,6 +24,7 @@ import com.lastpenguin.pix.generation.PoseTipper
 import com.lastpenguin.pix.generation.PoseTips
 import com.lastpenguin.pix.generation.PromptHistory
 import com.lastpenguin.pix.generation.ScreenLanguages
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -43,12 +46,16 @@ import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.PhotoSyncer
 import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteControlHandler
+import com.lastpenguin.pix.session.TipSyncer
 import com.lastpenguin.pix.session.fakeBitmap
+import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.settings.AppLanguage
 import com.lastpenguin.pix.settings.AppSettings
 import com.lastpenguin.pix.settings.TutorialScreen
 import java.io.File
 import java.io.IOException
+import java.util.Base64
+import java.util.zip.CRC32
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -56,7 +63,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
+import org.robolectric.RuntimeEnvironment
 
 /**
  * An [AppContainer] of fakes for screen tests under Robolectric (Testing Documentation 2.1.3): the camera, the
@@ -75,6 +84,8 @@ class TestAppContainer(
     val screenLanguages: ScreenLanguages? = null,
     /** The tutorial's slides seen; all unless a test is about them, so a screen test has no slide over its screen. */
     tutorialSeen: Set<TutorialScreen>? = TutorialScreen.entries.toSet(),
+    /** Whether usage data is shared (FR-10.6), the default; null while the stored answer loads. */
+    shareUsage: Boolean? = true,
 ) {
     val guides: GuideRepository = InMemoryGuideRepository(frameAspect)
     val mirror: GuideRepository = InMemoryGuideRepository()
@@ -99,10 +110,19 @@ class TestAppContainer(
     val friends = FakeFriendsRepository()
     val invitations = FakeInvitationManager()
     val mobileData = MobileDataNotice.InMemory()
-    val appSettings = AppSettings.InMemory(tutorial = tutorialSeen)
+    val appSettings = AppSettings.InMemory(tutorial = tutorialSeen, usage = shareUsage)
     val language = AppLanguage.InMemory()
-    val syncer =
-        GuideSyncer(session, guides, mirror, FakeGuideImageCodec(), FakeGuideReferenceCodec(), reference)
+
+    /** The guide on both phones, with an image and a reference photo a screen can draw (a guide from the subject). */
+    val syncer = GuideSyncer(
+        session,
+        guides,
+        mirror,
+        FakeGuideImageCodec { id -> ScreenTestSupport.guide(withReference = false).copy(id = id) },
+        FakeGuideReferenceCodec { ScreenTestSupport.bitmap(60, 80) },
+        reference,
+        Dispatchers.Unconfined,
+    )
 
     /** The photographer's candidates on the subject's phone; on the main thread, as the screens collect it. */
     val poses = PoseSyncer(session, FakePoseCandidateCodec(candidateImage), Dispatchers.Unconfined)
@@ -114,22 +134,61 @@ class TestAppContainer(
         Dispatchers.Unconfined,
     )
 
+    /** How the phone is held; upright unless the test turns it (FR-1.5). */
+    val turns = PhoneTurns.Fixed()
+
     /** The photographer's Generate poses on the subject's phone, the same way, with a scene photo a screen can draw. */
     val descriptions =
         DescriptionSyncer(session, FakePoseCandidateCodec { ScreenTestSupport.bitmap(60, 80) }, Dispatchers.Unconfined)
 
-    /** The session's photos, the same way; a screen test sends none. */
+    /** The photographer's tip of the guide on the subject's phone (#213), from this container's own tips. */
+    val tipSync = TipSyncer(session, tips.onCamera)
+
+    /**
+     * The session's photos, the same way; a screen test sends none. The subject's album saves each photo as
+     * [savedPhoto] of its id unless [albumFails]; nothing is written.
+     */
     val photos = PhotoSyncer(
         session,
         { null },
-        { _, _, _ -> Result.failure(IOException("No album in a screen test")) },
+        { _, photoId, _ ->
+            if (albumFails) Result.failure(IOException("The disk is full")) else Result.success(savedPhoto(photoId))
+        },
         File(System.getProperty("java.io.tmpdir"), "pix-session-photos"),
         Dispatchers.Unconfined,
     )
 
+    /** Whether the subject's album refuses the photographer's photos, as a full disk does (FR-6.14). */
+    var albumFails = false
+
+    /** The photos in Pix's album (FR-1.6), oldest first, which a test sets: no MediaStore here tells of a saved photo. */
+    val album = MutableStateFlow<List<Uri>>(emptyList())
+
+    /** The photos the viewer deleted, in order; each leaves [album] and the session's photos unless [deleteFails]. */
+    val deleted = mutableListOf<Uri>()
+
+    /** Whether a delete fails, as for a photo another app owns. */
+    var deleteFails = false
+
+    /** Pix's album's own delete, as `PixAlbumPhotos.delete`. */
+    private val albumDeleter = PhotoDeleter { uri ->
+        if (deleteFails) return@PhotoDeleter false
+        deleted += uri
+        album.value -= uri
+        true
+    }
+
+    /**
+     * The viewer's delete, through the real `PhotoSyncer` as in the app. A screen test starts no sender, so a photo
+     * taken in a session waits to go and is deleted only after its session.
+     */
+    private val deleter = PhotoDeleter { uri -> photos.delete(uri, albumDeleter, CoroutineScope(Dispatchers.Main)) }
+
     val container = AppContainer(
         cameraController = camera,
         cameraSettings = settings,
+        albumPhotos = album,
+        photoDeleter = deleter,
         guideRepository = guides,
         mirrorGuideRepository = mirror,
         mirrorReference = reference,
@@ -152,17 +211,40 @@ class TestAppContainer(
         confirmSyncer = confirms,
         descriptionSyncer = descriptions,
         photoSyncer = photos,
+        tipSyncer = tipSync,
         remoteControlHandler = RemoteControlHandler(session, camera, guides, attributeGuideChanges = syncer::attribute),
         mobileDataNotice = mobileData,
         appSettings = appSettings,
         appLanguage = language,
         screenLanguages = screenLanguages,
+        phoneTurns = turns,
     )
 
-    /** Installs the container in the test's [PixApplication]; call before the screen is launched. */
+    companion object {
+        /** Where the subject's album keeps the photographer's photo [photoId] in a screen test. */
+        fun savedPhoto(photoId: String): Uri = Uri.parse("content://media/external/images/media/$photoId")
+    }
+
+    /**
+     * Installs the container in the test's [PixApplication]; call before the screen is launched. The screen is drawn
+     * dark, as on the phone: Pix keeps dark through `AppCompatDelegate`, which only an `AppCompatActivity` follows, and
+     * `launchFragmentInContainer` hosts a plain `FragmentActivity`, so the test runs in the night configuration.
+     */
     fun install(): TestAppContainer {
+        RuntimeEnvironment.setQualifiers("+night")
         ApplicationProvider.getApplicationContext<PixApplication>().installContainer(container)
         return this
+    }
+
+    /**
+     * The photographer's photo [photoId] reaching this phone whole, as `photo.begin`, one chunk, and `photo.end`; the
+     * subject's [photos] must be receiving. A few bytes that start as a JPEG are enough, since nothing decodes them.
+     */
+    fun deliverPhoto(photoId: String) {
+        val bytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 1, 2, 3)
+        session.deliver(SessionMessage.PhotoBegin(photoId, "jpeg", bytes.size.toLong(), 1, takenAt = 1))
+        session.deliver(SessionMessage.PhotoChunk(photoId, 0, Base64.getEncoder().encodeToString(bytes)))
+        session.deliver(SessionMessage.PhotoEnd(photoId, CRC32().apply { update(bytes) }.value))
     }
 
     /** Makes a guide when the test says so: each request waits for [finish]. */
@@ -199,8 +281,9 @@ class TestAppContainer(
             request: PoseRequest,
             seed: Long,
             selfie: Boolean,
+            situation: Situation,
         ): Flow<GenerationEvent> {
-            val run = Run(scene, request, selfie).also(runs::add)
+            val run = Run(scene, request, selfie, situation).also(runs::add)
             return flow {
                 try {
                     for (event in run.events) emit(event)
@@ -211,7 +294,12 @@ class TestAppContainer(
             }
         }
 
-        class Run(val scene: Bitmap, val request: PoseRequest, val selfie: Boolean = false) {
+        class Run(
+            val scene: Bitmap,
+            val request: PoseRequest,
+            val selfie: Boolean = false,
+            val situation: Situation = Situation.DEFAULT,
+        ) {
             val events = Channel<GenerationEvent>(Channel.UNLIMITED)
             var cancelled = false
 

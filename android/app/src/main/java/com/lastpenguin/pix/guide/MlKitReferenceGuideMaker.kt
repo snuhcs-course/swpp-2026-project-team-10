@@ -1,12 +1,16 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
+import android.os.SystemClock
 import android.util.Log
 import com.lastpenguin.pix.core.Timings
+import com.lastpenguin.pix.telemetry.Telemetry
+import com.lastpenguin.pix.telemetry.TelemetryEvent
+import com.lastpenguin.pix.telemetry.TelemetryEvent.GuideMade.Outcome
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -29,19 +33,36 @@ class MlKitReferenceGuideMaker(
     override suspend fun make(bitmap: Bitmap, source: GuideSource): Result<ReferenceGuide> =
         timed(source) { build(bitmap, source) }
 
-    /** `seg.start` and `seg.end` around the whole step, from the picked photo to the guide (NFR-3). */
+    /**
+     * `seg.start` and `seg.end` around the whole step, from the picked photo to the guide (NFR-3), and its
+     * `guide_made` event (Design 2.8, Telemetry).
+     */
     private suspend fun timed(source: GuideSource, block: suspend () -> ReferenceGuide): Result<ReferenceGuide> =
         withContext(Dispatchers.Default) {
             Timings.mark("seg.start", source.name)
+            val startedAt = SystemClock.elapsedRealtime()
             val result = try {
                 Result.success(block())
             } catch (e: CancellationException) {
+                // Left before it was made (Back on Reference confirm, or another photo), often while the model downloads:
+                // its time until then still counts (NFR-3).
+                val ms = SystemClock.elapsedRealtime() - startedAt
+                Telemetry.event(TelemetryEvent.GuideMade(source, Outcome.CANCELLED, ms))
                 throw e
             } catch (e: Exception) {
                 // No person is an expected answer; anything else is worth the stack trace in logcat.
-                if (e !is NoPersonFoundException) Log.w(TAG, "Could not make a guide from the reference", e)
+                if (e !is NoPersonFoundException) {
+                    Log.w(TAG, "Could not make a guide from the reference", e)
+                    Telemetry.error("guide.make", e)
+                }
                 Result.failure(e)
             }
+            val outcome = when (result.exceptionOrNull()) {
+                null -> Outcome.MADE
+                is NoPersonFoundException -> Outcome.NO_PERSON
+                else -> Outcome.FAILED
+            }
+            Telemetry.event(TelemetryEvent.GuideMade(source, outcome, SystemClock.elapsedRealtime() - startedAt))
             Timings.mark(
                 "seg.end",
                 result.fold(

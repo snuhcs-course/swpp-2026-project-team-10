@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-10-31, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.camera
 
 import android.content.Context
@@ -43,6 +43,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Observer
 import com.lastpenguin.pix.BuildConfig
 import com.lastpenguin.pix.core.Timings
+import com.lastpenguin.pix.telemetry.Telemetry
 import java.io.IOException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -108,6 +109,9 @@ class CameraXController(
     private var torch = false
     private var torchRequest = 0
 
+    /** The quarter turn the next photo is saved at ([setPhotoTurn], FR-1.5). */
+    private var photoTurn = 0
+
     // Whether the bound lens has a flash; a separately exposed ultrawide may not.
     private var lensHasFlash = true
 
@@ -115,6 +119,9 @@ class CameraXController(
     // only a successfully applied request separately; the zoom observer publishes nothing until it is restored, so the
     // reset never replaces the user's framing on either phone.
     private var retainedZoom = 1f
+
+    // The photos asked for since the app started, for the timing marks; main thread only.
+    private var shots = 0
     private var pendingZoom: Float? = null
 
     // Whether pendingZoom is the last value of a pinch; until it is, the bound lens is held (CameraZoomPlan.lensFor).
@@ -287,13 +294,14 @@ class CameraXController(
             .build()
         val capture = ImageCapture.Builder()
             .setTargetRotation(rotation)
-            .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+            .setCaptureMode(CaptureTuning.CAPTURE_MODE)
+            .setJpegQuality(CaptureTuning.JPEG_QUALITY)
             .setFlashMode(flash.captureMode)
             .setResolutionSelector(
                 ResolutionSelector.Builder()
                     .setAspectRatioStrategy(aspect)
                     .setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
-                    .setAllowedResolutionMode(ResolutionSelector.PREFER_HIGHER_RESOLUTION_OVER_CAPTURE_RATE)
+                    .setAllowedResolutionMode(CaptureTuning.RESOLUTION_MODE)
                     .build(),
             )
             .build()
@@ -493,12 +501,19 @@ class CameraXController(
         }, mainExecutor)
     }
 
-    override suspend fun takePhoto(): Result<Uri> = withContext(Dispatchers.Main.immediate) {
+    override fun setPhotoTurn(turn: Int) {
+        photoTurn = turn
+    }
+
+    override suspend fun takePhoto(onCaptured: () -> Unit): Result<Uri> = withContext(Dispatchers.Main.immediate) {
         val current = binding
         val capture = current?.capture
         if (_status.value != CameraStatus.READY || capture == null) {
             return@withContext Result.failure(IllegalStateException("The camera is not ready"))
         }
+        // Photos overlap now that the shutter is free while one is saved: each photo's marks carry its number, so a
+        // reader of the log knows which press a result belongs to (scripts/zoom_timings.py).
+        val shot = "id=${++shots}"
         suspendCancellableCoroutine { continuation ->
             current.capturesInFlight++
             var finished = false
@@ -511,33 +526,42 @@ class CameraXController(
             }
             try {
                 extendTrace()
-                Timings.mark("camera.capture.start")
+                Timings.mark("camera.capture.start", shot)
+                // As the phone is held (FR-1.5): the viewport's crop stays the same part of the sensor, and only the
+                // photo's orientation, and with it its mirror, follows the turn.
+                capture.targetRotation = targetRotationFor(photoTurn)
                 capture.takePicture(
                     // As the mirrored preview showed it, so the photo matches the guide placed on it (FR-1.14).
                     photoSaver.outputOptions(mirrored = current.facing == CameraFacing.FRONT),
                     mainExecutor,
                     object : ImageCapture.OnImageSavedCallback {
+                        override fun onCaptureStarted() {
+                            // The camera is taking the picture: the next photo can be asked for (NFR-19).
+                            Timings.mark("camera.capture.started", shot)
+                            if (continuation.isActive) onCaptured()
+                        }
+
                         override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                             val result = output.savedUri?.let { Result.success(it) }
                                 ?: Result.failure(IOException("The saved photo has no gallery URI"))
                             if (result.isSuccess) {
-                                Timings.mark("camera.capture.saved")
+                                Timings.mark("camera.capture.saved", shot)
                             } else {
-                                Timings.mark("camera.capture.failed", "missing_uri")
+                                Timings.mark("camera.capture.failed", "$shot missing_uri")
                             }
                             finishCapture()
                             if (continuation.isActive) continuation.resume(result)
                         }
 
                         override fun onError(exception: ImageCaptureException) {
-                            Timings.mark("camera.capture.failed", "code=${exception.imageCaptureError}")
+                            Timings.mark("camera.capture.failed", "$shot code=${exception.imageCaptureError}")
                             finishCapture()
                             if (continuation.isActive) continuation.resume(Result.failure(exception))
                         }
                     },
                 )
             } catch (error: Exception) {
-                Timings.mark("camera.capture.failed", error.javaClass.simpleName)
+                Timings.mark("camera.capture.failed", "$shot ${error.javaClass.simpleName}")
                 finishCapture()
                 if (continuation.isActive) continuation.resume(Result.failure(error))
             }
@@ -799,6 +823,7 @@ class CameraXController(
             }
         } catch (error: Exception) {
             Log.e(TAG, "Could not process camera frame", error)
+            Telemetry.error("camera.frame", error)
         } finally {
             frame.close()
         }
@@ -883,6 +908,7 @@ class CameraXController(
     private fun failBinding(current: Binding, error: Exception) {
         if (binding !== current) return
         Log.e(TAG, "Could not bind the ${current.facing.name.lowercase()} camera", error)
+        Telemetry.error("camera.bind", error)
         if (recoverPrimary(current) || recoverRear(current)) return
         releaseBinding()
         publishStatus(CameraStatus.UNAVAILABLE)

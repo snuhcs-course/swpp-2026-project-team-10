@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-09, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.settings
 
 import android.content.Context
@@ -10,6 +10,7 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.util.AttributeSet
 import android.view.View
+import com.lastpenguin.pix.R
 import com.lastpenguin.pix.guide.GuideLook
 
 /**
@@ -21,6 +22,8 @@ class GuideLookPreview @JvmOverloads constructor(context: Context, attrs: Attrib
 
     private val density = resources.displayMetrics.density
     private val background = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val sky = context.getColor(R.color.guide_preview_sky)
+    private val ground = context.getColor(R.color.guide_preview_ground)
     private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
@@ -38,7 +41,7 @@ class GuideLookPreview @JvmOverloads constructor(context: Context, attrs: Attrib
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         bounds.set(0f, 0f, w.toFloat(), h.toFloat())
-        background.shader = LinearGradient(0f, 0f, 0f, h.toFloat(), SKY, GROUND, Shader.TileMode.CLAMP)
+        background.shader = LinearGradient(0f, 0f, 0f, h.toFloat(), sky, ground, Shader.TileMode.CLAMP)
         person.reset()
         val cx = w / 2f
         val headRadius = h * 0.13f
@@ -65,7 +68,5 @@ class GuideLookPreview @JvmOverloads constructor(context: Context, attrs: Attrib
     private companion object {
         const val LINE_DP = 2f
         const val CORNER_DP = 14f
-        const val SKY = 0xFFAFC3D6.toInt()
-        const val GROUND = 0xFF33373E.toInt()
     }
 }

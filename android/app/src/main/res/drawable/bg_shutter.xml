@@ -5,12 +5,12 @@
         <layer-list>
             <item>
                 <shape android:shape="oval">
-                    <stroke android:width="4dp" android:color="#59F4F4F2" />
+                    <stroke android:width="4dp" android:color="@color/camera_shutter_disabled" />
                 </shape>
             </item>
             <item android:bottom="8dp" android:left="8dp" android:right="8dp" android:top="8dp">
                 <shape android:shape="oval">
-                    <solid android:color="#59F4F4F2" />
+                    <solid android:color="@color/camera_shutter_disabled" />
                 </shape>
             </item>
         </layer-list>
@@ -19,12 +19,12 @@
         <layer-list>
             <item>
                 <shape android:shape="oval">
-                    <stroke android:width="4dp" android:color="@color/pix_text" />
+                    <stroke android:width="4dp" android:color="@color/camera_shutter" />
                 </shape>
             </item>
             <item android:bottom="11dp" android:left="11dp" android:right="11dp" android:top="11dp">
                 <shape android:shape="oval">
-                    <solid android:color="#D6D6D3" />
+                    <solid android:color="@color/camera_shutter_pressed" />
                 </shape>
             </item>
         </layer-list>
@@ -33,12 +33,12 @@
         <layer-list>
             <item>
                 <shape android:shape="oval">
-                    <stroke android:width="4dp" android:color="@color/pix_text" />
+                    <stroke android:width="4dp" android:color="@color/camera_shutter" />
                 </shape>
             </item>
             <item android:bottom="8dp" android:left="8dp" android:right="8dp" android:top="8dp">
                 <shape android:shape="oval">
-                    <solid android:color="@color/pix_text" />
+                    <solid android:color="@color/camera_shutter" />
                 </shape>
             </item>
         </layer-list>

@@ -1,12 +1,16 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.settings
 
 import android.animation.ValueAnimator
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.RectF
 import android.os.Looper
 import android.view.View
 import android.view.Window
 import android.view.WindowManager
+import android.widget.TextView
 import androidx.activity.ComponentDialog
 import androidx.core.os.bundleOf
 import androidx.core.view.isVisible
@@ -47,13 +51,16 @@ import org.robolectric.shadows.ShadowChoreographer
 
 /*
  * The tutorial's tips over a live screen (FR-10.4, Design 2.6.8), here over Add a pose guide, the sheet they open over
- * as it opens from Camera. The layer (state-based): a ring around each control the screen shows, where it is; none and
- * no caption for a control the screen does not show (no saved guides); a control that appears while they are up gets
- * its ring, and one that moves takes its ring along; a row of saved guides wider than the screen is ringed as far as
- * it shows (boundary). The captions are text, which TalkBack reads, one per ring.
- * Closing (equivalence partitioning): Back on the dialog closes them and marks the screen seen; showing them while
+ * as it opens from Camera. The layer (state-based): a ring around each control the screen shows, where it is, in the
+ * sheet's order: the situations' tiles, then the gallery's and My library's whole rows, their rings apart
+ * though the rows touch, each still centered on its row, and their captions on the rings' top edges at the right, with
+ * no arrow, My library's on the seam with the gallery's ring, which both stop around it (#243); none and no caption
+ * for a control the screen does not show (a row hidden) or that a short screen's sheet has scrolled out of view or shows less
+ * than half of, and a ring only around the part it shows of one cut by it; a control that appears while they are up
+ * gets its ring, and one that moves takes its ring along. The captions are text, which TalkBack reads, one per ring.
+ * Closing (equivalence partitioning): a tap anywhere on the layer, a tap on its closing line, and Back on the dialog each close them and marks the screen seen; showing them while
  * they are there adds no second layer.
- * Fading (Iter3-A14), with the display's frames paused to see a fade's start: the tips fade in; *Got it* counts them
+ * Fading (Iter3-A14), with the display's frames paused to see a fade's start: the tips fade in; a tap counts them
  * seen at once, lets touches and keys through to the screen at once, and fades them out before they close; with the
  * phone's animations off they come and go at once.
  * Whether a screen's tips are due: not while the stored answer loads or once seen, and still when another screen's are
@@ -120,8 +127,9 @@ class TutorialFragmentTest {
     }
 
     /** Where the sheet's control [id] is in the layer's own coordinates. */
-    private fun inLayer(id: Int): RectF {
-        val control = sheetView().findViewById<View>(id)
+    private fun inLayer(id: Int): RectF = inLayer(sheetView().findViewById<View>(id))
+
+    private fun inLayer(control: View): RectF {
         val at = IntArray(2).also(control::getLocationOnScreen)
         val origin = IntArray(2).also(layer()::getLocationOnScreen)
         val left = (at[0] - origin[0]).toFloat()
@@ -139,31 +147,93 @@ class TutorialFragmentTest {
         assertTrue("$ring hugs $control", ring.width() <= longest && ring.height() <= longest)
     }
 
+    /** The ring around a whole list row: as wide as it and a little more, over most of its height, centered on it. */
+    private fun assertRingAroundRow(ring: RectF, row: RectF) {
+        assertEquals("$ring centered on $row", row.centerY(), ring.centerY(), 1.5f)
+        assertTrue("$ring spans $row", ring.left <= row.left && ring.right >= row.right)
+        assertTrue("$ring hugs $row", ring.width() <= row.width() + 2 * RING_PAD_PX)
+        assertTrue("$ring on $row", ring.top <= row.top + RING_PAD_PX && ring.bottom >= row.bottom - RING_PAD_PX)
+        assertTrue("$ring near $row", ring.top >= row.top - RING_PAD_PX && ring.bottom <= row.bottom + RING_PAD_PX)
+    }
+
     @Test
     fun eachControlShown_isRinged_whereItIs() {
         openSheet()
 
         val placed = layer().placed
         assertEquals(3, placed.count { it != null })
-        assertRingAround(placed[0]!!.ring, inLayer(R.id.addPhotoTile))
-        assertRingAround(placed[1]!!.ring, inLayer(R.id.generateButton))
-        assertRingAround(placed[2]!!.ring, inLayer(R.id.savedGuidesList))
+        assertRingAround(
+            placed[0]!!.ring,
+            RectF(inLayer(R.id.situationRowTop)).apply {
+                union(inLayer(R.id.situationRowBottom))
+            },
+        )
+        assertRingAroundRow(placed[1]!!.ring, inLayer(R.id.galleryRow))
+        assertRingAroundRow(placed[2]!!.ring, inLayer(R.id.libraryRow))
+        // The rows touch; their rings do not.
+        assertTrue("${placed[1]!!.ring} above ${placed[2]!!.ring}", placed[1]!!.ring.bottom < placed[2]!!.ring.top)
     }
 
     @Test
-    fun aRowOfSavedGuidesWiderThanTheScreen_isRingedAsFarAsItShows() {
-        openSheet(saved = 10)
+    fun theRowsCaptions_sitOnTheirRingsEdges_atTheRight_withNoArrow() {
+        openSheet()
 
-        val row = inLayer(R.id.savedGuidesList)
-        val shown = inLayer(R.id.savedGuidesScroll)
-        assertTrue("$row runs past $shown", row.right > shown.right)
-        val saved = RectF(row).apply { intersect(shown) }
-        assertRingAround(layer().placed[2]!!.ring, saved)
+        val placed = layer().placed
+        for (index in listOf(1, 2)) {
+            val mark = placed[index]!!
+            val caption = captionOf(mark)
+            assertTrue(mark.onEdge)
+            assertEquals(mark.ring.top, caption.centerY(), 1.5f)
+            assertTrue("$caption at the right of ${mark.ring}", caption.centerX() > mark.ring.centerX())
+            assertTrue("$caption within ${mark.ring}", caption.right < mark.ring.right)
+        }
+        // The situations' caption, above its tiles, keeps its arrow.
+        assertFalse(placed[0]!!.onEdge)
+    }
+
+    private fun captionOf(mark: CoachMarkLayout.Placed) = RectF(
+        mark.caption.left.toFloat(),
+        mark.caption.top.toFloat(),
+        mark.caption.right.toFloat(),
+        mark.caption.bottom.toFloat(),
+    )
+
+    @Test
+    fun myLibrarysCaption_onTheSeamWithTheGallerysRing_stopsBothRings() {
+        openSheet()
+        val layer = layer()
+        val gallery = layer.placed[1]!!
+        val library = layer.placed[2]!!
+        val caption = captionOf(library)
+        assertTrue("$caption over ${gallery.ring}'s bottom", gallery.ring.bottom in caption.top..caption.bottom)
+
+        // The rings as drawn, without the captions: on each ring's line along the seam, no ink where the caption sits,
+        // and the line's dashes beside it, between the ring's corner and the caption.
+        layer.placed.forEach { it!!.caption.visibility = View.INVISIBLE }
+        val drawn = Bitmap.createBitmap(layer.width, layer.height, Bitmap.Config.ARGB_8888)
+        layer.draw(Canvas(drawn))
+        val density = layer.resources.displayMetrics.density
+        val beside = (gallery.ring.left + 28 * density).toInt() until (caption.left - 12 * density).toInt()
+        val under = caption.left.toInt()..caption.right.toInt()
+        for ((name, y) in listOf("the gallery's" to gallery.ring.bottom, "My library's" to library.ring.top)) {
+            assertTrue("$name ring has no line beside the caption", inked(drawn, beside, y))
+            assertFalse("$name ring runs under the caption", inked(drawn, under, y))
+        }
+    }
+
+    /** Whether [bitmap] has the rings' light ink at any x of [xs] within 2 px of the line at [y]. */
+    private fun inked(bitmap: Bitmap, xs: IntRange, y: Float): Boolean = xs.any { x ->
+        (y.toInt() - 2..y.toInt() + 2).any { row ->
+            val pixel = bitmap.getPixel(x, row)
+            Color.alpha(pixel) > 128 && Color.red(pixel) > 160 && Color.green(pixel) > 160 && Color.blue(pixel) > 160
+        }
     }
 
     @Test
     fun aControlNotShown_getsNoRingOrCaption() {
-        openSheet(saved = 0)
+        openSheet()
+        sheetView().findViewById<View>(R.id.libraryRow).isVisible = false
+        idleUntil { layer().placed[2] == null }
 
         val placed = layer().placed
         assertNull(placed[2])
@@ -173,10 +243,29 @@ class TutorialFragmentTest {
     }
 
     @Test
-    fun aControlThatAppears_getsItsRingAndCaption() {
-        openSheet(saved = 0)
+    @Config(qualifiers = "w360dp-h480dp-xxhdpi")
+    fun onAShortScreen_onlyWhatTheSheetShowsIsRinged() {
+        openSheet()
 
-        runBlocking { modules.saved.save(guide(), GuideState()) }
+        // The sheet scrolls, and shows less than half of its library row.
+        val shown = inLayer(sheetView())
+        assertTrue("$shown", inLayer(R.id.libraryRow).centerY() >= shown.bottom)
+        val placed = layer().placed
+        assertNull(placed[2])
+        assertFalse(string(R.string.tutorial_saved) in layer().shownTexts())
+        placed.filterNotNull().forEach { mark ->
+            assertTrue("${mark.ring} in $shown", mark.ring.bottom <= shown.bottom + RING_PAD_PX + 1f)
+        }
+    }
+
+    @Test
+    fun aControlThatAppears_getsItsRingAndCaption() {
+        openSheet()
+        val row = sheetView().findViewById<View>(R.id.libraryRow)
+        row.isVisible = false
+        idleUntil { layer().placed[2] == null }
+
+        row.isVisible = true
         idleUntil { layer().placed[2] != null }
 
         assertNotNull(layer().placed[2])
@@ -186,13 +275,14 @@ class TutorialFragmentTest {
     @Test
     fun aControlThatMoves_takesItsRingAlong() {
         openSheet()
-        val before = RectF(layer().placed[0]!!.ring)
+        val before = RectF(layer().placed[1]!!.ring)
 
-        sheetView().findViewById<View>(R.id.addPhotoTile).translationY = -60f
+        // A little, so its caption keeps its room on the ring's edge.
+        sheetView().findViewById<View>(R.id.galleryRow).translationY = -20f
         idle()
 
-        assertEquals(before.top - 60f, layer().placed[0]!!.ring.top, 1f)
-        assertRingAround(layer().placed[0]!!.ring, inLayer(R.id.addPhotoTile))
+        assertEquals(before.centerY() - 20f, layer().placed[1]!!.ring.centerY(), 1f)
+        assertRingAroundRow(layer().placed[1]!!.ring, inLayer(R.id.galleryRow))
     }
 
     @Test
@@ -200,8 +290,8 @@ class TutorialFragmentTest {
         openSheet()
 
         val expected = listOf(
-            R.string.tutorial_upload,
             R.string.tutorial_generate,
+            R.string.tutorial_upload,
             R.string.tutorial_saved,
         ).map(::string)
         assertEquals(expected, layer().placed.map { it!!.caption.text.toString() })
@@ -225,6 +315,29 @@ class TutorialFragmentTest {
     }
 
     @Test
+    fun aTapAnywhere_closesTheTips_andTheScreenIsSeen() {
+        openSheet()
+
+        layer().performClick()
+        idle()
+
+        assertNull(tips())
+        assertEquals(setOf(TutorialScreen.ADD_GUIDE), modules.appSettings.tutorialSeen.value)
+    }
+
+    @Test
+    fun aTapOnTheClosingLine_closesTheTips() {
+        openSheet()
+        val hint = layer().findViewById<TextView>(R.id.tutorialCloseHint)
+        assertEquals(string(R.string.tutorial_close_hint), hint.text.toString())
+
+        hint.performClick()
+        idle()
+
+        assertNull(tips())
+    }
+
+    @Test
     fun theTips_fadeIn() {
         // Opened with its tips seen, then due again, as after *Show the tutorial again*: an activity started with the
         // frames paused never gets its window's focus.
@@ -241,7 +354,7 @@ class TutorialFragmentTest {
     }
 
     @Test
-    fun gotIt_countsTheTipsSeenAtOnce_letsTheScreenTakeTouches_andFadesThemOut() {
+    fun aTap_countsTheTipsSeenAtOnce_letsTheScreenTakeTouches_andFadesThemOut() {
         openSheet()
         ShadowChoreographer.setPaused(true)
 

@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park and Dongje Park
 """The single error shape of the REST API (Design Documentation 2.5.3)."""
 
 import traceback
@@ -26,7 +26,8 @@ async def handle_api_error(request: Request, exc: ApiError) -> JSONResponse:
 
 
 async def handle_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
-    # FastAPI's default is 422, which this API reserves for REJECTED. The submitted value is left out of the message.
+    # FastAPI's default is 422, which this API reserves for REJECTED, DECLINED, and NO_PERSON. The submitted value is
+    # left out of the message.
     error = exc.errors()[0]
     return error_response(400, "INVALID_REQUEST", f"{error['loc'][-1]}: {error['msg']}")
 

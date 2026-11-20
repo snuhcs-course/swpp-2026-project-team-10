@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -51,16 +51,23 @@ class MessageCodecTest {
             SessionMessage.GuideImageEnd("g1", 3735928559L),
             SessionMessage.GuideStateUpdate(GuideState("g1", 0.32f, 0.55f, 0.7f, 0.5f, false), false),
             SessionMessage.GuideClear,
+            SessionMessage.GuideTip("g1", "Move a little closer.\nHold the phone at your waist, tilted up a little."),
+            SessionMessage.GuideTipClear,
             SessionMessage.ZoomSet(2f),
+            SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER),
+            SessionMessage.ZoomHoldUpdate(),
+            SessionMessage.ZoomSet(1.4f, final = true, cancel = true),
             SessionMessage.CameraStateUpdate(2f, Role.SUBJECT, true),
             SessionMessage.PoseStep("set1", PoseSetStep.GENERATING),
             SessionMessage.PoseStep("set1", PoseSetStep.PICKING, poseIds = listOf("pose-1", "pose-4")),
             SessionMessage.PoseStep("set1", PoseSetStep.CHOSEN, poseId = "pose-4", by = Role.SUBJECT),
+            SessionMessage.PoseStep("set1", PoseSetStep.CLOSED, failure = "DAILY_LIMITED"),
             SessionMessage.PoseCandidateBegin("set1", "pose-4", "jpeg", 768, 1024, 151_320, 17),
             SessionMessage.PoseCandidateChunk("set1", "pose-4", 0, "/9j/4AAQSkZJRgABAQ"),
             SessionMessage.PoseCandidateEnd("set1", "pose-4", 3735928559L),
             SessionMessage.PosePlanned("set1", listOf("pose-1", "pose-2", "pose-3", "pose-4")),
             SessionMessage.PoseCandidateFailed("set1", "pose-2"),
+            SessionMessage.PoseCandidateFailed("set1", "pose-1", descriptionRejected = true),
             SessionMessage.PosePick("set1", "pose-4"),
             SessionMessage.GuideConfirm("c1", ConfirmStep.FINDING),
             SessionMessage.GuideConfirm("c1", ConfirmStep.READY, guideId = "g1"),
@@ -70,6 +77,7 @@ class MessageCodecTest {
             SessionMessage.GuideConfirmImageEnd("c1", "g1", 3735928559L),
             SessionMessage.GuideConfirmUse("c1", "g1"),
             SessionMessage.PoseDescription("d1", DescriptionStep.OPEN, "wave", Role.SUBJECT, rejected = true),
+            SessionMessage.PoseDescription("d1", DescriptionStep.OPEN, "wave", situation = "landmark"),
             SessionMessage.PoseDescription("d1", DescriptionStep.STARTED),
             SessionMessage.PoseDescription("d1", DescriptionStep.STARTED, "wave", setId = "s1"),
             SessionMessage.PoseSceneBegin("d1", "jpeg", 768, 1024, 151_320, 17),
@@ -146,6 +154,42 @@ class MessageCodecTest {
     }
 
     @Test
+    fun `a set's end says why it failed only when it did`() {
+        val closed = Json.parseToJsonElement(codec.encode(SessionMessage.PoseStep("set1", PoseSetStep.CLOSED)))
+        assertEquals(setOf("setId", "step"), closed.jsonObject.getValue("b").jsonObject.keys)
+
+        val failed = SessionMessage.PoseStep("set1", PoseSetStep.CLOSED, failure = "OFFLINE")
+        val body = Json.parseToJsonElement(codec.encode(failed)).jsonObject.getValue("b").jsonObject
+        assertEquals(setOf("setId", "step", "failure"), body.keys)
+        assertEquals("OFFLINE", body.getValue("failure").jsonPrimitive.content)
+
+        // Any name: the receiver reads one it does not know as a server error, so a new reason drops no message.
+        val newer = """{"v":3,"t":"pose.step","seq":1,"ts":0,"b":{"setId":"s","step":"CLOSED","failure":"NEW"}}"""
+        assertEquals(SessionMessage.PoseStep("s", PoseSetStep.CLOSED, failure = "NEW"), codec.decode(newer)!!.message)
+    }
+
+    @Test
+    fun `a failed candidate says that the description was refused only when it was`() {
+        val plain = Json.parseToJsonElement(codec.encode(SessionMessage.PoseCandidateFailed("set1", "pose-2")))
+        assertEquals("pose.candidate.failed", plain.jsonObject.getValue("t").jsonPrimitive.content)
+        assertEquals(setOf("setId", "poseId"), plain.jsonObject.getValue("b").jsonObject.keys)
+
+        val refused = SessionMessage.PoseCandidateFailed("set1", "pose-1", descriptionRejected = true)
+        val body = Json.parseToJsonElement(codec.encode(refused)).jsonObject.getValue("b").jsonObject
+        assertEquals(setOf("setId", "poseId", "descriptionRejected"), body.keys)
+
+        // As a photographer of an older version sends it: nothing said.
+        val older = """{"v":3,"t":"pose.candidate.failed","seq":1,"ts":0,"b":{"setId":"set1","poseId":"pose-2"}}"""
+        assertEquals(SessionMessage.PoseCandidateFailed("set1", "pose-2"), codec.decode(older)!!.message)
+        val example =
+            """{"v":3,"t":"pose.candidate.failed","seq":1,"ts":0,"b":{"setId":"s","poseId":"p","descriptionRejected":true}}"""
+        assertEquals(
+            SessionMessage.PoseCandidateFailed("s", "p", descriptionRejected = true),
+            codec.decode(example)!!.message,
+        )
+    }
+
+    @Test
     fun `a set's step with an unknown step or without its set is dropped`() {
         assertNull(codec.decode("""{"v":3,"t":"pose.step","seq":1,"ts":0,"b":{"setId":"set1","step":"PAUSED"}}"""))
         assertNull(codec.decode("""{"v":3,"t":"pose.step","seq":1,"ts":0,"b":{"step":"PICKING"}}"""))
@@ -170,7 +214,7 @@ class MessageCodecTest {
     }
 
     @Test
-    fun `a description sends its text, writer, and rejection only while open, and an unknown step is dropped`() {
+    fun `a description sends its text, writer, rejection, and situation only while open, and drops unknown steps`() {
         val ended = Json.parseToJsonElement(codec.encode(SessionMessage.PoseDescription("d1", DescriptionStep.CLOSED)))
         assertEquals("pose.description", ended.jsonObject.getValue("t").jsonPrimitive.content)
         assertEquals(setOf("descriptionId", "step"), ended.jsonObject.getValue("b").jsonObject.keys)
@@ -182,6 +226,12 @@ class MessageCodecTest {
             SessionMessage.PoseDescription("d1", DescriptionStep.OPEN, "wave", Role.PHOTOGRAPHER),
             example!!.message,
         )
+        // The situation (It 4) goes only when there is one; an older photographer sends none.
+        val open = Json.parseToJsonElement(
+            codec.encode(SessionMessage.PoseDescription("d1", DescriptionStep.OPEN, "wave", situation = "full_body")),
+        )
+        assertEquals("full_body", open.jsonObject.getValue("b").jsonObject.getValue("situation").jsonPrimitive.content)
+        assertNull((example.message as SessionMessage.PoseDescription).situation)
         val unknownStep = """{"v":3,"t":"pose.description","seq":1,"ts":0,"b":{"descriptionId":"d1","step":"TYPING"}}"""
         assertNull(codec.decode(unknownStep))
         // A go without its text and its choice.
@@ -193,6 +243,34 @@ class MessageCodecTest {
     fun `guide clear has an empty body`() {
         val envelope = Json.parseToJsonElement(codec.encode(SessionMessage.GuideClear)).jsonObject
         assertEquals("guide.clear", envelope.getValue("t").jsonPrimitive.content)
+        assertEquals(0, envelope.getValue("b").jsonObject.size)
+    }
+
+    // The tip of the guide on the camera for the subject's phone (#213): the server's text, a sentence on each line.
+    @Test
+    fun `a guide tip carries its guide and its text`() {
+        val tip = SessionMessage.GuideTip("g1", "Move a little closer.\nLeave almost no room above the head.")
+        val envelope = Json.parseToJsonElement(codec.encode(tip)).jsonObject
+        assertEquals("guide.tip", envelope.getValue("t").jsonPrimitive.content)
+        val body = envelope.getValue("b").jsonObject
+        assertEquals("g1", body.getValue("guideId").jsonPrimitive.content)
+        assertEquals(tip.text, body.getValue("text").jsonPrimitive.content)
+        assertEquals(tip, codec.decode(codec.encode(tip))!!.message)
+    }
+
+    @Test
+    fun `a guide tip with a field from a later app is still read`() {
+        val text = """
+            {"v": 3, "t": "guide.tip", "seq": 7, "ts": 0,
+             "b": {"guideId": "g1", "text": "Step back a little.", "lines": [{"kind": "frame", "text": "x"}]}}
+        """.trimIndent()
+        assertEquals(SessionMessage.GuideTip("g1", "Step back a little."), codec.decode(text)!!.message)
+    }
+
+    @Test
+    fun `guide tip clear has an empty body`() {
+        val envelope = Json.parseToJsonElement(codec.encode(SessionMessage.GuideTipClear)).jsonObject
+        assertEquals("guide.tip.clear", envelope.getValue("t").jsonPrimitive.content)
         assertEquals(0, envelope.getValue("b").jsonObject.size)
     }
 

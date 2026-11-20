@@ -1,10 +1,12 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
 import android.app.Application
+import android.content.DialogInterface
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Looper
 import android.provider.Settings
@@ -14,6 +16,7 @@ import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.view.PreviewView
@@ -39,6 +42,7 @@ import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.session.shoot
+import com.lastpenguin.pix.ui.ScreenTestSupport
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
@@ -49,36 +53,50 @@ import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowChoreographer
+import org.robolectric.shadows.ShadowDialog
+import org.robolectric.shadows.ShadowToast
 
 /*
- * The Camera screen's interactions, beyond the render paths of CameraFragmentRenderTest (R&S 6.2, 6.3; FR-1.4,
- * FR-1.5, FR-1.7, FR-3.9, FR-4.1, FR-6.8, FR-7.1–7.4): the permission flow (denied, kept across a recreation, the
- * request's answer binding the camera; Open settings and Try again); the clicks that navigate (Add a guide, Shoot
- * together, Use this photo, which opens nothing for a photo without a person) and system back during the scene photo
- * step; End session; the gallery button with and
- * without an app to open the photo; each capture failure's message; the subject's zoom, brightness, flash, and guide
- * moves as notices, a lost connection, a photo not sent (FR-6.14), and the live view on mobile data (FR-6.13); the
- * zoom accessibility actions
- * and a tap on the readout through the quick steps (0.6×, 1×, 2×, back to 0.6×), by touch and by TalkBack; the
- * reference thumbnail's tap, drag,
- * and TalkBack moves; the sliders, a pinch, a tap to focus, and the ratio button with its ratios (opened by the button,
- * closed by a choice, the button, a touch elsewhere, and Back; the ratio the camera has changing nothing); the
- * preview's stream state;
- * *Save guide* (FR-3.8): a guide not saved, then saved, and a second tap that removes it; its icon kept while other
- * state changes. Design 2.8's controls: the brightness bar beside the focus box after a tap to focus (its place, a drag
- * up and down, kept up while held, gone after the idle time), on the right and, near the image's right edge, on the
- * left; the toggle label for Hide / Show and a zoom step, replaced at once and gone after its time; the pinch mode's
- * label over the guide-edit toggle, Camera then Guide.
+ * The Camera screen's interactions, beyond the render paths of CameraFragmentRenderTest (R&S 6.2, 6.3; FR-1.4, FR-1.5,
+ * FR-1.7, FR-3.9, FR-4.1, FR-6.8, FR-7.1–7.4): the permission flow (denied, kept across a recreation, the request's
+ * answer binding the camera; Open settings and Try again); the clicks that navigate (Add a guide, Shoot together, Use
+ * this photo, which opens nothing for a photo without a person) and system back during the scene photo step; End
+ * session; the gallery button: outside a session the album's newest, which opens Pix's album in Pix's viewer at the
+ * newest, a swipe to an older one and a tap on the strip of thumbnails, and system Back, and a photo just taken there
+ * at once; a photo deleted there, once asked, leaves it and the thumbnail, and one that cannot be deleted stays with a
+ * notice; in a session as the
+ * photographer none until the session's first photo, then the session's photos in Pix's viewer, which system Back and
+ * the session's end close, and Pix's album again after it (FR-1.6, Iter4-A2); each capture failure's message; the subject's
+ * zoom, brightness, flash, and guide moves as notices, a lost connection, a photo not sent (FR-6.14), also after the
+ * notice that the subject left, which it waits for (#238), and the live view
+ * on mobile data (FR-6.13); the zoom accessibility actions and a tap on the readout through the quick steps (0.6×, 1×,
+ * 2×, back to 0.6×), by touch and by TalkBack; the reference thumbnail's tap, drag, and TalkBack moves, and hiding it
+ * at the side (#237: a drag mostly past the side, its strip with the handle over it, a tap on the handle, TalkBack's
+ * *Hide at the side* and its tap on a hidden one, another guide; hidden while enlarged, the small strip, and small when
+ * it is back); the sliders, a pinch, a tap to focus, and the ratio button with its ratios (opened by the button, closed
+ * by a choice, the button, a touch elsewhere, and Back; the ratio the camera has changing nothing); the preview's
+ * stream state; *Save guide* (FR-3.8): a guide not saved, then saved, and a second tap that removes it; its icon kept
+ * while other state changes. Design 2.8's controls: the brightness bar beside the focus box after a tap to focus (its
+ * place, a drag up and down, kept up while held, gone after the idle time), on the right and, near the image's right
+ * edge, on the left; the focus box staying while the bar is up, held or not, both whole until the idle time and both
+ * gone after it, or, on a camera without brightness, fading by itself; the toggle label for Hide / Show and a zoom step, replaced at once and gone after its time; the
+ * pinch mode's label over the guide-edit toggle, Camera then Guide. A tap on the readout while the subject's pinch holds
+ * the zoom: no zoom, and the label names the subject (FR-7.6, #236).
+ * A photo taken with the phone held sideways, saved as held (FR-1.5, #206).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -280,6 +298,18 @@ class CameraFragmentInteractionTest {
     }
 
     @Test
+    fun aPhotoTakenWithThePhoneSideways_isSavedAsHeld() {
+        val modules =
+            launch(FakeCameraController().apply { photo = Uri.parse("content://media/external/images/media/1") })
+        modules.turns.set(90)
+
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idle()
+
+        assertEquals(listOf(90), modules.camera.photoTurns)
+    }
+
+    @Test
     fun twoPhotosNotSent_eachGetTheirFullTime() {
         val modules = launch()
         onScreen { _, fragment -> fragment.requireActivity().viewModel<SessionViewModel>().startRoom() }
@@ -295,6 +325,32 @@ class CameraFragmentInteractionTest {
 
         shadowOf(Looper.getMainLooper()).idleFor(CameraViewModel.NOTICE_MS + 100, TimeUnit.MILLISECONDS)
         onScreen { controls, _ -> assertFalse(controls.noticeText.isVisible) }
+    }
+
+    @Test
+    fun aPhotoNotSent_waitsForTheNoticeThatTheSubjectLeft() {
+        val modules = launch()
+        onScreen { _, fragment -> fragment.requireActivity().viewModel<SessionViewModel>().startRoom() }
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+
+        modules.session.deliver(SessionMessage.Leave(EndReason.PEER_LEFT))
+        idle()
+        modules.photos.shoot(Uri.parse("content://media/external/images/media/1"), takenAt = 1)
+        idle()
+        shadowOf(Looper.getMainLooper()).idleFor(CameraViewModel.NOTICE_MS + 100, TimeUnit.MILLISECONDS)
+
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.peer_left, "Joonhyung"), controls.noticeText.text.toString())
+        }
+
+        shadowOf(Looper.getMainLooper())
+            .idleFor(CameraViewModel.PEER_GONE_NOTICE_MS - CameraViewModel.NOTICE_MS, TimeUnit.MILLISECONDS)
+
+        onScreen { controls, _ ->
+            assertTrue(controls.noticeText.isVisible)
+            assertEquals(string(R.string.session_photo_not_sent, "Joonhyung"), controls.noticeText.text.toString())
+        }
     }
 
     @Test
@@ -375,25 +431,188 @@ class CameraFragmentInteractionTest {
     // ---- The gallery button and capture failures ------------------------------------------
 
     @Test
-    fun galleryButton_opensTheLastPhoto_orSaysNoAppCan() {
+    fun galleryButton_aPhotoJustTaken_opensInPix_beforeMediaStoreTellsOfIt() {
         val uri = Uri.parse("content://media/external/images/7")
         launch(FakeCameraController().apply { photo = uri })
+        val picture = Bitmap.createBitmap(4, 3, Bitmap.Config.ARGB_8888)
+        onScreen { _, fragment -> fragment.photoOf = { if (it == uri) picture else null } }
 
         onScreen { controls, _ -> controls.shutterButton.performClick() }
+        settleReads()
+        onScreen { controls, _ -> controls.galleryButton.performClick() }
+        settleReads()
+
+        assertNull(nextIntent())
+        onScreen { controls, _ ->
+            assertTrue(photoViewerOn(controls.root).root.isShown)
+            assertSame(picture, photoViewerOn(controls.root).pageShows())
+        }
+    }
+
+    /** Lets the screen's reads on Dispatchers.IO, such as the thumbnail's, finish and reach the screen. */
+    private fun settleReads() {
         idle()
-        // The thumbnail is read off the main thread; let that run (it finds no provider and keeps the placeholder).
         Thread.sleep(300)
         idle()
-        onScreen { controls, _ -> controls.galleryButton.performClick() }
-        val view = nextIntent()
-        assertEquals(Intent.ACTION_VIEW, view?.action)
-        assertEquals(uri, view?.data)
+    }
 
-        shadowOf(app).checkActivities(true)
-        onScreen { controls, _ -> controls.galleryButton.performClick() }
-        idle()
+    private fun FragmentCameraBinding.thumbnailShows(): Bitmap? = (galleryThumbnail.drawable as? BitmapDrawable)?.bitmap
+
+    @Test
+    fun galleryButton_outsideASession_showsTheAlbumsNewest_andOpensPixsAlbumInPix_atTheNewest() {
+        val modules = launch()
+        val thumbnail = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
+        val pictures = (1..3).associate {
+            TestAppContainer.savedPhoto("p$it") to
+                Bitmap.createBitmap(4, 3, Bitmap.Config.ARGB_8888)
+        }
         onScreen { _, fragment ->
-            assertTrue(shows(fragment.requireActivity().window.decorView, string(R.string.gallery_unavailable)))
+            fragment.thumbnailOf = { thumbnail }
+            fragment.photoOf = { pictures[it] }
+        }
+
+        // Taken here or received in earlier sessions, oldest first.
+        modules.album.value = (1..3).map { TestAppContainer.savedPhoto("p$it") }
+        settleReads()
+        onScreen { controls, _ ->
+            assertTrue(controls.galleryButton.isEnabled)
+            assertSame(thumbnail, controls.thumbnailShows())
+            controls.galleryButton.performClick()
+        }
+        settleReads()
+
+        // In Pix, not the gallery: the newest, and a swipe to an older one.
+        assertNull(nextIntent())
+        onScreen { controls, _ ->
+            val viewer = photoViewerOn(controls.root)
+            assertTrue(viewer.root.isShown)
+            assertSame(pictures[TestAppContainer.savedPhoto("p3")], viewer.pageShows())
+            // No title and no counter; TalkBack reads which photo of how many.
+            assertEquals(emptyList<String>(), viewer.textsShown())
+            assertEquals(string(R.string.photo_page_counter_description, 3, 3), viewer.pageReads())
+            assertEquals(3, viewer.stripCount())
+            assertEquals(2, viewer.stripSelected())
+            viewer.photoViewerPages.setCurrentItem(0, false)
+        }
+        settleReads()
+        onScreen { controls, _ ->
+            val viewer = photoViewerOn(controls.root)
+            assertSame(pictures[TestAppContainer.savedPhoto("p1")], viewer.pageShows())
+            assertEquals(string(R.string.photo_page_counter_description, 1, 3), viewer.pageReads())
+            assertEquals(0, viewer.stripSelected())
+            // A tap on the strip, as in a gallery app.
+            viewer.tapStrip(1)
+        }
+        settleReads()
+        onScreen { controls, _ ->
+            val viewer = photoViewerOn(controls.root)
+            assertSame(pictures[TestAppContainer.savedPhoto("p2")], viewer.pageShows())
+            assertEquals(string(R.string.photo_page_counter_description, 2, 3), viewer.pageReads())
+        }
+
+        // System Back closes it, and Camera is there as it was.
+        onScreen { _, fragment -> fragment.requireActivity().onBackPressedDispatcher.onBackPressed() }
+        idle()
+        onScreen { controls, _ -> assertEquals(View.GONE, photoViewerOn(controls.root).root.visibility) }
+    }
+
+    @Test
+    fun photoViewer_outsideASession_deletesThePhotoOnScreen_onceAsked_orSaysItCouldNot() {
+        val modules = launch()
+        val photos = (1..2).map { TestAppContainer.savedPhoto("p$it") }
+        val thumbnails = photos.associateWith { Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888) }
+        val pictures = photos.associateWith { Bitmap.createBitmap(4, 3, Bitmap.Config.ARGB_8888) }
+        onScreen { _, fragment ->
+            fragment.thumbnailOf = { thumbnails[it] }
+            fragment.photoOf = { pictures[it] }
+        }
+        modules.album.value = photos
+        settleReads()
+        onScreen { controls, _ -> controls.galleryButton.performClick() }
+        settleReads()
+
+        // A photo that cannot be deleted stays, and the screen says so.
+        modules.deleteFails = true
+        onScreen { controls, _ -> photoViewerOn(controls.root).photoViewerDelete.performClick() }
+        idle()
+        (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        settleReads()
+        assertEquals(string(R.string.photo_not_deleted), ShadowToast.getTextOfLatestToast())
+        onScreen { controls, _ -> assertEquals(2, photoViewerOn(controls.root).stripCount()) }
+
+        modules.deleteFails = false
+        onScreen { controls, _ -> photoViewerOn(controls.root).photoViewerDelete.performClick() }
+        idle()
+        (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        settleReads()
+
+        assertEquals(listOf(photos[1]), modules.deleted)
+        onScreen { controls, _ ->
+            val viewer = photoViewerOn(controls.root)
+            assertTrue(viewer.root.isShown)
+            assertSame(pictures[photos[0]], viewer.pageShows())
+            // One photo left: no strip.
+            assertEquals(0, viewer.stripCount())
+            assertSame(thumbnails[photos[0]], controls.thumbnailShows())
+        }
+    }
+
+    @Test
+    fun galleryButton_inASessionAsThePhotographer_isEmptyUntilItsFirstPhoto_andOpensItsPhotosInPix() {
+        val taken = Uri.parse("content://media/external/images/media/20")
+        val modules = launch(FakeCameraController().apply { photo = taken })
+        val thumbnail = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
+        val picture = Bitmap.createBitmap(4, 3, Bitmap.Config.ARGB_8888)
+        onScreen { _, fragment ->
+            fragment.thumbnailOf = { thumbnail }
+            fragment.photoOf = { picture }
+        }
+        modules.album.value = listOf(TestAppContainer.savedPhoto("p0"))
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.PHOTOGRAPHER))
+        settleReads()
+        onScreen { controls, _ ->
+            assertFalse(controls.galleryButton.isEnabled)
+            assertNull(controls.thumbnailShows())
+        }
+
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        settleReads()
+        onScreen { controls, _ ->
+            assertTrue(controls.galleryButton.isEnabled)
+            assertSame(thumbnail, controls.thumbnailShows())
+            controls.galleryButton.performClick()
+        }
+        settleReads()
+
+        assertNull(nextIntent())
+        onScreen { controls, _ ->
+            assertTrue(photoViewerOn(controls.root).root.isShown)
+            assertSame(picture, photoViewerOn(controls.root).pageShows())
+            // No title, and one photo has no counter.
+            assertEquals(emptyList<String>(), photoViewerOn(controls.root).textsShown())
+        }
+
+        // System Back closes it, and the session goes on.
+        onScreen { _, fragment -> fragment.requireActivity().onBackPressedDispatcher.onBackPressed() }
+        idle()
+        onScreen { controls, _ -> assertEquals(View.GONE, photoViewerOn(controls.root).root.visibility) }
+        assertTrue(modules.session.leaves.isEmpty())
+
+        // The session's end closes the viewer, and the thumbnail opens Pix's album again, the photo of the session in it.
+        onScreen { controls, _ -> controls.galleryButton.performClick() }
+        settleReads()
+        modules.album.value = listOf(TestAppContainer.savedPhoto("p0"), taken)
+        modules.session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        settleReads()
+        onScreen { controls, _ ->
+            assertEquals(View.GONE, photoViewerOn(controls.root).root.visibility)
+            controls.galleryButton.performClick()
+        }
+        settleReads()
+        assertNull(nextIntent())
+        onScreen { controls, _ ->
+            assertTrue(photoViewerOn(controls.root).root.isShown)
+            assertEquals(2, photoViewerOn(controls.root).stripCount())
         }
     }
 
@@ -412,6 +631,108 @@ class CameraFragmentInteractionTest {
             onScreen { controls, _ -> controls.shutterButton.performClick() }
             idle()
             onScreen { controls, _ -> assertEquals(string(message), controls.captureStatus.text.toString()) }
+        }
+    }
+
+    // A photo being saved (NFR-19, #208): the shutter is free for the next photo, the ways off Camera and the camera
+    // switch wait for the save, and nothing on screen says "saving".
+    @Test
+    fun whileAPhotoIsSaved_theShutterIsFree_andTheGuideAndTheSwitchWait_withNoStatus() {
+        val camera = FakeCameraController().apply {
+            photo = Uri.parse("content://media/external/images/media/1")
+            saving = CompletableDeferred()
+        }
+        launch(camera)
+
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idle()
+
+        onScreen { controls, _ ->
+            assertTrue(controls.shutterButton.isEnabled)
+            assertFalse(controls.guideButton.isEnabled)
+            assertFalse(controls.switchCameraButton.isEnabled)
+            assertFalse(controls.captureStatus.isVisible)
+        }
+        camera.saving?.complete(Unit)
+        idle()
+        onScreen { controls, _ -> assertTrue(controls.guideButton.isEnabled) }
+    }
+
+    // ---- The scene photo step (#231) --------------------------------------------------------
+    // The panel that says what to frame: shown when the step starts; a touch anywhere, here on the image, takes it away
+    // and still does what it does there; Back from the review keeps it away; another start shows it again. The ratio:
+    // on the bar while framing, and chosen as on Camera.
+
+    @Test
+    fun scenePhoto_aTouchAnywhere_takesThePanelAway_andOnlyAnotherStartShowsItAgain() {
+        val camera = FakeCameraController(hasFlash = true).apply { frame = ScreenTestSupport.bitmap(300, 400) }
+        launch(camera)
+        onScreen { _, fragment -> fragment.requireActivity().viewModel<GenerationViewModel>().beginScene() }
+        idle()
+        onScreen { controls, _ -> assertTrue(controls.sceneGuide.isShown) }
+
+        onScreen { controls, _ ->
+            val at = Pointer(0, controls.root.width / 2f, controls.root.height / 3f)
+            touch(controls.root, MotionEvent.ACTION_DOWN, at)
+            touch(controls.root, MotionEvent.ACTION_UP, at)
+        }
+        idle()
+        onScreen { controls, _ -> assertFalse(controls.sceneGuide.isShown) }
+
+        // Shoot, and Back from the review: the camera again, without the panel.
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idle()
+        onScreen { controls, _ -> controls.sceneBackButton.performClick() }
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.scene_title), controls.sceneTitle.text.toString())
+            assertFalse(controls.sceneGuide.isShown)
+        }
+
+        onScreen { _, fragment -> fragment.requireActivity().viewModel<GenerationViewModel>().beginScene() }
+        idle()
+        onScreen { controls, _ -> assertTrue(controls.sceneGuide.isShown) }
+    }
+
+    @Test
+    fun scenePhoto_whileFraming_theRatioIsChosenAsOnCamera_andIsNotOnTheReview() {
+        val camera = FakeCameraController(hasFlash = true).apply { frame = ScreenTestSupport.bitmap(300, 400) }
+        val modules = launch(camera)
+        onScreen { _, fragment -> fragment.requireActivity().viewModel<GenerationViewModel>().beginScene() }
+        idle()
+
+        onScreen { controls, _ ->
+            assertTrue(controls.aspectButton.isShown)
+            controls.aspectButton.performClick()
+        }
+        idle()
+        onScreen { controls, _ ->
+            assertTrue(controls.aspectPanel.isShown)
+            controls.aspect916Option.performClick()
+        }
+        idle()
+        assertEquals(listOf(AspectRatio.R16_9), camera.aspectRequests)
+        assertEquals(AspectRatio.R16_9, runBlocking { modules.settings.aspectRatio() })
+        onScreen { controls, _ -> assertFalse(controls.aspectPanel.isShown) }
+
+        // The photo is taken: its ratio is the photo's, so the review has no ratio to choose.
+        onScreen { controls, _ ->
+            controls.aspectButton.performClick()
+            controls.shutterButton.performClick()
+        }
+        idle()
+        onScreen { controls, _ ->
+            assertFalse(controls.aspectButton.isShown)
+            assertFalse(controls.aspectPanel.isShown)
+        }
+
+        // The ratios were open at a shutter that no touch closed them for, as with TalkBack: Back from the review
+        // shows the camera without them.
+        onScreen { controls, _ -> controls.sceneBackButton.performClick() }
+        idle()
+        onScreen { controls, _ ->
+            assertTrue(controls.aspectButton.isShown)
+            assertFalse(controls.aspectPanel.isShown)
         }
     }
 
@@ -631,7 +952,9 @@ class CameraFragmentInteractionTest {
         idle()
         assertEquals(4, camera.exposureRequests.last())
 
-        // A new focus drops what the drag added, and keeps the base.
+        // A new focus drops what the drag added, and keeps the base; past the double-tap time, or the detector would take
+        // the two taps for one double tap.
+        shadowOf(Looper.getMainLooper()).idleFor(ViewConfiguration.getDoubleTapTimeout() + 100L, TimeUnit.MILLISECONDS)
         onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 2f) }
         idle()
         assertEquals(2, camera.exposureRequests.last())
@@ -643,7 +966,7 @@ class CameraFragmentInteractionTest {
         val camera = FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true)
         launch(camera)
 
-        // Straight from the finger's down, without lifting: it focuses there and the bar's sun follows the finger.
+        // Straight from the finger's down, without lifting: it focuses there and the bar's sun follows the drag.
         onScreen { controls, _ ->
             val preview = controls.previewView
             val bar = controls.exposureBar
@@ -712,6 +1035,70 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ -> assertFalse(controls.exposureBar.isShown) }
     }
 
+    @Test
+    fun theFocusBox_staysAsLongAsTheBrightnessBar_andTheTwoGoTogether() {
+        launch(FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true))
+        onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 3f) }
+        // Past the moment the box used to fade by itself.
+        shadowOf(Looper.getMainLooper()).idleFor(1_500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ ->
+            assertBoth(controls, shown = true)
+            touch(controls.exposureBar, MotionEvent.ACTION_DOWN, Pointer(1, 24f, 64f))
+        }
+
+        // Held past the idle time: both stay.
+        shadowOf(Looper.getMainLooper()).idleFor(CameraFragment.BRIGHTNESS_IDLE_MS + 500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ ->
+            assertBoth(controls, shown = true)
+            touch(controls.exposureBar, MotionEvent.ACTION_UP, Pointer(1, 24f, 64f))
+        }
+
+        // Let go: both whole until the idle time, and both gone right after it.
+        shadowOf(Looper.getMainLooper()).idleFor(CameraFragment.BRIGHTNESS_IDLE_MS - 100, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ -> assertBoth(controls, shown = true) }
+        shadowOf(Looper.getMainLooper()).idleFor(500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ -> assertBoth(controls, shown = false) }
+
+        // A second tap shows both again.
+        onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 2f) }
+        shadowOf(Looper.getMainLooper()).idleFor(1_500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ ->
+            assertBoth(controls, shown = true)
+            assertEquals(1f, controls.focusRing.scaleX, 0f)
+        }
+    }
+
+    @Test
+    fun onACameraWithoutBrightness_theFocusBoxFadesByItself() {
+        launch(FakeCameraController(supportsFocusPoint = true))
+        // The display's frames held, so the box is seen before its animation runs to its end.
+        ShadowChoreographer.setPaused(true)
+        try {
+            onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 3f) }
+            idle()
+            onScreen { controls, _ ->
+                assertTrue(controls.focusRing.isShown)
+                assertFalse(controls.exposureBar.isShown)
+            }
+        } finally {
+            ShadowChoreographer.setPaused(false)
+        }
+
+        shadowOf(Looper.getMainLooper()).idleFor(1_500, TimeUnit.MILLISECONDS)
+
+        onScreen { controls, _ -> assertFalse(controls.focusRing.isShown) }
+    }
+
+    /** The focus box and the brightness bar, both whole and in view, or both gone. */
+    private fun assertBoth(controls: FragmentCameraBinding, shown: Boolean) {
+        assertEquals("focus box", shown, controls.focusRing.isShown)
+        assertEquals("brightness bar", shown, controls.exposureBar.isShown)
+        if (shown) {
+            assertEquals(1f, controls.focusRing.alpha, 0f)
+            assertEquals(1f, controls.exposureBar.alpha, 0f)
+        }
+    }
+
     /** A tap to focus at [x] on the preview's middle line. */
     private fun tapPreview(controls: FragmentCameraBinding, x: Float) {
         val preview = controls.previewView
@@ -719,11 +1106,9 @@ class CameraFragmentInteractionTest {
         touch(preview, MotionEvent.ACTION_UP, Pointer(1, x, preview.height / 2f))
     }
 
-    /** How far a finger moves for [steps] exposure indexes on [bar], whose length is the range (-4..4 here). */
-    private fun previewDrag(bar: ExposureBarView, steps: Int): Float {
-        val travel = bar.layoutParams.height - 14f * bar.resources.displayMetrics.density
-        return travel * steps / 8f
-    }
+    /** How far a finger moves for [steps] of the fake camera's 0.5 EV (`ExposureBarView.DP_PER_EV`). */
+    private fun previewDrag(bar: ExposureBarView, steps: Int): Float =
+        steps * FAKE_EV_STEP * ExposureBarView.DP_PER_EV * bar.resources.displayMetrics.density
 
     @Test
     fun aTapToFocusNearTheRightEdge_putsTheBrightnessBarOnTheBoxsLeft() {
@@ -774,6 +1159,26 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ -> assertTrue(controls.toggleLabel.isShown) }
         shadowOf(Looper.getMainLooper()).idleFor(CameraViewModel.NOTICE_MS, TimeUnit.MILLISECONDS)
         onScreen { controls, _ -> assertFalse(controls.toggleLabel.isShown) }
+    }
+
+    @Test
+    fun aTapOnTheReadout_whileTheSubjectZooms_namesTheSubject() {
+        val camera = FakeCameraController()
+        val modules = launch(camera)
+        onScreen { _, fragment -> fragment.requireActivity().viewModel<SessionViewModel>().startRoom() }
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        modules.container.remoteControlHandler.zoomHold.take(Role.SUBJECT)
+        val requests = camera.requests.size
+
+        onScreen { controls, _ -> controls.zoomReadout.performClick() }
+        idle()
+
+        onScreen { controls, _ ->
+            assertTrue(controls.toggleLabel.isShown)
+            assertEquals(string(R.string.zoom_held_label, "Joonhyung"), controls.toggleLabel.text.toString())
+        }
+        assertEquals(requests, camera.requests.size)
     }
 
     @Test
@@ -874,6 +1279,121 @@ class CameraFragmentInteractionTest {
         assertEquals(ReferenceCorner.BOTTOM_RIGHT, viewModel.uiState.value.referenceCorner)
     }
 
+    @Test
+    fun referenceThumbnail_draggedMostlyPastTheSide_hidesThere_andATapOnItsHandleBringsItBack() {
+        val modules = launch()
+        modules.guides.setGuide(guide())
+        idle()
+        val viewModel = cameraViewModel()
+
+        // From the top-left corner, to the left until most of it is out of the preview.
+        onScreen { controls, _ ->
+            val thumbnail = controls.referenceThumbnail
+            val out = thumbnail.width + ViewConfiguration.get(thumbnail.context).scaledTouchSlop * 4f
+            touch(thumbnail, MotionEvent.ACTION_DOWN, Pointer(1, 5f, 5f))
+            touch(thumbnail, MotionEvent.ACTION_MOVE, Pointer(1, 5f - out, 5f))
+            touch(thumbnail, MotionEvent.ACTION_UP, Pointer(1, 5f - out, 5f))
+        }
+        settle()
+        assertTrue(viewModel.uiState.value.referenceHidden)
+        assertEquals(ReferenceCorner.TOP_LEFT, viewModel.uiState.value.referenceCorner)
+        onScreen { controls, _ ->
+            val thumbnail = controls.referenceThumbnail
+            val peek = (REFERENCE_PEEK_DP * thumbnail.resources.displayMetrics.density).roundToInt()
+            // Only its peek is inside, see-through, with the handle over it.
+            assertEquals((peek - thumbnail.width).toFloat(), thumbnail.translationX)
+            assertEquals(REFERENCE_HIDDEN_ALPHA, thumbnail.alpha)
+            assertTrue(controls.referenceHandle.isShown)
+            // TalkBack hears that it is hidden, and its tap shows it; there is nothing to move or to hide.
+            val info = controls.referenceThumbnail.createAccessibilityNodeInfo()
+            val labels = info.actionList.map { it.label?.toString() }
+            assertEquals(string(R.string.reference_hidden), info.stateDescription?.toString())
+            assertTrue(labels.contains(string(R.string.show_reference)))
+            assertFalse(labels.contains(string(R.string.hide_reference)))
+            assertFalse(labels.contains(string(R.string.move_reference_top_right)))
+
+            touch(controls.referenceHandle, MotionEvent.ACTION_DOWN, Pointer(1, 5f, 5f))
+            touch(controls.referenceHandle, MotionEvent.ACTION_UP, Pointer(1, 5f, 5f))
+        }
+        settle()
+        assertFalse(viewModel.uiState.value.referenceHidden)
+        onScreen { controls, _ ->
+            val thumbnail = controls.referenceThumbnail
+            assertTrue(thumbnail.translationX > 0f)
+            assertEquals(1f, thumbnail.alpha)
+            assertFalse(controls.referenceHandle.isShown)
+            // Shown, TalkBack can hide it beside the moves.
+            val labels = thumbnail.createAccessibilityNodeInfo().actionList.map { it.label?.toString() }
+            assertTrue(labels.contains(string(R.string.hide_reference)))
+            assertTrue(ViewCompat.performAccessibilityAction(thumbnail, R.id.hide_reference, null))
+        }
+        settle()
+        assertTrue(viewModel.uiState.value.referenceHidden)
+
+        // Another guide's thumbnail shows again, in the corner the last one had.
+        modules.guides.setGuide(guide().copy(id = "another"))
+        settle()
+        assertFalse(viewModel.uiState.value.referenceHidden)
+        onScreen { controls, _ ->
+            assertEquals(1f, controls.referenceThumbnail.alpha)
+            assertFalse(controls.referenceHandle.isShown)
+        }
+    }
+
+    @Test
+    fun referenceThumbnail_hiddenWhileEnlarged_leavesTheSmallStrip_andComesBackSmall() {
+        val modules = launch()
+        modules.guides.setGuide(guide())
+        idle()
+        val viewModel = cameraViewModel()
+        var small = 0 to 0
+        onScreen { controls, _ ->
+            small = controls.referenceThumbnail.width to controls.referenceThumbnail.height
+            controls.referenceThumbnail.performClick()
+        }
+        settle()
+        assertTrue(viewModel.uiState.value.referenceExpanded)
+
+        // Enlarged in the top-left corner, to the left until most of it is out of the preview.
+        onScreen { controls, _ ->
+            val thumbnail = controls.referenceThumbnail
+            assertTrue(thumbnail.width > small.first * 2)
+            val out = thumbnail.width + ViewConfiguration.get(thumbnail.context).scaledTouchSlop * 4f
+            touch(thumbnail, MotionEvent.ACTION_DOWN, Pointer(1, 5f, 5f))
+            touch(thumbnail, MotionEvent.ACTION_MOVE, Pointer(1, 5f - out, 5f))
+            touch(thumbnail, MotionEvent.ACTION_UP, Pointer(1, 5f - out, 5f))
+        }
+        settle()
+        assertTrue(viewModel.uiState.value.referenceHidden)
+        assertFalse(viewModel.uiState.value.referenceExpanded)
+        onScreen { controls, _ ->
+            val thumbnail = controls.referenceThumbnail
+            val peek = (REFERENCE_PEEK_DP * thumbnail.resources.displayMetrics.density).roundToInt()
+            // What stays is the small thumbnail's strip, at its size and with its peek inside.
+            assertEquals(small, thumbnail.width to thumbnail.height)
+            assertEquals(1f, thumbnail.scaleX)
+            assertEquals(1f, thumbnail.scaleY)
+            assertEquals((peek - small.first).toFloat(), thumbnail.translationX)
+            // The handle over it is no taller than a touch target, as over any small strip.
+            assertEquals(maxOf(small.second, dp(REFERENCE_HANDLE_DP, thumbnail)), controls.referenceHandle.height)
+
+            touch(controls.referenceHandle, MotionEvent.ACTION_DOWN, Pointer(1, 5f, 5f))
+            touch(controls.referenceHandle, MotionEvent.ACTION_UP, Pointer(1, 5f, 5f))
+        }
+        settle()
+        assertFalse(viewModel.uiState.value.referenceHidden)
+        assertFalse(viewModel.uiState.value.referenceExpanded)
+        onScreen { controls, _ ->
+            assertEquals(small, controls.referenceThumbnail.width to controls.referenceThumbnail.height)
+            assertEquals(1f, controls.referenceThumbnail.alpha)
+        }
+    }
+
+    private fun dp(value: Float, view: View): Int = (value * view.resources.displayMetrics.density).roundToInt()
+
+    /** Every change played to its end, the thumbnail's glide included. */
+    private fun settle() = shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(400))
+
     // ---- The preview's stream state ------------------------------------------------------
 
     @Test
@@ -915,8 +1435,7 @@ class CameraFragmentInteractionTest {
     /** A drag up the brightness bar by [steps] exposure indexes (down for negative ones), from its middle. */
     private fun drag(bar: ExposureBarView, steps: Int) {
         assertTrue(bar.height > 0)
-        val travel = bar.height - 14f * bar.resources.displayMetrics.density
-        val dy = travel * steps / 8f
+        val dy = previewDrag(bar, steps)
         touch(bar, MotionEvent.ACTION_DOWN, Pointer(1, bar.width / 2f, bar.height / 2f))
         touch(bar, MotionEvent.ACTION_MOVE, Pointer(1, bar.width / 2f, bar.height / 2f - dy))
         touch(bar, MotionEvent.ACTION_UP, Pointer(1, bar.width / 2f, bar.height / 2f - dy))
@@ -1028,5 +1547,10 @@ class CameraFragmentInteractionTest {
         } finally {
             event.recycle()
         }
+    }
+
+    private companion object {
+        /** The fake camera's exposure step with a range (FakeCameraController). */
+        const val FAKE_EV_STEP = 0.5f
     }
 }

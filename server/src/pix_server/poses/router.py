@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-17, reviewed by Jaewan Park and Dongje Park
 """REST endpoints for pose generation (Design Documentation 2.5.3 and Android's PixApi.kt)."""
 
 import asyncio
@@ -15,7 +15,7 @@ from pix_server.poses.description_filter import DescriptionFilter
 from pix_server.poses.generator import PoseGenerator, aspect_ratio, check_scene
 from pix_server.poses.limiter import Kind, PoseLimiter
 from pix_server.poses.person_check import PersonCheck
-from pix_server.poses.prompts import DEFAULT_POSES, checked_pose, pose_prompt
+from pix_server.poses.prompts import DEFAULT_POSES, Situation, checked_pose, pose_prompt
 from pix_server.poses.suggester import PoseSuggester
 from pix_server.poses.tips import Angle, Framing, Height, Language, Level, PoseTipper
 
@@ -42,7 +42,7 @@ class PoseResponse(BaseModel):
 
 
 class PoseTipResponse(BaseModel):
-    text: str  # the sentence the app shows
+    text: str  # what the app shows: a sentence on each line (#213)
     framing: Framing
     hold: Level  # where to hold the phone, by the photographer's posture
     height: Height  # compared with where the phone was for the scene
@@ -50,14 +50,15 @@ class PoseTipResponse(BaseModel):
 
 
 async def count(request: Request, kind: Kind) -> None:
-    """Counts a request that is about to reach a model, or refuses it with 429. Only such requests count, because the
+    """Counts a request that is about to reach a model, or refuses it with 429: `RATE_LIMITED` for this client's window
+    and `DAILY_LIMITED` for everyone's day, which the app tells apart (FR-4.7). Only such requests count, because the
     limits exist to control what the models cost."""
     limiter: PoseLimiter = request.app.state.pose_limiter
     refused = await limiter.refuse(request.client.host if request.client else "", kind)
     if refused == "client":
         raise ApiError(429, "RATE_LIMITED", "Too many pose requests from this device; try again later")
     if refused == "global":
-        raise ApiError(429, "RATE_LIMITED", "Pix has made as many poses as it can for today; try again later")
+        raise ApiError(429, "DAILY_LIMITED", "Pix has made as many poses as it can for today; try again tomorrow")
 
 
 async def judge(request: Request, text: str, field: str = "description") -> None:
@@ -80,6 +81,17 @@ async def check_pose(request: Request, scene: bytes, description: str | None) ->
     for outcome in await asyncio.gather(*checks, return_exceptions=True):
         if isinstance(outcome, BaseException):
             raise outcome
+
+
+def chosen_situation(situation: Situation | None, selfie: bool) -> Situation:
+    """The situation whose prompts a request gets (FR-4.8): `situation`, or for an app from before Iteration 4, which
+    sends only `selfie`, `selfie` or `default`. A selfie's scene with another situation is refused, because the other
+    prompts turn a selfie into a photo someone else took (Design Documentation 2.6.3)."""
+    if situation is None:
+        return "selfie" if selfie else "default"
+    if selfie and situation != "selfie":
+        raise ApiError(400, "INVALID_REQUEST", "situation: a selfie takes the selfie situation")
+    return situation
 
 
 async def while_connected(request: Request, work: Coroutine[Any, Any, T]) -> T:
@@ -109,12 +121,15 @@ async def suggest_poses(
     image: UploadFile,
     # Left out, or empty, for suggested poses; FastAPI reads an empty form field as left out.
     description: Annotated[str | None, Form()] = None,
-    # The scene is a selfie (FR-1.14); apps from before Iteration 3 leave it out.
+    # The situation's prompts (FR-4.8); apps from before Iteration 4 leave it out, and send `selfie` for a selfie.
+    situation: Annotated[Situation | None, Form()] = None,
+    # The scene is a selfie (FR-1.14), as `situation` selfie; apps from before Iteration 3 leave it out.
     selfie: Annotated[bool, Form()] = False,
 ) -> PoseSuggestionsResponse:
     """Four poses for the scene, which the app then sends as the descriptions of its four POST /poses: four poses
-    suggested for the scene, or, with a description, the description and three variations of it; selfie poses for a
-    selfie."""
+    suggested for the scene, or, with a description, the description and three variations of it, each from the
+    situation's prompt."""
+    chosen = chosen_situation(situation, selfie)
     if description is not None:
         checked_pose(description)
     scene = await image.read()
@@ -122,9 +137,9 @@ async def suggest_poses(
     await count(request, "suggestions")
     suggester: PoseSuggester = request.app.state.pose_suggester
     if description is None:
-        return PoseSuggestionsResponse(poses=await suggester.suggest(scene, selfie))
+        return PoseSuggestionsResponse(poses=await suggester.suggest(scene, chosen))
     await judge(request, description)
-    return PoseSuggestionsResponse(poses=await suggester.vary(scene, description, selfie))
+    return PoseSuggestionsResponse(poses=await suggester.vary(scene, description, chosen))
 
 
 @router.post("/poses")
@@ -135,18 +150,21 @@ async def create_pose(
     # FastAPI reads an empty form field as left out, so an empty description with a template asks for the template.
     template_id: Annotated[str | None, Form(alias="templateId")] = None,
     description: Annotated[str | None, Form()] = None,
-    # The scene is a selfie (FR-1.14): the selfie pose prompt; apps from before Iteration 3 leave it out.
+    # The situation's pose prompt (FR-4.8); apps from before Iteration 4 leave it out, and send `selfie` for a selfie.
+    situation: Annotated[Situation | None, Form()] = None,
+    # The scene is a selfie (FR-1.14), as `situation` selfie; apps from before Iteration 3 leave it out.
     selfie: Annotated[bool, Form()] = False,
 ) -> PoseResponse:
     started = time.perf_counter()
     if (template_id is None) == (description is None):
         raise ApiError(400, "INVALID_REQUEST", "templateId or description: send exactly one")
-    if template_id is not None and selfie:
-        # A template is a default pose for an app from before Iteration 2, which never sends `selfie`, and some of them
-        # need both hands or the whole body; a selfie sends its pose as a description.
-        raise ApiError(400, "INVALID_REQUEST", "selfie: send a description, not a templateId")
+    chosen = chosen_situation(situation, selfie)
+    if template_id is not None and chosen != "default":
+        # A template is a default pose for an app from before Iteration 2, which sends neither field, and some of them
+        # need both hands or the whole body; a selfie or another situation sends its pose as a description.
+        raise ApiError(400, "INVALID_REQUEST", "situation: send a description, not a templateId")
     if description is not None:
-        prompt = pose_prompt(description, selfie)
+        prompt = pose_prompt(description, chosen)
     elif (default := DEFAULT_POSES.get(template_id)) is not None:
         # An app from before Iteration 2; its template is a default pose, sent with the same prompt.
         prompt = pose_prompt(default.pose)
@@ -176,11 +194,11 @@ async def pose_tip(
     scene: UploadFile,
     candidate: UploadFile,
     pose: Annotated[str, Form()],
-    # The language of the phone's screens, in which the sentence is written (FR-10.2); apps before it leave it out.
+    # The language of the phone's screens, in which the tip is written (FR-10.2); apps before it leave it out.
     language: Annotated[Language, Form()] = "en",
 ) -> PoseTipResponse:
-    """How to hold the phone for the candidate the user chose: `scene` as sent to POST /poses, the chosen candidate,
-    and the pose it was made with, the sentence in the language of the phone's screens (Design Documentation 2.6.3)."""
+    """How to take the candidate the user chose: `scene` as sent to POST /poses, the chosen candidate, and the pose
+    it was made with, the tip in the language of the phone's screens (Design Documentation 2.6.3)."""
     prompted = checked_pose(pose, "pose")
     scene_bytes = await scene.read()
     check_scene(scene_bytes)
@@ -191,4 +209,10 @@ async def pose_tip(
     tipper: PoseTipper = request.app.state.pose_tipper
     # A tip the phone stopped waiting for, because the user took another candidate, is not waited for either.
     tip = await while_connected(request, tipper.tip(scene_bytes, candidate_bytes, prompted, language))
-    return PoseTipResponse(text=tip.text, framing=tip.framing, hold=tip.hold, height=tip.height, angle=tip.angle)
+    return PoseTipResponse(
+        text=tip.text,
+        framing=tip.framing,
+        hold=tip.hold,
+        height=tip.height,
+        angle=tip.angle,
+    )

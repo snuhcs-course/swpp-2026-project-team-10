@@ -1,8 +1,9 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.net.Uri
 import com.lastpenguin.pix.camera.PhotoAlbum
+import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.session.protocol.PhotoRefusal
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import java.io.ByteArrayInputStream
@@ -68,6 +69,16 @@ import org.robolectric.RobolectricTestRunner
  * Subject, what it tells: no saved photo is lost unread, and what a session left unread does not reach the next one.
  * Subject, the session's other messages: a slow save, on real threads, leaves `incoming` read.
  * Subject, the shutter: each `photo.shutter` reaches a screen that listens; one that came before is not kept.
+ * Both, the session's photos (state-based; Iter4-A2): none outside a session and an empty list at its start; on the
+ * subject's phone each saved photo joins them in order, and a refused or broken photo, one the album fails to save, and
+ * one saved before do not, nor one whose save ends after its session ended and another started; on the photographer's
+ * each photo taken in the session joins them, and one whose session ended before it was saved, or one taken outside a
+ * session, does not; they stay through a reconnect and end with the
+ * session, and the next session starts with none.
+ * Delete (state-based, fault injection; FR-1.16, #247): a photo neither waiting nor going is deleted at once and leaves
+ * the session's photos, one not theirs leaves them as they are, and one the album cannot delete stays in them; on the
+ * photographer's phone a photo waiting to go, or going, leaves them at once but stays on the phone until it has reached
+ * the subject, or until the session ends, and is deleted then.
  */
 @RunWith(RobolectricTestRunner::class)
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -85,13 +96,27 @@ class PhotoSyncerTest {
 
     private val saved = mutableListOf<SavedPhoto>()
     private var albumFails = false
+
+    /** Runs while the album saves, as another session that starts during a slow save. */
+    private var whileSaving: () -> Unit = {}
     private val album = PhotoAlbum { file, photoId, takenAt ->
+        whileSaving()
         if (albumFails) {
             Result.failure(IOException("The disk is full"))
         } else {
             saved += SavedPhoto(photoId, takenAt, file.readBytes())
             Result.success(uri("saved/$photoId"))
         }
+    }
+
+    /** Pix's album's delete: the photo goes from MediaStore, so it can no longer be read, unless [deleteFails]. */
+    private val deleted = mutableListOf<Uri>()
+    private var deleteFails = false
+    private val deleter = PhotoDeleter { uri ->
+        if (deleteFails) return@PhotoDeleter false
+        deleted += uri
+        photos.remove(uri)
+        true
     }
 
     private val parts: File get() = File(folder.root, "parts")
@@ -865,5 +890,175 @@ class PhotoSyncerTest {
         session.deliver(SessionMessage.PhotoShutter)
         runCurrent()
         assertEquals(1, shutters)
+    }
+
+    // ---- The session's photos ----------------------------------------------------------------------------------
+
+    @Test
+    fun `there are no session photos outside a session, and none yet at its start`() = runTest {
+        val syncer = syncer()
+        assertNull(syncer.sessionPhotos.first())
+        session.setState(SessionState.Waiting("123456"))
+        assertNull(syncer.sessionPhotos.first())
+
+        connectedAs(Role.SUBJECT)
+
+        assertEquals(emptyList<Uri>(), syncer.sessionPhotos.first())
+    }
+
+    @Test
+    fun `each photo saved here joins the session's photos, in the order they came`() = runTest {
+        val (syncer, _, _) = receiver()
+
+        deliverWhole("p1", jpeg(10))
+        deliverWhole("p2", jpeg(10))
+
+        assertEquals(listOf(uri("saved/p1"), uri("saved/p2")), syncer.sessionPhotos.first())
+    }
+
+    @Test
+    fun `a photo refused, broken, unsaved, or already saved does not join them`() = runTest {
+        val (syncer, _, _) = receiver()
+        deliverWhole("p1", jpeg(10))
+        deliverWhole("p2", jpeg(10))
+
+        val broken = jpeg(10)
+        deliverBegin("p3", broken)
+        deliverChunks("p3", broken)
+        session.deliver(SessionMessage.PhotoEnd("p3", crc32 = 0))
+        runCurrent()
+        session.deliver(SessionMessage.PhotoBegin("p4", "webp", 10, 1, 1))
+        runCurrent()
+        deliverWhole("p1", jpeg(10))
+        albumFails = true
+        deliverWhole("p5", jpeg(10))
+
+        assertEquals(listOf(uri("saved/p1"), uri("saved/p2")), syncer.sessionPhotos.first())
+    }
+
+    @Test
+    fun `the session's photos stay through a reconnect, end with it, and the next session starts with none`() =
+        runTest {
+            val (syncer, _, _) = receiver()
+            deliverWhole("p1", jpeg(10))
+
+            session.setState(SessionState.Reconnecting("s_1", since = 0))
+            assertEquals(listOf(uri("saved/p1")), syncer.sessionPhotos.first())
+
+            session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+            assertNull(syncer.sessionPhotos.first())
+
+            session.setState(SessionState.Connected("s_2", PeerInfo("Dongje", null), Role.SUBJECT))
+            assertEquals(emptyList<Uri>(), syncer.sessionPhotos.first())
+        }
+
+    @Test
+    fun `a photo saved after its session ended, once another started, joins neither`() = runTest {
+        val (syncer, _, _) = receiver()
+        deliverWhole("p1", jpeg(10))
+        whileSaving = {
+            session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+            session.setState(SessionState.Connected("s_2", PeerInfo("Dongje", null), Role.SUBJECT))
+        }
+
+        deliverWhole("p2", jpeg(10))
+
+        assertEquals(emptyList<Uri>(), syncer.sessionPhotos.first())
+    }
+
+    @Test
+    fun `each photo taken here in a session joins its photos, and one of an ended session does not`() = runTest {
+        val (syncer, _) = sender()
+
+        syncer.shoot(photo("1", 10), takenAt = 1)
+        syncer.shoot(photo("2", 10), takenAt = 2)
+        assertEquals(listOf(uri("1"), uri("2")), syncer.sessionPhotos.first())
+
+        // Saving takes seconds: this one's session ends, and another starts, before it is saved.
+        val shutter = syncer.shutter()!!
+        session.setState(SessionState.Ended(EndReason.LEFT))
+        session.setState(SessionState.Connected("s_2", PeerInfo("Dongje", null), Role.PHOTOGRAPHER))
+        syncer.taken(shutter, photo("3", 10), takenAt = 3)
+
+        assertEquals(emptyList<Uri>(), syncer.sessionPhotos.first())
+    }
+
+    @Test
+    fun `a photo deleted while it goes or waits to go still reaches the subject, and is deleted once it has gone`() =
+        runTest {
+            val (syncer, failed) = sender()
+            syncer.shoot(photo("1", 10), takenAt = 1)
+            syncer.shoot(photo("2", 10), takenAt = 2)
+            runCurrent()
+
+            // Photo 1 is going, photo 2 waits behind it: both leave the viewer, and both stay to be read.
+            assertTrue(syncer.delete(uri("1"), deleter, backgroundScope))
+            assertTrue(syncer.delete(uri("2"), deleter, backgroundScope))
+            runCurrent()
+            assertEquals(emptyList<Uri>(), syncer.sessionPhotos.first())
+            assertTrue(deleted.isEmpty())
+
+            deliverSaved(begins[0].photoId)
+            runCurrent()
+            assertEquals(listOf(uri("1")), deleted)
+            assertEquals(listOf(1L, 2L), begins.map { it.takenAt })
+
+            deliverSaved(begins[1].photoId)
+            runCurrent()
+            assertEquals(listOf(uri("1"), uri("2")), deleted)
+            assertEquals(0, failed())
+        }
+
+    @Test
+    fun `a photo deleted while it waits to go is deleted when its session ends`() = runTest {
+        val (syncer, _) = sender()
+        syncer.shoot(photo("1", 10), takenAt = 1)
+        syncer.shoot(photo("2", 10), takenAt = 2)
+        runCurrent()
+        syncer.delete(uri("2"), deleter, backgroundScope)
+        runCurrent()
+        assertTrue(deleted.isEmpty())
+
+        session.setState(SessionState.Ended(EndReason.LEFT))
+        syncer.drop()
+        runCurrent()
+
+        assertEquals(listOf(uri("2")), deleted)
+    }
+
+    @Test
+    fun `a photo not on its way is deleted at once, one not the session's changes nothing, and one kept stays`() =
+        runTest {
+            val (syncer, _) = sender()
+            syncer.shoot(photo("1", 10), takenAt = 1)
+            runCurrent()
+            deliverSaved(begins[0].photoId)
+            syncer.shoot(photo("2", 10), takenAt = 2)
+            runCurrent()
+            deliverSaved(begins[1].photoId)
+            runCurrent()
+
+            deleteFails = true
+            assertFalse(syncer.delete(uri("1"), deleter, backgroundScope))
+            assertEquals(listOf(uri("1"), uri("2")), syncer.sessionPhotos.first())
+
+            deleteFails = false
+            assertTrue(syncer.delete(uri("1"), deleter, backgroundScope))
+            assertEquals(listOf(uri("1")), deleted)
+            assertEquals(listOf(uri("2")), syncer.sessionPhotos.first())
+
+            assertTrue(syncer.delete(uri("9"), deleter, backgroundScope))
+            assertEquals(listOf(uri("2")), syncer.sessionPhotos.first())
+        }
+
+    @Test
+    fun `a photo taken outside a session is none of the session's`() = runTest {
+        val syncer = syncer()
+        session.setState(SessionState.Waiting("123456"))
+        syncer.shoot(photo("1", 10), takenAt = 1)
+
+        connectedAs(Role.PHOTOGRAPHER)
+
+        assertEquals(emptyList<Uri>(), syncer.sessionPhotos.first())
     }
 }

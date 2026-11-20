@@ -1,7 +1,8 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
+import android.os.SystemClock
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -14,6 +15,8 @@ import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.PhoneTurns
+import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.camera.isAtZoomStep
 import com.lastpenguin.pix.camera.nextZoomStep
 import com.lastpenguin.pix.camera.quickZoomSteps
@@ -24,6 +27,10 @@ import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.PhotoShare
+import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.ZoomHold
+import com.lastpenguin.pix.telemetry.Telemetry
+import com.lastpenguin.pix.telemetry.TelemetryEvent
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -35,12 +42,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class CaptureNotice { SAVED, SAVE_FAILED, STORAGE_FAILED, CAMERA_UNAVAILABLE, PERMISSION_REQUIRED }
+/** Why the last photo failed. A saved photo has no notice: the thumbnail shows it (FR-1.6, #204). */
+enum class CaptureNotice { SAVE_FAILED, STORAGE_FAILED, CAMERA_UNAVAILABLE, PERMISSION_REQUIRED }
 
 /** What *Save guide* did (FR-3.8), shown as a short notice. */
 enum class GuideSaveNotice {
@@ -56,7 +65,7 @@ enum class GuideSaveNotice {
 
 /**
  * What a toggle on the camera screens just did, shown as a short label at the top of the image (Design 2.8): showing or
- * hiding the guide, and a zoom step.
+ * hiding the guide, a zoom step, and a pinch held back while the other phone zooms.
  */
 sealed interface ToggleLabel {
     data object GuideHidden : ToggleLabel
@@ -64,6 +73,9 @@ sealed interface ToggleLabel {
     data object GuideShown : ToggleLabel
 
     data class Zoom(val ratio: Float) : ToggleLabel
+
+    /** The other phone's pinch holds the zoom, so this phone's changed nothing (FR-7.6, #236): "Jaewan is zooming". */
+    data object ZoomHeld : ToggleLabel
 }
 
 /**
@@ -152,8 +164,11 @@ data class CameraUiState(
     /** False hides the camera switch: the phone has no front camera, or the cameras are not known yet. */
     val canSwitchCamera: Boolean = false,
     val supportsFocusPoint: Boolean = false,
+    /** From the shutter until the camera has taken the photo: the shutter waits, so one tap is one photo (NFR-19). */
+    val shutterBusy: Boolean = false,
+    /** A photo is being saved, or several: the camera switch, the ratio, and the ways off Camera wait for them. */
     val isSaving: Boolean = false,
-    /** "Saved without the guide" for [CameraViewModel.NOTICE_MS], or why the last photo failed until the next one. */
+    /** Why the last photo failed, until the next one. */
     val captureNotice: CaptureNotice? = null,
     val guide: ReferenceGuide? = null,
     val guideState: GuideState = GuideState(),
@@ -166,17 +181,36 @@ data class CameraUiState(
     val referenceExpanded: Boolean = false,
     /** The preview corner the reference thumbnail sits in, kept from one guide to the next. */
     val referenceCorner: ReferenceCorner = ReferenceCorner.TOP_LEFT,
+    /**
+     * The reference thumbnail is put away at its corner's side of the preview, with a strip of it left to pull it
+     * back by (FR-3.9, #237). On this phone only; another guide's thumbnail shows again. A hidden thumbnail is never
+     * [referenceExpanded]: hiding makes it small, so its strip is the small one's and it comes back small.
+     */
+    val referenceHidden: Boolean = false,
     /** The guide on the camera is one of the saved guides (FR-3.8), so *Save guide* shows it as saved. */
     val guideSaved: Boolean = false,
     /** *Save guide* is writing the guide; the button waits. */
     val savingGuide: Boolean = false,
-    /** The last saved photo, for the thumbnail and "Saved without the guide". */
+    /**
+     * The thumbnail's photo (FR-1.6): in a session, the session's newest, none until its first; otherwise the newest in
+     * Pix's album, taken here or received.
+     */
     val lastPhoto: Uri? = null,
+    /** The photos of the session running now, oldest first, for the viewer (FR-1.6); null outside a session. */
+    val sessionPhotos: List<Uri>? = null,
+    /** The photos in Pix's album, oldest first, with one just saved here that MediaStore has not told of yet. */
+    val albumPhotos: List<Uri> = emptyList(),
+    /** The viewer of [viewerPhotos] is open over the camera (FR-1.6). */
+    val photosOpen: Boolean = false,
     /** A short notice, such as "Joonhyung set zoom to 2×" (FR-7.4). */
     val notice: String? = null,
     /** The pose tip of the guide on the camera (FR-4.10), or null when it has none. */
     val tip: TipBanner? = null,
-)
+) {
+    /** What the viewer pages through: the session's photos in a session, Pix's album otherwise. */
+    val viewerPhotos: List<Uri>
+        get() = sessionPhotos ?: albumPhotos
+}
 
 /**
  * Camera screen (Design 2.2, Figure 6).
@@ -191,19 +225,39 @@ class CameraViewModel(
     private val tips: StateFlow<GuideTip?> = MutableStateFlow(null),
     /** Each saved photo, which in a session goes to the subject's phone too (FR-6.14). */
     private val photos: PhotoShare = PhotoShare.None,
+    /** The photos in Pix's album (`PixAlbumPhotos`, FR-1.6), oldest first, taken here or received in a session. */
+    private val albumPhotos: StateFlow<List<Uri>> = MutableStateFlow(emptyList()),
+    /** The photos of the session running now (`PhotoSyncer.sessionPhotos`, FR-1.6); null outside a session. */
+    private val sessionPhotos: Flow<List<Uri>?> = flowOf(null),
+    /** Deletes a photo from the viewer, from the album and the session's photos (`AppContainer.photoDeleter`). */
+    private val deleter: PhotoDeleter = PhotoDeleter { false },
     /** The base brightness in EV from the settings (FR-1.11): each tap to focus starts from it again. */
     private val baseBrightness: StateFlow<Float> = MutableStateFlow(0f),
     private val clock: () -> Long = System::currentTimeMillis,
+    /** For durations, the telemetry's times (Design 2.8): never set back, unlike [clock], which dates the photos. */
+    private val elapsed: () -> Long = SystemClock::elapsedRealtime,
+    /** How the phone is held: each photo is saved as it was at its shutter press (FR-1.5). */
+    private val phoneTurns: PhoneTurns = PhoneTurns.Fixed(),
+    /** Who holds the zoom in a session (`RemoteControlHandler.zoomHold`, FR-7.6); free outside one. */
+    private val zoomHold: ZoomHold = ZoomHold(),
 ) : ViewModel() {
+
+    /** Follows how the phone is held while [owner], the camera screen, is in front (FR-1.5, FR-1.15). */
+    fun watchPhoneTurn(owner: LifecycleOwner) = phoneTurns.watch(owner)
+
+    /** How the phone is held, which the controls' icons turn with (FR-1.15). */
+    val phoneTurn: StateFlow<Int> = phoneTurns.turn
 
     private val _uiState = MutableStateFlow(CameraUiState())
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
-    private var savedNoticeJob: Job? = null
 
     // The quick step a tap asked for until the camera applies it, so that another tap goes on from it (FR-1.3); the
     // readout still shows the applied zoom.
     private var pendingZoomStep: Float? = null
     private var failedTipJob: Job? = null
+
+    // True from a pinch's step that the subject's pinch held back until that pinch's final value (FR-7.6).
+    private var zoomHeldBack = false
 
     private val _guideSaveNotices = Channel<GuideSaveNotice>(Channel.BUFFERED)
 
@@ -214,6 +268,17 @@ class CameraViewModel(
 
     /** One label per toggle, the newest replacing one not yet shown; the screen shows it for [NOTICE_MS]. */
     val toggleLabels: Flow<ToggleLabel> = _toggleLabels.receiveAsFlow()
+
+    private val _photoNotDeleted = Channel<Unit>(Channel.BUFFERED)
+
+    /** One per photo the viewer could not delete, for its notice; kept until the screen reads it. */
+    val photoNotDeleted: Flow<Unit> = _photoNotDeleted.receiveAsFlow()
+
+    // The thumbnail's and the viewer's sources (FR-1.6): outside a session Pix's album, with the photo just saved here
+    // before MediaStore tells of it; in a session the session's photos alone.
+    private var album: List<Uri> = emptyList()
+    private var newestSaved: Uri? = null
+    private var thisSession: List<Uri>? = null
 
     init {
         // The last ratio chosen comes back when the screen opens (Design 2.8); before the camera binds, if it can.
@@ -270,6 +335,19 @@ class CameraViewModel(
             camera.hasFrontCamera.collect { has -> _uiState.update { it.copy(canSwitchCamera = has) } }
         }
         viewModelScope.launch {
+            albumPhotos.collect { photos ->
+                album = photos
+                newestSaved = photos.lastOrNull()
+                showNewestPhoto()
+            }
+        }
+        viewModelScope.launch {
+            sessionPhotos.collect { photos ->
+                thisSession = photos
+                showNewestPhoto()
+            }
+        }
+        viewModelScope.launch {
             camera.zoom.collect { zoom ->
                 if (pendingZoomStep?.let { isAtZoomStep(zoom, it) } == true) pendingZoomStep = null
                 _uiState.update { it.copy(zoom = zoom) }
@@ -281,7 +359,15 @@ class CameraViewModel(
                     // A new guide starts in edit mode so that it can be placed at once; no guide, no mode.
                     val editing = guide != null && (guide !== it.guide || it.guideEditing)
                     val expanded = it.referenceExpanded && guide === it.guide
-                    it.copy(guide = guide, guideEditing = editing, referenceExpanded = expanded)
+                    // A saved copy keeps the guide's id and its photo, so it stays hidden; another guide's photo
+                    // is one the user has not seen, so it shows.
+                    val hidden = it.referenceHidden && guide != null && guide.id == it.guide?.id
+                    it.copy(
+                        guide = guide,
+                        guideEditing = editing,
+                        referenceExpanded = expanded,
+                        referenceHidden = hidden,
+                    )
                 }
             }
         }
@@ -318,6 +404,56 @@ class CameraViewModel(
         }
     }
 
+    /**
+     * In a session, the session's newest photo, none until its first, and the session's photos for the viewer;
+     * otherwise the newest saved here, and Pix's album (FR-1.6).
+     */
+    private fun showNewestPhoto() {
+        val session = thisSession
+        val saved = newestSaved
+        val albumPhotos = if (saved != null && saved !in album) album + saved else album
+        _uiState.update {
+            val next = it.copy(
+                lastPhoto = if (session != null) session.lastOrNull() else saved,
+                sessionPhotos = session,
+                albumPhotos = albumPhotos,
+            )
+            // The viewer closes as a session starts or ends, so it never turns from one's photos to the other's.
+            val sameKind = (it.sessionPhotos == null) == (session == null)
+            next.copy(photosOpen = it.photosOpen && sameKind && next.viewerPhotos.isNotEmpty())
+        }
+    }
+
+    /**
+     * A tap on the thumbnail opens its photos over the camera, at the newest (FR-1.6): the session's in a session,
+     * Pix's album otherwise, so Pix stays in front in both.
+     */
+    fun openPhotos() {
+        _uiState.update { it.copy(photosOpen = it.viewerPhotos.isNotEmpty()) }
+    }
+
+    /** The viewer's Back, or the system's, closes it. */
+    fun closePhotos() {
+        _uiState.update { it.copy(photosOpen = false) }
+    }
+
+    /**
+     * The viewer's Delete, once asked (FR-1.6): the photo leaves the viewer and the thumbnail at once, before
+     * MediaStore tells of it, or stays, and [photoNotDeleted] says so. In a session the deleter drops it from the
+     * session's photos too.
+     */
+    fun deletePhoto(uri: Uri) {
+        viewModelScope.launch {
+            if (!deleter.delete(uri)) {
+                _photoNotDeleted.trySend(Unit)
+                return@launch
+            }
+            album = album - uri
+            if (newestSaved == uri) newestSaved = album.lastOrNull()
+            showNewestPhoto()
+        }
+    }
+
     /** The ratios under the top bar open or close (FR-1.13). */
     fun setAspectsOpen(open: Boolean) {
         _uiState.update { it.copy(aspectsOpen = open) }
@@ -346,31 +482,89 @@ class CameraViewModel(
         }
     }
 
+    // Photos asked for and not yet saved or failed; touched on the main thread only.
+    private var photosInFlight = 0
+
+    // The newest press's work; each press publishes its result after the one before it.
+    private var lastShot: Job? = null
+
     fun bindCamera(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) {
         camera.bind(owner, surfaceProvider)
     }
 
-    /** Takes a photo, unless one is being saved or the camera is not ready; true when it takes one. */
+    /**
+     * Takes a photo, unless the camera is not ready or has not yet taken the photo of the press before; true when it
+     * takes one. The shutter is free again as soon as the camera took the picture, while the photo is still being
+     * saved (NFR-19), so photos can follow each other; [CameraUiState.isSaving] lasts until all of them are done. Their
+     * results are published in shutter order.
+     */
     fun onShutter(): Boolean {
-        if (_uiState.value.isSaving || camera.status.value != CameraStatus.READY) return false
-        savedNoticeJob?.cancel()
+        if (_uiState.value.shutterBusy || camera.status.value != CameraStatus.READY) return false
         // Set before launching so two taps in the same frame cannot enqueue two captures. The shutter also ends
         // guide editing (Design 2.6.2): the guide is placed, and the next pinch zooms again.
-        _uiState.update { it.copy(isSaving = true, captureNotice = null, guideEditing = false, aspectsOpen = false) }
+        photosInFlight++
+        _uiState.update {
+            it.copy(
+                shutterBusy = true,
+                isSaving = true,
+                captureNotice = null,
+                guideEditing = false,
+                aspectsOpen = false,
+            )
+        }
         val takenAt = clock()
+        val pressedAt = elapsed()
+        // At the press, like the time: the phone may turn while an earlier photo is still being saved.
+        val turn = phoneTurns.turn.value
         // Now, not once it is saved: the photo belongs to the session running at the shutter.
         val sessionId = photos.shutter()
-        viewModelScope.launch {
+        // The press before, for the order below.
+        val earlier = lastShot
+        lastShot = viewModelScope.launch {
+            // This press's own hold on the shutter: the "taken" of an earlier photo, come late, must not free it.
+            var held = true
+            // When the camera took the photo, for its `photo_taken` event (NFR-19; Design 2.8, Telemetry).
+            var capturedAt: Long? = null
+            fun free() {
+                if (!held) return
+                held = false
+                _uiState.update { it.copy(shutterBusy = false) }
+            }
             try {
-                camera.takePhoto().fold(
+                val result = try {
+                    camera.setPhotoTurn(turn)
+                    camera.takePhoto(
+                        onCaptured = {
+                            capturedAt = elapsed()
+                            free()
+                        },
+                    )
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    Result.failure(error)
+                }
+                // A camera that never said "taken", or a photo that failed before it.
+                free()
+                val endedAt = elapsed()
+                // In shutter order, whatever order the saves end in: the thumbnail is the newest photo, and the
+                // session sends the photos as they were taken (PhotoSyncer).
+                earlier?.join()
+                Telemetry.event(
+                    TelemetryEvent.PhotoTaken(
+                        saved = result.isSuccess,
+                        shutterMs = capturedAt?.let { it - pressedAt },
+                        ms = endedAt - pressedAt,
+                        inSession = sessionId != null,
+                    ),
+                )
+                result.fold(
                     onSuccess = { uri ->
-                        _uiState.update { it.copy(lastPhoto = uri, captureNotice = CaptureNotice.SAVED) }
+                        // No notice (FR-1.6, #204): the thumbnail shows the new photo, in a session once it is the
+                        // session's.
+                        newestSaved = uri
+                        showNewestPhoto()
                         sessionId?.let { photos.taken(it, uri, takenAt) }
-                        // Only a confirmation (FR-1.6): it goes by itself, while a failure stays until the next photo.
-                        savedNoticeJob = viewModelScope.launch {
-                            delay(NOTICE_MS)
-                            _uiState.update { it.copy(captureNotice = null) }
-                        }
                     },
                     onFailure = { error ->
                         if (error is CancellationException) throw error
@@ -378,13 +572,10 @@ class CameraViewModel(
                         _uiState.update { it.copy(captureNotice = captureFailureNotice(error)) }
                     },
                 )
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                sessionId?.let(photos::notTaken)
-                _uiState.update { it.copy(captureNotice = captureFailureNotice(error)) }
             } finally {
-                _uiState.update { it.copy(isSaving = false) }
+                free()
+                photosInFlight--
+                _uiState.update { it.copy(isSaving = photosInFlight > 0) }
             }
         }
         return true
@@ -393,7 +584,26 @@ class CameraViewModel(
     /** [final] is false for the steps of a pinch, so the camera holds its lens until the pinch ends (NFR-19). */
     fun onZoomChanged(ratio: Float, final: Boolean = true) {
         pendingZoomStep = null
+        if (!mayZoom(final)) return
         requestZoom(ratio, final)
+        if (final) zoomHold.release(Role.PHOTOGRAPHER)
+    }
+
+    /**
+     * Whether this phone may zoom now (FR-7.6, #236): not while the subject's pinch holds the zoom. A pinch's step takes
+     * the zoom for the photographer until its final value; a pinch held back stays so until its fingers lift, and its
+     * first step says who is zooming. A single final value (a quick step, a TalkBack action) takes nothing.
+     */
+    private fun mayZoom(final: Boolean): Boolean {
+        if (zoomHeldBack) {
+            if (final) zoomHeldBack = false
+            return false
+        }
+        val may = if (final) zoomHold.mayChange(Role.PHOTOGRAPHER) else zoomHold.take(Role.PHOTOGRAPHER)
+        if (may) return true
+        zoomHeldBack = !final
+        _toggleLabels.trySend(ToggleLabel.ZoomHeld)
+        return false
     }
 
     /**
@@ -403,6 +613,7 @@ class CameraViewModel(
     fun onZoomTap() {
         val state = _uiState.value
         val step = nextZoomStep(quickZoomSteps(state.minZoom, state.maxZoom), pendingZoomStep ?: state.zoom) ?: return
+        if (!mayZoom(final = true)) return
         if (requestZoom(step, final = true)) {
             pendingZoomStep = step
             _toggleLabels.trySend(ToggleLabel.Zoom(step))
@@ -524,14 +735,50 @@ class CameraViewModel(
         _toggleLabels.trySend(if (guides.state.value.visible) ToggleLabel.GuideShown else ToggleLabel.GuideHidden)
     }
 
-    /** A tap on the reference thumbnail enlarges it, and another tap makes it small again (FR-3.9). */
+    /**
+     * A tap on the reference thumbnail enlarges it, and another tap makes it small again (FR-3.9). A hidden one stays
+     * small.
+     */
     fun setReferenceExpanded(expanded: Boolean) {
-        _uiState.update { it.copy(referenceExpanded = expanded && it.guide?.reference != null) }
+        _uiState.update {
+            it.copy(referenceExpanded = expanded && it.guide?.reference != null && !it.referenceHidden)
+        }
     }
 
     /** A drag drops the reference thumbnail into one of the preview's corners, and nowhere else (FR-3.9). */
     fun setReferenceCorner(corner: ReferenceCorner) {
         _uiState.update { it.copy(referenceCorner = corner) }
+    }
+
+    /**
+     * Puts the reference thumbnail away at its corner's side, small, or shows it again (#237); nothing without one.
+     */
+    fun setReferenceHidden(hidden: Boolean) {
+        _uiState.update {
+            val hides = hidden && it.guide?.reference != null
+            it.copy(referenceHidden = hides, referenceExpanded = it.referenceExpanded && !hides)
+        }
+    }
+
+    /** A drag let the thumbnail go: into [drop]'s corner, or hidden, and small, at that corner's side (#237). */
+    fun onReferenceDropped(drop: ReferenceDrop) {
+        _uiState.update {
+            val hides = drop.hidden && it.guide?.reference != null
+            it.copy(
+                referenceCorner = drop.corner,
+                referenceHidden = hides,
+                referenceExpanded = it.referenceExpanded && !hides,
+            )
+        }
+    }
+
+    /** A tap on the thumbnail: a hidden one comes back, small, and a shown one changes its size (FR-3.9). */
+    fun onReferenceTap() {
+        if (_uiState.value.referenceHidden) {
+            setReferenceHidden(false)
+        } else {
+            setReferenceExpanded(!_uiState.value.referenceExpanded)
+        }
     }
 
     /**
@@ -560,8 +807,19 @@ class CameraViewModel(
         guides.setGuide(null)
     }
 
+    override fun onCleared() {
+        // A pinch cut off with the screen never sends its final value; the zoom must not stay the photographer's.
+        zoomHold.release(Role.PHOTOGRAPHER)
+    }
+
     companion object {
-        /** How long a short notice stays on the Camera screen: "Saved without the guide" and remote action notices. */
+        /** How long a short notice stays on the Camera screen, such as the remote action notices. */
         const val NOTICE_MS = 3_000L
+
+        /**
+         * How long the notice that the subject left or dropped stays (FR-6.10, FR-6.11): longer than [NOTICE_MS], since
+         * the photographer may not be looking at the screen (#238).
+         */
+        const val PEER_GONE_NOTICE_MS = 10_000L
     }
 }

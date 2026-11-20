@@ -1,8 +1,9 @@
-// AI-generated with Claude Code, 2026-10-15, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-11, reviewed by Dongje Park and Joonhyung Han
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.session.Role
 import kotlinx.serialization.json.Json
@@ -16,7 +17,8 @@ import org.junit.Test
  * Partitions for the Iteration 2 fields of camera.capabilities and camera.state (Design 2.5.1).
  * Capabilities: the Design's example; a round trip; an older phone without the new fields (defaults); a malformed
  * exposureRange (one value, min above max, not an array).
- * State: the Design's example; a round trip with every field; an older phone without the new fields (defaults).
+ * State: the Design's example; a round trip with every field; an older phone without the new fields (defaults), the
+ * rear camera among them (#201).
  */
 class CameraMessagesTest {
     private val codec = MessageCodec(clock = { 1_759_212_345_678L })
@@ -92,6 +94,7 @@ class CameraMessagesTest {
             -4,
             FlashMode.ON,
             AspectRatio.R1_1,
+            CameraFacing.FRONT,
         )
 
         assertEquals(message, codec.decode(codec.encode(message))!!.message)
@@ -101,6 +104,8 @@ class CameraMessagesTest {
     fun state_olderPhoneWithoutTheNewFields_meansThe43FrameWithoutFlash() {
         val text = """{"v":1,"t":"camera.state","seq":5,"ts":0,"b":{"zoom":1.5,"by":"PHOTOGRAPHER","final":true}}"""
 
-        assertEquals(SessionMessage.CameraStateUpdate(1.5f, Role.PHOTOGRAPHER, true), codec.decode(text)!!.message)
+        val message = codec.decode(text)!!.message
+        assertEquals(SessionMessage.CameraStateUpdate(1.5f, Role.PHOTOGRAPHER, true), message)
+        assertEquals(CameraFacing.BACK, (message as SessionMessage.CameraStateUpdate).facing)
     }
 }

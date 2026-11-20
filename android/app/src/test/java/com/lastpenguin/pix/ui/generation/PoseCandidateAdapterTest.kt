@@ -4,20 +4,20 @@ package com.lastpenguin.pix.ui.generation
 import android.animation.ValueAnimator
 import android.os.Looper
 import android.widget.FrameLayout
-import androidx.appcompat.app.AppCompatActivity
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.PlannedPose
+import com.lastpenguin.pix.ui.OwnActivities
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import java.time.Duration
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowChoreographer
@@ -34,6 +34,8 @@ import org.robolectric.shadows.ShadowChoreographer
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PoseCandidateAdapterTest {
+    @get:Rule
+    val activities = OwnActivities()
 
     @After
     fun tearDown() {
@@ -50,7 +52,7 @@ class PoseCandidateAdapterTest {
      * list is taken at once; a later one is compared off the main thread.
      */
     private fun bound(slot: PoseSlot): Pair<PoseCandidateAdapter, PoseCandidateAdapter.Holder> {
-        val activity = Robolectric.buildActivity(AppCompatActivity::class.java).setup().get()
+        val activity = activities.start()
         activity.setTheme(R.style.Theme_Pix)
         val parent = FrameLayout(activity)
         val adapter = PoseCandidateAdapter()

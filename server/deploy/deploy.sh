@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
-# Deploys the Pix server on a course server or an AWS server (Design 2.8, Deployment; server/README.md, Deploy). Run as root.
+# Deploys the Pix server on a course server or an AWS server (Design 2.8, Deployment; server/README.md, Deploy).
+# Run as root.
 #
 #   deploy.sh auto           deploy the configured branch if it has a new commit; the systemd timer runs this
 #   deploy.sh deploy [ref]   deploy a branch or a commit now; the default is the configured branch
 #   deploy.sh restart        start the other copy from the same image, for example after editing .env
 #   deploy.sh rollback       switch back to the image that served before the last deploy
+#   deploy.sh reload         have nginx read its configuration and the certificate again; certbot's hook runs this
 #   deploy.sh status         show what is running
 #
 # Settings come from /opt/pix/deploy.conf: BRANCH, and optionally HTTP_PORT, MAX_WAIT_SECONDS (600), and PROJECT.
@@ -42,7 +44,7 @@ log() { echo "[deploy] $*"; }
 die() { echo "[deploy] ERROR: $*" >&2; exit 1; }
 
 usage() {
-    sed -n '3,9p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '3,11p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 # --- state ------------------------------------------------------------------------------------------------------
@@ -128,9 +130,31 @@ secret() {
     cat "$1"
 }
 
-# HTTPS where the certificate exists, if the checked-out commit has the file for it (a rollback may not).
+# HTTPS where the certificate exists, if the checked-out commit has the file for it.
 https_on() {
     [ -f "$CERTIFICATE" ] && [ -f "$REPO/server/deploy/docker-compose.https.yml" ]
+}
+
+# True for a commit that would close port 443 here: nginx would be recreated without docker-compose.https.yml, and the
+# builds, which use HTTPS, would lose the server. A deploy or a rollback refuses such a commit.
+drops_https() {
+    [ -f "$CERTIFICATE" ] && ! git -C "$REPO" cat-file -e "$1:server/deploy/docker-compose.https.yml" 2> /dev/null
+}
+
+# What nginx serves, from the running container's published ports rather than the files: a certificate made after
+# nginx started takes effect only once nginx is recreated.
+https_state() {
+    local nginx
+    if ! https_on; then
+        echo off
+        return 0
+    fi
+    nginx=$(compose ps -q nginx 2> /dev/null || true)
+    if [ -n "$nginx" ] && docker port "$nginx" 443/tcp > /dev/null 2>&1; then
+        echo "on, port 443"
+    else
+        echo "not yet: the certificate exists, but nginx does not publish port 443; run deploy.sh restart"
+    fi
 }
 
 compose() {
@@ -298,6 +322,13 @@ deploy_commit() {
         return 1
     fi
 
+    if drops_https "$sha"; then
+        FAILED_TREE=$tree
+        save_state
+        log "$tag has no server/deploy/docker-compose.https.yml, so nginx would stop serving HTTPS; not deploying it"
+        return 1
+    fi
+
     if [ -n "$ACTIVE" ] && [ "$tree" = "$(server_tree "$(commit_of "$ACTIVE")")" ] && [ "$(served_copy)" = "$ACTIVE" ]; then
         git -C "$REPO" checkout -q --detach "$sha"
         COMMIT=$sha
@@ -374,6 +405,9 @@ command_rollback() {
     [ -n "$target" ] || die "there is no earlier image to roll back to"
     [ "$target" != "$from" ] || die "both copies hold $(short "$from"); there is no earlier image to roll back to"
     docker image inspect "$IMAGE:$(short "$target")" > /dev/null 2>&1 || die "the image $IMAGE:$(short "$target") is gone"
+    if drops_https "$target"; then
+        die "$(short "$target") has no docker-compose.https.yml, so nginx would stop serving HTTPS; not rolling back"
+    fi
     : > "$BUILD_LOG"
     log "rolling back from $(short "$from") to $(short "$target") on app-$idle"
     git -C "$REPO" checkout -q --detach "$target"
@@ -386,6 +420,12 @@ command_rollback() {
     FAILED_TREE=$(server_tree "$from")
     save_state
     log "done: $(short "$target") is live. $(short "$from") is not deployed again until the branch changes server/, or you run: deploy.sh deploy"
+}
+
+# After certbot renews the certificate: nginx keeps the old one in memory until it reads its files again.
+command_reload() {
+    reload_nginx || die "nginx refused its configuration and keeps the one it has"
+    log "nginx read its configuration and the certificate again"
 }
 
 command_status() {
@@ -401,7 +441,7 @@ command_status() {
     echo "serving:       app-$ACTIVE, built from $(short "$(commit_of "$ACTIVE")")"
     echo "standby:       app-$idle, built from $(short "$(commit_of "$idle")")"
     echo "through nginx: app-$(served_copy)"
-    if https_on; then echo "https:         on, port 443"; else echo "https:         off"; fi
+    echo "https:         $(https_state)"
     echo "open rooms:    ${rooms:-unknown}"
     if [ -n "$FAILED_TREE" ]; then echo "not retried:   server/ tree $(short "$FAILED_TREE") failed or was rolled back"; fi
     check_env > /dev/null
@@ -413,7 +453,7 @@ main() {
     local command=${1:-}
     if [ $# -gt 0 ]; then shift; fi
     case "$command" in
-        auto | deploy | restart | rollback | status) ;;
+        auto | deploy | restart | rollback | reload | status) ;;
         *)
             usage
             exit 2
@@ -439,7 +479,12 @@ main() {
     if [ "$command" != status ]; then
         # One deploy at a time: the lock is released when this process ends, however it ends.
         exec 9> "$PIX_HOME/deploy.lock"
-        if command -v flock > /dev/null 2>&1 && ! flock -n 9; then
+        if ! command -v flock > /dev/null 2>&1; then
+            :
+        elif [ "$command" = reload ]; then
+            # certbot's hook waits for a deploy, which recreates or reloads nginx itself.
+            flock -w 900 9 || die "another deploy held the lock for 15 minutes"
+        elif ! flock -n 9; then
             if [ "$command" = auto ]; then exit 0; fi
             die "another deploy is running"
         fi
@@ -450,6 +495,7 @@ main() {
         deploy) command_deploy "$@" ;;
         restart) command_restart ;;
         rollback) command_rollback ;;
+        reload) command_reload ;;
         status) command_status ;;
     esac
 }

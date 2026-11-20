@@ -325,19 +325,21 @@ If you delete an AWS instance, also remove it from the IAM user's policy. Delete
 The AWS servers serve HTTPS on port 443 with a certificate from [Let's Encrypt](https://letsencrypt.org/). The certificate names a hostname that [sslip.io](https://sslip.io/) resolves to the server's Elastic IP: `swpp26t10.15-134-147-114.sslip.io` resolves to `15.134.147.114`. Port 80 stays open, because Let's Encrypt checks the hostname over it.
 
 - Every server's nginx serves Let's Encrypt's check, `/.well-known/acme-challenge/`, from `/opt/pix/acme`. The folder is empty on the course servers.
-- Once `/etc/letsencrypt/live/pix/fullchain.pem` exists, `deploy.sh` adds [`docker-compose.https.yml`](deploy/docker-compose.https.yml) to each Compose command. That file publishes port 443 and mounts [`nginx/https/`](deploy/nginx/https/) and `/etc/letsencrypt`, so nginx also listens on 443 with the certificate. `deploy.sh status` then shows `https: on`.
-- certbot's systemd timer renews the certificate before it expires. Its deploy hook then reloads nginx.
+- Once `/etc/letsencrypt/live/pix/fullchain.pem` exists, `deploy.sh` adds [`docker-compose.https.yml`](deploy/docker-compose.https.yml) to each Compose command. That file publishes port 443 and mounts [`nginx/https/`](deploy/nginx/https/) and `/etc/letsencrypt`, so nginx also listens on 443 with the certificate. `deploy.sh status` shows `https: on` once the running nginx publishes port 443.
+- On a server with the certificate, `deploy.sh` refuses to deploy or roll back to a commit without `docker-compose.https.yml`, which would close port 443. The commit that serves keeps serving.
+- certbot's systemd timer renews the certificate before it expires. Its deploy hook, `deploy.sh reload`, then has nginx read the certificate again.
 - nginx tells the app that a request came over HTTPS (`X-Forwarded-Proto`), so the app's invite links start with `https://`.
 
 Set it up once on each AWS server, after a deploy of a commit that has these files:
 
 1. In the security group, allow inbound TCP on port 443 from anywhere.
-2. On the server, with the server's own hostname (`swpp26t10.3-105-185-251.sslip.io` on AWS dev):
+2. On the server, set `host` to the server's own hostname, then run the rest:
 
    ```sh
+   host=swpp26t10.15-134-147-114.sslip.io   # AWS main; swpp26t10.3-105-185-251.sslip.io on AWS dev
    sudo apt install -y certbot
-   sudo certbot certonly --webroot -w /opt/pix/acme --cert-name pix -d swpp26t10.15-134-147-114.sslip.io \
-     --deploy-hook 'docker kill -s HUP pix-nginx-1' --register-unsafely-without-email --agree-tos
+   sudo certbot certonly --webroot -w /opt/pix/acme --cert-name pix -d "$host" \
+     --deploy-hook '/opt/pix/repo/server/deploy/deploy.sh reload' --register-unsafely-without-email --agree-tos
    sudo /opt/pix/repo/server/deploy/deploy.sh restart
    ```
 
@@ -345,6 +347,35 @@ Set it up once on each AWS server, after a deploy of a commit that has these fil
 3. Check it from your computer: `curl https://<hostname>/health` answers `{"status":"ok"}`. On the server, `sudo certbot renew --dry-run` checks the renewal.
 
 sslip.io is not on the Public Suffix List, so all sslip.io names share Let's Encrypt's limit of 50 new certificates in 7 days. If certbot is refused for that limit, try again later. A renewal of the same name is exempt.
+
+### Move the accounts to AWS main
+
+Each server has its own database, so AWS main does not have the accounts made on Server A. A release build that moves its users from Server A to AWS main needs them there first. These steps copy Server A's database over AWS main's. They delete everything AWS main holds, the accounts made there included. The dump holds password hashes and push tokens, so only you may read it, and every copy is deleted at the end.
+
+1. On Server A, dump the database to a file in your home folder:
+
+   ```sh
+   (umask 077 && sudo docker exec pix-postgres-1 pg_dump -U pix -d pix -Fc > ~/pix-accounts.dump)
+   ```
+
+2. On your computer, copy it to AWS main, and delete it on Server A and on your computer:
+
+   ```sh
+   scp swpp-a:pix-accounts.dump . && scp -i <key>.pem pix-accounts.dump ubuntu@15.134.147.114:
+   ssh swpp-a rm pix-accounts.dump && rm pix-accounts.dump
+   ```
+
+3. On AWS main, stop both copies of the app, replace the database, and start a copy again. The copy brings the schema up to date as it starts. `docker stop` prints an error for a copy that never ran, which does no harm.
+
+   ```sh
+   sudo docker stop pix-app-blue-1 pix-app-green-1
+   sudo docker exec pix-postgres-1 dropdb -U pix pix
+   sudo docker exec pix-postgres-1 createdb -U pix pix
+   sudo docker exec -i pix-postgres-1 pg_restore -U pix -d pix --no-owner < ~/pix-accounts.dump && rm ~/pix-accounts.dump
+   sudo /opt/pix/repo/server/deploy/deploy.sh restart
+   ```
+
+A phone stays signed in. AWS main refuses Server A's access token, because each server signs with its own key, and the app then gets a new one with its refresh token, which the copied database holds. A phone whose sign-in was refreshed on Server A after the dump signs in again.
 
 ### Settings
 
@@ -374,6 +405,7 @@ Without the shortcuts, run these commands on the server with `sudo`:
 | `/opt/pix/repo/server/deploy/deploy.sh status` | The branch, the recorded commit, which copy serves, whether HTTPS is on, the open rooms, and the containers. |
 | `… deploy.sh deploy [ref]` | Deploys a branch or a commit now. The default is the server's branch. It also deploys a commit that the timer stopped trying. |
 | `… deploy.sh rollback` | Switches back to the image that served before the last deploy, without a wait for rooms. The timer does not deploy the rolled-back code again until the branch changes `server/`. |
+| `… deploy.sh reload` | Has nginx read its configuration and the certificate again, after it checks them. certbot's deploy hook runs it after a renewal ([HTTPS](#https)). |
 | `… deploy.sh restart` | Starts the other copy from the same image, for example after you edit `/opt/pix/.env`. |
 | `journalctl -u pix-deploy -n 50` | What the timer's deploys printed. `/opt/pix/state/last-build.log` has the last build in full. |
 | `docker logs -n 100 pix-app-blue-1` | The server's log. Use `pix-app-green-1` for the other copy, `pix-nginx-1` for the access log, `pix-redis-1` for the session store, and `pix-postgres-1` for the database. Logs rotate at 10 MB, five files each. |

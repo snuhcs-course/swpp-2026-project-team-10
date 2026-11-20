@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-21, reviewed by Sungmin Jo
 import java.util.Properties
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
@@ -12,19 +12,20 @@ plugins {
     jacoco
 }
 
-// The Pix server (Design 2.8, Hosting and Configuration). Release builds use Server A, which runs main.
-// Debug builds default to the AWS server, which runs dev and, unlike the course servers, answers from any network,
-// cellular data included. To use another server, set `pix.serverUrl` in local.properties (never committed) or pass
+// The Pix server (Design 2.8, Hosting and Configuration). Release and debug builds use the AWS server, which runs dev
+// and, unlike the course servers, answers from any network, cellular data included: the store's build is a release
+// build. A debug build can use another server: set `pix.serverUrl` in local.properties (never committed) or pass
 // -Ppix.serverUrl=...: a laptop on the test Wi-Fi (`http://192.168.0.10:8000/`), or the host machine as seen from the
-// emulator (`http://10.0.2.2:8000/`).
+// emulator (`http://10.0.2.2:8000/`). A new release host also goes into src/main/res/xml/network_security_config.xml.
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) file.inputStream().use { load(it) }
 }
+val awsServerUrl = "http://3.105.185.251/"
 val debugServerUrl: String = providers.gradleProperty("pix.serverUrl").orNull
     ?: localProperties.getProperty("pix.serverUrl")
-    ?: "http://3.105.185.251/"
-val releaseServerUrl = "http://swpp26t10.147-46-242-169.sslip.io/"
+    ?: awsServerUrl
+val releaseServerUrl = awsServerUrl
 
 // Debug builds only: `pix.relayOnly=true` makes WebRTC use the TURN relay even when a direct path exists, so the relay
 // can be tried and measured on one Wi-Fi (Design 2.6.7).

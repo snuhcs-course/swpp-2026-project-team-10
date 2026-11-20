@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-21, reviewed by Sungmin Jo
 name: server-deploy-aws
 
 # Deploys dev to the AWS server (Design 2.8, Hosting). Unlike the course servers, GitHub can reach it, so
@@ -31,7 +31,7 @@ jobs:
     env:
       AWS_DEFAULT_REGION: ap-southeast-2
       AWS_INSTANCE_ID: i-07f7e5dd7cc4cc9cc
-      # Debug builds of the app use this address (android/app/build.gradle.kts).
+      # Release and debug builds of the app use this address (android/app/build.gradle.kts).
       SERVER_URL: http://3.105.185.251
     steps:
       # PixDeploy waits for a deploy already running (an operator's, or the timer's if it is still on), because

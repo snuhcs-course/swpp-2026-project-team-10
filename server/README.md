@@ -176,9 +176,9 @@ The server runs on the two course servers and on an AWS server ([Design 2.8][d28
 
 | Server | Address | Branch | Use |
 | --- | --- | --- | --- |
-| A (`ssh swpp-a`) | `http://swpp26t10.147-46-242-169.sslip.io` | `main` | Production. Release builds of the app use it. |
+| A (`ssh swpp-a`) | `http://swpp26t10.147-46-242-169.sslip.io` | `main` | The state of `main`. To use it, set `pix.serverUrl` in a debug build. |
 | B (`ssh swpp-b`) | `http://swpp26t10.147-46-242-174.sslip.io` | `dev` | Staging. To use it, set `pix.serverUrl` in a debug build. |
-| AWS (`ap-southeast-2`) | `http://3.105.185.251` | `dev` | Debug builds use it by default. Every network reaches it, cellular data included. |
+| AWS (`ap-southeast-2`) | `http://3.105.185.251` | `dev` | Release builds use it, and debug builds by default. Every network reaches it, cellular data included. |
 
 [`deploy/docker-compose.yml`](deploy/docker-compose.yml) runs these services:
 

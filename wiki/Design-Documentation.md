@@ -112,6 +112,7 @@
 | 3.32 | 2026-11-20 | The design as built through Iteration 4: the QR connection ([#214]) and light mode ([#212]) dropped on 11/20 as not needed, so *Still open* is empty; the Iteration 4 tasks' status, with the UAT's fixes and the scene photo step added, and what is left for Iteration 5 (2.1, 2.8, 2.9, 3). |
 | 3.33 | 2026-11-20 | The live view's sharpness after a reconnection, left for Iteration 5 ([#238]) (2.9). |
 | 3.34 | 2026-11-20 | The Iteration 4 tasks as their issues stand: the owners of Iter4-P7 and Iter4-P11, the name and date of Iter4-P16, and when the prompt templates were dropped (2.9). |
+| 3.35 | 2026-11-21 | Release builds use the AWS server, so the store's build works on every network, and allow plain HTTP only to it (AD-11, 2.8). |
 
 </details>
 
@@ -337,7 +338,7 @@ App versions are from `android/gradle/libs.versions.toml`; server versions are t
 | AD-8 | **One session abstraction with pluggable entry points (room code, invitation)** | Streaming and sync work without accounts, and each entry point only yields a `sessionId`. | Building accounts and invitations first |
 | AD-9 | **One app for both roles** | Friends swap roles between shots: one codebase, one install, the role chosen per session. | A separate viewer app |
 | AD-10 | **One frame in the chosen aspect ratio (3:4, 9:16, or 1:1), shown whole (fit) on both phones** | One CameraX `ViewPort` makes what you see what is captured, with the same guide coordinates on both phones; 9:16 fits Instagram stories. The crops: 2.6.2. | Fixed 3:4; full-screen 9:16 with cropping |
-| AD-11 | **The server runs on the course-provided servers with Docker and nginx, over HTTP and WS, and an AWS server serves other networks** | The course servers open only HTTP on port 80, without TLS (NFR-14), and only to the campus network. They stay the main hosting, as Servers A and B. An AWS server with the same setup serves other networks, cellular data included (2.8, Hosting). | AWS as the only hosting (cost); a TLS front such as a Cloudflare Tunnel (domain and approval; revisit if `ws://` fails on cellular); GitHub hosting; a laptop with port forwarding |
+| AD-11 | **The server runs on the course-provided servers with Docker and nginx, over HTTP and WS, and an AWS server serves other networks** | The course servers open only HTTP on port 80, without TLS (NFR-14), and only to the campus network. They stay, as Servers A and B. An AWS server with the same setup answers from every network, cellular data included, so release builds (the store's build) and debug builds use it (2.8, Hosting). | AWS as the only hosting (cost); a TLS front such as a Cloudflare Tunnel (domain and approval; revisit if `ws://` fails on cellular); GitHub hosting; a laptop with port forwarding |
 | AD-12 | **Sign-in with a Pix ID and a password or with Google; the server issues its own tokens** | No Google account is needed, and Google is one tap. The Pix ID is the login name, with no email; either account can add the other (FR-5.13). Tokens and password hashes: 2.8, Accounts. | Email and password; Kakao sign-in (not on every test phone) |
 | AD-13 | **Invitations by Firebase Cloud Messaging, with an invite link as the fallback** | Only a push reaches a friend whose Pix is closed, and a link through any messenger covers a lost push. | WebSocket presence only; KakaoTalk-only invitations |
 | AD-14 | **A managed TURN relay (Cloudflare Realtime TURN), with short-lived credentials from the server** | STUN often fails behind carrier NAT, and the course servers cannot host a relay (port 80 only). Cloudflare's needs no host, fits its free allowance, and also listens on TCP 80 and TLS 443. The key stays on the server, and media stays SRTP-encrypted (NFR-14). | coturn on the server host (no open ports) or on AWS (cost, upkeep); a media server (SFU); no relay |
@@ -3128,9 +3129,9 @@ erDiagram
 
 **Configuration and secrets**
 
-- `BuildConfig.SERVER_URL` is Server A in release builds. Debug builds use the AWS server, `http://3.105.185.251/`, or any server set in `pix.serverUrl`, such as a laptop on the test Wi-Fi. A debug build's `pix.relayOnly=true` forces the relay (2.6.7).
+- `BuildConfig.SERVER_URL` is the AWS server, `http://3.105.185.251/`, in release builds, so the store's build works on every network. Debug builds use it too, or any server set in `pix.serverUrl`, such as a laptop on the test Wi-Fi. A debug build's `pix.relayOnly=true` forces the relay (2.6.7).
 - `BuildConfig.GOOGLE_SERVER_CLIENT_ID`, one constant in `app/build.gradle.kts`, equals the servers' `PIX_GOOGLE_CLIENT_ID`. Google accepts sign-in only from an APK whose signing key is registered as an Android OAuth client in that project.
-- The course servers have no TLS (AD-11). Release builds allow plain HTTP and WebSocket traffic only to the two course hostnames (`network_security_config.xml`); debug builds allow any host.
+- No server has TLS (AD-11). Release builds allow plain HTTP and WebSocket traffic only to the AWS server's address (`network_security_config.xml`); debug builds allow any host.
 - `server/.env.example` lists every setting, and a test keeps it in step with the code. Each server must set the names left empty: `OPENROUTER_API_KEY` (never committed), `PIX_GOOGLE_CLIENT_ID`, and Cloudflare's TURN key, `PIX_TURN_KEY_ID` and `PIX_TURN_API_TOKEN` (AD-14). The rest are commented with the app's default, such as `PIX_POSE_MODEL`.
 - On a server, Compose sets `PIX_REDIS_URL`, `PIX_DATABASE_URL`, `PIX_JWT_SECRET`, and `PIX_FCM_CREDENTIALS_FILE`. `deploy.sh` makes the database password and the JWT secret once, in `/opt/pix/db-password` and `/opt/pix/jwt-secret`.
 - The FCM key belongs to a service account of the app's Firebase project that may only send FCM messages. Compose mounts it from `/opt/pix/secrets/`, readable only by the app's user; without it, no push goes out. Other secrets live only in each server's `/opt/pix/.env`.
@@ -3152,7 +3153,7 @@ erDiagram
 | `room.join` with a wrong code | 100 per 10 min | — | `PIX_JOIN_FAILURE_LIMIT`, `PIX_JOIN_FAILURE_WINDOW_SECONDS` (2.5.2) |
 
 - The global limits bound a day's model cost, however many addresses send. The OpenRouter key's spending limit, set in its dashboard, is the last bound. On the course servers, the address is the last `X-Forwarded-For` value (*Hosting*).
-- Over plain HTTP to the course servers, a scene photo, a sign-in password, and the tokens travel unencrypted (AD-11). The live view goes phone to phone, encrypted (NFR-14).
+- Over plain HTTP to every server, the AWS server included, a scene photo, a sign-in password, and the tokens travel unencrypted (AD-11). The live view goes phone to phone, encrypted (NFR-14).
 - No URL holds a Pix ID or other personal data, because nginx's error log prints a failed request's whole request line. The lookup is `POST /users/lookup`. nginx and Uvicorn access logs leave out query strings.
 - Password hashes run two at a time per worker. A burst of sign-ins, which needs no account, then queues instead of taking a 64 MiB argon2id buffer per pool thread.
 - Cloud backups are off (`allowBackup="false"`); `data_extraction_rules.xml` keeps the sign-in, `guides/`, and the prompt history out of transfers to a new phone.
@@ -3191,12 +3192,12 @@ erDiagram
 
 | Server | Address | Branch | Use |
 |----|----|----|----|
-| A | `http://swpp26t10.147-46-242-169.sslip.io` | `main` | Production; release builds |
-| B | `http://swpp26t10.147-46-242-174.sslip.io` | `dev` | Staging |
-| AWS | `http://3.105.185.251` | `dev` | Debug builds; reachable from every network, cellular data included |
+| A | `http://swpp26t10.147-46-242-169.sslip.io` | `main` | The state of `main`; campus network only |
+| B | `http://swpp26t10.147-46-242-174.sslip.io` | `dev` | Staging; campus network only |
+| AWS | `http://3.105.185.251` | `dev` | Release and debug builds; reachable from every network, cellular data included |
 
 - The course servers are reachable only through the course's HTTP proxy on port 80, and only from the campus network. They cannot reach each other, so each has its own database and session store.
-- The AWS server runs the same Compose setup. It stays on and answers from every network, so debug builds and sessions across networks use it.
+- The AWS server runs the same Compose setup. It stays on and answers from every network, so release and debug builds use it. It runs `dev`, so each push to `dev` reaches the store's build's server.
 - `server/deploy/docker-compose.yml` runs:
   - `nginx` on port 80, which forwards `/api/v1`, `/ws`, `/health`, and the invite link's page `/i/<id>`, serves `/version`, and answers `404` to the rest, so FastAPI's `/docs` is not public;
   - `app-blue` and `app-green`, two copies of the app, each Uvicorn with two workers, set explicitly because the servers report 38 CPUs for our 8 cores;
@@ -3225,7 +3226,7 @@ erDiagram
 - The app sends the access token as a bearer header on REST calls and on the signaling upgrade. Everything but friends and invitations works without one (FR-5.1).
 - Sign-up takes a Pix ID, a display name, and a password, or Google. Either account can add the other sign-in (`PUT /me/google`, `PUT /me/password`; 2.5.3). Without email, a lost password cannot be reset.
 - Passwords are hashed with argon2id (`argon2-cffi`'s defaults: 3 passes over 64 MiB) on a worker thread, so a hash does not hold up the worker's sockets. Only the hash is stored.
-- Passwords cross plain HTTP to the course servers (AD-11, NFR-14). Log-in attempts are not limited.
+- Passwords cross plain HTTP to every server (AD-11, NFR-14). Log-in attempts are not limited.
 - Whether a Pix ID exists is not secret: the lookup tells any signed-in user, and `POST /auth/check-pix-id` anyone, for an exact Pix ID only (NFR-15). Neither is limited. A failed log-in answers alike for an unknown Pix ID and a wrong password.
 - `google-auth` verifies Google ID tokens against Google's published keys and our web client ID. The server stores only the Google subject.
 - A sign-in gives a 15-minute access token (`PIX_ACCESS_TOKEN_MINUTES`), a JWT that `PyJWT` signs with HS256 and `PIX_JWT_SECRET`. It also gives a refresh token valid 30 days from its last use (`PIX_SESSION_TTL_DAYS`; 2.5.3, *Session tokens*). The app keeps both in DataStore, in its private files, without Keystore encryption (*Privacy*).

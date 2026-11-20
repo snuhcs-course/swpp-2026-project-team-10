@@ -140,9 +140,9 @@ git checkout iteration-4-demo
 
 ### 2. Choose a server
 
-**The AWS server (no setup).** A debug build uses the AWS server, `http://3.105.185.251/`, by default. It runs `dev` and answers from any network, cellular data included. To check it, open `http://3.105.185.251/health` in a phone's browser. It answers `{"status":"ok"}`.
+**The AWS server (no setup).** A release build always uses the AWS server, `http://3.105.185.251/`, and a debug build uses it by default. It runs `dev` and answers from any network, cellular data included. To check it, open `http://3.105.185.251/health` in a phone's browser. It answers `{"status":"ok"}`.
 
-**Server A (campus network only).** A release build uses Server A, `http://swpp26t10.147-46-242-169.sslip.io/`. It runs `main`. To use it in a debug build, create `android/local.properties` with this line:
+**Server A (campus network only).** Server A, `http://swpp26t10.147-46-242-169.sslip.io/`, runs `main`. To use it in a debug build, create `android/local.properties` with this line:
 
 ```properties
 pix.serverUrl=http://swpp26t10.147-46-242-169.sslip.io/

@@ -112,6 +112,7 @@
 | 3.29 | 2026-11-19 | *Add a pose guide*'s tiles as buttons and the picker kept open (Iter4-A6, [#243]): its owner, the partitions of the order, the tiles, the press, the badge, the picker, and the rings, and steps on IT-7, IT-23, and IT-26 (1.1, 2.1.5, 2.1.6, Appendix A). |
 | 3.30 | 2026-11-20 | The sheet's current labels in older steps: a situation's tile for *Generate poses here* (US-4, IT-18, IT-35, IT-37), and *Choose from the gallery* for *Add photo* (US-2, US-12, IT-23, IT-35) (4.3, Appendix A). |
 | 3.31 | 2026-11-20 | One phone zooms at a time (Iter4-A3, [#236]): its owner, the state-based and boundary partitions, the new test classes, and IT-6's added steps (1.1, 2.1.5, 2.1.6, Appendix A). |
+| 3.32 | 2026-11-20 | The tips check of Iteration 4 ([#213]): 50 tips of `t213-run1` checked by three of us, with our answers committed (3.2, 6, Appendix B). |
 
 </details>
 
@@ -742,6 +743,7 @@ Each iteration's run adds a column to the tables below; the run's details are in
 **Runs.**
 
 - **Iteration 3:** 2026-11-05; three runs (`run1`–`run3`) of the 50 cases on a local server at `430447f` (the AI modules' code is the same at `c842fa1`); judge rubric `996c7738f404`; the phone's person check on a Galaxy Note20 (Android 13). The first AI run, so nothing changed before it. [Record](#run-2026-11-05-ai-module-tests).
+- **Iteration 4:** the tips alone ([#213]). One run, `t213-run1`, of the 50 cases, made on 2026-11-16 and its tips asked again up to 2026-11-18 with the tip of [#213]; 50 of its tips checked by 한준형, 박재완, and 박동제 by 2026-11-20. 조성민's answers did not come in, so "most of us" is two of three. The judge did not run, as we check the tips ourselves (3.1), and the other modules were not measured again. [Record](#run-2026-11-20-tips-check).
 
 **Judge validation.** The judge's numbers count only for an iteration whose judge passes these checks.
 
@@ -751,21 +753,21 @@ Each iteration's run adds a column to the tables below; the run's details are in
 | Consistency: the sample judged three times | — | 1 of 306 verdicts changed (0.3 %) |
 | Negative control: 20 candidates beside another case's scene | all fail *same person* and *same background* | pass: 20 of 20 |
 
-**Results against the thresholds.** Pose generation, suggestions, and tips are pooled over the iteration's three runs, with 95 % intervals in brackets.
+**Results against the thresholds.** Pose generation, suggestions, and tips are pooled over the iteration's three runs, with 95 % intervals in brackets. Iteration 4 measured only the tips, in one run (—: not measured).
 
-| Module | Metric | Threshold | Iteration 3 |
-|---|---|---|---|
-| Pose generation | returned images that are valid | 100 % | pass: 1192 of 1192 |
-| | sets with all four candidates within 30 s | ≥ 95 % | pass: 291 of 300, 97.0 % (94–98) |
-| | candidates that break a rule | ≤ 20 % | pass: 2 of 1192, 0.2 % (0–1) |
-| | candidates that follow the request | ≥ 80 % | pass: 1124 of 1192, 94.3 % |
-| Suggestions | suggested sets with four different poses | ≥ 90 % | **fail**: 117 of 150, 78.0 % (71–84) |
-| Tips | tips that match their pose | ≥ 80 % | pass, at the threshold: 240 of 300, 80.0 % (75–84) |
-| | tips with a number or a unit | none | pass: 0 of 300 |
-| Description filter | harmful descriptions let through | ≤ 5 % | pass: 0 of 50 |
-| | harmless descriptions refused | ≤ 5 % | pass: 1 of 50, 2 % |
-| Person check (phone and server) | photos with a person refused | ≤ 5 % | **fail**: 9 of 26, 34.6 % (19–54) |
-| | photos without a person let through | ≤ 10 % | pass: 2 of 24, 8.3 % (2–26) |
+| Module | Metric | Threshold | Iteration 3 | Iteration 4 |
+|---|---|---|---|---|
+| Pose generation | returned images that are valid | 100 % | pass: 1192 of 1192 | — |
+| | sets with all four candidates within 30 s | ≥ 95 % | pass: 291 of 300, 97.0 % (94–98) | — |
+| | candidates that break a rule | ≤ 20 % | pass: 2 of 1192, 0.2 % (0–1) | — |
+| | candidates that follow the request | ≥ 80 % | pass: 1124 of 1192, 94.3 % | — |
+| Suggestions | suggested sets with four different poses | ≥ 90 % | **fail**: 117 of 150, 78.0 % (71–84) | — |
+| Tips | tips that match their pose | ≥ 80 % | pass, at the threshold: 240 of 300, 80.0 % (75–84) | pass: 48 of 50, 96.0 % (87–99), against ≥ 90 % from Iteration 4 |
+| | tips with a number or a unit | none | pass: 0 of 300 | pass: 0 of 100 |
+| Description filter | harmful descriptions let through | ≤ 5 % | pass: 0 of 50 | — |
+| | harmless descriptions refused | ≤ 5 % | pass: 1 of 50, 2 % | — |
+| Person check (phone and server) | photos with a person refused | ≤ 5 % | **fail**: 9 of 26, 34.6 % (19–54) | — |
+| | photos without a person let through | ≤ 10 % | pass: 2 of 24, 8.3 % (2–26) | — |
 
 **Other measurements** (no threshold).
 
@@ -787,6 +789,24 @@ Each iteration's run adds a column to the tables below; the run's details are in
 - **Requests without an image.** The image provider's safety system refused 7 requests as sexual content; 4 of them are one scene (s15, a woman sitting on a concrete block), and the same request is refused again when replayed. The server cannot tell these refusals from other upstream errors, so the app cannot explain them to the user. One request did not answer within the app's 60 s.
 - **Variations that repeat the description.** In 15 of 150 described sets, a variation was the description with a full stop added, which the server's duplicate check misses. For Korean descriptions, the first variation is often the English translation. Both are to be addressed with the prompt revision ([#125]). Not addressed in Iteration 4: that revision ([#211]) was dropped on 11/14; Iteration 5 **TBD**.
 - **Filter.** The one harmless description refused is a Korean idiom: "폭탄 맞은 머리로 하품하는 모습" ("yawning with bomb-hit hair", meaning messy hair).
+
+**Tips check, Iteration 4** ([#213]). 50 tips of `t213-run1`, 115 sentences, with 95 % intervals in brackets.
+
+| Measurement | Iteration 4 |
+|---|---|
+| Tips that match their pose, by each of us | 한준형 36 of 50 (72 %), 박재완 44 of 50 (88 %), 박동제 49 of 50 (98 %) |
+| Sentences right, by most of us | 113 of 115, 98.3 % (94–100) |
+| Two of us agree on a sentence | 한준형 and 박재완 84.3 %, 한준형 and 박동제 87.0 %, 박재완 and 박동제 95.7 % |
+| Tips with something important left out | 0 of 50 by 한준형 and by 박동제; 박재완 did not answer it |
+| The other 50 tips, read through Claude Code | 49 of 50, 98.0 % (90–100) |
+| Tips that ask for no change of distance or phone | 22 of 50: the same distance in 12, the guide-outline sentence in 10; 14 of them say nothing more |
+| The phone's height the same as for the scene photo | 41 of 50 |
+
+**Failure analysis, Iteration 4.**
+
+- **Tips (pass).** Most of us found two sentences wrong: "Keep the same distance." (s05, suggested) and "훨씬 뒤로 물러나세요." (s42, suggested). The page kept the words of 11/18; a big move now reads "가까이 다가가세요." or "멀리 물러나세요." ([#213]). 한준형 noted that s12 (described) should tilt the phone down, not up.
+- **The guide-outline sentence.** It stands where the two measures of the distance disagree: 14 of 50 tips. 한준형 failed 12 of the 14, and 박재완 and 박동제 passed all of them. Whether it helps, or only repeats the guide on the screen, is open.
+- **Whether the tips help.** The check asks whether each sentence fits the candidate, not whether the tip helps. 22 of 50 tips ask for no change, since a candidate keeps the scene's camera: the phone's height is the same in 41 of 50. Measuring the tips' use, for example in a user test, is not planned; Iteration 5 **TBD**.
 
 ---
 
@@ -1040,6 +1060,7 @@ One row per recorded run, newest first, so the history of the numbers shows at a
 
 | Date | Iteration | What ran | Commit | Outcome | Section |
 |---|---|---|---|---|---|
+| 2026-11-20 | 4 | AI module tests: the tips of one run, 50 of them checked by three of us | `78287b5` | Tips pass: 48 of 50 (96.0 %) by most of us; 한준형 failed 12 of the 14 guide-outline sentences; 22 of 50 tips ask for no change | 3.2; [record](#run-2026-11-20-tips-check) |
 | 2026-11-16 | 4 | UAT cycle 1 in class: two testers of other teams, the five stories in 70 steps | `d806e2a` | All five stories pass: no step rejected; 137 of 140 marks accepted, three missing. Satisfaction 3 on zooming from both phones at once and on the photo on the subject's phone; follow-ups in 4.4 | 4.4 |
 | 2026-11-06 | 3 | Integration scripts on the phones (IT-1–4, 6, 8, 10–34), from 11/04 | `7b03e9e`, `c842fa1` | 31 of 31 pass; IT-5, 7, and 9 covered by later scripts; IT-12, 21, and 22 with notes. NFR-5 0.3 s cellular, 0.5 s relay; NFR-9 push 2 s; NFR-10 10/10 per pair; NFR-11 about 5 s. The defect of IT-22 (a refused description kept in the prompt history) is fixed (IT-34) | 2.2.2, 2.2.3; [record](#run-2026-11-06-integration-scripts) |
 | 2026-11-06 | 3 | Unit, Robolectric, screen, and adapter tests; server; coverage | `c842fa1` | 1,711 + 791 tests, 0 failed; app 86.9 % (94.4 / 97.7 / 93.7 / 50.4); server 98.3 % | 2.2.1; [record](#run-2026-11-06-unit-tests-and-coverage) |
@@ -2181,6 +2202,15 @@ One request timed out: run2 s25 suggested, candidate 2 ("Turn your body slightly
 | Both, as the app runs them | 9 of 26 | 2 of 24: statue-04, statue-05 |
 
 Found as the app runs the checks, by category: full body 4/4, from behind 3/3, group 2/2, selfie 2/2, near 3/4, sitting 2/3, partly hidden 1/2, far 0/4, low light 0/2. The phone counts a person when ML Kit finds enough body landmarks (likelihood ≥ 0.5) or a face; a small or dark figure gives neither.
+
+
+### Run 2026-11-20 tips check
+
+**Setup.** `t213-run1`: the 50 cases made once on 2026-11-16, on a local server at `d806e2a` with the tip of [#213], not yet committed. Its tips were asked again with `retip` after each change of the tip, the last on 2026-11-18 (prompts `aeb50809390f`). They follow the tip merged in `78287b5`, except a big move's words (3.2). 50 of the 100 tips, drawn with seed 3 (sample `160ab2b1f2ef`), were shown on `label-tips.html`; the other 50 were read through Claude Code (3.1). Counted with `eval_poses.py agree t213-run1 --kind tip --labels ...`, then `report t213-run1`. Our answers are committed in `server/eval/labels/` (`t213-run1-tips-joonhyung.json`, `-jaewan.json`, `-dongje.json`); the run's outputs are under `server/scripts/out/eval/t213-run1/` (not committed). Which tips ask for a change comes from what the model answered for each photo (`tip-seen.jsonl`), through the server's `seen` and `framing_of`.
+
+**Sentences each of us found wrong.** 한준형 14: twelve guide-outline sentences, one same distance, one phone. 박재완 6: three phone, two same distance, one big move back. 박동제 1: the big move back.
+
+**Pose generation in this run** (not judged, one run): 399 of 400 candidates made (one `ReadError`), all valid; all four within 30 s in 96 of 100 sets, the first within 20 s in 82 of 100.
 
 [#47]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/47
 [#48]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/48

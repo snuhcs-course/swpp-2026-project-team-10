@@ -1,12 +1,14 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park
 import java.util.Properties
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.serialization)
-    // Reads app/google-services.json, the app's Firebase project, for push notifications (Design 2.6.6).
+    // Reads app/google-services.json, the app's Firebase project, for push notifications (Design 2.6.6) and telemetry.
     alias(libs.plugins.google.services)
+    // Gives each build the ID that Crashlytics needs at start (Design 2.8, Telemetry).
+    alias(libs.plugins.firebase.crashlytics)
     jacoco
 }
 
@@ -33,6 +35,13 @@ val debugRelayOnly: Boolean = (
 // The web OAuth client of the team's Google Cloud project "Pix" (Design 2.8, Configuration). The app asks Google for
 // ID tokens addressed to it, and both servers check them against the same ID in `PIX_GOOGLE_CLIENT_ID`. It is not a
 // secret: every APK contains it.
+// Crash reports and usage events (Design 2.8, Telemetry): release builds send them while the user allows it (Settings,
+// FR-10.6). Debug builds send nothing, unless `pix.telemetry=true` is set in local.properties or passed as
+// -Ppix.telemetry=true to see the events in Firebase's DebugView.
+val debugTelemetry: Boolean = (
+    providers.gradleProperty("pix.telemetry").orNull ?: localProperties.getProperty("pix.telemetry")
+    )?.toBoolean() ?: false
+
 val googleServerClientId = "572788944856-cr72pqlradqibnep626t672driie7537.apps.googleusercontent.com"
 
 android {
@@ -58,9 +67,13 @@ android {
         debug {
             buildConfigField("String", "SERVER_URL", "\"$debugServerUrl\"")
             buildConfigField("boolean", "RELAY_ONLY", "$debugRelayOnly")
+            buildConfigField("boolean", "TELEMETRY", "$debugTelemetry")
+            manifestPlaceholders["telemetry"] = "$debugTelemetry"
         }
         release {
             buildConfigField("String", "SERVER_URL", "\"$releaseServerUrl\"")
+            buildConfigField("boolean", "TELEMETRY", "true")
+            manifestPlaceholders["telemetry"] = "true"
             optimization {
                 enable = false
             }
@@ -183,9 +196,12 @@ dependencies {
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
 
-    // Invitations and friend requests (#119): push notifications through Firebase Cloud Messaging only.
+    // Invitations and friend requests (#119): push notifications through Firebase Cloud Messaging.
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
+    // Crash reports and usage events (Design 2.8, Telemetry), behind `telemetry/Telemetry`.
+    implementation(libs.firebase.crashlytics)
+    implementation(libs.firebase.analytics)
 
     // Other libraries from Design 1.2 are declared in gradle/libs.versions.toml.
     // Add them here when your module starts using them.

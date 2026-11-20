@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -84,6 +84,8 @@ class TestAppContainer(
     val screenLanguages: ScreenLanguages? = null,
     /** The tutorial's slides seen; all unless a test is about them, so a screen test has no slide over its screen. */
     tutorialSeen: Set<TutorialScreen>? = TutorialScreen.entries.toSet(),
+    /** Whether usage data is shared (FR-10.6), the default; null while the stored answer loads. */
+    shareUsage: Boolean? = true,
 ) {
     val guides: GuideRepository = InMemoryGuideRepository(frameAspect)
     val mirror: GuideRepository = InMemoryGuideRepository()
@@ -108,7 +110,7 @@ class TestAppContainer(
     val friends = FakeFriendsRepository()
     val invitations = FakeInvitationManager()
     val mobileData = MobileDataNotice.InMemory()
-    val appSettings = AppSettings.InMemory(tutorial = tutorialSeen)
+    val appSettings = AppSettings.InMemory(tutorial = tutorialSeen, usage = shareUsage)
     val language = AppLanguage.InMemory()
 
     /** The guide on both phones, with an image and a reference photo a screen can draw (a guide from the subject). */

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.settings
 
 import android.os.Bundle
@@ -44,7 +44,8 @@ class AboutFragment : Fragment(R.layout.fragment_about) {
             Library("Kotlin, kotlinx.coroutines, kotlinx.serialization", APACHE),
             Library("OkHttp, Retrofit", APACHE),
             Library("WebRTC", "BSD 3-Clause License"),
-            Library("Firebase Cloud Messaging", APACHE),
+            Library("Firebase Cloud Messaging, Crashlytics", APACHE),
+            Library("Google Analytics for Firebase", "Android Software Development Kit License"),
             Library("ML Kit Subject Segmentation", "ML Kit Terms of Service"),
             Library("Google Identity Services", "Google APIs Terms of Service"),
             Library("Pretendard", OFL),

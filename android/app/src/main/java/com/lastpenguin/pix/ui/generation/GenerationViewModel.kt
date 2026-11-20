@@ -1,7 +1,8 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
+import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -29,6 +30,8 @@ import com.lastpenguin.pix.session.PoseShare
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SubjectPick
+import com.lastpenguin.pix.telemetry.Telemetry
+import com.lastpenguin.pix.telemetry.TelemetryEvent
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
@@ -764,54 +767,87 @@ class GenerationViewModel(
             "pose.start",
             (if (request is PoseRequest.Suggested) "suggested" else "described") + " " + situation.apiName,
         )
-        // Why the run itself ended early, as the suggestions failing does; null when it ran to its end.
-        var stopped: GenerationError? = null
-        val inTime = withTimeoutOrNull(limitMs) {
-            try {
-                generator.generate(scene, request, Random.nextLong(), selfie, situation).collect { event ->
-                    receive(id, event)
+        val startedAt = SystemClock.elapsedRealtime()
+        // The state after the last event: Back clears the screen's state before this run hears it was cancelled.
+        var seen = _uiState.value
+        var reported = false
+        try {
+            // Why the run itself ended early, as the suggestions failing does; null when it ran to its end.
+            var stopped: GenerationError? = null
+            val inTime = withTimeoutOrNull(limitMs) {
+                try {
+                    generator.generate(scene, request, Random.nextLong(), selfie, situation).collect { event ->
+                        receive(id, event)
+                        seen = _uiState.value
+                    }
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    // The poses could not be had; whatever arrived before a later failure is still shown.
+                    Log.w(TAG, "Generation stopped: $error")
+                    stopped = (error as? GenerationFailedException)?.error ?: GenerationError.SERVER
                 }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                // The poses could not be had; whatever arrived before a later failure is still shown.
-                Log.w(TAG, "Generation stopped: $error")
-                stopped = (error as? GenerationFailedException)?.error ?: GenerationError.SERVER
             }
-        }
-        if (inTime == null) {
-            stopUnanswered(id)
-            // The limit came before any pose was known, as with suggestions that take too long.
-            if (_uiState.value.poses.isEmpty()) stopped = GenerationError.TIMEOUT
-        }
-        val state = _uiState.value
-        Timings.mark("pose.done", "${state.readyCount} of ${state.poses.size} ready")
-        val errors =
-            state.candidates.values.mapNotNull { (it as? CandidateEvent.Failed)?.error } + listOfNotNull(stopped)
-        val failure = failureOf(errors, request)
-        _uiState.update {
-            if (it.readyCount > 0) {
-                it.copy(phase = GenerationUiState.Phase.PICKING)
+            if (inTime == null) {
+                stopUnanswered(id)
+                // The limit came before any pose was known, as with suggestions that take too long.
+                if (_uiState.value.poses.isEmpty()) stopped = GenerationError.TIMEOUT
+            }
+            val state = _uiState.value
+            Timings.mark("pose.done", "${state.readyCount} of ${state.poses.size} ready")
+            val errors =
+                state.candidates.values.mapNotNull { (it as? CandidateEvent.Failed)?.error } + listOfNotNull(stopped)
+            val failure = failureOf(errors, request)
+            _uiState.update {
+                if (it.readyCount > 0) {
+                    it.copy(phase = GenerationUiState.Phase.PICKING)
+                } else {
+                    it.copy(
+                        phase = GenerationUiState.Phase.FAILED,
+                        failure = failure,
+                        // Generate poses says so once back there (US-5): the filter or the image service refused.
+                        descriptionRejected = request is PoseRequest.Described &&
+                            (failure == GenerationError.REJECTED || failure == GenerationError.DECLINED),
+                        noPerson = failure == GenerationError.NO_PERSON,
+                    )
+                }
+            }
+            val ended = _uiState.value
+            reported = true
+            Telemetry.event(
+                TelemetryEvent.PosesEnded(
+                    described = request is PoseRequest.Described,
+                    situation = situation,
+                    failure = failure.takeIf { ended.phase != GenerationUiState.Phase.PICKING },
+                    ready = ended.readyCount,
+                    total = ended.poses.size,
+                    ms = SystemClock.elapsedRealtime() - startedAt,
+                ),
+            )
+            if (ended.phase == GenerationUiState.Phase.PICKING) {
+                // In the pager's order, which the subject's Pick a pose follows.
+                share.picking(id, ended.poses.map { it.id }.filter { ended.candidates[it] is CandidateEvent.Ready })
             } else {
-                it.copy(
-                    phase = GenerationUiState.Phase.FAILED,
-                    failure = failure,
-                    // Generate poses says so once back there (US-5): the filter or the image service refused.
-                    descriptionRejected = request is PoseRequest.Described &&
-                        (failure == GenerationError.REJECTED || failure == GenerationError.DECLINED),
-                    noPerson = failure == GenerationError.NO_PERSON,
+                closeSet(failure)
+            }
+        } catch (error: CancellationException) {
+            // Left with Back, or the screen gone, while generating: the set ends here, with what had come.
+            if (!reported) {
+                Telemetry.event(
+                    TelemetryEvent.PosesEnded(
+                        described = request is PoseRequest.Described,
+                        situation = situation,
+                        failure = null,
+                        ready = seen.readyCount,
+                        total = seen.poses.size,
+                        ms = SystemClock.elapsedRealtime() - startedAt,
+                        cancelled = true,
+                    ),
                 )
             }
-        }
-        val ended = _uiState.value
-        if (ended.phase == GenerationUiState.Phase.PICKING) {
-            // In the pager's order, which the subject's Pick a pose follows.
-            share.picking(id, ended.poses.map { it.id }.filter { ended.candidates[it] is CandidateEvent.Ready })
-        } else {
-            closeSet(failure)
+            throw error
         }
     }
-
     private fun receive(id: String, event: GenerationEvent) {
         when (event) {
             is GenerationEvent.Planned -> {

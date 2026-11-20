@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.content.Intent
@@ -38,8 +38,10 @@ import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowToast
 
 /*
- * Settings on the real screen (FR-10.1–10.4, FR-3.10, FR-4.2), with the settings in memory behind the ViewModel.
- * Partitions: the defaults (white, normal, the indicator off, the phone's language, an agreement given, signed out);
+ * Settings on the real screen (FR-10.1–10.4, FR-10.6, FR-3.10, FR-4.2), with the settings in memory behind the ViewModel.
+ * Partitions: the defaults (white, normal, the indicator off, the phone's language, an agreement given, usage data
+ * shared, signed out); usage data turned off from its switch and on from its row, and its switch while the stored
+ * answer loads (disabled, saving nothing, also when its restored state changes it) and once it arrives off;
  * the base brightness at 0 EV, slid to +1 EV and saved, and shown as kept; each color and thickness chosen; the indicator turned on from its switch and off from its row; a language chosen and
  * the dialog cancelled; the agreement withdrawn, the row without one, and the row while the stored answer loads; the
  * account signed in and signed out (Sign in; Friends until #188);
@@ -86,6 +88,7 @@ class SettingsFragmentTest {
             assertFalse(binding.thicknessThick.isSelected)
             assertEquals(GuideLook(), binding.guidePreview.look)
             assertFalse(binding.latencySwitch.isChecked)
+            assertTrue(binding.usageSwitch.isChecked)
             assertEquals(string(R.string.settings_language_phone), binding.languageRow.settingValue.text.toString())
             assertEquals(string(R.string.settings_on), binding.notificationsRow.settingValue.text.toString())
             assertEquals(string(R.string.settings_consent_given), binding.consentRow.settingValue.text.toString())
@@ -186,6 +189,42 @@ class SettingsFragmentTest {
         onScreen { it.latencyRow.performClick() }
         assertFalse(modules.appSettings.showLatency.value)
         onScreen { assertFalse(it.latencySwitch.isChecked) }
+    }
+
+    @Test
+    fun usageData_isTurnedOffFromItsSwitch_andOnFromItsRow() {
+        val modules = launch()
+
+        onScreen { it.usageSwitch.performClick() }
+        assertEquals(false, modules.appSettings.shareUsage.value)
+        onScreen { assertFalse(it.usageSwitch.isChecked) }
+
+        onScreen { it.usageRow.performClick() }
+        assertEquals(true, modules.appSettings.shareUsage.value)
+        onScreen { assertTrue(it.usageSwitch.isChecked) }
+    }
+
+    @Test
+    fun usageData_whileTheStoredAnswerLoads_isDisabledAndSavesNothing_thenShowsTheAnswer() {
+        val modules = launch(TestAppContainer(shareUsage = null))
+
+        onScreen { binding ->
+            assertFalse(binding.usageSwitch.isEnabled)
+            assertFalse(binding.usageSwitch.isChecked)
+            binding.usageRow.performClick()
+            // As Android restores the switch's own state after Pix was stopped, before the stored answer is read.
+            binding.usageSwitch.isChecked = true
+        }
+        assertNull(modules.appSettings.shareUsage.value)
+
+        // The stored answer arrives: off, as a user who turned it off left it.
+        runBlocking { modules.appSettings.setShareUsage(false) }
+        idle()
+        onScreen { binding ->
+            assertTrue(binding.usageSwitch.isEnabled)
+            assertFalse(binding.usageSwitch.isChecked)
+        }
+        assertEquals(false, modules.appSettings.shareUsage.value)
     }
 
     @Test

@@ -8,7 +8,7 @@
 - **Usability improvements** ([#222], [#223], [#225], [#232], [#250]): the problems of the user test and the heuristic evaluation (Testing Documentation 4.1, 4.2). The agent rendered the real screens at the Galaxy S22's size before changing them, and the team chose among drafts from those screenshots.
 - **Testing** ([#229], [#253], [#255]): 397 app and 90 server tests were added (2,108 and 881 in all). The agent checked its coverage split against Iteration 3's numbers and made a flaky server test fail every time before fixing it. Claude Code subagents read the 50 tips outside our sample of the tips check (49 of 50 right); the threshold counts only our own answers.
 - **Code review:** Codex left 43 inline findings and 19 reviews with findings on 21 code PRs, and 21 reviews with no major issue. The author had Claude Code check each finding, then fix it or reply.
-- **Documents** ([#218], [#220], [#226], [#233], [#251]): the Iteration 4 plan and issues from the kickoff notes, the UAT results, and the standup logs.
+- **Documents** ([#218], [#220], [#226], [#233], [#251], [#257], [#258]): the Iteration 4 plan and issues from the kickoff notes, the UAT results, the standup logs, and the documents as built.
 - **CLAUDE.md:** the root file did not change. Each feature PR added its rules to `android/CLAUDE.md` (16 PRs) or `server/CLAUDE.md` (5 PRs) ([[history|Iteration-4-–-CLAUDE-md-History]]).
 - **Not used:** product decisions, the phone runs of the integration scripts and the UAT, our answers in the tips check, and final review verdicts.
 
@@ -92,3 +92,5 @@ Fixes were made by prompting Claude Code again. These are decisions the team mad
 [#253]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/253
 [#255]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/255
 [#256]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/256
+[#257]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/257
+[#258]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/258

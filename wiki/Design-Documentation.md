@@ -111,6 +111,7 @@
 | 3.31 | 2026-11-20 | Crash reports and usage events through Firebase, behind `Telemetry`, while *Share usage data* allows it (1.1.1, 1.1.2, 1.2, AD-19, 2.1, 2.6.8, 2.8, 2.9; FR-10.6; Iter4-A8, [#254]). |
 | 3.32 | 2026-11-20 | The design as built through Iteration 4: the QR connection ([#214]) and light mode ([#212]) dropped on 11/20 as not needed, so *Still open* is empty; the Iteration 4 tasks' status, with the UAT's fixes and the scene photo step added, and what is left for Iteration 5 (2.1, 2.8, 2.9, 3). |
 | 3.33 | 2026-11-20 | The live view's sharpness after a reconnection, left for Iteration 5 ([#238]) (2.9). |
+| 3.34 | 2026-11-20 | The Iteration 4 tasks as their issues stand: the owners of Iter4-P7 and Iter4-P11, the name and date of Iter4-P16, and when the prompt templates were dropped (2.9). |
 
 </details>
 
@@ -3363,16 +3364,16 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 | The subject's live view mirrored (Iter4-P4, [#201]) | 한준형 | 11/12 | Done | 2.6.4 |
 | Color tokens and a DayNight theme (Iter4-P5, [#202]) | 박동제 | 11/12 | Done | 2.8 |
 | A message for each way pose generation fails (Iter4-P6, [#203]) | 박동제 | 11/13 | Done | 2.5.3, 2.6.3 |
-| UI fixes: no notice after saving, the primary buttons at the top right, and the leftovers of the user test and the heuristic evaluation (Iter4-P7, [#204]) | 박동제 | 11/13 | Done | 2.6.2 |
+| UI fixes: no notice after saving, the primary buttons at the top right, and the leftovers of the user test and the heuristic evaluation (Iter4-P7, [#204]) | 한준형 | 11/13 | Done | 2.6.2 |
 | The UAT (Iter4-P8, [#205]) | 조성민 | 11/18 | Done | Testing Documentation 4.3, 4.4 |
 | Landscape photos saved as taken, and landscape poses (Iter4-P9, [#206]) | 한준형 | 11/19 | Done | 2.6.1–2.6.4, 2.8 |
 | The controls turn with the phone (Iter4-P10, [#207]) | 한준형 | 11/19 | Done | 2.1, 2.6.2 |
-| Camera quality and latency, low priority (from #183) (Iter4-P11, [#208]) | 한준형 | 11/19 | Done | 2.8 |
+| Camera quality and latency, low priority (from #183) (Iter4-P11, [#208]) | 박동제 | 11/19 | Done | 2.8 |
 | Situation prompts, compared with the current prompt (Iter4-P12, [#209]) | 박재완 | 11/19 | Done | 2.5.3, 2.6.3 |
 | The situation choice before the scene photo (Iter4-P13, [#210]) | 박재완 | 11/19 | Done | 2.4, 2.5.1, 2.6.2, 2.6.3, 2.6.5 |
 | Prompt templates and the default prompt (from #125) (Iter4-P14, [#211]) | 박재완 | 11/19 | Dropped | — |
 | Light mode (Iter4-P15, [#212]) | 박동제 | 11/19 | Dropped | — |
-| Better pose tips, with the background (Iter4-P16, [#213]) | 박동제 | 11/17 | Done | 2.5.1, 2.5.3, 2.6.3 |
+| Better pose tips (Iter4-P16, [#213]) | 박동제 | 11/19 | Done | 2.5.1, 2.5.3, 2.6.3 |
 | The scene photo step on a small phone: the camera's bar, a panel that goes away, and the ratio (Iter4-P21, [#231]) | 박동제 | 11/19 | Done | 2.6.3 |
 | The reference thumbnail for a guide from the subject (Iter4-A1, [#234]) | 박재완 | 11/20 | Done | 2.5.1, 2.6.2, 2.6.5 |
 | The session's photos in Pix on the subject's phone (Iter4-A2, [#235]) | 박재완 | 11/20 | Done | 2.6.5 |
@@ -3387,7 +3388,7 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 | Integrate the Iteration 4 features (Iter4-P19, [#216]) | 조성민 | 11/19 | Done | — |
 | The Iteration 4 documents, demo README, and `iteration-4-demo` (Iter4-P20, [#217]) | All | 11/20 | Done | — |
 
-Left out of Iteration 4 at its kickoff, for the UAT and its fixes: the remote-control switch and remote focus (FR-7.5, FR-7.7), and search, situations, and memos in the library (FR-3.11), both for Iteration 5. Dropped on 11/20 as not needed: the QR connection ([#214]) and light mode ([#212]). Also left for Iteration 5: the changes for UAT cycle 2 and the live view's sharpness after a reconnection ([#238]; Testing Documentation 4.4), and the open problems of the user test and the heuristic evaluation (Testing Documentation 4.1, 4.2). Marking the face, the limbs, or the background on the guide (Testing Documentation 4.1) is on hold: ML Kit's pose detection or segmentation may err too much, and a background overlay did not work well; the tips take its place ([#213]).
+Left out of Iteration 4 at its kickoff, for the UAT and its fixes: the remote-control switch and remote focus (FR-7.5, FR-7.7), and search, situations, and memos in the library (FR-3.11), both for Iteration 5. Dropped on 11/14 after a trial: the prompt templates ([#211]). Dropped on 11/20 as not needed: the QR connection ([#214]) and light mode ([#212]). Also left for Iteration 5: the changes for UAT cycle 2 and the live view's sharpness after a reconnection ([#238]; Testing Documentation 4.4), and the open problems of the user test and the heuristic evaluation (Testing Documentation 4.1, 4.2). Marking the face, the limbs, or the background on the guide (Testing Documentation 4.1) is on hold: ML Kit's pose detection or segmentation may err too much, and a background overlay did not work well; the tips take its place ([#213]).
 
 **Iteration 2 build order** (the schedule of 2026-10-11; the issues' due dates). All was delivered by 10/23, except as noted:
 

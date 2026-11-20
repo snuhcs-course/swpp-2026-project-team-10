@@ -117,6 +117,7 @@
 | 3.34 | 2026-11-20 | Crash reports and usage data (Iter4-A8, [#254]): its owner, `TelemetryEventTest`, `GatedTelemetryTest`, the events in their modules' tests, `TelemetryRecorder` and `FakeTelemetryBackend`, `FirebaseTelemetry` by hand, and IT-39 (1.1, 2.1.3, 2.1.5, 2.1.6, 2.1.8, Appendix A). |
 | 3.35 | 2026-11-20 | Light mode ([#212]) and the QR connection ([#214]) dropped on 11/20 as not needed; what Iteration 4 built, and why the rest stays open, for the problems of the user test and the heuristic evaluation; IT-39's run on emulators (1.1, 2.1.8, 2.2.2, 4.1, 4.2, Appendix B). |
 | 3.36 | 2026-11-20 | What Iteration 4 built for each UAT problem, and the live view after a reconnection left open; T2's final sheet: every step accepted and scored, the outline comment, and the overall comment (4.4, 6). |
+| 3.37 | 2026-11-20 | The owners of Iter4-P7 and Iter4-P11 as their issues stand, and what the tips say in place of marking the guide (1.1, 4.1). |
 
 </details>
 
@@ -188,12 +189,12 @@ One member writes and maintains each component's tests, following the module own
 | The guide and the pose flow (Iter3-A13) | Views, ViewModels, Managers | `guide/`, `ui/`, `session/` | 조성민 |
 | Transitions between screens (Iter3-A14) | Views | `ui/` | 조성민 |
 | Who takes the photo (Iter3-A17) | Views; the invitations client and endpoint | `ui/`, `account/`, `test_invitations.py` | 조성민 |
-| Back on the pose screens, the mirrored view (Iter4-P2, P4) | ViewModels, Views, Managers | `ui/`, `generation/`, `session/` | 한준형 |
+| Back on the pose screens, the mirrored view, and the UI fixes (Iter4-P2, P4, P7) | ViewModels, Views, Managers | `ui/`, `generation/`, `session/` | 한준형 |
 | The refused description out of the history, and the failure messages (Iter4-P3, P6) | ViewModels, Views, Managers, the session protocol; server module | `ui/generation/`, `generation/`, `session/`, `test_poses.py` | 박동제 |
 | Landscape photos and the controls that turn (Iter4-P9, P10) | Platform, Managers, Views; server module | `camera/`, `ui/camera/`, `guide/`, `ui/generation/`, `ui/guide/`, `ui/session/`, `test_poses.py` | 한준형 |
-| Camera quality and latency (Iter4-P11) | Platform | `camera/` | 한준형 |
+| Camera quality and latency (Iter4-P11) | Platform | `camera/` | 박동제 |
 | Situation prompts and the choice (Iter4-P12, P13) | Server module, ViewModels, Views | `test_prompts.py`, `test_poses.py`, `generation/`, `ui/`, `session/` | 박재완 |
-| Color tokens, the UI fixes, and the tips (Iter4-P5, P7, P16); light mode (Iter4-P15) was dropped on 11/20 ([#212]) | Views, managers, resources; server module | `ui/`, `settings/`, `session/` (`TipSyncerTest`), `test_prompts.py`, `test_pose_tips.py` | 박동제 |
+| Color tokens and the tips (Iter4-P5, P16); light mode (Iter4-P15) was dropped on 11/20 ([#212]) | Views, managers, resources; server module | `ui/`, `settings/`, `session/` (`TipSyncerTest`), `test_prompts.py`, `test_pose_tips.py` | 박동제 |
 | The reference thumbnail hidden at the side (Iter4-A4) | ViewModels, Views | `ui/camera/`, `ui/session/` | 박동제 |
 | The QR connection (Iter4-P17): dropped on 11/20, so no tests ([#214]) | — | — | 조성민 |
 | The session's photos on both phones (Iter4-A2) | Managers, ViewModels, Views | `session/`, `camera/`, `ui/session/`, `ui/camera/` | 박재완 |
@@ -876,7 +877,7 @@ A test with users outside the team, run to find problems early. It is separate f
 | The prompts used before, on *Generate poses* | 5 (P2–P6) | Built: prompt history ([#164], merged 11/3) |
 | Photos saved on both phones | 3 (P1, P4, P5) | Built: session photos on both phones ([#159], merged 11/2) |
 | ‘참고 사진 올리기’ unclear; poses for an occasion (졸업식, 증명사진); similar poses whatever the background; choosing the gender | 3; 1; 1; 1 | Iteration 4: poses by situation ([#209], [#210]); the wording checked again ([#204]). *Decided in Iteration 4:* the wording is already gone; *Add a pose guide* says *Add photo* (c8e2352, [#204]). *Built in Iteration 4:* poses by situation, chosen first on *Add a pose guide* ([#209], [#210], [#243]). *Open after Iteration 4:* similar poses whatever the background, and choosing the gender, left out at the kickoff of 11/7, for the UAT and its fixes; Iteration 5 **TBD** |
-| An outline alone hides the pose under long hair or a thick coat; the face and arms not marked; the silhouette not fitting the person | 3 (P1, P3, P4) | On hold (the kickoff of 11/7): ML Kit's detection may err too much, and a background overlay did not work well. The tips say how the pose fits the background instead ([#213]) |
+| An outline alone hides the pose under long hair or a thick coat; the face and arms not marked; the silhouette not fitting the person | 3 (P1, P3, P4) | On hold (the kickoff of 11/7): ML Kit's detection may err too much, and a background overlay did not work well. The tips say how far to stand and how to hold the phone instead ([#213]) |
 | The photo going to an outside AI service; the photo changed by AI | 4; 1 | No fix decided. *Open after Iteration 4:* the image model cannot run on the phone (R&S 7), and Pix asks for consent before the first photo goes to it (IT-21) |
 | The wait for poses | 2, and 1 asking for faster generation | No fix decided. *Open after Iteration 4:* the wait is the image model's, and NFR-4 is met, with all four candidates in a median of 20.2 s (3.2) |
 | The default suggested poses; no step that sets the scene photo apart from the camera after *AI로 포즈 생성* | 1; 1 | No fix decided for the default poses; Iteration 4: the scene photo step marked on Camera ([#204]). *Built in Iteration 4:* the step's title and Back in the top bar ([#199]), and "Frame the place with the person in it" over the image while framing ([#204]); four default poses for each situation ([#209]) |

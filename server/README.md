@@ -341,10 +341,10 @@ Set it up once on each AWS server, after a deploy of a commit that has these fil
    sudo /opt/pix/repo/server/deploy/deploy.sh restart
    ```
 
-   `restart` recreates nginx with port 443.
+   `restart` recreates nginx with port 443. To try the certbot line first against Let's Encrypt's test service, add `--dry-run`.
 3. Check it from your computer: `curl https://<hostname>/health` answers `{"status":"ok"}`. On the server, `sudo certbot renew --dry-run` checks the renewal.
 
-If Let's Encrypt refuses with a rate limit, try again later.
+sslip.io is not on the Public Suffix List, so all sslip.io names share Let's Encrypt's limit of 50 new certificates in 7 days. If certbot is refused for that limit, try again later. A renewal of the same name is exempt.
 
 ### Settings
 

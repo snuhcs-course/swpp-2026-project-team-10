@@ -102,8 +102,8 @@ Known limitations of the Iteration 4 build ([Testing Documentation 3.2](https://
 
 ![Architecture](wiki/images/design_target_architecture.png)
 
-- **Pix server** (FastAPI behind nginx on port 80): connects the two phones (signaling) and keeps accounts, friends, and invitations. It sends push notifications through Firebase Cloud Messaging (FCM). It checks each description and scene photo with a decision model. Then it sends the pose requests to the image and vision models through OpenRouter. The API key stays on the server. The server never sees the video.
-- **Servers**: Server A on the course servers runs `main` for release builds. Server B runs `dev` for staging. The AWS server runs `dev` for debug builds and answers from any network. Each server deploys a new commit blue-green. The course servers pull it with a timer, and GitHub Actions deploys the AWS server.
+- **Pix server** (FastAPI behind nginx, over HTTPS on the AWS servers): connects the two phones (signaling) and keeps accounts, friends, and invitations. It sends push notifications through Firebase Cloud Messaging (FCM). It checks each description and scene photo with a decision model. Then it sends the pose requests to the image and vision models through OpenRouter. The API key stays on the server. The server never sees the video.
+- **Servers**: Server A on the course servers runs `main`, and Server B runs `dev` for staging. Two AWS servers answer from any network over HTTPS: AWS main runs `main` for release builds, and AWS dev runs `dev` for debug builds. Each server deploys a new commit blue-green. The course servers pull it with a timer, and GitHub Actions deploys the AWS servers.
 - **Phone to phone** (WebRTC): the live video and the photos go directly between the two phones. So do the guide, the shared steps, the candidates, and the subject's controls. Without a direct path, Cloudflare's TURN relay forwards the encrypted packets. Each phone draws the guide itself, so the guide never appears in the video or in saved photos.
 - **On the phone**: CameraX runs the camera, and ML Kit makes the outline and the person check. The guide library, the settings, and the sign-in tokens stay on the phone.
 
@@ -115,7 +115,7 @@ The full design is in the [Design Documentation](https://github.com/snuhcs-cours
 |---|---|
 | Android app | Kotlin 2.2, XML Views with ViewBinding, Navigation, ViewModel, and coroutines · CameraX 1.6 · ML Kit Subject Segmentation, Pose Detection, and Face Detection · WebRTC (`io.github.webrtc-sdk:android` 137) · OkHttp 4.12 and Retrofit 2.11 with kotlinx.serialization · Jetpack DataStore · Credential Manager with Google ID · Firebase Cloud Messaging, Crashlytics, and Analytics |
 | Server | Python 3.11 · FastAPI and Uvicorn (WebSocket signaling and REST API) · SQLAlchemy 2 with asyncpg and Alembic on PostgreSQL 18 · Redis (session store) · PyJWT and argon2 · google-auth (Google sign-in and FCM) · pydantic-settings · httpx2 · Pillow · Docker and nginx with blue-green deploys |
-| Services | Cloudflare Realtime (TURN relay) · Firebase Cloud Messaging, Crashlytics, and Analytics · OpenRouter · AWS EC2 (the AWS server) |
+| Services | Cloudflare Realtime (TURN relay) · Firebase Cloud Messaging, Crashlytics, and Analytics · OpenRouter · AWS EC2 (the AWS servers) · Let's Encrypt (their certificates) |
 | AI | Through OpenRouter: GPT Image 2.5 Flare at low quality for the candidates · Gemini 3.1 Flash Lite for the suggestions and the tips · Jev 1.14 (`typesafe/jev-1.14`) for the description filter and the person check. The AI module test uses Claude Opus 5.5 as its judge. |
 | Tests and CI | JUnit 4, Robolectric 4.17, and FragmentScenario with JaCoCo · pytest with pytest-cov, fakeredis, and SQLite · Spotless with ktlint · Ruff · GitHub Actions (lint, tests, the server image, the AWS deploy, the wiki) |
 
@@ -126,7 +126,7 @@ The full design is in the [Design Documentation](https://github.com/snuhcs-cours
 | Android app | Android Studio with its bundled JDK (the unit tests need JDK 21 or later), Kotlin 2.2, and Gradle 9.5 through the wrapper. minSdk 29 (Android 10), target and compile SDK 36. |
 | Server | Only for a local server: Python 3.11 or later and [uv](https://docs.astral.sh/uv/getting-started/installation/). Pose generation needs an [OpenRouter](https://openrouter.ai/) API key with credits. Redis and PostgreSQL are optional locally. Without them, the server keeps rooms in the process and accounts in a SQLite file. |
 | Tested on | Galaxy S21, S22, S23 Ultra, S25 Ultra, and Note20 |
-| Network | Wi-Fi or cellular data on each phone. The AWS server answers from any network. The course servers answer only on the campus network. |
+| Network | Wi-Fi or cellular data on each phone. The AWS servers answer from any network. The course servers answer only on the campus network. |
 
 ## Run the demo
 
@@ -140,7 +140,7 @@ git checkout iteration-4-demo
 
 ### 2. Choose a server
 
-**The AWS server (no setup).** A release build always uses the AWS server, `http://3.105.185.251/`, and a debug build uses it by default. It runs `dev` and answers from any network, cellular data included. To check it, open `http://3.105.185.251/health` in a phone's browser. It answers `{"status":"ok"}`.
+**The AWS dev server (no setup).** A debug build uses the AWS dev server, `https://swpp26t10.3-105-185-251.sslip.io/`, by default. It runs `dev` and answers from any network, cellular data included. To check it, open `https://swpp26t10.3-105-185-251.sslip.io/health` in a phone's browser. It answers `{"status":"ok"}`. A release build always uses the AWS main server, `https://swpp26t10.15-134-147-114.sslip.io/`, which runs `main`.
 
 **Server A (campus network only).** Server A, `http://swpp26t10.147-46-242-169.sslip.io/`, runs `main`. To use it in a debug build, create `android/local.properties` with this line:
 

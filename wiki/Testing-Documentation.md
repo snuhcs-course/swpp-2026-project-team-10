@@ -118,6 +118,7 @@
 | 3.35 | 2026-11-20 | Light mode ([#212]) and the QR connection ([#214]) dropped on 11/20 as not needed; what Iteration 4 built, and why the rest stays open, for the problems of the user test and the heuristic evaluation; IT-39's run on emulators (1.1, 2.1.8, 2.2.2, 4.1, 4.2, Appendix B). |
 | 3.36 | 2026-11-20 | What Iteration 4 built for each UAT problem, and the live view after a reconnection left open; T2's final sheet: every step accepted and scored, the outline comment, and the overall comment (4.4, 6). |
 | 3.37 | 2026-11-20 | The owners of Iter4-P7 and Iter4-P11 as their issues stand, and what the tips say in place of marking the guide (1.1, 4.1). |
+| 3.38 | 2026-11-21 | `server-image` also checks HTTPS as on the AWS servers (1.2). |
 
 </details>
 
@@ -235,7 +236,7 @@ The CI jobs:
 - `android-test`: `./gradlew :app:testDebugUnitTest`, all JVM and Robolectric tests.
 - `server-lint`: Ruff lint and format.
 - `server-test`: `uv run pytest` on fakeredis and a SQLite file, then on real Redis and PostgreSQL.
-- `server-image` also runs: it builds the server's Docker image (the build runs the server tests), starts it with nginx, Redis, and PostgreSQL, and checks the routes, a sign-up, an access log without the Pix ID, and eight rooms through nginx.
+- `server-image` also runs: it builds the server's Docker image (the build runs the server tests), starts it with nginx, Redis, and PostgreSQL, and checks the routes, a sign-up, an access log without the Pix ID, and eight rooms through nginx. *Added in Iteration 5:* HTTPS on port 443 with a certificate made for the run, as on the AWS servers (`/health`, `/version`, a WSS upgrade, `/docs` still 404), and Let's Encrypt's check over port 80.
 
 Passing CI is necessary, not sufficient. The reviewer also checks the tests (1.3) and, when UI or camera code changed, the PR's *How to verify* steps on a phone.
 

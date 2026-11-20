@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
-# Deploys the Pix server on a course server (Design 2.8, Deployment; server/README.md, Deploy). Run as root.
+# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
+# Deploys the Pix server on a course server or an AWS server (Design 2.8, Deployment; server/README.md, Deploy). Run as root.
 #
 #   deploy.sh auto           deploy the configured branch if it has a new commit; the systemd timer runs this
 #   deploy.sh deploy [ref]   deploy a branch or a commit now; the default is the configured branch
@@ -28,6 +28,10 @@ JWT_SECRET_FILE=$PIX_HOME/jwt-secret
 # The account database's files (Design 2.7). Never delete it: it holds every account.
 POSTGRES_DIR=$PIX_HOME/postgres
 STATE_DIR=$PIX_HOME/state
+# Where certbot writes Let's Encrypt's check, which nginx serves on port 80 (README, HTTPS).
+ACME_DIR=$PIX_HOME/acme
+# An AWS server's certificate. Once it exists, nginx also serves HTTPS on port 443 (docker-compose.https.yml).
+CERTIFICATE=/etc/letsencrypt/live/pix/fullchain.pem
 STATE_FILE=$STATE_DIR/deploy.state
 BUILD_LOG=$STATE_DIR/last-build.log
 # Names only, never values: what check_env found wrong with .env, for `status` and the login notice in pix.sh.
@@ -124,11 +128,18 @@ secret() {
     cat "$1"
 }
 
+# HTTPS where the certificate exists, if the checked-out commit has the file for it (a rollback may not).
+https_on() {
+    [ -f "$CERTIFICATE" ] && [ -f "$REPO/server/deploy/docker-compose.https.yml" ]
+}
+
 compose() {
+    local files=(-f "$REPO/server/deploy/docker-compose.yml")
+    if https_on; then files+=(-f "$REPO/server/deploy/docker-compose.https.yml"); fi
     PIX_BLUE_TAG=$(short "${BLUE_COMMIT:-none}") PIX_GREEN_TAG=$(short "${GREEN_COMMIT:-none}") \
         PIX_ENV_FILE=$ENV_FILE PIX_STATE_DIR=$STATE_DIR PIX_POSTGRES_DIR=$POSTGRES_DIR PIX_HTTP_PORT=$HTTP_PORT \
-        PIX_DB_PASSWORD=$(secret "$DB_PASSWORD_FILE") PIX_JWT_SECRET=$(secret "$JWT_SECRET_FILE") \
-        docker compose -p "$PROJECT" -f "$REPO/server/deploy/docker-compose.yml" "$@"
+        PIX_ACME_DIR=$ACME_DIR PIX_DB_PASSWORD=$(secret "$DB_PASSWORD_FILE") PIX_JWT_SECRET=$(secret "$JWT_SECRET_FILE") \
+        docker compose -p "$PROJECT" "${files[@]}" "$@"
 }
 
 # Runs a command with its output in the build log, and shows the end of the log only if the command fails.
@@ -390,6 +401,7 @@ command_status() {
     echo "serving:       app-$ACTIVE, built from $(short "$(commit_of "$ACTIVE")")"
     echo "standby:       app-$idle, built from $(short "$(commit_of "$idle")")"
     echo "through nginx: app-$(served_copy)"
+    if https_on; then echo "https:         on, port 443"; else echo "https:         off"; fi
     echo "open rooms:    ${rooms:-unknown}"
     if [ -n "$FAILED_TREE" ]; then echo "not retried:   server/ tree $(short "$FAILED_TREE") failed or was rolled back"; fi
     check_env > /dev/null
@@ -421,7 +433,7 @@ main() {
     case "$MAX_WAIT_SECONDS" in
         "" | *[!0-9]*) die "MAX_WAIT_SECONDS must be a whole number of seconds, not '$MAX_WAIT_SECONDS'" ;;
     esac
-    mkdir -p "$STATE_DIR" "$POSTGRES_DIR"
+    mkdir -p "$STATE_DIR" "$POSTGRES_DIR" "$ACME_DIR"
     load_state
 
     if [ "$command" != status ]; then

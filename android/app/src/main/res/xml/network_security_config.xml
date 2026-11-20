@@ -1,10 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    No server has TLS (Design AD-11), so plain http:// and ws:// are allowed to the one host a release build uses,
-    the AWS server, and to nothing else. Debug builds replace this file with src/debug/res/xml/.
+    Release builds use the AWS main server over HTTPS (Design 2.8, Configuration and secrets), so they allow no plain
+    http:// or ws:// to any host. Debug builds replace this file with src/debug/res/xml/.
 -->
 <network-security-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">3.105.185.251</domain>
-    </domain-config>
+    <base-config cleartextTrafficPermitted="false" />
 </network-security-config>

@@ -523,6 +523,23 @@ class RtcSessionManagerTest {
     }
 
     @Test
+    fun `a zoom step sent before the subject's cancel is stale when it arrives after it`() = runTest {
+        val (manager, peer) = connectedPhotographer()
+        val step = otherPhone.encode(SessionMessage.ZoomSet(2f))
+        val cancel = otherPhone.encode(SessionMessage.ZoomSet(1f, final = true, cancel = true))
+
+        peer.deliver(cancel, Channel.RELIABLE)
+        peer.deliver(step, Channel.REALTIME)
+        runCurrent()
+
+        assertEquals(
+            listOf(SessionMessage.ZoomSet(1f, final = true, cancel = true)),
+            incoming.filterIsInstance<SessionMessage.ZoomSet>(),
+        )
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
     fun `pings are answered with pongs`() = runTest {
         val (manager, peer) = connectedPhotographer()
 

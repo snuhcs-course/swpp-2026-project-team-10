@@ -22,8 +22,9 @@ import org.junit.Test
  *   final one answered with the camera's zoom as the photographer's.
  * - The subject's pinch with a step held back, then the zoom freed: its later steps and final value still dropped
  *   (an older subject that keeps sending), the final one answered; the next pinch applied.
- * - `camera.zoom.cancel` after a held-back step: nothing changes, and the next pinch applied; while the subject holds
- *   the zoom: free, and the lens settles.
+ * - The subject's cancel (a `camera.zoom.set` with `cancel`) while the zoom is free: its ratio never applied; after a
+ *   held-back step: nothing changes, and the next pinch applied; while the subject holds the zoom: free, and the lens
+ *   settles where it is.
  * - The subject's final value after its steps: applied, and the zoom free again.
  * - No request for 1 ms less than the timeout: still the subject's; at the timeout: free, and the lens settles. A later
  *   step starts the timeout again.
@@ -40,6 +41,9 @@ class RemoteZoomHoldTest {
     private val actions = mutableListOf<RemoteAction>()
 
     private fun holds(): List<Role?> = session.sent.filterIsInstance<SessionMessage.ZoomHoldUpdate>().map { it.by }
+
+    /** The subject's cancel of a held-back pinch, with the photographer's zoom as it last saw it. */
+    private fun cancel(ratio: Float) = SessionMessage.ZoomSet(ratio, final = true, cancel = true)
 
     private fun lastFinalEcho(): SessionMessage.CameraStateUpdate =
         session.sent.filterIsInstance<SessionMessage.CameraStateUpdate>().last { it.final }
@@ -106,13 +110,26 @@ class RemoteZoomHoldTest {
     }
 
     @Test
+    fun subjectCancel_zoomFree_neverAppliesItsRatio() = runTest {
+        started()
+
+        handler.handle(cancel(2f))
+        runCurrent()
+
+        assertEquals(emptyList<Float>(), camera.requests)
+        assertEquals(emptyList<Role?>(), holds())
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
     fun subjectCancel_afterAHeldBackStep_changesNothingAndEndsThePinch() = runTest {
         started()
         hold.take(Role.PHOTOGRAPHER)
         handler.handle(SessionMessage.ZoomSet(2f))
         hold.release(Role.PHOTOGRAPHER)
 
-        handler.handle(SessionMessage.ZoomCancel)
+        handler.handle(cancel(1f))
         runCurrent()
         assertEquals(emptyList<Float>(), camera.requests)
 
@@ -128,10 +145,11 @@ class RemoteZoomHoldTest {
         handler.handle(SessionMessage.ZoomSet(2f))
         runCurrent()
 
-        handler.handle(SessionMessage.ZoomCancel)
+        handler.handle(cancel(3f))
         runCurrent()
 
         assertNull(hold.holder.value)
+        assertEquals(listOf(2f, 2f), camera.requests)
         assertEquals(listOf(false, true), camera.requestFinals)
         assertEquals(listOf(Role.SUBJECT, null), holds())
         handler.stop()

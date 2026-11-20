@@ -56,7 +56,7 @@ class MessageCodecTest {
             SessionMessage.ZoomSet(2f),
             SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER),
             SessionMessage.ZoomHoldUpdate(),
-            SessionMessage.ZoomCancel,
+            SessionMessage.ZoomSet(1.4f, final = true, cancel = true),
             SessionMessage.CameraStateUpdate(2f, Role.SUBJECT, true),
             SessionMessage.PoseStep("set1", PoseSetStep.GENERATING),
             SessionMessage.PoseStep("set1", PoseSetStep.PICKING, poseIds = listOf("pose-1", "pose-4")),

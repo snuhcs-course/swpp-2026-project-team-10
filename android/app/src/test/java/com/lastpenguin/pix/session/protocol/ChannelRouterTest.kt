@@ -51,9 +51,10 @@ class ChannelRouterTest {
         // Who holds the zoom, each change in order (#236).
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER)))
         assertFalse(router.latestOnly(SessionMessage.ZoomHoldUpdate()))
-        // The end of a held-back pinch, after its steps and never dropped (#236).
-        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ZoomCancel))
-        assertFalse(router.latestOnly(SessionMessage.ZoomCancel))
+        // The cancel of a held-back pinch goes like its final value, and makes its earlier steps stale (#236).
+        val cancel = SessionMessage.ZoomSet(1.4f, final = true, cancel = true)
+        assertEquals(Channel.RELIABLE, router.channelFor(cancel))
+        assertTrue(router.latestOnly(cancel))
     }
 
     @Test

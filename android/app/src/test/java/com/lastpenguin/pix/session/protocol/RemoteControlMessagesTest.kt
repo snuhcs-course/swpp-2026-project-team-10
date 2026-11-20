@@ -15,7 +15,7 @@ import org.junit.Test
  * Partitions for the subject's requests of Design 2.5.1 (#57): the Design's JSON example of each message decodes;
  * a round trip keeps every field; `final` left out means a step; `guide.state` from a phone without `by` means the
  * photographer, and the echo of a `guide.move` carries `by: SUBJECT`; `camera.zoom.hold` naming a holder, null, or no
- * holder at all, the last two meaning a free zoom, and `camera.zoom.cancel` with an empty body (#236).
+ * holder at all, the last two meaning a free zoom, and a `camera.zoom.set` with `cancel`, which is false when left out (#236).
  */
 class RemoteControlMessagesTest {
     private val codec = MessageCodec(clock = { 1_759_212_345_678L })
@@ -52,9 +52,12 @@ class RemoteControlMessagesTest {
 
     @Test
     fun zoomCancel_designExample_decodes() {
-        val text = """{ "v": 3, "t": "camera.zoom.cancel", "seq": 32, "ts": 1759212352340, "b": {} }"""
+        val text = """{ "v": 3, "t": "camera.zoom.set", "seq": 32, "ts": 1759212352340,
+            "b": { "ratio": 1.4, "final": true, "cancel": true } }"""
+        val older = """{ "v": 3, "t": "camera.zoom.set", "seq": 33, "ts": 1759212352400, "b": { "ratio": 2.0 } }"""
 
-        assertEquals(SessionMessage.ZoomCancel, decode(text))
+        assertEquals(SessionMessage.ZoomSet(1.4f, final = true, cancel = true), decode(text))
+        assertEquals(SessionMessage.ZoomSet(2f), decode(older))
     }
 
     @Test

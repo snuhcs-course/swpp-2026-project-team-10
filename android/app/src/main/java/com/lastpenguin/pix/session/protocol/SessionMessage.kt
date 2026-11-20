@@ -392,6 +392,12 @@ sealed interface SessionMessage {
         val ratio: Float,
         /** True for the last value of a pinch (or a single tap). Only it travels reliably and gets a notice. */
         val final: Boolean = false,
+        /**
+         * True, with [final], for a pinch that stopped without a value of its own, held back by the photographer's
+         * (FR-7.6, #236): [ratio] is the photographer's zoom as last echoed and is not applied. As a `camera.zoom.set`,
+         * it makes a step sent before it stale. Only a photographer that sends `camera.zoom.hold` gets one.
+         */
+        val cancel: Boolean = false,
     ) : SessionMessage
 
     /**
@@ -402,15 +408,6 @@ sealed interface SessionMessage {
     @Serializable
     @SerialName("camera.zoom.hold")
     data class ZoomHoldUpdate(val by: Role? = null) : SessionMessage
-
-    /**
-     * Subject → photographer: the subject's pinch stopped without a value, held back by the photographer's (FR-7.6,
-     * #236). It never changes the zoom: the photographer stops dropping that pinch's requests. Only a photographer that
-     * sends `camera.zoom.hold` gets it.
-     */
-    @Serializable
-    @SerialName("camera.zoom.cancel")
-    data object ZoomCancel : SessionMessage
 
     /** A step of the subject's brightness slider, an exposure-compensation index, or its final value (FR-7.3). */
     @Serializable

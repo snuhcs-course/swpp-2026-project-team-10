@@ -48,8 +48,9 @@ sealed interface RemoteAction {
  * **One phone zooms at a time (FR-7.6, #236).** The subject's pinch takes [zoomHold] at its first step and frees it
  * at its final value, or [HOLD_TIMEOUT_MS] after its last request when the final value never comes. While the
  * photographer's pinch holds it, the subject's requests are dropped, and so is the rest of a subject's pinch up to its
- * final value, which is answered with the camera's zoom so the subject's readout comes back, or up to
- * `camera.zoom.cancel`, which changes nothing. Each change of the holder goes to the subject as `camera.zoom.hold`.
+ * final value, which is answered with the camera's zoom so the subject's readout comes back, or up to its cancel (a
+ * `camera.zoom.set` with `cancel`), which changes nothing. Each change of the holder goes to the subject as
+ * `camera.zoom.hold`.
  *
  * **Brightness and flash (It 2, FR-7.3).** `camera.exposure.set` is clamped to the exposure range and applied
  * with the same step-then-final pattern, and `camera.flash.set` is applied when the camera has a flash; a request
@@ -150,8 +151,7 @@ class RemoteControlHandler(
     /** Handles the subject's requests; other messages are ignored. */
     fun handle(message: SessionMessage) {
         when (message) {
-            is SessionMessage.ZoomSet -> handleZoom(message)
-            is SessionMessage.ZoomCancel -> handleZoomCancel()
+            is SessionMessage.ZoomSet -> if (message.cancel) handleZoomCancel() else handleZoom(message)
             is SessionMessage.ExposureSet -> handleExposure(message)
             is SessionMessage.FlashSet -> handleFlash(message)
             is SessionMessage.GuideMove -> handleGuideMove(message)
@@ -208,8 +208,8 @@ class RemoteControlHandler(
     /**
      * Whether the subject's request may zoom now (FR-7.6): not while the photographer's pinch holds [zoomHold]. A step
      * takes it, or keeps it for another [HOLD_TIMEOUT_MS]; a final value frees it. A pinch with a step held back stays
-     * held back up to its final value or `camera.zoom.cancel`, even once the zoom is free, since an older subject keeps
-     * sending its steps.
+     * held back up to its final value or its cancel, even once the zoom is free, since an older subject keeps sending
+     * its steps.
      */
     private fun holdForSubject(final: Boolean): Boolean {
         holdTimeoutJob?.cancel()
@@ -237,8 +237,8 @@ class RemoteControlHandler(
     }
 
     /**
-     * `camera.zoom.cancel`: the subject's pinch stopped, held back by the photographer's (FR-7.6). It changes no zoom:
-     * that pinch's requests are no longer dropped, and a hold the subject still has is freed.
+     * A `camera.zoom.set` with `cancel`: the subject's pinch stopped, held back by the photographer's (FR-7.6). It
+     * changes no zoom: that pinch's requests are no longer dropped, and a hold the subject still has is freed.
      */
     private fun handleZoomCancel() {
         subjectHeldBack = false

@@ -108,17 +108,15 @@
 | 3.28 | 2026-11-19 | The notice that the subject left (Iter4-A5, [#238]): 10 s on Camera, gone once the subject is back, and a photo not sent shown after it (2.6.5). |
 | 3.29 | 2026-11-19 | *Add a pose guide* (Iter4-A6, [#243]): each situation's tile starts its scene photo, with no preselection, a pressed look, *Top pick* on *Auto*, and no second tap, then a guide from a photo; a closed picker leaves its screen open; an edge caption on a seam (`seamRing`) (2.4, 2.6.2, 2.6.3, 2.6.5, 2.6.8). |
 | 3.30 | 2026-11-20 | One phone zooms at a time (Iter4-A3, [#236]): `ZoomHold` on the photographer's phone, `camera.zoom.hold` kept as `SessionManager.peerZoomHolder`, the cancel of a pinch held back, and the label of the phone held back (AD-7, 2.1, 2.5.1, 2.6.5, 2.8, Figure 7). |
+| 3.31 | 2026-11-20 | The design as built through Iteration 4: the QR connection ([#214]) and light mode ([#212]) dropped on 11/20 as not needed, so *Still open* is empty; the Iteration 4 tasks' status, with the UAT's fixes and the scene photo step added, and what is left for Iteration 5 (2.1, 2.8, 2.9, 3). |
 
 </details>
 
-Audience: the development team. This page describes Pix's design as built through Iteration 3, and the plan for later iterations (2.9; R&S 4.1). The PR that builds a feature updates its design here. **TBD** and **TODO** mark open decisions. *Still open* below lists each with an owner, who updates this page in the PR that settles it. Requirement IDs (FR-, NFR-, US-) refer to the [Requirements and Specifications](Requirements-and-Specifications). Testing is described in the [Testing Documentation](Testing-Documentation).
+Audience: the development team. This page describes Pix's design as built through Iteration 4, and the plan for later iterations (2.9; R&S 4.1). The PR that builds a feature updates its design here. **TBD** and **TODO** mark open decisions. *Still open* below lists each with an owner, who updates this page in the PR that settles it. Requirement IDs (FR-, NFR-, US-) refer to the [Requirements and Specifications](Requirements-and-Specifications). Testing is described in the [Testing Documentation](Testing-Documentation).
 
 **Still open**
 
-| Decision | Current proposal | Owner | Decide by |
-|----|----|----|----|
-| Offline QR connection (F9) | The photographer's phone opens a local-only hotspot and runs the signaling, so no server or shared Wi-Fi is needed. The QR code carries the hotspot's details. One connection per code; the session starts once both tap *Resume*. Another entry point (AD-8). Open: the QR payload, the local signaling, and the hotspot API's limits (Iter3-P22, [#122]; now [#214]). | 조성민 | Iteration 4 |
-| The light mode's colors (FR-10.1) | Light mode follows the phone's setting, with dark kept, on color tokens sorted into *page* and *on the image* ([#202]). Open: the palette, the current black and yellow or a lighter one; the comparison boards are on the team's design canvas ([#212]). | 박동제 | Iteration 4 |
+None at the close of Iteration 4. The QR connection ([#214]) and light mode ([#212]) were dropped on 11/20 as not needed. The tips' open question (Testing Documentation 3.2) and the work left out of Iteration 4 (2.9) wait for the kickoff of Iteration 5.
 
 **Contents**
 
@@ -421,7 +419,6 @@ android/app/src/main/java/com/lastpenguin/pix/
 
 - *I'll take the photo* opens *Share my camera* (`friendsFragment`, `FriendsFragment`): friends to invite, and *Show a code*, signed in or not.
 - *I'll be in the photo* opens *See their camera* (`joinCodeFragment`, `JoinCodeFragment`): received invitations above the code field. The button counts them, so a dismissed invitation can still be accepted within its minute (2.6.6, FR-6.17).
-- *Show a QR code* and *Scan a QR code* are planned under them ([#122]).
 - A photographer whose subject left still waits in its room (`Waiting`, 2.4), unseen on Camera, and `SessionManager.start` ignores a second session. So *I'll be in the photo* and *Accept* (on *Invitation* and *See their camera*) first end that room (`SessionViewModel.endWaitingRoom` awaits `leave(CANCELLED)`). A session with someone in it, or on its way, still refuses them (FR-6.9).
 - *Room code* has no join field; it says which phone enters the code, and where. The code screens name the other phone's buttons by their own labels (`room_code_path`, `join_hint`, `withColoredPart`), so a renamed button renames them.
 - *Sign in* returns to the screen that opened it (`popBackStack(signInFragment, inclusive)`); *Sign up* closes with it, and *Pix ID setup* replaces it. So *Invitation* and Settings open *Sign in* themselves.
@@ -3051,8 +3048,8 @@ erDiagram
 - A flow's screens share an activity-scoped ViewModel: account, friends, generation, incoming invitations, pose saving, reference, session, and settings. Camera, Subject view, the subject's shared-step screens, and *Invitation* have their own.
 - A ViewModel takes user events and exposes its UI state as a `StateFlow`. One-shot results and notices come from buffered `Channel`s, so they wait while the screen is stopped.
 - `AppContainer` creates every module, so a fake can stand in for one that is not ready.
-- Colors are tokens in `colors.xml`, in two sets (Iter4-P5, [#202]). The page tokens (`pix_*`) are the ones light mode gives a second value ([#212]). The tokens on the image (`camera_*`, `guide_preview_*`) are what is drawn over the camera's image or a photo, which stays the same in every mode (R&S 6.9), and the camera screens' bars and shutter, apart so that light mode can give them other values. No layout, drawable, color list, style, or theme writes a color as a value; an icon is white and takes its color from the tint where it is used. *Why:* light mode then changes values, not screens.
-- `Theme.Pix` is a DayNight theme that takes the mode Pix sets, not the phone's: `PixApplication` sets dark until light mode adds the choice ([#212]), which also decides which parts of Camera and Subject view change with the mode.
+- Colors are tokens in `colors.xml`, in two sets (Iter4-P5, [#202]): the page tokens (`pix_*`), and the tokens on the image (`camera_*`, `guide_preview_*`), for what is drawn over the camera's image or a photo and for the camera screens' bars and shutter. No layout, drawable, color list, style, or theme writes a color as a value; an icon is white and takes its color from the tint where it is used. *Why:* a theme then changes values, not screens. Light mode, which would have given the page tokens a second value, was dropped on 11/20 ([#212]).
+- `Theme.Pix` is a DayNight theme that takes the mode Pix sets, not the phone's: `PixApplication` always sets dark, since light mode was dropped ([#212]).
 
 **Concurrency**
 
@@ -3330,30 +3327,36 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 
 | Task | Owner | Due | Status | Design |
 |----|----|----|----|----|
-| The documents and the issues (Iter4-P1, [#198]) | 조성민 | 11/9 | Open | — |
-| Back on the pose screens, with *Generate again* (Iter4-P2, [#199]) | 한준형 | 11/12 | Open | 2.4, 2.6.5, *Still open* |
-| A refused description kept in the history (Iter4-P3, [#200]) | 박동제 | 11/12 | Open | 2.5.1, 2.6.3 |
-| The subject's live view mirrored (Iter4-P4, [#201]) | 한준형 | 11/12 | Open | 2.6.4 |
-| Color tokens and a DayNight theme (Iter4-P5, [#202]) | 박동제 | 11/12 | Open | 2.8 |
-| A message for each way pose generation fails (Iter4-P6, [#203]) | 박동제 | 11/13 | Open | 2.5.3, 2.6.3 |
-| UI fixes: no notice after saving, the primary buttons at the top right, and the leftovers of the user test and the heuristic evaluation (Iter4-P7, [#204]) | 박동제 | 11/13 | Open | 2.6.2 |
-| The UAT (Iter4-P8, [#205]) | 조성민 | 11/18 | Open | Testing Documentation 4.3, 4.4 |
-| Landscape photos saved as taken, and landscape poses (Iter4-P9, [#206]) | 한준형 | 11/19 | Open | 2.6.1–2.6.4, 2.8 |
-| The controls turn with the phone (Iter4-P10, [#207]) | 한준형 | 11/19 | Open | 2.1, 2.6.2 |
-| Camera quality and latency, low priority (from #183) (Iter4-P11, [#208]) | 한준형 | 11/19 | Open | 2.8 |
-| Situation prompts, compared with the current prompt (Iter4-P12, [#209]) | 박재완 | 11/19 | Open | 2.5.3, 2.6.3, *Still open* |
-| The situation choice before the scene photo (Iter4-P13, [#210]) | 박재완 | 11/19 | Open | 2.4, 2.5.1, 2.6.2, 2.6.3, 2.6.5 |
+| The documents and the issues (Iter4-P1, [#198]) | 조성민 | 11/9 | Done | — |
+| Back on the pose screens, with *Generate again* (Iter4-P2, [#199]) | 한준형 | 11/12 | Done | 2.4, 2.6.5 |
+| A refused description kept in the history (Iter4-P3, [#200]) | 박동제 | 11/12 | Done | 2.5.1, 2.6.3 |
+| The subject's live view mirrored (Iter4-P4, [#201]) | 한준형 | 11/12 | Done | 2.6.4 |
+| Color tokens and a DayNight theme (Iter4-P5, [#202]) | 박동제 | 11/12 | Done | 2.8 |
+| A message for each way pose generation fails (Iter4-P6, [#203]) | 박동제 | 11/13 | Done | 2.5.3, 2.6.3 |
+| UI fixes: no notice after saving, the primary buttons at the top right, and the leftovers of the user test and the heuristic evaluation (Iter4-P7, [#204]) | 박동제 | 11/13 | Done | 2.6.2 |
+| The UAT (Iter4-P8, [#205]) | 조성민 | 11/18 | Done | Testing Documentation 4.3, 4.4 |
+| Landscape photos saved as taken, and landscape poses (Iter4-P9, [#206]) | 한준형 | 11/19 | Done | 2.6.1–2.6.4, 2.8 |
+| The controls turn with the phone (Iter4-P10, [#207]) | 한준형 | 11/19 | Done | 2.1, 2.6.2 |
+| Camera quality and latency, low priority (from #183) (Iter4-P11, [#208]) | 한준형 | 11/19 | Done | 2.8 |
+| Situation prompts, compared with the current prompt (Iter4-P12, [#209]) | 박재완 | 11/19 | Done | 2.5.3, 2.6.3 |
+| The situation choice before the scene photo (Iter4-P13, [#210]) | 박재완 | 11/19 | Done | 2.4, 2.5.1, 2.6.2, 2.6.3, 2.6.5 |
 | Prompt templates and the default prompt (from #125) (Iter4-P14, [#211]) | 박재완 | 11/19 | Dropped | — |
-| Light mode (Iter4-P15, [#212]) | 박동제 | 11/19 | Open | 2.6.8, 2.8, *Still open* |
+| Light mode (Iter4-P15, [#212]) | 박동제 | 11/19 | Dropped | — |
 | Better pose tips, with the background (Iter4-P16, [#213]) | 박동제 | 11/17 | Done | 2.5.1, 2.5.3, 2.6.3 |
-| The reference thumbnail hides at the side, and its changes are animated (Iter4-A4, [#237]) | 박동제 | 11/20 | Done | 2.6.2 |
+| The scene photo step on a small phone: the camera's bar, a panel that goes away, and the ratio (Iter4-P21, [#231]) | 박동제 | 11/19 | Done | 2.6.3 |
 | The reference thumbnail for a guide from the subject (Iter4-A1, [#234]) | 박재완 | 11/20 | Done | 2.5.1, 2.6.2, 2.6.5 |
-| The offline QR connection (from #122) (Iter4-P17, [#214]) | 조성민 | 11/19 | Open | *Still open*, AD-8 |
-| Integration tests for the Iteration 4 flows (Iter4-P18, [#215]) | 조성민 | 11/19 | Open | Testing Documentation |
-| Integrate the Iteration 4 features (Iter4-P19, [#216]) | 조성민 | 11/19 | Open | — |
-| The Iteration 4 documents, demo README, and `iteration-4-demo` (Iter4-P20, [#217]) | All | 11/20 | Open | — |
+| The session's photos in Pix on the subject's phone (Iter4-A2, [#235]) | 박재완 | 11/20 | Done | 2.6.5 |
+| One phone zooms at a time (Iter4-A3, [#236]) | 조성민 | 11/20 | Done | 2.1, 2.5.1, 2.6.5, 2.8, AD-7 |
+| The reference thumbnail hides at the side, and its changes are animated (Iter4-A4, [#237]) | 박동제 | 11/20 | Done | 2.6.2 |
+| The notice that the subject left (Iter4-A5, [#238]) | 박재완 | 11/20 | Done | 2.6.5 |
+| *Add a pose guide*: the situations as tiles, and the sheet kept open when the picker closes (Iter4-A6, [#243]) | 박재완 | 11/20 | Done | 2.4, 2.6.2, 2.6.3, 2.6.5, 2.6.8 |
+| Pix's album in Pix's own viewer, as in a gallery app (Iter4-A7, [#247]) | 박재완 | 11/20 | Done | 2.6.5 |
+| The offline QR connection (from #122) (Iter4-P17, [#214]) | 조성민 | 11/19 | Dropped | — |
+| Integration tests for the Iteration 4 flows (Iter4-P18, [#215]) | 조성민 | 11/19 | Done | Testing Documentation |
+| Integrate the Iteration 4 features (Iter4-P19, [#216]) | 조성민 | 11/19 | Done | — |
+| The Iteration 4 documents, demo README, and `iteration-4-demo` (Iter4-P20, [#217]) | All | 11/20 | Done | — |
 
-Left out of Iteration 4 at its kickoff, for the UAT and its fixes: the remote-control switch and remote focus (FR-7.5, FR-7.7), and search, situations, and memos in the library (FR-3.11), both for Iteration 5. Marking the face, the limbs, or the background on the guide (Testing Documentation 4.1) is on hold: ML Kit's pose detection or segmentation may err too much, and a background overlay did not work well; the tips take its place ([#213]).
+Left out of Iteration 4 at its kickoff, for the UAT and its fixes: the remote-control switch and remote focus (FR-7.5, FR-7.7), and search, situations, and memos in the library (FR-3.11), both for Iteration 5. Dropped on 11/20 as not needed: the QR connection ([#214]) and light mode ([#212]). Also left for Iteration 5: the changes for UAT cycle 2 (Testing Documentation 4.4), and the open problems of the user test and the heuristic evaluation (Testing Documentation 4.1, 4.2). Marking the face, the limbs, or the background on the guide (Testing Documentation 4.1) is on hold: ML Kit's pose detection or segmentation may err too much, and a background overlay did not work well; the tips take its place ([#213]).
 
 **Iteration 2 build order** (the schedule of 2026-10-11; the issues' due dates). All was delivered by 10/23, except as noted:
 
@@ -3400,7 +3403,7 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 | **State** | `SessionState`, `RtcSessionManager` | Different allowed actions and UI in each connection phase (Figure 9) |
 | **Observer** | `StateFlow` in repositories and ViewModels | Many screens and the syncers react to one guide or session state |
 | **Adapter** | `CameraFrameSource` | CameraX frames to the WebRTC video source |
-| **Strategy** | `SessionEntry` (room code, invitation; QR later); mask smoothing (one set of functions in `MaskSmoothing.kt` today) | Change how a session starts, or how the mask is cleaned, without changing callers |
+| **Strategy** | `SessionEntry` (room code, invitation); mask smoothing (one set of functions in `MaskSmoothing.kt` today) | Change how a session starts, or how the mask is cleaned, without changing callers |
 | **Command** | `camera.*` and `guide.move` messages, handled by `RemoteControlHandler` | Remote actions as objects that can be validated, queued, cancelled, and logged |
 | **Repository / Facade** | `GuideRepository`, `SessionManager` | A simple interface over CameraX, ML Kit, WebRTC, and the network, which also makes fakes possible |
 

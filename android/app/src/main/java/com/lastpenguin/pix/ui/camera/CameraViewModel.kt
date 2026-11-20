@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri

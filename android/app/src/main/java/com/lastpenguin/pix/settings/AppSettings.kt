@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.settings
 
 import android.content.Context

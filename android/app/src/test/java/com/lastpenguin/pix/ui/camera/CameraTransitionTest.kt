@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -146,7 +146,7 @@ class CameraTransitionTest {
     private fun Camera.previewTop(): Float =
         (controls.previewContainer.layoutParams as ViewGroup.MarginLayoutParams).topMargin / density()
 
-    /** The scene photo for poses, as *Take a scene photo for poses* starts it (#210). */
+    /** The scene photo for poses, as a situation's tile on *Add a pose guide* starts it (#210, #243). */
     private fun Camera.generation(): GenerationViewModel =
         ViewModelProvider(fragment.requireActivity(), PixViewModels.Factory)[GenerationViewModel::class.java]
 

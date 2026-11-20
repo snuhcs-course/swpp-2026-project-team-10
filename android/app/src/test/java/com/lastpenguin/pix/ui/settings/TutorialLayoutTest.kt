@@ -65,7 +65,7 @@ import org.robolectric.annotation.GraphicsMode
  * title, and the closing line lie inside the screen, whole, and clear of each other and of every ring, but a caption
  * on its own ring's edge (*Add a pose guide*'s rows, #210), which crosses that ring only, and on a seam also the ring
  * that meets it there (My library's, under the gallery's, #243). *Add a pose guide* rings, in its order, the
- * situations with their button, then each row (#243). Camera, the guide on
+ * situations' tiles, then each row (#243). Camera, the guide on
  * Camera, and Subject view show every control their tips name (a guide on the video for its edit-mode toggle; the guide's
  * ✕ with its own tip, #204), and
  * Add a pose guide its saved guides, so each is laid out at its fullest. A ring is a circle around a round control up to
@@ -280,13 +280,13 @@ class TutorialLayoutTest {
     }
 
     @Test
-    fun addAPoseGuide_ringsTheSituationsWithTheirButton_thenEachRow() {
+    fun addAPoseGuide_ringsTheSituations_thenEachRow() {
         val layer = sheet()
         val situations = ringOf(layer, R.string.tutorial_generate).ring
         val gallery = ringOf(layer, R.string.tutorial_upload).ring
         val library = ringOf(layer, R.string.tutorial_saved).ring
-        // The tiles and *Take a scene photo for poses* in one ring (FR-4.8): the situation is the button's alone.
-        for (id in listOf(R.id.situationRowTop, R.id.situationRowBottom, R.id.generateButton)) {
+        // The tiles in one ring (FR-4.8), each the button that takes the scene photo for its situation.
+        for (id in listOf(R.id.situationRowTop, R.id.situationRowBottom)) {
             val control = boundsIn(layer, screenView(id))
             assertTrue("$situations around $control", situations.contains(control))
         }

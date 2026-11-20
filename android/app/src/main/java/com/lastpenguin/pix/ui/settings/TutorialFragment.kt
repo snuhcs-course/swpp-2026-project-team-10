@@ -176,12 +176,12 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
     TutorialScreen.ADD_GUIDE to TutorialTips(
         title = null,
         tips = listOf(
-            // The situations and the button right under them, which takes the scene photo for the one chosen (FR-4.8).
+            // The situations, each tile the button that takes the scene photo for it (FR-4.8).
             TutorialTip(
                 R.string.tutorial_generate,
                 CaptionSide.ABOVE,
                 overControls = true,
-                locate = controls(R.id.situationRowTop, R.id.situationRowBottom, R.id.generateButton),
+                locate = controls(R.id.situationRowTop, R.id.situationRowBottom),
             ),
             // The whole row (#210), its caption on the ring's top edge at the right.
             TutorialTip(

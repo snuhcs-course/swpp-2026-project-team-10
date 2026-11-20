@@ -52,7 +52,7 @@ import org.robolectric.shadows.ShadowChoreographer
 /*
  * The tutorial's tips over a live screen (FR-10.4, Design 2.6.8), here over Add a pose guide, the sheet they open over
  * as it opens from Camera. The layer (state-based): a ring around each control the screen shows, where it is, in the
- * sheet's order: the situations with their button, then the gallery's and My library's whole rows, their rings apart
+ * sheet's order: the situations' tiles, then the gallery's and My library's whole rows, their rings apart
  * though the rows touch, each still centered on its row, and their captions on the rings' top edges at the right, with
  * no arrow, My library's on the seam with the gallery's ring, which both stop around it (#243); none and no caption
  * for a control the screen does not show (a row hidden) or that a short screen's sheet has scrolled out of view or shows less
@@ -166,7 +166,6 @@ class TutorialFragmentTest {
             placed[0]!!.ring,
             RectF(inLayer(R.id.situationRowTop)).apply {
                 union(inLayer(R.id.situationRowBottom))
-                union(inLayer(R.id.generateButton))
             },
         )
         assertRingAroundRow(placed[1]!!.ring, inLayer(R.id.galleryRow))

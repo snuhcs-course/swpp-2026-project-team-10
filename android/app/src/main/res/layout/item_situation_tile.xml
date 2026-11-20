@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One situation on Add a pose guide (FR-4.8): its drawing, which shows the framing, and its name. A tap chooses it;
-     the chosen one has the accent edge and a check. -->
+<!-- One situation on Add a pose guide (FR-4.8): its drawing, which shows the framing, its name, and on Auto's alone the
+     badge Recommended. A tap takes the scene photo for it (FR-4.1); while pressed, SituationTiles dims and shrinks it. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -42,17 +42,32 @@
         android:textSize="14sp"
         tools:text="Landmark" />
 
-    <ImageView
-        android:id="@+id/situationCheck"
-        android:layout_width="22dp"
-        android:layout_height="22dp"
-        android:layout_gravity="top|end"
+    <!-- On the recommended situation's tile only (#243). -->
+    <TextView
+        android:id="@+id/situationBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
         android:layout_margin="8dp"
-        android:background="@drawable/bg_check_badge"
+        android:background="@drawable/bg_situation_badge"
+        android:ellipsize="end"
         android:importantForAccessibility="no"
-        android:padding="4dp"
-        android:src="@drawable/ic_check"
+        android:maxLines="1"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="2dp"
+        android:text="@string/situation_recommended"
+        android:textAppearance="@style/TextAppearance.Pix.Caption"
+        android:textColor="@color/pix_on_accent"
+        android:textSize="11sp"
         android:visibility="gone"
-        app:tint="@color/pix_on_accent"
         tools:visibility="visible" />
+
+    <!-- The tile pressed (#243): SituationTiles fades this in under the finger and out again. -->
+    <View
+        android:id="@+id/situationDim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0"
+        android:background="@drawable/bg_situation_dim"
+        android:importantForAccessibility="no" />
 </FrameLayout>

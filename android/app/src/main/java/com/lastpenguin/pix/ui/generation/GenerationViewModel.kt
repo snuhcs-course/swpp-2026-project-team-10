@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -182,17 +182,11 @@ class GenerationViewModel(
 
     private val _situationChoice = MutableStateFlow(Situation.DEFAULT)
 
-    /**
-     * The situation chosen last on *Add a pose guide* (FR-4.8): the next scene starts with it, and the sheet shows it
-     * selected. Kept while Pix runs.
-     */
+    /** The situation of the tile tapped last on *Add a pose guide* (FR-4.8): the next scene starts with it. */
     val situationChoice: StateFlow<Situation> = _situationChoice.asStateFlow()
 
     /** Whether *Selfie* can be chosen: only on a phone with a front camera (FR-1.14, FR-4.8). */
     val selfieAvailable: StateFlow<Boolean> = camera.hasFrontCamera
-
-    /** The situation other than a selfie chosen last, which *Add a pose guide* shows again with the rear camera. */
-    private var rearChoice = Situation.DEFAULT
 
     private var generating: Job? = null
     private var shooting: Job? = null
@@ -291,28 +285,13 @@ class GenerationViewModel(
     }
 
     /**
-     * *Add a pose guide* opened: its tiles follow the camera, so *Selfie* is chosen while the front camera is on and
-     * the last other situation with the rear one (FR-1.14, FR-4.8).
+     * A situation's tile on *Add a pose guide* (FR-4.8): the next scene photo is for it, and whether it was taken.
+     * Nothing is sent. *Selfie* is refused on a phone without a front camera, whose tile is off.
      */
-    fun followCamera() {
-        val front = camera.facing.value == CameraFacing.FRONT
-        _situationChoice.update { chosen ->
-            when {
-                front -> Situation.SELFIE
-                chosen == Situation.SELFIE -> rearChoice
-                else -> chosen
-            }
-        }
-    }
-
-    /**
-     * A situation's tile on *Add a pose guide* (FR-4.8): chosen for the next scene photo. Nothing is sent. *Selfie* is
-     * ignored on a phone without a front camera, whose tile is off.
-     */
-    fun chooseSituation(situation: Situation) {
-        if (situation == Situation.SELFIE && !camera.hasFrontCamera.value) return
-        if (situation != Situation.SELFIE) rearChoice = situation
+    fun chooseSituation(situation: Situation): Boolean {
+        if (situation == Situation.SELFIE && !camera.hasFrontCamera.value) return false
         _situationChoice.value = situation
+        return true
     }
 
     /**

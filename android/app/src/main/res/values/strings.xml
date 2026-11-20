@@ -132,7 +132,8 @@
     <string name="keep_current_guide">Keep the current guide</string>
     <string name="situation_question">What are you taking?</string>
     <string name="situation_question_body">Pix sets the framing and the poses for it.</string>
-    <string name="take_scene_for_poses">Take a scene photo for poses</string>
+    <string name="situation_recommended">Top pick</string>
+    <string name="situation_recommended_description">%1$s, top pick</string>
     <string name="situation_default">Auto</string>
     <string name="situation_background">Scenery</string>
     <string name="situation_half_body">Upper body</string>

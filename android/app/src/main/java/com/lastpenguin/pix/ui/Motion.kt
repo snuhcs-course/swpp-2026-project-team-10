@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui
 
 import android.animation.Animator
@@ -45,6 +45,9 @@ internal object Motion {
 
     /** The controls' icons turning with the phone (FR-1.15). */
     const val TURN_MS = 250L
+
+    /** A situation's tile dimming and shrinking under the finger, and back (#243). */
+    const val PRESS_MS = 100L
 
     /** Material's standard curve: quick to start, slow to settle. */
     val STANDARD = PathInterpolator(0.4f, 0f, 0.2f, 1f)

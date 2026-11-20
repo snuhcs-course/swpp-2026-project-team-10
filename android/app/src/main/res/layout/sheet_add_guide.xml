@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Add a pose guide (R&S 6.2): first the situations (FR-4.8) with the button right under them that takes the scene
-     photo for the chosen one, since the situation is that button's alone, then a guide from a photo. It opens expanded;
-     on a short screen or a large font, it scrolls. -->
+<!-- Add a pose guide (R&S 6.2): first the situations (FR-4.8), each tile the button that takes the scene photo for it,
+     then a guide from a photo. It opens expanded; on a short screen or a large font, it scrolls. -->
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -30,8 +29,8 @@
             android:text="@string/add_guide_title"
             android:textAppearance="@style/TextAppearance.Pix.SheetTitle" />
 
-        <!-- The poses (FR-4.1, FR-4.8): What are you taking?, two rows of three situations that SituationTiles fills,
-             the last chosen selected, and right under them the button for the chosen one. Gone from Subject view. -->
+        <!-- The poses (FR-4.1, FR-4.8): What are you taking?, and two rows of three situations that SituationTiles
+             fills; a tile takes the scene photo for its situation. Gone from Subject view. -->
         <LinearLayout
             android:id="@+id/newPosesSection"
             android:layout_width="match_parent"
@@ -68,15 +67,6 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:orientation="horizontal" />
-
-            <!-- Takes the scene photo for the chosen situation; asks for the agreement first (FR-4.2). -->
-            <Button
-                android:id="@+id/generateButton"
-                style="@style/Widget.Pix.Button"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="@string/take_scene_for_poses" />
         </LinearLayout>
 
         <!-- A guide from a photo (FR-2.7, FR-3.8, FR-3.11): one from the gallery, or one saved before. -->

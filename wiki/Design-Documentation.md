@@ -110,6 +110,7 @@
 | 3.30 | 2026-11-20 | One phone zooms at a time (Iter4-A3, [#236]): `ZoomHold` on the photographer's phone, `camera.zoom.hold` kept as `SessionManager.peerZoomHolder`, the cancel of a pinch held back, and the label of the phone held back (AD-7, 2.1, 2.5.1, 2.6.5, 2.8, Figure 7). |
 | 3.31 | 2026-11-20 | Crash reports and usage events through Firebase, behind `Telemetry`, while *Share usage data* allows it (1.1.1, 1.1.2, 1.2, AD-19, 2.1, 2.6.8, 2.8, 2.9; FR-10.6; Iter4-A8, [#254]). |
 | 3.32 | 2026-11-20 | The design as built through Iteration 4: the QR connection ([#214]) and light mode ([#212]) dropped on 11/20 as not needed, so *Still open* is empty; the Iteration 4 tasks' status, with the UAT's fixes and the scene photo step added, and what is left for Iteration 5 (2.1, 2.8, 2.9, 3). |
+| 3.33 | 2026-11-20 | The live view's sharpness after a reconnection, left for Iteration 5 ([#238]) (2.9). |
 
 </details>
 
@@ -3386,7 +3387,7 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 | Integrate the Iteration 4 features (Iter4-P19, [#216]) | 조성민 | 11/19 | Done | — |
 | The Iteration 4 documents, demo README, and `iteration-4-demo` (Iter4-P20, [#217]) | All | 11/20 | Done | — |
 
-Left out of Iteration 4 at its kickoff, for the UAT and its fixes: the remote-control switch and remote focus (FR-7.5, FR-7.7), and search, situations, and memos in the library (FR-3.11), both for Iteration 5. Dropped on 11/20 as not needed: the QR connection ([#214]) and light mode ([#212]). Also left for Iteration 5: the changes for UAT cycle 2 (Testing Documentation 4.4), and the open problems of the user test and the heuristic evaluation (Testing Documentation 4.1, 4.2). Marking the face, the limbs, or the background on the guide (Testing Documentation 4.1) is on hold: ML Kit's pose detection or segmentation may err too much, and a background overlay did not work well; the tips take its place ([#213]).
+Left out of Iteration 4 at its kickoff, for the UAT and its fixes: the remote-control switch and remote focus (FR-7.5, FR-7.7), and search, situations, and memos in the library (FR-3.11), both for Iteration 5. Dropped on 11/20 as not needed: the QR connection ([#214]) and light mode ([#212]). Also left for Iteration 5: the changes for UAT cycle 2 and the live view's sharpness after a reconnection ([#238]; Testing Documentation 4.4), and the open problems of the user test and the heuristic evaluation (Testing Documentation 4.1, 4.2). Marking the face, the limbs, or the background on the guide (Testing Documentation 4.1) is on hold: ML Kit's pose detection or segmentation may err too much, and a background overlay did not work well; the tips take its place ([#213]).
 
 **Iteration 2 build order** (the schedule of 2026-10-11; the issues' due dates). All was delivered by 10/23, except as noted:
 

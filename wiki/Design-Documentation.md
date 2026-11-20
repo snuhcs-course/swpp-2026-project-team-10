@@ -107,7 +107,7 @@
 | 3.27 | 2026-11-19 | The package layout names `TurningIcons` and `PhoneTurns` (2.1; [#207]). |
 | 3.28 | 2026-11-19 | The notice that the subject left (Iter4-A5, [#238]): 10 s on Camera, gone once the subject is back, and a photo not sent shown after it (2.6.5). |
 | 3.29 | 2026-11-19 | *Add a pose guide* (Iter4-A6, [#243]): each situation's tile starts its scene photo, with no preselection, a pressed look, *Top pick* on *Auto*, and no second tap, then a guide from a photo; a closed picker leaves its screen open; an edge caption on a seam (`seamRing`) (2.4, 2.6.2, 2.6.3, 2.6.5, 2.6.8). |
-| 3.30 | 2026-11-20 | One phone zooms at a time (Iter4-A3, [#236]): `ZoomHold` on the photographer's phone, `camera.zoom.hold`, and the label of the phone held back (AD-7, 2.5.1, 2.6.5, 2.8, Figure 7). |
+| 3.30 | 2026-11-20 | One phone zooms at a time (Iter4-A3, [#236]): `ZoomHold` on the photographer's phone, `camera.zoom.hold` kept as `SessionManager.peerZoomHolder`, and the label of the phone held back (AD-7, 2.1, 2.5.1, 2.6.5, 2.8, Figure 7). |
 
 </details>
 
@@ -594,6 +594,7 @@ interface SessionManager {
     val incoming: Flow<SessionMessage>                  // not replayed: a late subscriber misses earlier messages
     val peerCapabilities: StateFlow<CameraCapabilities?> // subject: the last camera.capabilities, for a late screen
     val peerCamera: StateFlow<CameraState?>             // subject: the last camera.state; null until one arrives
+    val peerZoomHolder: StateFlow<Role?>                // subject: the last camera.zoom.hold's holder; null when free
     val path: StateFlow<IcePath?>                       // the selected candidate pair while connected, every 2 s (2.6.7)
     val latencyMs: StateFlow<Int?>                      // half the ping round trip, last three averaged (FR-10.3); null
                                                         // until measured, while reconnecting, and after the end
@@ -784,6 +785,7 @@ classDiagram
     +incoming Flow~SessionMessage~
     +peerCapabilities StateFlow~CameraCapabilities~
     +peerCamera StateFlow~CameraState~
+    +peerZoomHolder StateFlow~Role~
     +path StateFlow~IcePath~
     +latencyMs StateFlow~Int~
     +start(entry, role)
@@ -1772,7 +1774,7 @@ A tap on the readout (a quick step, 2.6.2) and its *Zoom in* / *Zoom out* access
 { "v": 3, "t": "camera.zoom.hold", "seq": 4, "ts": 1759212352290, "b": { "by": "PHOTOGRAPHER" } }
 ```
 
-`by` is `PHOTOGRAPHER`, `SUBJECT`, or null when the zoom is free. The photographer sends it at each change and when the session connects (2.6.5). An older phone ignores it.
+`by` is `PHOTOGRAPHER`, `SUBJECT`, or null when the zoom is free. The photographer sends it at each change and when the session connects (2.6.5). The subject keeps the last one as `SessionManager.peerZoomHolder`. An older phone ignores it.
 
 </details>
 
@@ -2750,7 +2752,8 @@ Subject view's controls are requests. The photographer's phone applies them in a
 - **One phone zooms at a time (It 4, FR-7.6, [#236]).** `ZoomHold`, on the photographer's phone, keeps whose pinch holds the zoom. A pinch's first step takes it, and its final value frees it.
   - `CameraViewModel` takes it for the photographer's pinch. `RemoteControlHandler` takes it for the subject's, and frees it 2 s after the subject's last request when the final value never comes; the camera then settles its lens, as in `stop()`.
   - While one phone holds it, the other's pinch changes nothing until its own fingers lift. A quick step or a zoom action never takes it, and changes nothing while the other phone holds it. The photographer drops the subject's requests and answers a final one with the current zoom.
-  - Each change of the holder goes to the subject as `camera.zoom.hold`, and again when the session connects. Subject view then sends nothing, stops a pinch that is running, and its readout follows the echo.
+  - A subject's pinch with a request dropped stays dropped up to its final value, even once the zoom is free, since an older subject keeps sending its steps.
+  - Each change of the holder goes to the subject as `camera.zoom.hold`, and again when the session connects. The subject's session keeps it, so a screen that opens late knows it. Subject view then sends nothing, ends a pinch that is running with the photographer's zoom as its final value, and its readout follows the echo.
   - The phone held back says who is zooming in its toggle label (2.8).
 - **Unanswered requests.** `RemoteControlHandler` gives a final zoom, brightness, or flash request 500 ms, and longer while the camera is `STARTING`. It then confirms a request the camera holds, or answers with the current state, `by: PHOTOGRAPHER`, so the control snaps back. A request applied within 5 s still counts as the subject's.
 - **Brightness and flash (It 2, FR-7.3).** Subject view's brightness button opens a slider over the exposure range from `camera.capabilities`. It stays a slider, since the subject sets no focus for Camera's bar (2.8, [#182]). The flash button is in the top bar. Each control hides when the camera lacks it.

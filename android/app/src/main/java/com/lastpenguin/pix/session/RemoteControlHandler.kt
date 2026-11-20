@@ -47,8 +47,9 @@ sealed interface RemoteAction {
  *
  * **One phone zooms at a time (FR-7.6, #236).** The subject's pinch takes [zoomHold] at its first step and frees it
  * at its final value, or [HOLD_TIMEOUT_MS] after its last request when the final value never comes. While the
- * photographer's pinch holds it, the subject's requests are dropped, and a final one is answered with the camera's
- * zoom so the subject's readout comes back. Each change of the holder goes to the subject as `camera.zoom.hold`.
+ * photographer's pinch holds it, the subject's requests are dropped, and so is the rest of a subject's pinch up to its
+ * final value, which is answered with the camera's zoom so the subject's readout comes back. Each change of the holder
+ * goes to the subject as `camera.zoom.hold`.
  *
  * **Brightness and flash (It 2, FR-7.3).** `camera.exposure.set` is clamped to the exposure range and applied
  * with the same step-then-final pattern, and `camera.flash.set` is applied when the camera has a flash; a request
@@ -87,6 +88,7 @@ class RemoteControlHandler(
     private var settingsJob: Job? = null
     private var holderJob: Job? = null
     private var holdTimeoutJob: Job? = null
+    private var subjectHeldBack = false
     private var finalJob: Job? = null
     private var timeoutJob: Job? = null
     private var exposureTimeoutJob: Job? = null
@@ -122,6 +124,7 @@ class RemoteControlHandler(
             camera.setZoom(camera.zoom.value, final = true)
         }
         zoomHold.release(Role.SUBJECT)
+        subjectHeldBack = false
         zoomJob?.cancel()
         settingsJob?.cancel()
         settingsJob = null
@@ -203,17 +206,25 @@ class RemoteControlHandler(
 
     /**
      * Whether the subject's request may zoom now (FR-7.6): not while the photographer's pinch holds [zoomHold]. A step
-     * takes it, or keeps it for another [HOLD_TIMEOUT_MS]; a final value frees it.
+     * takes it, or keeps it for another [HOLD_TIMEOUT_MS]; a final value frees it. A pinch with a step held back stays
+     * held back up to its final value, even once the zoom is free, since an older subject keeps sending its steps.
      */
     private fun holdForSubject(final: Boolean): Boolean {
         holdTimeoutJob?.cancel()
         holdTimeoutJob = null
+        if (subjectHeldBack) {
+            if (final) subjectHeldBack = false
+            return false
+        }
         if (final) {
             if (!zoomHold.mayChange(Role.SUBJECT)) return false
             zoomHold.release(Role.SUBJECT)
             return true
         }
-        if (!zoomHold.take(Role.SUBJECT)) return false
+        if (!zoomHold.take(Role.SUBJECT)) {
+            subjectHeldBack = true
+            return false
+        }
         holdTimeoutJob = scope?.launch {
             delay(HOLD_TIMEOUT_MS)
             holdTimeoutJob = null

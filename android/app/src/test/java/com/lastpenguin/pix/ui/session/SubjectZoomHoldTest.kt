@@ -30,12 +30,14 @@ import org.junit.Test
  * Partitions for the subject's zoom while the photographer may zoom too (FR-7.6, #236), state-based on the holder that
  * `camera.zoom.hold` names: the photographer, the subject, or none.
  * - The photographer holds it, then a pinch: nothing sent, the readout on the photographer's zoom, one label.
+ * - The photographer's hold kept by the session before this screen listened: the pinch held back all the same.
  * - A pinch held back: still held back to its final value when the zoom is free meanwhile; the next pinch is sent.
- * - The photographer's hold arriving during a pinch: no further step and no final value, the readout back on the
- *   photographer's zoom, one label.
+ * - The photographer's hold arriving during a pinch: the pinch ends there with a final value of the photographer's
+ *   zoom, no further step, the readout back on the photographer's zoom, one label.
  * - The subject holds it (its own pinch): the pinch goes on.
  * - A quick step while the photographer holds it: nothing sent, a label.
- * - The session dropping: the hold forgotten, so a pinch after the reconnect is sent.
+ * - The session dropping during a held-back pinch: the hold-back forgotten, so a pinch after the reconnect is sent once
+ *   the zoom is free.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SubjectZoomHoldTest {
@@ -85,6 +87,24 @@ class SubjectZoomHoldTest {
     }
 
     @Test
+    fun pinch_holdKeptBeforeTheScreenListened_isHeldBack() = runTest(dispatcher) {
+        session.setState(SessionState.Connected("s_1", PeerInfo("Dongje"), Role.SUBJECT))
+        session.deliver(SessionMessage.Capabilities(CameraCapabilities(0.6f, 10f, listOf(0.6f, 1f, 2f, 3f))))
+        session.deliver(SessionMessage.CameraStateUpdate(1.4f, Role.PHOTOGRAPHER, final = true))
+        session.deliver(SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER))
+        // Opened after the messages, so its collectors never see them.
+        val late = SubjectViewModel(session, FakeGuideRepository(), MirrorReference(), FakeRemoteVideo())
+        backgroundScope.launch { late.toggleLabels.collect { labels += it } }
+        runCurrent()
+
+        late.onZoomGesture(2f, final = false)
+        runCurrent()
+
+        assertEquals(emptyList<SessionMessage.ZoomSet>(), requests())
+        assertEquals(listOf<ToggleLabel>(ToggleLabel.ZoomHeld), labels)
+    }
+
+    @Test
     fun heldBackPinch_zoomFreedMeanwhile_staysHeldBackUntilItsFingersLift() = runTest(dispatcher) {
         connected()
         holder(Role.PHOTOGRAPHER)
@@ -102,7 +122,7 @@ class SubjectZoomHoldTest {
     }
 
     @Test
-    fun photographerHold_duringAPinch_stopsSendingIt() = runTest(dispatcher) {
+    fun photographerHold_duringAPinch_endsItWithThePhotographersZoom() = runTest(dispatcher) {
         connected()
         viewModel.onZoomGesture(2f, final = false)
         runCurrent()
@@ -113,7 +133,7 @@ class SubjectZoomHoldTest {
         viewModel.onZoomGesture(3f, final = true)
         runCurrent()
 
-        assertEquals(listOf(SessionMessage.ZoomSet(2f)), requests())
+        assertEquals(listOf(SessionMessage.ZoomSet(2f), SessionMessage.ZoomSet(1.4f, final = true)), requests())
         assertEquals(1.4f, viewModel.uiState.value.zoom, 0f)
         assertEquals(listOf<ToggleLabel>(ToggleLabel.ZoomHeld), labels)
     }
@@ -144,14 +164,15 @@ class SubjectZoomHoldTest {
     }
 
     @Test
-    fun sessionDrop_photographerHeld_holdIsForgotten() = runTest(dispatcher) {
+    fun sessionDrop_duringAHeldBackPinch_forgetsTheHoldBack() = runTest(dispatcher) {
         connected()
         holder(Role.PHOTOGRAPHER)
+        viewModel.onZoomGesture(1.8f, final = false)
 
         session.setState(SessionState.Reconnecting("s_1", since = 0L))
         runCurrent()
         session.setState(SessionState.Connected("s_1", PeerInfo("Dongje"), Role.SUBJECT))
-        runCurrent()
+        holder(null)
         viewModel.onZoomGesture(2f, final = false)
         runCurrent()
 

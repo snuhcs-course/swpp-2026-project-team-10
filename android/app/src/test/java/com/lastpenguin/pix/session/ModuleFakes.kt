@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -50,6 +50,9 @@ class FakeSessionManager : SessionManager {
 
     private val _peerCamera = MutableStateFlow<CameraState?>(null)
     override val peerCamera: StateFlow<CameraState?> = _peerCamera.asStateFlow()
+
+    private val _peerZoomHolder = MutableStateFlow<Role?>(null)
+    override val peerZoomHolder: StateFlow<Role?> = _peerZoomHolder.asStateFlow()
 
     private val _path = MutableStateFlow<IcePath?>(null)
     override val path: StateFlow<IcePath?> = _path.asStateFlow()
@@ -121,6 +124,7 @@ class FakeSessionManager : SessionManager {
             _peerCamera.value =
                 CameraState(message.zoom, message.exposure, message.flash, message.aspect, facing = message.facing)
         }
+        if (message is SessionMessage.ZoomHoldUpdate) _peerZoomHolder.value = message.by
         check(_incoming.tryEmit(message))
     }
 }

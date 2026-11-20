@@ -241,10 +241,11 @@ class SubjectViewModel(
     // does not take the readout, and the next tap, back to it (FR-7.1).
     private var pendingZoomStep: Float? = null
 
-    // Whether the photographer's pinch holds the zoom (`camera.zoom.hold`, FR-7.6), and whether this phone's pinch was
-    // held back by it until its fingers lift.
-    private var photographerZooming = false
+    // Whether this phone's pinch was held back by the photographer's (FR-7.6) until its fingers lift.
     private var zoomHeldBack = false
+
+    // Kept by the session from the last `camera.zoom.hold`, so a screen that opens late still knows it.
+    private val photographerZooming: Boolean get() = session.peerZoomHolder.value == Role.PHOTOGRAPHER
 
     private val exposureSender = StepSender<Int>(viewModelScope, SEND_INTERVAL_MS) { index, final ->
         session.send(SessionMessage.ExposureSet(index, final))
@@ -315,9 +316,9 @@ class SubjectViewModel(
                 if (!ui.hasBrightness) exposureSender.cancel()
             }
         }
+        viewModelScope.launch { session.peerZoomHolder.collect { onZoomHolder(it) } }
         viewModelScope.launch {
             session.incoming.collect { message ->
-                if (message is SessionMessage.ZoomHoldUpdate) onZoomHolder(message.by)
                 if (message !is SessionMessage.CameraStateUpdate) return@collect
                 // While a pinch or the slider is moving its own steps rule the display; the echo wins once it ends.
                 _uiState.update {
@@ -592,18 +593,24 @@ class SubjectViewModel(
      * this phone that is running was held back there: it stops sending until its fingers lift.
      */
     private fun onZoomHolder(by: Role?) {
-        photographerZooming = by == Role.PHOTOGRAPHER
-        if (photographerZooming && zoomSender.adjusting) holdBack(gestureGoesOn = true)
+        if (by == Role.PHOTOGRAPHER && zoomSender.adjusting) holdBack(gestureGoesOn = true)
     }
 
     /**
      * The photographer's pinch holds the zoom: this phone's change is not sent, the readout follows the photographer's
      * applied zoom, and a label says who is zooming. A pinch that [gestureGoesOn] stays held back until its final value.
+     * A pinch that already sent steps ends there with a final value of that zoom, since the photographer's phone drops
+     * a pinch it held back up to its final value (`RemoteControlHandler`).
      */
     private fun holdBack(gestureGoesOn: Boolean) {
-        zoomSender.cancel()
+        val photographerZoom = session.peerCamera.value?.zoom
+        if (zoomSender.adjusting && photographerZoom != null) {
+            zoomSender.finish(photographerZoom)
+        } else {
+            zoomSender.cancel()
+        }
         zoomHeldBack = gestureGoesOn
-        session.peerCamera.value?.let { camera -> _uiState.update { it.copy(zoom = camera.zoom) } }
+        photographerZoom?.let { zoom -> _uiState.update { it.copy(zoom = zoom) } }
         _toggleLabels.trySend(ToggleLabel.ZoomHeld)
     }
 
@@ -682,7 +689,6 @@ class SubjectViewModel(
 
     private fun endInteractions() {
         pendingZoomStep = null
-        photographerZooming = false
         zoomHeldBack = false
         zoomSender.cancel()
         exposureSender.cancel()

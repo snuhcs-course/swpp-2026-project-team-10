@@ -20,11 +20,14 @@ import org.junit.Test
  * - The subject's step while the zoom is free: applied, and the zoom is the subject's, which the subject hears.
  * - The subject's steps and final value while the photographer's pinch holds it: none applied, no notice, and the
  *   final one answered with the camera's zoom as the photographer's.
+ * - The subject's pinch with a step held back, then the zoom freed: its later steps and final value still dropped
+ *   (an older subject that keeps sending), the final one answered; the next pinch applied.
  * - The subject's final value after its steps: applied, and the zoom free again.
  * - No request for 1 ms less than the timeout: still the subject's; at the timeout: free, and the lens settles. A later
  *   step starts the timeout again.
  * - The photographer's pinch taking and freeing the zoom: the subject hears both.
- * - stop while the subject holds the zoom: free. start while the photographer holds it: the subject hears it.
+ * - stop while the subject holds the zoom: free; while a pinch is held back: forgotten. start while the photographer
+ *   holds it: the subject hears it.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemoteZoomHoldTest {
@@ -76,6 +79,27 @@ class RemoteZoomHoldTest {
         assertTrue(actions.isEmpty())
         assertEquals(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true), lastFinalEcho())
         assertEquals(Role.PHOTOGRAPHER, hold.holder.value)
+        handler.stop()
+    }
+
+    @Test
+    fun subjectPinch_heldBackThenZoomFreed_staysHeldBackToItsFinalValue() = runTest {
+        started()
+        hold.take(Role.PHOTOGRAPHER)
+        handler.handle(SessionMessage.ZoomSet(2f))
+        hold.release(Role.PHOTOGRAPHER)
+        runCurrent()
+
+        handler.handle(SessionMessage.ZoomSet(2.5f))
+        handler.handle(SessionMessage.ZoomSet(2.6f, final = true))
+        runCurrent()
+        assertEquals(emptyList<Float>(), camera.requests)
+        assertNull(hold.holder.value)
+        assertEquals(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true), lastFinalEcho())
+
+        handler.handle(SessionMessage.ZoomSet(1.5f))
+        runCurrent()
+        assertEquals(listOf(1.5f), camera.requests)
         handler.stop()
     }
 
@@ -149,6 +173,22 @@ class RemoteZoomHoldTest {
         handler.stop()
 
         assertNull(hold.holder.value)
+    }
+
+    @Test
+    fun stop_subjectPinchHeldBack_isForgotten() = runTest {
+        started()
+        hold.take(Role.PHOTOGRAPHER)
+        handler.handle(SessionMessage.ZoomSet(2f))
+        hold.release(Role.PHOTOGRAPHER)
+
+        handler.stop()
+        handler.start(this)
+        handler.handle(SessionMessage.ZoomSet(1.5f))
+        runCurrent()
+
+        assertEquals(listOf(1.5f), camera.requests)
+        handler.stop()
     }
 
     @Test

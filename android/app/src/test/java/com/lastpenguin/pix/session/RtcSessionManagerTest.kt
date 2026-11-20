@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.ChannelRouter
@@ -487,6 +487,23 @@ class RtcSessionManagerTest {
         runCurrent()
         assertEquals(SessionState.Waiting("482915"), manager.state.value)
         assertEquals(1, incoming.count { it is SessionMessage.Leave })
+    }
+
+    @Test
+    fun `the subject keeps who holds the photographer's zoom, and a new session starts with none`() = runTest {
+        val (manager, peer) = connectedSubject()
+        assertNull(manager.peerZoomHolder.value)
+
+        peer.deliver(otherPhone.encode(SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER)))
+        runCurrent()
+        assertEquals(Role.PHOTOGRAPHER, manager.peerZoomHolder.value)
+        assertEquals(SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER), incoming.last())
+
+        manager.leave(EndReason.LEFT)
+        manager.start(SessionEntry.RoomCode("482915"), Role.SUBJECT)
+        runCurrent()
+        assertNull(manager.peerZoomHolder.value)
+        manager.leave(EndReason.CANCELLED)
     }
 
     @Test

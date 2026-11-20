@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -91,6 +91,9 @@ class RtcSessionManager(
 
     private val _peerCamera = MutableStateFlow<CameraState?>(null)
     override val peerCamera: StateFlow<CameraState?> = _peerCamera.asStateFlow()
+
+    private val _peerZoomHolder = MutableStateFlow<Role?>(null)
+    override val peerZoomHolder: StateFlow<Role?> = _peerZoomHolder.asStateFlow()
 
     private val _path = MutableStateFlow<IcePath?>(null)
     override val path: StateFlow<IcePath?> = _path.asStateFlow()
@@ -232,6 +235,7 @@ class RtcSessionManager(
         socketFailures = 0
         _peerCapabilities.value = null
         _peerCamera.value = null
+        _peerZoomHolder.value = null
         // The photographer stays Idle until the code arrives, or waits for the friend of an invitation; the subject is
         // connecting from the first moment.
         _state.value = when {
@@ -866,6 +870,11 @@ class RtcSessionManager(
             is SessionMessage.CameraStateUpdate -> {
                 _peerCamera.value =
                     CameraState(message.zoom, message.exposure, message.flash, message.aspect, facing = message.facing)
+                _incoming.tryEmit(message)
+            }
+
+            is SessionMessage.ZoomHoldUpdate -> {
+                _peerZoomHolder.value = message.by
                 _incoming.tryEmit(message)
             }
 

@@ -1,8 +1,9 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.settings
 
 import android.content.Context
 import android.util.Log
+import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -27,7 +28,8 @@ import kotlinx.coroutines.flow.stateIn
 
 /**
  * The choices on the settings screen that outlive the app (FR-10.1, Design 2.8): the guide's look, the camera's base
- * brightness, the latency indicator, and which screens' tutorial tips were seen (FR-10.4). Each change applies at once, through the flows.
+ * brightness, the latency indicator, crash reports and usage data (FR-10.6), and which screens' tutorial tips were seen
+ * (FR-10.4). Each change applies at once, through the flows.
  * The language is not here: Android keeps it as Pix's per-app language (`AppCompatDelegate.setApplicationLocales`).
  * Owner: Settings (#123).
  */
@@ -47,6 +49,12 @@ interface AppSettings {
     /** The screens whose tutorial tips were seen; null until the stored answer is read, so none ever flash (FR-10.4). */
     val tutorialSeen: StateFlow<Set<TutorialScreen>?>
 
+    /**
+     * Whether release builds send crash reports and usage events (FR-10.6, Design 2.8, Telemetry); on by default. null
+     * until the stored answer is read, so a phone whose user turned it off never sends in between.
+     */
+    val shareUsage: StateFlow<Boolean?>
+
     suspend fun setGuideColor(color: GuideColor)
 
     suspend fun setGuideThickness(thickness: GuideThickness)
@@ -55,6 +63,8 @@ interface AppSettings {
 
     /** Kept within [BASE_BRIGHTNESS_EV]. */
     suspend fun setBaseBrightness(ev: Float)
+
+    suspend fun setShareUsage(share: Boolean)
 
     /** Adds [screens] to the tips seen. */
     suspend fun setTutorialSeen(screens: Set<TutorialScreen>)
@@ -68,6 +78,7 @@ interface AppSettings {
         latency: Boolean = false,
         brightness: Float = 0f,
         tutorial: Set<TutorialScreen>? = TutorialScreen.entries.toSet(),
+        usage: Boolean? = true,
     ) : AppSettings {
         private val _guideLook = MutableStateFlow(look)
         override val guideLook: StateFlow<GuideLook> = _guideLook.asStateFlow()
@@ -80,6 +91,9 @@ interface AppSettings {
 
         private val _tutorialSeen = MutableStateFlow(tutorial)
         override val tutorialSeen: StateFlow<Set<TutorialScreen>?> = _tutorialSeen.asStateFlow()
+
+        private val _shareUsage = MutableStateFlow(usage)
+        override val shareUsage: StateFlow<Boolean?> = _shareUsage.asStateFlow()
 
         override suspend fun setGuideColor(color: GuideColor) {
             _guideLook.value = _guideLook.value.copy(color = color)
@@ -95,6 +109,10 @@ interface AppSettings {
 
         override suspend fun setBaseBrightness(ev: Float) {
             _baseBrightness.value = ev.coerceIn(BASE_BRIGHTNESS_EV)
+        }
+
+        override suspend fun setShareUsage(share: Boolean) {
+            _shareUsage.value = share
         }
 
         override suspend fun setTutorialSeen(screens: Set<TutorialScreen>) {
@@ -123,11 +141,12 @@ private val Context.appSettingsStore by preferencesDataStore(name = "app_setting
 
 /**
  * Kept in Jetpack DataStore (Design 1.2), read into the flows on [scope] from the start. Until the first read, and after
- * a storage error, the flows hold the defaults; a choice that cannot be saved is lost with the process.
+ * a storage error, the flows hold the defaults, except [shareUsage], which stays unread; a choice that cannot be saved
+ * is lost with the process. [store] is the app's own outside tests.
  */
-class DataStoreAppSettings(context: Context, scope: CoroutineScope) : AppSettings {
+class DataStoreAppSettings(private val store: DataStore<Preferences>, scope: CoroutineScope) : AppSettings {
 
-    private val store = context.applicationContext.appSettingsStore
+    constructor(context: Context, scope: CoroutineScope) : this(context.applicationContext.appSettingsStore, scope)
 
     private val preferences = store.data
         .catch { error ->
@@ -152,6 +171,19 @@ class DataStoreAppSettings(context: Context, scope: CoroutineScope) : AppSetting
             TutorialScreen.entries.filter { it.name in names }.toSet()
         }.stateIn(scope, SharingStarted.Eagerly, null)
 
+    /**
+     * Read apart from the other settings: a read that fails keeps the last answer, or none, and never takes the default,
+     * which would turn sharing on for a user who turned it off (FR-10.6).
+     */
+    override val shareUsage: StateFlow<Boolean?> =
+        store.data
+            .map<Preferences, Boolean?> { it[SHARE_USAGE] ?: true }
+            .catch { error ->
+                if (error !is IOException) throw error
+                Log.w(TAG, "Could not read whether usage data is shared", error)
+            }
+            .stateIn(scope, SharingStarted.Eagerly, null)
+
     override suspend fun setGuideColor(color: GuideColor) = save { it[GUIDE_COLOR] = color.name }
 
     override suspend fun setGuideThickness(thickness: GuideThickness) = save { it[GUIDE_THICKNESS] = thickness.name }
@@ -159,6 +191,8 @@ class DataStoreAppSettings(context: Context, scope: CoroutineScope) : AppSetting
     override suspend fun setShowLatency(show: Boolean) = save { it[SHOW_LATENCY] = show }
 
     override suspend fun setBaseBrightness(ev: Float) = save { it[BASE_BRIGHTNESS] = ev.coerceIn(BASE_BRIGHTNESS_EV) }
+
+    override suspend fun setShareUsage(share: Boolean) = save { it[SHARE_USAGE] = share }
 
     override suspend fun setTutorialSeen(screens: Set<TutorialScreen>) = save { stored ->
         stored[TUTORIAL_SEEN] = stored[TUTORIAL_SEEN].orEmpty() + screens.map { it.name }
@@ -187,5 +221,6 @@ class DataStoreAppSettings(context: Context, scope: CoroutineScope) : AppSetting
         val SHOW_LATENCY = booleanPreferencesKey("show_latency")
         val BASE_BRIGHTNESS = floatPreferencesKey("base_brightness_ev")
         val TUTORIAL_SEEN = stringSetPreferencesKey("tutorial_seen_screens")
+        val SHARE_USAGE = booleanPreferencesKey("share_usage")
     }
 }

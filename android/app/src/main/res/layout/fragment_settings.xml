@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Settings, from the gear on Camera (FR-10.1, R&S 6.10): the camera's base brightness (FR-1.11), the guide's color
-     and thickness with a preview (FR-3.10), the latency indicator (FR-10.3), the language (FR-10.2), notifications, the AI consent (FR-4.2), the Pix account, how
+     and thickness with a preview (FR-3.10), the latency indicator (FR-10.3), the language (FR-10.2), notifications, the AI consent (FR-4.2), crash reports and usage data (FR-10.6), the Pix account, how
      to use Pix, and the app's version and licenses. Every choice applies at once and stays after a restart. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -306,7 +306,7 @@
                     layout="@layout/item_setting_row" />
             </LinearLayout>
 
-            <!-- Privacy (FR-4.2) -->
+            <!-- Privacy (FR-4.2, FR-10.6) -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -338,6 +338,47 @@
                     android:paddingHorizontal="16dp"
                     android:text="@string/settings_consent_body"
                     android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+            </LinearLayout>
+
+            <!-- Crash reports and usage data (FR-10.6, Design 2.8, Telemetry), a card of its own like the latency row. -->
+            <LinearLayout
+                android:id="@+id/usageRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_list_card"
+                android:gravity="center_vertical"
+                android:minHeight="56dp"
+                android:paddingVertical="12dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="12dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_usage"
+                        android:textAppearance="@style/TextAppearance.Pix.BodyLarge" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/settings_usage_body"
+                        android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+                </LinearLayout>
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/usageSwitch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:contentDescription="@string/settings_usage" />
             </LinearLayout>
 
             <!-- Account (F5) -->

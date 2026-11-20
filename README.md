@@ -59,7 +59,7 @@ This table lists everything the Iteration 4 build can do. The subsection below l
 | **Pix ID and friends** | Sign up with a Pix ID and a password, or continue with Google. Find friends by their exact Pix ID. Send and answer friend requests. A friend request arrives as a push notification. Everything else in Pix works without an account. |
 | **Shoot together** | Tap *Shoot together* and choose who takes the photo. The photographer invites a Pix friend or shows a 6-digit code. The friend gets a push notification and accepts the invitation. Without an account, the subject enters the code. The phones connect over Wi-Fi or cellular data. When the phones have no direct path, a TURN relay forwards the encrypted video. After a drop of less than 10 s, the session comes back by itself. When the subject leaves or drops, the photographer's phone says so until they are back. |
 | **Both phones in a session** | The subject's phone shows the live camera in the photographer's ratio, as a mirror, with the same guide and thumbnail. Either phone can add a guide from a photo, and the other phone shows its thumbnail. Both phones show the pose description as either person types it, and the candidates as they arrive. The first phone to pick a candidate decides. The subject can zoom, change the brightness and the flash, move the guide, and open the photographer's tip. One phone zooms at a time, and the other says who is zooming. Only the photographer takes the photo. Both phones save it, and each phone's thumbnail shows the session's photos. |
-| **Settings and help** | The gear on Camera opens *Settings*, also during a session. It has the base brightness, the guide's color and thickness, and the live-view delay. It also has the language (English or Korean), notifications, the AI agreement, and the Pix account. At first use, a tutorial shows tips over each screen, and a tap anywhere closes them. *Settings* can show the tutorial again. |
+| **Settings and help** | The gear on Camera opens *Settings*, also during a session. It has the base brightness, the guide's color and thickness, and the live-view delay. It also has the language (English or Korean), notifications, the AI agreement, *Share usage data*, and the Pix account. At first use, a tutorial shows tips over each screen, and a tap anywhere closes them. *Settings* can show the tutorial again. |
 
 The plan for every iteration is in [Requirements and Specifications §4.1](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Requirements-and-Specifications#41-scope-by-iteration).
 
@@ -72,6 +72,7 @@ These features are new since the Iteration 3 build:
 - **The session's photos.** Each phone's thumbnail shows the session's photos. Pix's album opens in Pix's own viewer, as in a gallery app ([#239], [#248]).
 - **Fixes from the user test and the heuristic evaluation.** Back goes one step back on the pose screens ([#222]). A refused description stays out of the history ([#221]), and each failure says why ([#223]). The subject sees a mirror ([#224]). The step's action sits at the top right, Settings opens in a session, and the scene photo keeps the camera's bar ([#225], [#232]). Every color is a token ([#219]).
 - **Fixes from UAT cycle 1.** One phone zooms at a time ([#252]). The notice that the subject left stays on screen ([#249]). The reference thumbnail hides at the side, and it shows for a guide from the subject ([#241], [#245]).
+- **Crash reports and usage data.** Release builds send crash reports and usage events through Firebase, never a description, a name, or a room code. *Share usage data* in Settings turns them off ([#256]).
 - **Better tips and a faster shutter.** The tip says how far to stand and how to hold the phone, and the subject can open it ([#240]). The camera takes the photo 0.26 s after the press instead of 0.70 s ([#230]).
 - **Tests.** The Iteration 4 flows passed on two phones, and four of us checked the tips: 92 % match their pose ([#253], [#255]).
 
@@ -112,9 +113,9 @@ The full design is in the [Design Documentation](https://github.com/snuhcs-cours
 
 | Part | Stack |
 |---|---|
-| Android app | Kotlin 2.2, XML Views with ViewBinding, Navigation, ViewModel, and coroutines · CameraX 1.6 · ML Kit Subject Segmentation, Pose Detection, and Face Detection · WebRTC (`io.github.webrtc-sdk:android` 137) · OkHttp 4.12 and Retrofit 2.11 with kotlinx.serialization · Jetpack DataStore · Credential Manager with Google ID · Firebase Cloud Messaging |
+| Android app | Kotlin 2.2, XML Views with ViewBinding, Navigation, ViewModel, and coroutines · CameraX 1.6 · ML Kit Subject Segmentation, Pose Detection, and Face Detection · WebRTC (`io.github.webrtc-sdk:android` 137) · OkHttp 4.12 and Retrofit 2.11 with kotlinx.serialization · Jetpack DataStore · Credential Manager with Google ID · Firebase Cloud Messaging, Crashlytics, and Analytics |
 | Server | Python 3.11 · FastAPI and Uvicorn (WebSocket signaling and REST API) · SQLAlchemy 2 with asyncpg and Alembic on PostgreSQL 18 · Redis (session store) · PyJWT and argon2 · google-auth (Google sign-in and FCM) · pydantic-settings · httpx2 · Pillow · Docker and nginx with blue-green deploys |
-| Services | Cloudflare Realtime (TURN relay) · Firebase Cloud Messaging · OpenRouter · AWS EC2 (the AWS server) |
+| Services | Cloudflare Realtime (TURN relay) · Firebase Cloud Messaging, Crashlytics, and Analytics · OpenRouter · AWS EC2 (the AWS server) |
 | AI | Through OpenRouter: GPT Image 2.5 Flare at low quality for the candidates · Gemini 3.1 Flash Lite for the suggestions and the tips · Jev 1.14 (`typesafe/jev-1.14`) for the description filter and the person check. The AI module test uses Claude Opus 5.5 as its judge. |
 | Tests and CI | JUnit 4, Robolectric 4.17, and FragmentScenario with JaCoCo · pytest with pytest-cov, fakeredis, and SQLite · Spotless with ktlint · Ruff · GitHub Actions (lint, tests, the server image, the AWS deploy, the wiki) |
 
@@ -261,3 +262,4 @@ SWPP 2026 Team 10:
 [#252]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/252
 [#253]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/253
 [#255]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/255
+[#256]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/256

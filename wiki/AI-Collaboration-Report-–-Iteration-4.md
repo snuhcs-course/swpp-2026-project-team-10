@@ -4,12 +4,12 @@
 
 ## 1. Where AI Was Used
 
-- **Feature development** (19 PRs, [#219]–[#252]): Claude Code planned each task and wrote the code, the tests, the wireframes, and the document updates. The author chose the scope and the look, and checked the result on phones. This covers the situations, landscape photos and the controls that turn, the session's photos and Pix's viewer, the tips, and the fixes from UAT cycle 1.
+- **Feature development** (20 PRs, [#219]–[#256]): Claude Code planned each task and wrote the code, the tests, the wireframes, and the document updates. The author chose the scope and the look, and checked the result on phones. This covers the situations, landscape photos and the controls that turn, the session's photos and Pix's viewer, the tips, crash reports and usage data, and the fixes from UAT cycle 1.
 - **Usability improvements** ([#222], [#223], [#225], [#232], [#250]): the problems of the user test and the heuristic evaluation (Testing Documentation 4.1, 4.2). The agent rendered the real screens at the Galaxy S22's size before changing them, and the team chose among drafts from those screenshots.
 - **Testing** ([#229], [#253], [#255]): 397 app and 90 server tests were added (2,108 and 881 in all). The agent checked its coverage split against Iteration 3's numbers and made a flaky server test fail every time before fixing it. Claude Code subagents read the 50 tips outside our sample of the tips check (49 of 50 right); the threshold counts only our own answers.
-- **Code review:** Codex left 38 inline findings and 18 reviews with findings on 20 code PRs, and 21 reviews with no major issue. The author had Claude Code check each finding, then fix it or reply.
+- **Code review:** Codex left 43 inline findings and 19 reviews with findings on 21 code PRs, and 21 reviews with no major issue. The author had Claude Code check each finding, then fix it or reply.
 - **Documents** ([#218], [#220], [#226], [#233], [#251]): the Iteration 4 plan and issues from the kickoff notes, the UAT results, and the standup logs.
-- **CLAUDE.md:** the root file did not change. Each feature PR added its rules to `android/CLAUDE.md` (15 PRs) or `server/CLAUDE.md` (5 PRs) ([[history|Iteration-4-–-CLAUDE-md-History]]).
+- **CLAUDE.md:** the root file did not change. Each feature PR added its rules to `android/CLAUDE.md` (16 PRs) or `server/CLAUDE.md` (5 PRs) ([[history|Iteration-4-–-CLAUDE-md-History]]).
 - **Not used:** product decisions, the phone runs of the integration scripts and the UAT, our answers in the tips check, and final review verdicts.
 
 ## 2. Prompt History
@@ -59,7 +59,7 @@ Fixes were made by prompting Claude Code again. These are decisions the team mad
 
 - Ask for a measurement before a cause: three guessed causes each cost a round this iteration.
 - Say which actions need a yes first: paid calls, and taps on a real phone.
-- Trim `android/CLAUDE.md`, which grew from 5,525 to 7,311 words this iteration, and every session reads it whole.
+- Trim `android/CLAUDE.md`, which grew from 5,525 to 7,410 words this iteration, and every session reads it whole.
 
 [#203]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/203
 [#209]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/209
@@ -91,3 +91,4 @@ Fixes were made by prompting Claude Code again. These are decisions the team mad
 [#252]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/252
 [#253]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/253
 [#255]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/255
+[#256]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/256

@@ -62,6 +62,34 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 - [Sungmin, 11-20] "Commit and push."
 - [Sungmin, 11-20] "Write the AI prompt log too, then commit and push." (This section.)
 
+## Crash reports and usage data ([#254])
+
+- [Jaewan, 11-20] "I think we should add some telemetry logging to the android part before deploying to the app store, how should we do this?"
+- [Jaewan, 11-20] "should the firebase project owner do this? or can i also do this?"
+- [Jaewan, 11-20] "or can we add that person to add me to the project"
+- [Jaewan, 11-20] "start drafting the telemetry PR"
+- [Jaewan, 11-20] "we're going to deploy to one store not google play. and tell me what to do in firebase"
+- [Jaewan, 11-20] "where are the analytics settings at"
+- [Jaewan, 11-20] "do i also need permisssion for this?"
+- [Jaewan, 11-20] "we already had a linked analysis account"
+- [Jaewan, 11-20] "do the firebase and google analytics accounts have to be accessed from the same google account?"
+- [Jaewan, 11-20] "is it okay to unlink and relink a new account? should anything change then?"
+- [Jaewan, 11-20] "what should i set the new account name? any recommendation"
+- [Jaewan, 11-20] "where is 'google signals' and 'custom definitions' located in the settings"
+- [Jaewan, 11-20] "[Image #1] [Image #2] good? now where is crashlytics"
+- [Jaewan, 11-20] "i think it's already enabled. can you send the report?"
+- [Jaewan, 11-20] "[Image #3] good?"
+- [Jaewan, 11-20] "shut the emulator down. now what more i need to check?"
+- [Jaewan, 11-20] "can you run step 1 in the emulator? and i'll check in analytics. for step 2, i've closed the issue and gave teammates access"
+- [Jaewan, 11-20] "where can i view these logs?"
+- [Jaewan, 11-20] "check this here 'https://console.firebase.google.com/project/pix-swpp/overview', yourself in brave"
+- [Jaewan, 11-20] "[Image #4] [Image #5] [Image #6]"
+- [Jaewan, 11-20] "do you recommend it? yes then"
+- [Jaewan, 11-20] "commit and push this. open an issue with Iter4-A8, and link the PR to this"
+- [Jaewan, 11-20] "checks on phones are done"
+- [Jaewan, 11-20] "change them. and what changed in 'AppSettings'?"
+- [Jaewan, 11-20] "this is confirmed"
+
 [#201]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/201
 [#234]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/234
 [#235]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/235
@@ -69,3 +97,4 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 [#238]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/238
 [#247]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/247
 [#252]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/252
+[#254]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/254

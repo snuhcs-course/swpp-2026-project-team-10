@@ -6,7 +6,7 @@ This page continues the [[Iteration 3 history|Iteration-3-–-CLAUDE-md-History]
 
 The rules that changed are in the two other files, each updated in the PR whose feature needed the rule:
 
-- `android/CLAUDE.md`: 15 PRs ([#219], [#221], [#222], [#223], [#225], [#228], [#230], [#232], [#239], [#240], [#241], [#242], [#245], [#248], [#252]), from 5,525 to 7,311 words.
+- `android/CLAUDE.md`: 16 PRs ([#219], [#221], [#222], [#223], [#225], [#228], [#230], [#232], [#239], [#240], [#241], [#242], [#245], [#248], [#252], [#256]), from 5,525 to 7,410 words.
 - `server/CLAUDE.md`: 5 PRs ([#223], [#227], [#229], [#240], [#242]), from 2,260 to 2,608 words.
 
 `git log -- android/CLAUDE.md server/CLAUDE.md` gives each change with its PR.
@@ -28,3 +28,4 @@ The rules that changed are in the two other files, each updated in the PR whose 
 [#245]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/245
 [#248]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/248
 [#252]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/252
+[#256]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/256

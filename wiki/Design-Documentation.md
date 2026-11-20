@@ -108,7 +108,8 @@
 | 3.28 | 2026-11-19 | The notice that the subject left (Iter4-A5, [#238]): 10 s on Camera, gone once the subject is back, and a photo not sent shown after it (2.6.5). |
 | 3.29 | 2026-11-19 | *Add a pose guide* (Iter4-A6, [#243]): each situation's tile starts its scene photo, with no preselection, a pressed look, *Top pick* on *Auto*, and no second tap, then a guide from a photo; a closed picker leaves its screen open; an edge caption on a seam (`seamRing`) (2.4, 2.6.2, 2.6.3, 2.6.5, 2.6.8). |
 | 3.30 | 2026-11-20 | One phone zooms at a time (Iter4-A3, [#236]): `ZoomHold` on the photographer's phone, `camera.zoom.hold` kept as `SessionManager.peerZoomHolder`, the cancel of a pinch held back, and the label of the phone held back (AD-7, 2.1, 2.5.1, 2.6.5, 2.8, Figure 7). |
-| 3.31 | 2026-11-20 | The design as built through Iteration 4: the QR connection ([#214]) and light mode ([#212]) dropped on 11/20 as not needed, so *Still open* is empty; the Iteration 4 tasks' status, with the UAT's fixes and the scene photo step added, and what is left for Iteration 5 (2.1, 2.8, 2.9, 3). |
+| 3.31 | 2026-11-20 | Crash reports and usage events through Firebase, behind `Telemetry`, while *Share usage data* allows it (1.1.1, 1.1.2, 1.2, AD-19, 2.1, 2.6.8, 2.8, 2.9; FR-10.6; Iter4-A8, [#254]). |
+| 3.32 | 2026-11-20 | The design as built through Iteration 4: the QR connection ([#214]) and light mode ([#212]) dropped on 11/20 as not needed, so *Still open* is empty; the Iteration 4 tasks' status, with the UAT's fixes and the scene photo step added, and what is left for Iteration 5 (2.1, 2.8, 2.9, 3). |
 
 </details>
 
@@ -150,14 +151,14 @@ Pix is one Android app in two roles, **photographer** and **subject**, plus a sm
 
 ![Architecture](images/design_target_architecture.png)
 
-*Figure 1. High-level architecture. The phones talk to each other over WebRTC and to the Pix server over HTTP and WS on port 80. Through OpenRouter, a decision model checks each text and scene photo before the vision and image models see it. Saved guides stay on the phone. Push notifications and the relay, drawn dashed, are built (Iter3-P13, Iter3-P15). The relay is Cloudflare's service, not a process on the Pix server (AD-11, AD-14, AD-18).*
+*Figure 1. High-level architecture. The phones talk to each other over WebRTC and to the Pix server over HTTP and WS on port 80. Through OpenRouter, a decision model checks each text and scene photo before the vision and image models see it. Saved guides stay on the phone. Push notifications and the relay, drawn dashed, are built (Iter3-P13, Iter3-P15). The relay is Cloudflare's service, not a process on the Pix server (AD-11, AD-14, AD-18). Release builds send crash reports and usage events to Firebase, while the user allows it (AD-19).*
 
 #### 1.1.2 Components and interfaces
 
 | Component | Responsibility | Interfaces |
 |----|----|----|
-| **Pix app, photographer role** (Android) | Owns the camera. Makes and saves guides, takes photos, requests poses, and streams video. Applies the subject's requests. Signs in, keeps friends, and invites them. | CameraX; ML Kit; WebRTC; REST; signaling; MediaStore; app files; DataStore; Credential Manager; FCM |
-| **Pix app, subject role** (Android) | Shows the live video under its own copy of the guide. Requests camera changes, guide moves, guides, and pose steps (AD-7). Saves the session's photos and guides. Gets invitations by push, link, or *See their camera*. | WebRTC; REST; signaling; ML Kit; MediaStore; app files; FCM |
+| **Pix app, photographer role** (Android) | Owns the camera. Makes and saves guides, takes photos, requests poses, and streams video. Applies the subject's requests. Signs in, keeps friends, and invites them. | CameraX; ML Kit; WebRTC; REST; signaling; MediaStore; app files; DataStore; Credential Manager; FCM; Crashlytics and Analytics |
+| **Pix app, subject role** (Android) | Shows the live video under its own copy of the guide. Requests camera changes, guide moves, guides, and pose steps (AD-7). Saves the session's photos and guides. Gets invitations by push, link, or *See their camera*. | WebRTC; REST; signaling; ML Kit; MediaStore; app files; FCM; Crashlytics and Analytics |
 | **Signaling hub** (Pix server) | Creates room-code sessions; relays SDP and ICE, never media; gives each phone its `iceServers` and a rejoin token. A socket with an access token marks its user online (FR-5.9). Counts wrong room codes per address. | WebSocket, JSON (2.5.2); session store |
 | **Pose proxy** (Pix server) | Holds the API key and validates the scene photo. Refuses harmful or manipulative text and scenes without a person. Gets four poses or three variations, a candidate per pose, and a tip for the chosen one. Applies timeouts (60 s per image) and rate limits, and cancels the upstream call when the phone drops. | REST `POST /api/v1/pose-suggestions`, `/poses`, `/pose-tips`; `GET /api/v1/pose-templates` for apps before Iteration 2 (2.5.3) |
 | **Account and friends API** (Pix server) | Sign-up and sign-in with a Pix ID and a password or with Google; tokens; exact-match lookup; friend requests, friendships, presence; push device tokens. | REST `/auth`, `/me`, `/users`, `/friend-requests`, `/friends`, `/devices` (2.5.3) |
@@ -166,6 +167,7 @@ Pix is one Android app in two roles, **photographer** and **subject**, plus a sm
 | **Database** (server host) | PostgreSQL: users, sign-in sessions, spent refresh tokens, devices, friend requests, friendships, invitations (2.7). | SQL, through the server only |
 | **Session store** (server host) | Redis: sessions, room codes, presence, rate-limit windows, wrong-code counts; pub/sub between server processes (AD-18, 2.7). | Redis, through the server only |
 | **Firebase Cloud Messaging** (external) | Invitation and friend-request notifications, even with Pix closed. | FCM HTTP v1 API; Firebase SDK |
+| **Firebase Crashlytics and Analytics** (external) | Crash reports, errors the app survived, and usage events from release builds, while the user allows it (FR-10.6, AD-19). | Firebase SDK, from the app only |
 | **Google sign-in** (external) | Identifies a Google user; the server verifies the ID token and never stores it. | Credential Manager; token check on the server |
 | **OpenRouter models** (external) | A vision model suggests four poses or three variations of a description, and writes the tip. A decision model runs the description filter on every description and pose, and the person check on every `POST /poses` scene. An image-editing model makes the same person in the same scene in another pose (2.6.3). | Chat completions, `POST https://openrouter.ai/api/v1/chat/completions` (`PIX_SUGGESTION_MODEL`, `PIX_TIP_MODEL`; default `google/gemini-3.1-flash-lite`); Decisions API, `POST https://openrouter.ai/api/alpha/decisions` (`PIX_FILTER_MODEL`, `PIX_PERSON_MODEL`; default `typesafe/jev-1.14`); Image API, `POST https://openrouter.ai/api/v1/images` (`PIX_POSE_MODEL`; default `openai/gpt-image-2.5-flare@low`) |
 
@@ -308,7 +310,7 @@ App versions are from `android/gradle/libs.versions.toml`; server versions are t
 | OkHttp 4.12, Retrofit 2.11 | WebSocket signaling; REST | App |
 | Jetpack DataStore 1.1 | The sign-in, the aspect ratio, the AI agreement, the descriptions used before (FR-4.11), and most settings (2.6.8) | App |
 | Credential Manager 1.5, Google ID 1.1 | Google sign-in. The ID token goes to the server once, and again only after `NOT_REGISTERED` (FR-5.13). | App |
-| Firebase Messaging (Firebase BoM 34.0) | Pushes, also with Pix closed; the device token | App |
+| Firebase Messaging, Crashlytics, and Analytics (Firebase BoM 34.0; Crashlytics Gradle plugin 3.0) | Pushes, also with Pix closed, and the device token; crash reports, errors, and usage events from release builds (2.8, *Telemetry*) | App |
 | Manrope, Pretendard, DM Mono (bundled fonts) | UI text, Korean text, the room code (2.8) | App |
 | FastAPI 0.142, Uvicorn 0.54 with `websockets`, pydantic-settings, python-multipart, Pillow 12 (Python 3.11) | Signaling and REST in one process, in one or more workers (AD-18); settings; uploads; checking scene photos and converting candidates to JPEG | Server |
 | `httpx2` 2.13 | Calls to OpenRouter, Cloudflare, FCM, and Google's published keys | Server |
@@ -341,6 +343,7 @@ App versions are from `android/gradle/libs.versions.toml`; server versions are t
 | AD-16 | **Saved guides live in the app's private storage** | Reuse with nothing in the gallery or on the server (FR-3.8, NFR-13). The library (FR-3.11) is this store: up to 100 guides, thumbnails read on demand. | Gallery album; server-side guides |
 | AD-17 | **Pinch zoom with a guide-edit mode toggle on both phones** | A pinch is the natural zoom, and one toggle decides: on, gestures edit the guide; off, a pinch zooms. The subject moves the guide (FR-7.2) and zooms too. | A zoom slider; deciding by where the finger lands |
 | AD-18 | **Session state lives in a Redis session store, not in the server process** | Workers share the state, and a new copy takes over during a deploy without losing a waiting room (2.8). The small, short-lived state fits Redis's atomic scripts, expiry, and pub/sub (2.7). Cost: one more service and Lua room transitions; NFR-18's 50 sessions fit in one worker. | One process with in-memory state; routing rooms by code; the relational database |
+| AD-19 | **Crash reports and usage events through Firebase Crashlytics and Analytics, behind one `Telemetry` facade** | Pix already uses Firebase for pushes, so no account or server is added. The phones send over HTTPS from any network, which the course servers cannot receive. One facade with typed events keeps personal data out (NFR-13) and lets tests record what is sent. Release builds only, while the user allows it (FR-10.6). | An endpoint on the Pix server (plain HTTP, campus only, our own storage and dashboards); Sentry (another account and SDK) |
 
 ## 2. Design Details
 
@@ -388,6 +391,7 @@ android/app/src/main/java/com/lastpenguin/pix/
 │               RemoteAuthRepository, RemoteFriendsRepository, PresenceConnection, GoogleIdTokens,
 │               InvitationManager and RemoteInvitationManager, PushTokenRegistrar
 ├─ push/        PixMessagingService (FCM), PushNotifications, FirebasePushTokens
+├─ telemetry/   Telemetry (the facade), TelemetryEvent, GatedTelemetry (ReportedError), FirebaseTelemetry
 ├─ session/     SessionModels*, SessionManager*, RtcSessionManager, SignalingClient, OkHttpSignalingClient,
 │               PeerConnectionClient, WebRtcPeerConnectionClient, WebRtcRuntime, CameraFrameSource, RemoteVideo,
 │               GuideImageCodec, GuideSyncer, GuideReference (GuideReferenceCodec, MirrorReference),
@@ -2899,7 +2903,7 @@ The settings screen (FR-10.1, R&S 6.10; Iter3-P23, [#123]) opens from a gear on 
 | Guide | Color, thickness, preview |
 | Shoot together | *Show the delay* |
 | General | *Language*, *Notifications* |
-| Privacy | *AI pose generation* |
+| Privacy | *AI pose generation*, *Share usage data* |
 | Account | *Pix account* |
 | Help | *How to use Pix*, *Show the tutorial again*, *About Pix* |
 
@@ -2913,6 +2917,7 @@ The settings screen (FR-10.1, R&S 6.10; Iter3-P23, [#123]) opens from a gear on 
 - **The other rows.**
   - *Notifications* shows whether Pix's notifications are on and opens Android's page for them.
   - *AI pose generation* follows `GenerationViewModel.consentGiven` (FR-4.2). After a confirmation, `withdrawConsent` withdraws the agreement, and Pix asks again before the next scene photo.
+  - *Share usage data* (FR-10.6) is a switch, on by default, kept as `AppSettings.shareUsage` (DataStore `share_usage`). It is disabled until the stored choice is read, so neither a tap nor the switch's restored state saves the default. A choice that cannot be read stays unread, never the default. A change applies at once (2.8, *Telemetry*).
   - *Pix account* shows the Pix ID and opens the account sheet. Signed out, it opens *Sign in*, which returns to Settings.
   - *How to use Pix* explains guides, poses, shooting together, and the subject's controls. *About Pix* shows the version and the open-source licenses.
 - **First-use tutorial (FR-10.4).** Each `TutorialScreen` shows tips over its live view the first time it opens: Camera, *Add a pose guide* from Camera, the guide on Camera, *Generate poses* on either phone, and Subject view, titled "When you're the subject".
@@ -3149,6 +3154,7 @@ erDiagram
 - No URL holds a Pix ID or other personal data, because nginx's error log prints a failed request's whole request line. The lookup is `POST /users/lookup`. nginx and Uvicorn access logs leave out query strings.
 - Password hashes run two at a time per worker. A burst of sign-ins, which needs no account, then queues instead of taking a 64 MiB argon2id buffer per pool thread.
 - Cloud backups are off (`allowBackup="false"`); `data_extraction_rules.xml` keeps the sign-in, `guides/`, and the prompt history out of transfers to a new phone.
+- Crash reports and usage events go to Firebase only from release builds, while the user allows it, and hold no personal data (*Telemetry*).
 
 **Measurement hooks**
 
@@ -3156,6 +3162,28 @@ erDiagram
 - Times are each phone's own clock (`elapsedRealtime`); the `ping.received` and `rtt` lines align two phones' logs (2.5.1).
 - Each ping also logs a `stats` line from WebRTC's statistics (codec, size, frame rate, bitrate, round-trip time), the source for NFR-5, NFR-6, and NFR-12. An `ice.pair` line names each new candidate pair (NFR-10, 2.6.7).
 - The zoom marks and the `zoom.frame` lines after each zoom request feed `android/scripts/zoom_timings.py` (2.6.5).
+
+**Telemetry** (AD-19, FR-10.6; Iter4-A8, [#254])
+
+- `telemetry/Telemetry` is the one entry point, like `Timings`: `Telemetry.event(TelemetryEvent)` and `Telemetry.error(where, error)`. Until `AppContainer.create` installs the real sink, and in tests, both do nothing.
+- `GatedTelemetry` sends only while the build allows it (`BuildConfig.TELEMETRY`: release builds; a debug build only with `pix.telemetry=true`) and the switch does, from the stored choice on. Off stops our events and Analytics at once and turns Crashlytics off; both keep the answer for the next start.
+- Crashlytics decides at each start whether to send the reports it holds. So they are deleted at the first start with it off, and it collects again only at a start, after that deletion: turned on again in the run that turned it off, it stays off until the next start.
+- The manifest turns collection on in release builds and off in debug builds, so a crash before the stored choice is read is caught as the user last chose.
+- Crashlytics catches crashes and freezes (ANRs) itself, with the exception's message. `Telemetry.error` reports a failure the app survived: each `catch` that logs with `Log.e`, and the guide maker's. Each place's error goes once per process, as a `ReportedError` with the place, the classes, and the stack traces, and no message.
+- No report has a user ID, an advertising ID, or an SSAID. The manifest removes the advertising-ID permissions that Analytics adds.
+- Analytics also sends its automatic events: `first_open`, `session_start`, `user_engagement`, and `app_exception` at a crash. Each carries the phone's model, the Android version, the app's version, and a random ID per install. Its automatic `screen_view` is off in the manifest, since Pix has one activity and every screen would read `MainActivity`.
+- Each of Pix's own events is one class of `TelemetryEvent`, so the app sends no other. Its fields are fixed choices, counts, and times in ms from `elapsedRealtime`, which is never set back:
+
+| Event | Sent | Fields | For |
+|----|----|----|----|
+| `guide_made` | Each guide from a gallery photo or a generated pose, also when it is left before it is made | `source`, `outcome` (`made`, `no_person`, `failed`, `cancelled`), `ms` | NFR-3 |
+| `poses_ended` | Each pose set's end, also when Back leaves it while generating | `request` (`suggested`, `described`), `situation`, `outcome` (`ok`, `cancelled`, or the `GenerationError`), `ready`, `total`, `ms` | FR-4.7, NFR-4 |
+| `session_connect` | Each try to connect, the subject's from its start and the photographer's from the subject joining | `entry`, `role`, `outcome` (`connected` or the `EndReason`), `ms` | NFR-10 |
+| `session_drop` | Each link that dropped while connected, once: back within the 10 s, or not, also when the session or its subject ends first | `role`, `recovered` (1 or 0), `ms` | NFR-11 |
+| `photo_taken` | Each shutter press | `outcome` (`saved`, `failed`), `shutter_ms` (until the camera took it), `ms`, `in_session` | NFR-19 |
+
+- Each field is an event-scoped custom definition in the linked Analytics property: a dimension, or a metric for a count or a time (milliseconds for `ms` and `shutter_ms`). Analytics' reports show only registered fields, from their registration on, so a new field is registered before its release.
+- To see a debug build's events in Firebase's DebugView, build with `-Ppix.telemetry=true` and run `adb shell setprop debug.firebase.analytics.app com.lastpenguin.pix`.
 
 **Hosting** (AD-11)
 
@@ -3276,6 +3304,7 @@ Owners follow the README's *Team* section. The Iteration 3 table names who built
 | **Guide sync** | 조성민 | `GuideSyncer`, the guide on Subject view | `visible` through `guide.state` (2.5.1) | UI |
 | **Shared steps** (`DescriptionSyncer`, `PoseSyncer`, `ConfirmSyncer`, `PhotoSyncer`) | 한준형 | — | — | UI |
 | **Settings and tutorial** (`SettingsViewModel`, `AppSettings`, `TutorialFragment`) | 조성민 (settings), 한준형 (tutorial) | — | — | All screens |
+| **Telemetry** (`telemetry/`) | 박재완 | — | — | All modules |
 
 The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 passed on the S21 and the S22 in Iteration 3, by eye. Remote focus and the remote-control switch (Iter2-P17, Could) move to Iteration 5, left out of Iteration 4 at its kickoff of 11/7.
 
@@ -3351,6 +3380,7 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 | The notice that the subject left (Iter4-A5, [#238]) | 박재완 | 11/20 | Done | 2.6.5 |
 | *Add a pose guide*: the situations as tiles, and the sheet kept open when the picker closes (Iter4-A6, [#243]) | 박재완 | 11/20 | Done | 2.4, 2.6.2, 2.6.3, 2.6.5, 2.6.8 |
 | Pix's album in Pix's own viewer, as in a gallery app (Iter4-A7, [#247]) | 박재완 | 11/20 | Done | 2.6.5 |
+| Crash reports and usage data from release builds (Iter4-A8, [#254]) | 박재완 | 11/20 | Done | AD-19, 2.6.8, 2.8 |
 | The offline QR connection (from #122) (Iter4-P17, [#214]) | 조성민 | 11/19 | Dropped | — |
 | Integration tests for the Iteration 4 flows (Iter4-P18, [#215]) | 조성민 | 11/19 | Done | Testing Documentation |
 | Integrate the Iteration 4 features (Iter4-P19, [#216]) | 조성민 | 11/19 | Done | — |
@@ -3489,3 +3519,4 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#216]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/216
 [#217]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/217
 [#247]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/247
+[#254]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/254

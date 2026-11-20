@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Dongje Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.generation
 
 import android.content.Context
@@ -15,6 +15,7 @@ import com.lastpenguin.pix.session.MirrorPoseSet
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.StartedDescription
 import com.lastpenguin.pix.session.protocol.PoseSetStep
+import com.lastpenguin.pix.telemetry.Telemetry
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -213,7 +214,10 @@ class DataStorePromptHistory(
             delay(READ_RETRY_MS)
             true
         }
-        .catch { error -> Log.e(TAG, "The prompt history can no longer be read", error) }
+        .catch { error ->
+            Log.e(TAG, "The prompt history can no longer be read", error)
+            Telemetry.error("prompt_history.read", error)
+        }
         .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
     override suspend fun record(text: String, role: Role, partnerId: String?) {

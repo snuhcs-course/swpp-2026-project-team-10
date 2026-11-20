@@ -1,7 +1,8 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
+import android.os.SystemClock
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -28,6 +29,8 @@ import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.PhotoShare
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.ZoomHold
+import com.lastpenguin.pix.telemetry.Telemetry
+import com.lastpenguin.pix.telemetry.TelemetryEvent
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -231,6 +234,8 @@ class CameraViewModel(
     /** The base brightness in EV from the settings (FR-1.11): each tap to focus starts from it again. */
     private val baseBrightness: StateFlow<Float> = MutableStateFlow(0f),
     private val clock: () -> Long = System::currentTimeMillis,
+    /** For durations, the telemetry's times (Design 2.8): never set back, unlike [clock], which dates the photos. */
+    private val elapsed: () -> Long = SystemClock::elapsedRealtime,
     /** How the phone is held: each photo is saved as it was at its shutter press (FR-1.5). */
     private val phoneTurns: PhoneTurns = PhoneTurns.Fixed(),
     /** Who holds the zoom in a session (`RemoteControlHandler.zoomHold`, FR-7.6); free outside one. */
@@ -508,6 +513,7 @@ class CameraViewModel(
             )
         }
         val takenAt = clock()
+        val pressedAt = elapsed()
         // At the press, like the time: the phone may turn while an earlier photo is still being saved.
         val turn = phoneTurns.turn.value
         // Now, not once it is saved: the photo belongs to the session running at the shutter.
@@ -517,6 +523,8 @@ class CameraViewModel(
         lastShot = viewModelScope.launch {
             // This press's own hold on the shutter: the "taken" of an earlier photo, come late, must not free it.
             var held = true
+            // When the camera took the photo, for its `photo_taken` event (NFR-19; Design 2.8, Telemetry).
+            var capturedAt: Long? = null
             fun free() {
                 if (!held) return
                 held = false
@@ -525,7 +533,12 @@ class CameraViewModel(
             try {
                 val result = try {
                     camera.setPhotoTurn(turn)
-                    camera.takePhoto(onCaptured = ::free)
+                    camera.takePhoto(
+                        onCaptured = {
+                            capturedAt = elapsed()
+                            free()
+                        },
+                    )
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: Exception) {
@@ -533,9 +546,18 @@ class CameraViewModel(
                 }
                 // A camera that never said "taken", or a photo that failed before it.
                 free()
+                val endedAt = elapsed()
                 // In shutter order, whatever order the saves end in: the thumbnail is the newest photo, and the
                 // session sends the photos as they were taken (PhotoSyncer).
                 earlier?.join()
+                Telemetry.event(
+                    TelemetryEvent.PhotoTaken(
+                        saved = result.isSuccess,
+                        shutterMs = capturedAt?.let { it - pressedAt },
+                        ms = endedAt - pressedAt,
+                        inSession = sessionId != null,
+                    ),
+                )
                 result.fold(
                     onSuccess = { uri ->
                         // No notice (FR-1.6, #204): the thumbnail shows the new photo, in a session once it is the

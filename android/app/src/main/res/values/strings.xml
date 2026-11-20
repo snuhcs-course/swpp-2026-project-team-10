@@ -478,6 +478,8 @@
     <string name="settings_withdraw_title">Withdraw your agreement?</string>
     <string name="settings_withdraw_message">Pix will ask again before it sends the next scene photo for poses.</string>
     <string name="settings_withdraw">Withdraw</string>
+    <string name="settings_usage">Share usage data</string>
+    <string name="settings_usage_body">Crash reports and how Pix runs, so we can fix problems. Never your photos, names, or what you write.</string>
     <string name="settings_section_account">Account</string>
     <string name="settings_account">Pix account</string>
     <string name="settings_signed_out">Not signed in</string>

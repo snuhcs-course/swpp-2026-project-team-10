@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -25,6 +25,8 @@ import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.session.PhotoShare
+import com.lastpenguin.pix.telemetry.TelemetryEvent
+import com.lastpenguin.pix.telemetry.TelemetryRecorder
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -45,6 +47,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -52,6 +55,9 @@ import org.junit.runner.RunWith
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class CameraViewModelTest {
+    @get:Rule
+    val telemetry = TelemetryRecorder()
+
     private val dispatcher = StandardTestDispatcher()
     private val store = ViewModelStore()
     private val camera = FakeCamera()
@@ -499,6 +505,48 @@ class CameraViewModelTest {
         override fun notTaken(sessionId: String) {
             failed += sessionId
         }
+    }
+
+    // The `photo_taken` event (NFR-19; Design 2.8, Telemetry): a photo saved in a session, with the time the camera
+    // took it and the time it was saved, from the press, on the clock for durations while the wall clock jumps; a photo
+    // that failed before the camera took it, outside one.
+    @Test
+    fun aSavedPhoto_sendsWhenTheCameraTookIt_andWhenItWasSaved() = runTest {
+        var now = 1_000L
+        var wall = 5_000_000L
+        val sharing = CameraViewModel(camera, guides, photos = RecordingShare(), clock = { wall }, elapsed = { now })
+
+        sharing.onShutter()
+        runCurrent()
+        now = 1_150
+        wall -= 3_600_000
+        camera.captured.single()()
+        now = 1_900
+        camera.capture.complete(Result.success(Uri.parse("content://media/external/images/media/1")))
+        runCurrent()
+
+        assertEquals(
+            listOf(TelemetryEvent.PhotoTaken(saved = true, shutterMs = 150, ms = 900, inSession = true)),
+            telemetry.sent<TelemetryEvent.PhotoTaken>(),
+        )
+    }
+
+    @Test
+    fun aPhotoThatFailedBeforeTheCameraTookIt_sendsFailed_withoutAShutterTime() = runTest {
+        var now = 1_000L
+        val alone =
+            CameraViewModel(camera, guides, photos = RecordingShare().apply { session = null }, elapsed = { now })
+
+        alone.onShutter()
+        runCurrent()
+        now = 1_040
+        camera.capture.complete(Result.failure(IOException("Storage full")))
+        runCurrent()
+
+        assertEquals(
+            listOf(TelemetryEvent.PhotoTaken(saved = false, shutterMs = null, ms = 40, inSession = false)),
+            telemetry.sent<TelemetryEvent.PhotoTaken>(),
+        )
     }
 
     @Test

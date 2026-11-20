@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -87,6 +87,9 @@ import com.lastpenguin.pix.settings.AndroidAppLanguage
 import com.lastpenguin.pix.settings.AppLanguage
 import com.lastpenguin.pix.settings.AppSettings
 import com.lastpenguin.pix.settings.DataStoreAppSettings
+import com.lastpenguin.pix.telemetry.FirebaseTelemetry
+import com.lastpenguin.pix.telemetry.GatedTelemetry
+import com.lastpenguin.pix.telemetry.Telemetry
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
@@ -94,6 +97,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -191,6 +196,13 @@ class AppContainer(
 
             /** Work that outlives every screen: loading the sign-in, presence, reading the saved guides. */
             val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            val appSettings = DataStoreAppSettings(appContext, appScope)
+            // Crash reports and usage events (Design 2.8, Telemetry): only while Settings allows them (FR-10.6), from
+            // the stored answer on, and never from a debug build unless pix.telemetry is set.
+            val telemetry = GatedTelemetry(FirebaseTelemetry(appContext), buildAllows = BuildConfig.TELEMETRY)
+            Telemetry.install(telemetry)
+            appScope.launch { appSettings.shareUsage.filterNotNull().collect(telemetry::setAllowed) }
+
             val json = Json { ignoreUnknownKeys = true }
             fun retrofit(client: OkHttpClient): Retrofit = Retrofit.Builder()
                 .baseUrl(BuildConfig.SERVER_URL)
@@ -317,7 +329,7 @@ class AppContainer(
                     attributeGuideChanges = guideSyncer::attribute,
                 ),
                 mobileDataNotice = DataStoreMobileDataNotice(appContext),
-                appSettings = DataStoreAppSettings(appContext, appScope),
+                appSettings = appSettings,
                 appLanguage = AndroidAppLanguage(),
                 screenLanguages = screenLanguages,
                 pushTokenRegistrar = pushTokenRegistrar,

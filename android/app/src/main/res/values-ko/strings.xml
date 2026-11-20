@@ -447,6 +447,8 @@
     <string name="settings_withdraw_title">동의를 철회할까요?</string>
     <string name="settings_withdraw_message">포즈를 만들려고 다음 장면 사진을 보내기 전에 다시 물어봐요.</string>
     <string name="settings_withdraw">철회</string>
+    <string name="settings_usage">사용 정보 보내기</string>
+    <string name="settings_usage_body">문제를 고칠 수 있게 오류 보고와 앱 동작 정보를 보내요. 사진, 이름, 입력한 글은 보내지 않아요.</string>
     <string name="settings_section_account">계정</string>
     <string name="settings_account">Pix 계정</string>
     <string name="settings_signed_out">로그인 안 함</string>

@@ -1,7 +1,8 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
+import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -29,6 +30,8 @@ import com.lastpenguin.pix.session.PoseShare
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SubjectPick
+import com.lastpenguin.pix.telemetry.Telemetry
+import com.lastpenguin.pix.telemetry.TelemetryEvent
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
@@ -764,6 +767,7 @@ class GenerationViewModel(
             "pose.start",
             (if (request is PoseRequest.Suggested) "suggested" else "described") + " " + situation.apiName,
         )
+        val startedAt = SystemClock.elapsedRealtime()
         // Why the run itself ended early, as the suggestions failing does; null when it ran to its end.
         var stopped: GenerationError? = null
         val inTime = withTimeoutOrNull(limitMs) {
@@ -804,6 +808,16 @@ class GenerationViewModel(
             }
         }
         val ended = _uiState.value
+        Telemetry.event(
+            TelemetryEvent.PosesEnded(
+                described = request is PoseRequest.Described,
+                situation = situation,
+                failure = failure.takeIf { ended.phase != GenerationUiState.Phase.PICKING },
+                ready = ended.readyCount,
+                total = ended.poses.size,
+                ms = SystemClock.elapsedRealtime() - startedAt,
+            ),
+        )
         if (ended.phase == GenerationUiState.Phase.PICKING) {
             // In the pager's order, which the subject's Pick a pose follows.
             share.picking(id, ended.poses.map { it.id }.filter { ended.candidates[it] is CandidateEvent.Ready })

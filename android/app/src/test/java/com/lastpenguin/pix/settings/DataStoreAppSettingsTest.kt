@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park
 package com.lastpenguin.pix.settings
 
 import androidx.test.core.app.ApplicationProvider
@@ -21,8 +21,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /*
- * The settings kept across runs (FR-10.1, Design 2.8): the defaults before any choice, then each choice in the flows and
- * read back by a new instance, as after a restart. One test, because the DataStore behind the context extension lives
+ * The settings kept across runs (FR-10.1, Design 2.8): the defaults before any choice (usage data shared, FR-10.6),
+ * then each choice in the flows and read back by a new instance, as after a restart. One test, because the DataStore behind the context extension lives
  * for the process.
  */
 @RunWith(AndroidJUnit4::class)
@@ -39,10 +39,12 @@ class DataStoreAppSettingsTest {
                 settings.tutorialSeen.filterNotNull().first()
             },
         )
+        assertTrue(withTimeout(TIMEOUT_MS) { settings.shareUsage.filterNotNull().first() })
 
         settings.setGuideColor(GuideColor.BLACK)
         settings.setGuideThickness(GuideThickness.THICK)
         settings.setShowLatency(true)
+        settings.setShareUsage(false)
         // Each screen's tips on their own: the second keeps the first.
         settings.setTutorialSeen(setOf(TutorialScreen.CAMERA))
         settings.setTutorialSeen(setOf(TutorialScreen.SUBJECT_VIEW))
@@ -51,11 +53,14 @@ class DataStoreAppSettingsTest {
         assertEquals(chosen, withTimeout(TIMEOUT_MS) { settings.guideLook.first { it == chosen } })
         assertTrue(withTimeout(TIMEOUT_MS) { settings.showLatency.first { it } })
         assertEquals(seen, withTimeout(TIMEOUT_MS) { settings.tutorialSeen.first { it == seen } })
+        assertEquals(false, withTimeout(TIMEOUT_MS) { settings.shareUsage.first { it == false } })
 
         val restarted = DataStoreAppSettings(ApplicationProvider.getApplicationContext(), scope)
         assertEquals(chosen, withTimeout(TIMEOUT_MS) { restarted.guideLook.first { it == chosen } })
         assertTrue(withTimeout(TIMEOUT_MS) { restarted.showLatency.first { it } })
         assertEquals(seen, withTimeout(TIMEOUT_MS) { restarted.tutorialSeen.first { it == seen } })
+        // Off from the first read: a phone whose user turned it off never sends in between (FR-10.6).
+        assertEquals(false, withTimeout(TIMEOUT_MS) { restarted.shareUsage.filterNotNull().first() })
 
         // Show the tutorial again: every screen's tips due again, also after a restart.
         restarted.resetTutorial()

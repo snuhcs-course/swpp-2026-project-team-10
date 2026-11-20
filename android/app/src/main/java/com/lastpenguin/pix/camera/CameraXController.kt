@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-17, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park
 package com.lastpenguin.pix.camera
 
 import android.content.Context
@@ -43,6 +43,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Observer
 import com.lastpenguin.pix.BuildConfig
 import com.lastpenguin.pix.core.Timings
+import com.lastpenguin.pix.telemetry.Telemetry
 import java.io.IOException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -822,6 +823,7 @@ class CameraXController(
             }
         } catch (error: Exception) {
             Log.e(TAG, "Could not process camera frame", error)
+            Telemetry.error("camera.frame", error)
         } finally {
             frame.close()
         }
@@ -906,6 +908,7 @@ class CameraXController(
     private fun failBinding(current: Binding, error: Exception) {
         if (binding !== current) return
         Log.e(TAG, "Could not bind the ${current.facing.name.lowercase()} camera", error)
+        Telemetry.error("camera.bind", error)
         if (recoverPrimary(current) || recoverRear(current)) return
         releaseBinding()
         publishStatus(CameraStatus.UNAVAILABLE)

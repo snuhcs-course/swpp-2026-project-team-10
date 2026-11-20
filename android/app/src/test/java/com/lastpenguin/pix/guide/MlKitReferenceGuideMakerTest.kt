@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park
 package com.lastpenguin.pix.guide
 
 import android.content.Context
@@ -7,6 +7,9 @@ import android.graphics.Color
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.lastpenguin.pix.telemetry.TelemetryEvent.GuideMade
+import com.lastpenguin.pix.telemetry.TelemetryEvent.GuideMade.Outcome
+import com.lastpenguin.pix.telemetry.TelemetryRecorder
 import java.io.File
 import kotlin.math.abs
 import kotlinx.coroutines.runBlocking
@@ -14,6 +17,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
@@ -27,10 +31,15 @@ import org.robolectric.annotation.GraphicsMode
  * and the thumbnail have the photo alone, and the guide keeps the screenshot and where the photo was), a screenshot of a
  * photo centered in an image viewer (cut at its sides too), the same with the whole image asked for (not cut), and a
  * camera photo (not cut); a generated pose shaped like a screenshot is never cut.
+ * Its `guide_made` event (Design 2.8, Telemetry): a guide made, no person (no error sent), and another failure (its
+ * error sent too).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class MlKitReferenceGuideMakerTest {
+    @get:Rule
+    val telemetry = TelemetryRecorder()
+
     /** The model replaced by a field: 1.0 inside [person], 0.0 elsewhere, or a failure. */
     private class FieldSegmenter(
         private val person: (x: Int, y: Int, width: Int, height: Int) -> Boolean,
@@ -102,6 +111,49 @@ class MlKitReferenceGuideMakerTest {
         val result = maker(FieldSegmenter(standing, failure)).make(photo(100, 100), GuideSource.GALLERY)
 
         assertTrue(result.exceptionOrNull() is SegmentationModelUnavailableException)
+    }
+
+    @Test
+    fun aGuideMade_sendsItsSourceAndMade() = runBlocking {
+        maker(FieldSegmenter(standing)).make(photo(300, 400), GuideSource.GENERATED).getOrThrow()
+
+        assertEquals(
+            listOf(GuideSource.GENERATED to Outcome.MADE),
+            telemetry.sent<GuideMade>().map {
+                it.source to
+                    it.outcome
+            },
+        )
+        assertTrue(telemetry.errors.isEmpty())
+    }
+
+    @Test
+    fun noPerson_sendsNoPerson_andNoError() = runBlocking {
+        maker(FieldSegmenter({ _, _, _, _ -> false })).make(photo(100, 100), GuideSource.GALLERY)
+
+        assertEquals(
+            listOf(GuideSource.GALLERY to Outcome.NO_PERSON),
+            telemetry.sent<GuideMade>().map {
+                it.source to
+                    it.outcome
+            },
+        )
+        assertTrue(telemetry.errors.isEmpty())
+    }
+
+    @Test
+    fun anotherFailure_sendsFailed_andItsError() = runBlocking {
+        val failure = SegmentationModelUnavailableException()
+        maker(FieldSegmenter(standing, failure)).make(photo(100, 100), GuideSource.GALLERY)
+
+        assertEquals(
+            listOf(GuideSource.GALLERY to Outcome.FAILED),
+            telemetry.sent<GuideMade>().map {
+                it.source to
+                    it.outcome
+            },
+        )
+        assertEquals(listOf("guide.make" to failure), telemetry.errors.toList())
     }
 
     @Test

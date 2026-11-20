@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-12, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.settings
 
 import android.content.ActivityNotFoundException
@@ -39,7 +39,8 @@ import kotlinx.coroutines.launch
  * Settings (FR-10.1, R&S 6.10), from the gear on Camera, and in a session from Subject view's too (#204), which this
  * screen covers, so it goes back to Subject view when the session ends, as the guide screens do. The base brightness, the guide's look, and the latency indicator are kept by
  * [SettingsViewModel]; the language is Android's per-app language, which recreates the screen in it; notifications open
- * Android's settings for Pix; the AI consent can be withdrawn here and is asked for again before the next scene photo.
+ * Android's settings for Pix; the AI consent can be withdrawn here and is asked for again before the next scene photo;
+ * *Share usage data* turns crash reports and usage events off or on (FR-10.6, Design 2.8, Telemetry).
  * Owner: Settings (#123).
  */
 class SettingsFragment : Fragment(R.layout.fragment_settings) {
@@ -65,6 +66,12 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
             if (checked != viewModel.showLatency.value) viewModel.setShowLatency(checked)
         }
         binding.latencyRow.setOnClickListener { binding.latencySwitch.toggle() }
+        binding.usageSwitch.setOnCheckedChangeListener { _, checked ->
+            // The render sets the switch too: only a change from the stored answer is saved, never one before it loads.
+            val stored = viewModel.shareUsage.value ?: return@setOnCheckedChangeListener
+            if (checked != stored) viewModel.setShareUsage(checked)
+        }
+        binding.usageRow.setOnClickListener { if (binding.usageSwitch.isEnabled) binding.usageSwitch.toggle() }
         // The base brightness (FR-1.11), saved as each step is chosen; the Camera screen applies it when it shows.
         binding.baseBrightnessSlider.setLabelFormatter { ExposureScale.formatEv(brightnessEv(it)) }
         binding.baseBrightnessSlider.addOnChangeListener { _, value, fromUser ->
@@ -97,6 +104,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.guideLook.collect { renderLook(binding, it) } }
                 launch { viewModel.showLatency.collect { binding.latencySwitch.isChecked = it } }
+                launch { viewModel.shareUsage.collect { renderUsage(binding, it) } }
                 launch { viewModel.baseBrightness.collect { renderBrightness(binding, it) } }
                 launch { viewModel.account.collect { renderAccount(binding.accountRow, it) } }
                 // Followed, not read once: Android may restore Pix straight to this screen before the answer loads.
@@ -116,6 +124,12 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
     override fun onDestroyView() {
         binding = null
         super.onDestroyView()
+    }
+
+    /** Off and disabled until the stored answer is read, so a tap never acts on the default (FR-10.6). */
+    private fun renderUsage(binding: FragmentSettingsBinding, share: Boolean?) {
+        binding.usageSwitch.isChecked = share == true
+        binding.usageSwitch.isEnabled = share != null
     }
 
     private fun renderBrightness(binding: FragmentSettingsBinding, ev: Float) {

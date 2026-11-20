@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -14,6 +14,8 @@ import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.session.signaling.IceCandidate
 import com.lastpenguin.pix.session.signaling.IceServer
 import com.lastpenguin.pix.session.signaling.SignalMessage
+import com.lastpenguin.pix.telemetry.Telemetry
+import com.lastpenguin.pix.telemetry.TelemetryEvent
 import java.util.EnumSet
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
@@ -103,6 +105,10 @@ class RtcSessionManager(
 
     // ---- Session fields, touched only on the serial scope ---------------------
     private var active = false
+    private var entry: SessionEntry? = null
+
+    /** The try to connect still open, for its one `session_connect` event (Design 2.8, Telemetry). */
+    private var attempt: ConnectAttempt? = null
     private var role: Role? = null
 
     /** The last round trips of this phone's pings, newest last, for [latencyMs]. */
@@ -195,6 +201,9 @@ class RtcSessionManager(
         }
         active = true
         this@RtcSessionManager.role = role
+        this@RtcSessionManager.entry = entry
+        // The subject tries from its start; the photographer once a subject joins (onPeerJoined).
+        attempt = if (role == Role.SUBJECT) ConnectAttempt(entry, role, clock()) else null
         // A Reconnect takes its place in the session it lost; without a token for it, it joins the code again.
         val ticket = lost?.takeIf { entry is SessionEntry.Rejoin && it.code == entry.code }
         this@RtcSessionManager.ticket = ticket
@@ -251,6 +260,7 @@ class RtcSessionManager(
                 throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Signaling failed", e)
+                Telemetry.error("session.signaling", e)
                 end(EndReason.ERROR)
             }
         }
@@ -496,6 +506,7 @@ class RtcSessionManager(
         closePeer()
         _state.value = SessionState.Connecting(sessionId)
         Timings.mark("peer.joined")
+        if (attempt == null) attempt = entry?.let { ConnectAttempt(it, Role.PHOTOGRAPHER, clock()) }
         openPeer()
     }
 
@@ -541,6 +552,7 @@ class RtcSessionManager(
             } catch (e: Exception) {
                 if (client === peer) {
                     Log.e(TAG, "Peer connection failed", e)
+                    Telemetry.error("session.peer", e)
                     fail()
                 }
             }
@@ -590,6 +602,7 @@ class RtcSessionManager(
                 throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Could not restart ICE", e)
+                Telemetry.error("session.ice_restart", e)
             }
         }
     }
@@ -649,6 +662,7 @@ class RtcSessionManager(
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "Could not apply the remote signal", e)
+            Telemetry.error("session.remote_signal", e)
             // A restart that fails leaves the link as it was: running, or reconnecting until the budget runs out.
             if (_state.value is SessionState.Connecting) fail()
         }
@@ -750,6 +764,7 @@ class RtcSessionManager(
         connectTimeout = null
         _state.value = SessionState.Connected(checkNotNull(sessionId), peerInfo(hello), checkNotNull(role), partner)
         Timings.mark("session.connected")
+        reportAttempt(failure = null)
         pingJob?.cancel()
         pingJob = scope.launch {
             while (true) {
@@ -775,6 +790,7 @@ class RtcSessionManager(
         reconnectBudget = scope.launch {
             delay(RECONNECT_BUDGET_MS)
             Log.w(TAG, "Not reconnected after ${RECONNECT_BUDGET_MS / 1000} s")
+            role?.let { Telemetry.event(TelemetryEvent.SessionDrop(it, recovered = false, ms = clock() - since)) }
             onLinkLost()
         }
         when {
@@ -800,6 +816,7 @@ class RtcSessionManager(
         reconnectBudget = null
         _state.value = SessionState.Connected(state.sessionId, peerInfo(hello), checkNotNull(role), partner)
         Timings.mark("session.reconnected", "${clock() - state.since} ms")
+        Telemetry.event(TelemetryEvent.SessionDrop(checkNotNull(role), recovered = true, ms = clock() - state.since))
     }
 
     private fun peerInfo(hello: SessionMessage.Hello) = PeerInfo(hello.name, hello.haveGuideId, hello.haveReferenceId)
@@ -977,6 +994,7 @@ class RtcSessionManager(
      */
     private fun withoutSubject(reason: EndReason) {
         if (!active) return
+        reportAttempt(reason)
         val waitingCode = code
         if (waitingCode != null) {
             _state.value = SessionState.Waiting(waitingCode)
@@ -1061,6 +1079,8 @@ class RtcSessionManager(
     private fun end(reason: EndReason) {
         if (!active) return
         active = false
+        reportAttempt(reason)
+        entry = null
         // What the subject's Reconnect needs to take its place again while the photographer still holds it.
         val id = sessionId
         val token = rejoinToken
@@ -1094,6 +1114,19 @@ class RtcSessionManager(
         _state.value = SessionState.Ended(reason)
         Timings.mark("session.ended", reason.name)
     }
+
+    /**
+     * Ends the open try to connect with its one event (NFR-10; Design 2.8, Telemetry): connected when [failure] is null,
+     * else why the session or the photographer's subject ended before the link came up.
+     */
+    private fun reportAttempt(failure: EndReason?) {
+        val open = attempt ?: return
+        attempt = null
+        Telemetry.event(TelemetryEvent.SessionConnect(open.entry, open.role, failure, clock() - open.since))
+    }
+
+    /** A try to connect: how the session was entered, this phone's role, and when the try began. */
+    private class ConnectAttempt(val entry: SessionEntry, val role: Role, val since: Long)
 
     /** Subject: a session it lost by its connection, with what a Reconnect needs to take its place again. */
     private class LostSession(

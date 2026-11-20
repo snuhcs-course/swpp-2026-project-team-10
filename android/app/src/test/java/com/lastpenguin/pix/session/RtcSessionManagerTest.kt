@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.ChannelRouter
@@ -9,6 +9,9 @@ import com.lastpenguin.pix.session.signaling.IceCandidate
 import com.lastpenguin.pix.session.signaling.IceServer
 import com.lastpenguin.pix.session.signaling.SessionDescription
 import com.lastpenguin.pix.session.signaling.SignalMessage
+import com.lastpenguin.pix.telemetry.TelemetryEvent.SessionConnect
+import com.lastpenguin.pix.telemetry.TelemetryEvent.SessionDrop
+import com.lastpenguin.pix.telemetry.TelemetryRecorder
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -21,12 +24,15 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.webrtc.VideoFrame
 import org.webrtc.VideoSink
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RtcSessionManagerTest {
+    @get:Rule
+    val telemetry = TelemetryRecorder()
 
     /** Above the channel's backpressure limit. */
     private val backpressureFull = 300L * 1024
@@ -397,6 +403,129 @@ class RtcSessionManagerTest {
         assertEquals(SessionState.Ended(EndReason.NOT_FOUND), manager.state.value)
         assertEquals(1, signaling.closeCount)
         assertTrue(peers.created.isEmpty())
+    }
+
+    // The `session_connect` and `session_drop` events (NFR-10, NFR-11; Design 2.8, Telemetry). Partitions: the subject's
+    // try from its start and the photographer's from the subject joining, each connected once and nothing more at the
+    // end; a try that failed by the connecting timeout and by an unknown code; a photographer no subject joined (none);
+    // a drop recovered within 10 s and one that was not, with the time since the link dropped.
+    @Test
+    fun `the subject's try runs from its start and is sent once, connected`() = runTest {
+        val manager = manager()
+        now = 1_000
+        manager.start(SessionEntry.RoomCode("482915"), Role.SUBJECT)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.SessionJoined("s_1", Role.SUBJECT, iceServers = relay))
+        runCurrent()
+        val peer = peers.created.last()
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("offer", "v=0 offer")))
+        peer.open()
+        now = 2_500
+        peer.deliver(hello(Role.PHOTOGRAPHER, "Dongje"))
+        runCurrent()
+        manager.leave()
+        runCurrent()
+
+        assertEquals(
+            listOf(SessionConnect(SessionEntry.RoomCode("482915"), Role.SUBJECT, failure = null, ms = 1_500)),
+            telemetry.sent<SessionConnect>(),
+        )
+    }
+
+    @Test
+    fun `the photographer's try runs from the subject joining`() = runTest {
+        val manager = manager()
+        manager.start(SessionEntry.NewRoom, Role.PHOTOGRAPHER)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.RoomCreated("482915", "s_1"))
+        runCurrent()
+        now = 60_000
+        signaling.receive(SignalMessage.PeerJoined())
+        runCurrent()
+        val peer = peers.created.last()
+        signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 answer")))
+        peer.open()
+        now = 60_800
+        peer.deliver(hello(Role.SUBJECT, "Joonhyung"))
+        runCurrent()
+        manager.leave()
+        runCurrent()
+
+        assertEquals(
+            listOf(SessionConnect(SessionEntry.NewRoom, Role.PHOTOGRAPHER, failure = null, ms = 800)),
+            telemetry.sent<SessionConnect>(),
+        )
+    }
+
+    @Test
+    fun `a try that times out is sent as failed, with why`() = runTest {
+        val manager = manager()
+        manager.start(SessionEntry.RoomCode("482915"), Role.SUBJECT)
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.SessionJoined("s_1", Role.SUBJECT))
+        runCurrent()
+        advanceTimeBy(15_100)
+        runCurrent()
+
+        assertEquals(SessionState.Ended(EndReason.CONNECTION_LOST), manager.state.value)
+        assertEquals(listOf(EndReason.CONNECTION_LOST), telemetry.sent<SessionConnect>().map { it.failure })
+    }
+
+    @Test
+    fun `a try that meets an unknown code is sent as failed, with why`() = runTest {
+        val manager = manager()
+        manager.start(SessionEntry.RoomCode("000000"), Role.SUBJECT)
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.ServerError("NOT_FOUND", "No active room with this code"))
+        runCurrent()
+
+        assertEquals(listOf(EndReason.NOT_FOUND), telemetry.sent<SessionConnect>().map { it.failure })
+    }
+
+    @Test
+    fun `a photographer whom no subject joined sends no try`() = runTest {
+        val manager = manager()
+        manager.start(SessionEntry.NewRoom, Role.PHOTOGRAPHER)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.RoomCreated("482915", "s_1"))
+        runCurrent()
+        manager.leave()
+        runCurrent()
+
+        assertTrue(telemetry.sent<SessionConnect>().isEmpty())
+    }
+
+    @Test
+    fun `a drop is sent recovered with its time, and one that stays down as not recovered`() = runTest {
+        val (manager, peer) = connectedPhotographer()
+
+        now = 10_000
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        advanceTimeBy(5_000)
+        runCurrent()
+        now = 14_000
+        peer.push(PeerEvent.Link(LinkState.CONNECTED))
+        advanceTimeBy(6_000)
+        runCurrent()
+
+        now = 30_000
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+        now = 40_000
+        advanceTimeBy(10_100)
+        runCurrent()
+        assertEquals(SessionState.Waiting("482915"), manager.state.value)
+
+        assertEquals(
+            listOf(
+                SessionDrop(Role.PHOTOGRAPHER, recovered = true, ms = 4_000),
+                SessionDrop(Role.PHOTOGRAPHER, recovered = false, ms = 10_000),
+            ),
+            telemetry.sent<SessionDrop>(),
+        )
     }
 
     @Test

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -34,6 +34,8 @@ import com.lastpenguin.pix.session.PoseShare
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SubjectPick
+import com.lastpenguin.pix.telemetry.TelemetryEvent
+import com.lastpenguin.pix.telemetry.TelemetryRecorder
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -61,10 +63,14 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class GenerationViewModelTest {
+    @get:Rule
+    val telemetry = TelemetryRecorder()
+
     private val dispatcher = StandardTestDispatcher()
     private val store = ViewModelStore()
     private val generator = FakeGenerator()
@@ -1051,6 +1057,51 @@ class GenerationViewModelTest {
         assertEquals(GenerationUiState.Phase.PICKING, state.phase)
         assertNull(state.failure)
         assertFalse(share.calls.any { it.startsWith("close ${share.opened.last()}") })
+    }
+
+    // The `poses_ended` event (Design 2.8, Telemetry): one per set at its end, a failed set with why, a set with poses
+    // as ok with how many came, and never the description.
+    @Test
+    fun eachSetsEnd_isSentOnce_withHowItEnded() = runTest {
+        generateFromAPhoto()
+        generator.runs.single().apply {
+            plan()
+            send(*(1..4).map { failed("pose-$it", GenerationError.OFFLINE) }.toTypedArray())
+            finish()
+        }
+        runCurrent()
+        model.retry()
+        runCurrent()
+        generator.runs.last().apply {
+            plan()
+            send(ready("pose-1"), failed("pose-2", GenerationError.OFFLINE), ready("pose-3"), ready("pose-4"))
+            finish()
+        }
+        runCurrent()
+
+        val ended = telemetry.sent<TelemetryEvent.PosesEnded>()
+        assertEquals(
+            listOf(GenerationError.OFFLINE to 0, null to 3),
+            ended.map { it.failure to it.ready },
+        )
+        assertEquals(listOf(4, 4), ended.map { it.total })
+    }
+
+    @Test
+    fun aDescribedSetsEnd_saysDescribed_andNeverTheText() = runTest {
+        describeAPhoto()
+        model.generate("Lean on the wall")
+        runCurrent()
+        generator.runs.single().apply {
+            plan(listOf("Lean on the wall", "Lean back", "Lean with arms crossed", "Lean and laugh"))
+            send(ready("pose-1"))
+            finish()
+        }
+        runCurrent()
+
+        val ended = telemetry.sent<TelemetryEvent.PosesEnded>().single()
+        assertTrue(ended.described)
+        assertFalse(ended.params.values.any { "Lean" in it.toString() })
     }
 
     @Test

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-19, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -26,6 +26,8 @@ import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.PhotoShare
+import com.lastpenguin.pix.telemetry.Telemetry
+import com.lastpenguin.pix.telemetry.TelemetryEvent
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -507,6 +509,8 @@ class CameraViewModel(
         lastShot = viewModelScope.launch {
             // This press's own hold on the shutter: the "taken" of an earlier photo, come late, must not free it.
             var held = true
+            // When the camera took the photo, for its `photo_taken` event (NFR-19; Design 2.8, Telemetry).
+            var capturedAt: Long? = null
             fun free() {
                 if (!held) return
                 held = false
@@ -515,7 +519,12 @@ class CameraViewModel(
             try {
                 val result = try {
                     camera.setPhotoTurn(turn)
-                    camera.takePhoto(onCaptured = ::free)
+                    camera.takePhoto(
+                        onCaptured = {
+                            capturedAt = clock()
+                            free()
+                        },
+                    )
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: Exception) {
@@ -523,9 +532,18 @@ class CameraViewModel(
                 }
                 // A camera that never said "taken", or a photo that failed before it.
                 free()
+                val endedAt = clock()
                 // In shutter order, whatever order the saves end in: the thumbnail is the newest photo, and the
                 // session sends the photos as they were taken (PhotoSyncer).
                 earlier?.join()
+                Telemetry.event(
+                    TelemetryEvent.PhotoTaken(
+                        saved = result.isSuccess,
+                        shutterMs = capturedAt?.let { it - takenAt },
+                        ms = endedAt - takenAt,
+                        inSession = sessionId != null,
+                    ),
+                )
                 result.fold(
                     onSuccess = { uri ->
                         // No notice (FR-1.6, #204): the thumbnail shows the new photo, in a session once it is the

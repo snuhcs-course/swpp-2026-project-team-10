@@ -185,6 +185,7 @@ Back to [[AI Collaboration Report – Iteration 4|AI-Collaboration-Report-–-It
 - [Dongje, 11-18] "Check the other 50 through Claude Code." (Two subagents on Claude Opus 5.5 read 25 tips each, with what the page shows one of us: 49 of 50 match their pose, and 116 of 117 sentences are right. They passed, by the rules' letter, 4 tips that say "a little closer" for a person about twice as big.)
 - [Dongje, 11-18] "'조금' is fine, but the word '훨씬' is a bit off. Could it be said another way?" (Three pairs offered: 많이, 가까이 and 멀리, 더.)
 - [Dongje, 11-18] "Go with B. Keep '조금' and change only the '훨씬' cases. Keep the current HTML, and take this into account when writing later. Match the English too." (A big move is "가까이 다가가세요." and "멀리 물러나세요.", in English "Move in close." and "Step far back."; the check page and the run's tips keep the words they were checked with.)
+- [Dongje, 11-20] "Can you look at these three? I'm not sure the tips will really help." (The three label files counted: 48 of 50 tips match by most of us. 한준형 failed 12 of the 14 guide-outline sentences, and 22 of 50 tips ask for no change of distance or phone; the check measures fit, not help. Recorded in Testing 3.2.)
 
 [#199]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/199
 [#200]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/200

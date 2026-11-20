@@ -1,0 +1,273 @@
+{
+  "labeler": "박동제",
+  "run": "t213-run1",
+  "kind": "tips",
+  "sample": "160ab2b1f2ef",
+  "labels": {
+    "tip-s18-s": {
+      "1": "pass",
+      "2": "pass",
+      "3": "pass",
+      "whole": "pass"
+    },
+    "tip-s21-s": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s23-s": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s03-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s39-d": {
+      "1": "pass",
+      "2": "pass",
+      "3": "pass",
+      "whole": "pass"
+    },
+    "tip-s07-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s01-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s33-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s22-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s06-s": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s41-s": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s20-s": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s04-s": {
+      "1": "pass",
+      "2": "pass",
+      "3": "pass",
+      "whole": "pass"
+    },
+    "tip-s25-d": {
+      "1": "pass",
+      "2": "pass",
+      "3": "pass",
+      "whole": "pass"
+    },
+    "tip-s40-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s08-s": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s27-s": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s32-d": {
+      "1": "pass",
+      "2": "pass",
+      "3": "pass",
+      "4": "pass",
+      "whole": "pass"
+    },
+    "tip-s05-s": {
+      "1": "pass",
+      "2": "pass",
+      "3": "pass",
+      "whole": "pass"
+    },
+    "tip-s27-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s35-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s28-s": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s32-s": {
+      "1": "pass",
+      "2": "pass",
+      "3": "pass",
+      "4": "pass",
+      "whole": "pass"
+    },
+    "tip-s33-s": {
+      "1": "pass",
+      "2": "pass",
+      "3": "pass",
+      "whole": "pass"
+    },
+    "tip-s31-s": {
+      "1": "pass",
+      "2": "pass",
+      "3": "pass",
+      "whole": "pass"
+    },
+    "tip-s34-s": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s48-s": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s10-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s30-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s44-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s50-s": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s47-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s06-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s09-s": {
+      "1": "pass",
+      "2": "pass",
+      "3": "pass",
+      "whole": "pass"
+    },
+    "tip-s37-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s11-s": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s08-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s23-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s19-s": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s46-s": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s12-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s30-s": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s42-s": {
+      "1": "fail",
+      "2": "pass",
+      "3": "pass",
+      "whole": "pass"
+    },
+    "tip-s17-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s14-d": {
+      "1": "pass",
+      "2": "pass",
+      "3": "pass",
+      "whole": "pass"
+    },
+    "tip-s50-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s21-d": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s14-s": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s22-s": {
+      "1": "pass",
+      "2": "pass",
+      "whole": "pass"
+    },
+    "tip-s49-d": {
+      "1": "pass",
+      "2": "pass",
+      "3": "pass",
+      "whole": "pass"
+    }
+  }
+}

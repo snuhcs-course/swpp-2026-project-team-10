@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -54,6 +54,9 @@ class MessageCodecTest {
             SessionMessage.GuideTip("g1", "Move a little closer.\nHold the phone at your waist, tilted up a little."),
             SessionMessage.GuideTipClear,
             SessionMessage.ZoomSet(2f),
+            SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER),
+            SessionMessage.ZoomHoldUpdate(),
+            SessionMessage.ZoomSet(1.4f, final = true, cancel = true),
             SessionMessage.CameraStateUpdate(2f, Role.SUBJECT, true),
             SessionMessage.PoseStep("set1", PoseSetStep.GENERATING),
             SessionMessage.PoseStep("set1", PoseSetStep.PICKING, poseIds = listOf("pose-1", "pose-4")),

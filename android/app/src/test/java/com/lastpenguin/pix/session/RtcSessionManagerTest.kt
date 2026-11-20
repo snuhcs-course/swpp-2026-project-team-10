@@ -619,6 +619,23 @@ class RtcSessionManagerTest {
     }
 
     @Test
+    fun `the subject keeps who holds the photographer's zoom, and a new session starts with none`() = runTest {
+        val (manager, peer) = connectedSubject()
+        assertNull(manager.peerZoomHolder.value)
+
+        peer.deliver(otherPhone.encode(SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER)))
+        runCurrent()
+        assertEquals(Role.PHOTOGRAPHER, manager.peerZoomHolder.value)
+        assertEquals(SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER), incoming.last())
+
+        manager.leave(EndReason.LEFT)
+        manager.start(SessionEntry.RoomCode("482915"), Role.SUBJECT)
+        runCurrent()
+        assertNull(manager.peerZoomHolder.value)
+        manager.leave(EndReason.CANCELLED)
+    }
+
+    @Test
     fun `stale realtime values are dropped`() = runTest {
         val (manager, peer) = connectedPhotographer()
         val first = otherPhone.encode(SessionMessage.ZoomSet(1f))
@@ -631,6 +648,23 @@ class RtcSessionManagerTest {
         runCurrent()
 
         assertEquals(listOf(1f, 3f), incoming.filterIsInstance<SessionMessage.ZoomSet>().map { it.ratio })
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `a zoom step sent before the subject's cancel is stale when it arrives after it`() = runTest {
+        val (manager, peer) = connectedPhotographer()
+        val step = otherPhone.encode(SessionMessage.ZoomSet(2f))
+        val cancel = otherPhone.encode(SessionMessage.ZoomSet(1f, final = true, cancel = true))
+
+        peer.deliver(cancel, Channel.RELIABLE)
+        peer.deliver(step, Channel.REALTIME)
+        runCurrent()
+
+        assertEquals(
+            listOf(SessionMessage.ZoomSet(1f, final = true, cancel = true)),
+            incoming.filterIsInstance<SessionMessage.ZoomSet>(),
+        )
         manager.leave(EndReason.LEFT)
     }
 

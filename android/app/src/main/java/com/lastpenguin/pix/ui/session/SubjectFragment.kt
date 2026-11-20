@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-19, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.animation.Animator
@@ -378,13 +378,26 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                 }
                 launch {
                     viewModel.toggleLabels.collect { label ->
-                        if (label is ToggleLabel.Zoom) {
-                            showToggleLabel(
+                        when (label) {
+                            is ToggleLabel.Zoom -> showToggleLabel(
                                 binding,
                                 getString(R.string.zoom_ratio, DecimalFormat("0.#").format(label.ratio)),
                                 R.drawable.ic_zoom_small,
                                 R.color.pix_accent,
                             )
+
+                            // The photographer's pinch holds the zoom (FR-7.6, #236).
+                            ToggleLabel.ZoomHeld -> {
+                                val name = viewModel.uiState.value.photographerName ?: return@collect
+                                showToggleLabel(
+                                    binding,
+                                    getString(R.string.zoom_held_label, name),
+                                    R.drawable.ic_zoom_small,
+                                    R.color.pix_text,
+                                )
+                            }
+
+                            else -> Unit
                         }
                     }
                 }

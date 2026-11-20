@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-19, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -546,6 +546,17 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                                 R.drawable.ic_zoom_small,
                                 R.color.pix_accent,
                             )
+
+                            // The subject's pinch holds the zoom (FR-7.6, #236).
+                            ToggleLabel.ZoomHeld -> {
+                                val connected = sessionViewModel.state.value as? SessionState.Connected
+                                val name = connected?.peer?.displayName ?: return@collect
+                                showToggleLabel(
+                                    controls,
+                                    getString(R.string.zoom_held_label, name),
+                                    R.drawable.ic_zoom_small,
+                                )
+                            }
                         }
                     }
                 }

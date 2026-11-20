@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -392,7 +392,22 @@ sealed interface SessionMessage {
         val ratio: Float,
         /** True for the last value of a pinch (or a single tap). Only it travels reliably and gets a notice. */
         val final: Boolean = false,
+        /**
+         * True, with [final], for a pinch that stopped without a value of its own, held back by the photographer's
+         * (FR-7.6, #236): [ratio] is the photographer's zoom as last echoed and is not applied. As a `camera.zoom.set`,
+         * it makes a step sent before it stale. Only a photographer that sends `camera.zoom.hold` gets one.
+         */
+        val cancel: Boolean = false,
     ) : SessionMessage
+
+    /**
+     * Photographer → subject: whose pinch holds the zoom now, [by], or null when it is free (FR-7.6, #236). Sent at each
+     * change and when the session connects. While the photographer holds it, the subject's pinch sends nothing and its
+     * readout follows the echo; an older phone ignores the message, and the photographer drops its requests anyway.
+     */
+    @Serializable
+    @SerialName("camera.zoom.hold")
+    data class ZoomHoldUpdate(val by: Role? = null) : SessionMessage
 
     /** A step of the subject's brightness slider, an exposure-compensation index, or its final value (FR-7.3). */
     @Serializable

@@ -111,7 +111,10 @@
 | 3.28 | 2026-11-19 | The notice that the subject left (Iter4-A5, [#238]): its owner, its 10 s boundary and states, and a step on IT-16 (1.1, 2.1.5, 2.1.6, Appendix A). |
 | 3.29 | 2026-11-19 | *Add a pose guide*'s tiles as buttons and the picker kept open (Iter4-A6, [#243]): its owner, the partitions of the order, the tiles, the press, the badge, the picker, and the rings, and steps on IT-7, IT-23, and IT-26 (1.1, 2.1.5, 2.1.6, Appendix A). |
 | 3.30 | 2026-11-20 | The sheet's current labels in older steps: a situation's tile for *Generate poses here* (US-4, IT-18, IT-35, IT-37), and *Choose from the gallery* for *Add photo* (US-2, US-12, IT-23, IT-35) (4.3, Appendix A). |
-| 3.31 | 2026-11-20 | Crash reports and usage data (Iter4-A8, [#254]): its owner, `TelemetryEventTest`, `GatedTelemetryTest`, the events in their modules' tests, `TelemetryRecorder` and `FakeTelemetryBackend`, `FirebaseTelemetry` by hand, and IT-39 (1.1, 2.1.3, 2.1.5, 2.1.6, 2.1.8, Appendix A). |
+| 3.31 | 2026-11-20 | One phone zooms at a time (Iter4-A3, [#236]): its owner, the state-based and boundary partitions, the new test classes, and IT-6's added steps (1.1, 2.1.5, 2.1.6, Appendix A). |
+| 3.32 | 2026-11-20 | The tips check of Iteration 4 ([#213]): 50 tips of `t213-run1` checked by three of us, with our answers committed (3.2, 6, Appendix B). |
+| 3.33 | 2026-11-20 | Iteration 4 results (Iter4-P18, [#215]): suites and coverage at `752b7c3`, integration scripts at `44de211` and `752b7c3`, the NFRs, and the Test Log; the tips check with 조성민's answers, by the four of us (2.2, 3.2, 6, Appendix B). |
+| 3.34 | 2026-11-20 | Crash reports and usage data (Iter4-A8, [#254]): its owner, `TelemetryEventTest`, `GatedTelemetryTest`, the events in their modules' tests, `TelemetryRecorder` and `FakeTelemetryBackend`, `FirebaseTelemetry` by hand, and IT-39 (1.1, 2.1.3, 2.1.5, 2.1.6, 2.1.8, Appendix A). |
 
 </details>
 
@@ -194,6 +197,7 @@ One member writes and maintains each component's tests, following the module own
 | The session's photos on both phones (Iter4-A2) | Managers, ViewModels, Views | `session/`, `camera/`, `ui/session/`, `ui/camera/` | 박재완 |
 | The reference thumbnail for a guide from the subject (Iter4-A1) | Managers, Views | `session/` (`GuideFromSubjectTest`), `ui/camera/` (`CameraFragmentRenderTest`) | 박재완 |
 | The notice that the subject left (Iter4-A5) | Views | `ui/camera/` (`CameraFragmentRenderTest`, `CameraFragmentInteractionTest`) | 박재완 |
+| One phone zooms at a time (Iter4-A3) | Managers, ViewModels, Views, the session protocol | `session/` (`ZoomHoldTest`, `RemoteZoomHoldTest`, `RtcSessionManagerTest`, `MessageCodecTest`, `ChannelRouterTest`, `RemoteControlMessagesTest`), `ui/camera/` (`CameraZoomHoldTest`, `CameraFragmentInteractionTest`), `ui/session/` (`SubjectZoomHoldTest`, `SubjectFragmentRenderTest`) | 조성민 |
 | *Add a pose guide*'s tiles as buttons and the picker kept open (Iter4-A6) | Views, ViewModels | `ui/guide/` (`AddGuideSheetTest`), `ui/settings/` (`TutorialLayoutTest`, `TutorialFragmentTest`), `ui/generation/` (`GenerationViewModelTest`) | 박재완 |
 | Crash reports and usage data (Iter4-A8) | Managers, ViewModels, Views | `telemetry/` (`TelemetryEventTest`, `GatedTelemetryTest`); the tests of each class that sends an event; `settings/`, `ui/settings/` (`SettingsFragmentTest`) | 박재완 |
 | Integration tests, Iteration 2 flows | Across components (two phones, public server) | 2.1.5; Design 2.9 (Iter2-P21) | 한준형 |
@@ -415,7 +419,7 @@ The codec and message tests use the JSON examples of Design 2.5 verbatim, so a f
 | IT-3 | Invite link fallback | As IT-2; the subject's notifications off | The shared link opens the *Invitation* screen, and *Accept* connects. | FR-6.1 · Iteration 3 | [steps](#it-3-procedure) |
 | IT-4 | Reconnection | As IT-2. Added for Iter3-P14: a room code, AWS server, one Wi-Fi, then the subject on cellular | Recovers within 10 s without a new invitation. Added: `session.reconnected` under 10 000 ms on both phones; video and guide back without a new connection. | NFR-11 · Iteration 3 | [steps](#it-4-procedure) |
 | IT-5 | Guide sync and moves from both phones | As IT-1 | Same position on both phones within 0.3 s; offset ≤ 3 % of the frame width, also after hiding and replacing. | US-11, NFR-7, NFR-8, FR-3.1, FR-3.6, FR-6.7 | [steps](#it-5-procedure) |
-| IT-6 | Remote zoom, brightness, flash, and guide moves | As IT-1 | Each of 20 gestures per control applies on the photographer's phone within 0.5 s, with one notice; both agree on release. | US-12, NFR-7 | [steps](#it-6-procedure) |
+| IT-6 | Remote zoom, brightness, flash, and guide moves. *Added in Iter4-A3 ([#236]): both phones pinching at once.* | As IT-1 | Each of 20 gestures per control applies on the photographer's phone within 0.5 s, with one notice; both agree on release. *Added in Iter4-A3:* of two pinches at once, the first zooms and the image does not jump; the other phone says who is zooming and zooms once the first lets go. | US-12, FR-7.6, NFR-7 | [steps](#it-6-procedure) |
 | IT-7 | Pose description. *Changed in Iter3-A13 ("Skip" is gone; "Suggest 4 poses" replaces it); was: "Skip, suggest poses for me".* | One phone, Wi-Fi | Four candidates follow the description: first within 20 s, all within 30 s. With an empty field: four poses that suit the scene, in the same times. *Added in Iter4-P13 ([#210]):* a situation's hint and camera on the scene photo, its name on *Generate poses*, and candidates that fit it. *Added in Iter4-A6 ([#243]):* each situation's tile starts the scene photo for it, and none shows as chosen. | US-5, FR-4.4, FR-4.8, NFR-4 | [steps](#it-7-procedure) |
 | IT-8 | Aspect ratios and the saved photo | One phone; two for the subject's view | The saved photo is 16:9, then 1:1, and matches the preview. The subject's video, grid, and guide follow each ratio. | FR-1.13 | [steps](#it-8-procedure) |
 | IT-9 | Saved guides | One phone | After a restart the guide is listed. It starts where the person stands in its reference, and shows as saved. | FR-3.8 | [steps](#it-9-procedure) |
@@ -461,10 +465,10 @@ That comment is the full list of the class's partitions. The table gives each te
 | Technique | Rule | Where it applies in Pix |
 |---|---|---|
 | Equivalence partitioning | Split inputs and outputs into classes treated the same way, and test each class at least once, not every combination. | **Areas:** the usage events, every choice of their fields, and what they leave out (`TelemetryEventTest`; FR-10.6); accounts, tokens, and friends on the server and the app (Iter2-P13); room codes, rejoin tokens (Iter3-P14), and TURN credentials (Iter3-P13); invitations, received ones included (FR-6.17), and pushes; `POST /poses`, `POST /pose-suggestions`, `POST /pose-tips`, `prompts.toml`, the description filter, the person check (Iter3-A7), selfie mode (Iter3-P12), the situations on the server and on *Add a pose guide* (Iter4-P12, P13), and the tip's language (Iter3-A4); the camera controls and the camera screens' layout (Iter3-A2, NFR-16), the scene photo's review with a 3:4 photo and a 9:16 one that leaves no room for its message, and *Use* at the top right (`CameraLayoutTest`; Iter4-P2); saved guides (Iter2-P18), the library's filters (FR-3.11), the ♥ (FR-4.14), and the prompt history (FR-4.11), with whose request of a set was refused, the description's own or a variation's, and why it failed (Iter4-P3); why a set failed: each error, each server code, and a suggested set's refusal, with the case that wins when they mix (Iter4-P6); the Korean strings (Iter3-P7) and the settings (Iter3-P23); Subject view's reference photo (Iter3-A1); the screenshot cut (Iter3-A10, Iter3-A11); screen changes and transitions (Iter3-A12, Iter3-A14), the guide and pose flow (Iter3-A13), and who takes the photo (Iter3-A17); Camera's controls: the horizon bar, the brightness bar and its base, the labels, the tip button, and *Save guide* (Iter3-A15); the colors: every color of the resources a token, and `Theme.Pix` dark or light with the configuration, dark at start (Iter4-P5); how the phone is held: photos and the scene photo at 0°, 90°, 180°, and 270°, with the rear camera and the front one, a pose's guide from a scene held sideways turned back, the pose screens with a landscape scene, and the server's ratio for each frame, landscape included (`PhoneTurnTest`, `CameraViewModelTest`, `SceneTurnTest`, `PoseGuideTurnTest`, `GenerationScreensTest`, `CameraLayoutTest`, `test_poses.py`; Iter4-P9); a pose's ♥ from a scene held sideways saved turned back on both phones and opened from the library there, and `pose.step`'s turn sent, kept, or read as upright when it is not a quarter turn or missing (`PoseGuideTurnTest`, `GenerationScreensTest`, `SubjectPickPoseFragmentTest`, `PoseSyncerTest`, `SceneTurnTest`; Iter4-P9); the controls held at each quarter on Camera and Subject view, what turns and what stays (`TurningIconsTest`, `CameraControlTurnTest`, `SubjectControlTurnTest`; Iter4-P10); the tutorial's ring around a control upright, inside a turned block, moved, or grown (`TutorialBoundsTest`; Iter4-P10); the scene photo step in a session, without *End session* until it ends (`CameraFragmentRenderTest`; Iter4-P10); a brightness drag on cameras of 0.1 EV and 1/6 EV steps, up and down, on a bar short, tall, or not laid out (`ExposureBarViewTest`; Iter4-P10); the photo viewer held at each quarter over Camera and Subject view, a landscape screen while sideways with the photo on screen kept, and a drag down the photo as the user sees it (`PhotoViewerTurnTest`, `ZoomablePhotoViewTest`, `SubjectSessionPhotoTest`; Iter4-P10). **Examples:** a Pix ID too short, valid, too long, with an invalid character, or taken; a refresh token current, unknown, already exchanged, expired, or signed out; a lookup relation `NONE`, `SELF`, `FRIEND`, `REQUESTED`, or `INCOMING`; flash off, auto, on, and a phone without a flash. |
-| Boundary testing | Test at, just inside, and just outside each edge: zero, min and max, empty, null, off-by-one, `>` vs `>=`. | **Areas:** an error's cause chain at its limit of eight (`GatedTelemetryTest`); sizes of images, masks, uploads, chunks, and session photos; text lengths (Pix ID, password, display name, description, poses); timeouts and expiries (invitations, room codes, tokens, reconnection, model calls); counts (saved guides, prompt history, wrong room codes, pose windows); geometry and layout (guide size and visibility, taps, the lens hold band, the camera screens, the camera bar's title on its icons' line, the tutorial's rings around what each control draws, none overlapping, and only around what a short screen's sheet shows, with *Add a pose guide*'s captions on their rows' rings, every chevron's tip 16 dp from its card's edge, and the no-person alert on its message's first line; Iter4-P7; *Add a pose guide*'s order at the S22's size at font scale 1.0 and 1.3, the situations before the guide from a photo, *Auto*'s badge whole on its tile, and its rings in that order, with My library's caption on the seam with the gallery's ring, which both stop around it (`AddGuideSheetTest`, `TutorialLayoutTest`, `TutorialFragmentTest`; Iter4-A6); Subject view's bottom row as Camera's, *Guide* within 1 dp of Camera's and the photo thumbnail as far from the right edge, shown before any photo, and the step's button where Camera's shutter is, clear of both with each label at font scale 1 and 1.3, and the session photos' viewer over the whole screen on Subject view and on Camera, with *Share* and *Delete* as far from the right edge as Back from the left, `CameraLayoutTest`; Iter4-A2); the photo viewer's zoom at 1× and at 4× and past both, its pan at the photo's edges, and its drag to close just short of 96 dp and past it, and a flick (`ZoomablePhotoViewTest`, `SubjectSessionPhotoTest`; Iter4-A7); cutoffs (description filter, person check, the latency colors of FR-10.3); the screenshot cut's ratios and colors; the horizon bar's 20° limit, the brightness bar's idle time, the toggle label's 3 s, and the base brightness at the camera's range (Iter3-A15); the notice that the subject left or dropped just before and after its 10 s (`CameraFragmentRenderTest`; Iter4-A5); the reference thumbnail's center at the preview's side and just past it, and a flick at the hiding speed and just under it (`ReferenceThumbnailTest`, `ReferenceDragControllerTest`; Iter4-A4); the phone's turn, a new quarter at 35° from it and not at 36°, both ways and across upright, a phone just flat and just past it, and the scene's shape halfway between two landscape ratios (`PhoneTurnTest`, `test_poses.py`; Iter4-P9); a half turn, which goes clockwise, and an angle past 180 read back, and the viewer laid out sideways from 45° and not just under it (`TurningIconsTest`; Iter4-P10); a brightness drag of half a step's way and just under it, and one past the range's end (`ExposureBarViewTest`; Iter4-P10). **Examples:** an upload of exactly 1 MiB and 1 MiB + 1 byte (`413`); a description of 100 and 101 characters, counted after trimming; reconnection at 10 s, one millisecond before and after (Iter3-P14); chunk size 12 KiB and `bufferedAmount` 256 KiB. The changed boundary is below the table. |
+| Boundary testing | Test at, just inside, and just outside each edge: zero, min and max, empty, null, off-by-one, `>` vs `>=`. | **Areas:** an error's cause chain at its limit of eight (`GatedTelemetryTest`); sizes of images, masks, uploads, chunks, and session photos; text lengths (Pix ID, password, display name, description, poses); timeouts and expiries (invitations, room codes, tokens, reconnection, model calls); counts (saved guides, prompt history, wrong room codes, pose windows); geometry and layout (guide size and visibility, taps, the lens hold band, the camera screens, the camera bar's title on its icons' line, the tutorial's rings around what each control draws, none overlapping, and only around what a short screen's sheet shows, with *Add a pose guide*'s captions on their rows' rings, every chevron's tip 16 dp from its card's edge, and the no-person alert on its message's first line; Iter4-P7; *Add a pose guide*'s order at the S22's size at font scale 1.0 and 1.3, the situations before the guide from a photo, *Auto*'s badge whole on its tile, and its rings in that order, with My library's caption on the seam with the gallery's ring, which both stop around it (`AddGuideSheetTest`, `TutorialLayoutTest`, `TutorialFragmentTest`; Iter4-A6); Subject view's bottom row as Camera's, *Guide* within 1 dp of Camera's and the photo thumbnail as far from the right edge, shown before any photo, and the step's button where Camera's shutter is, clear of both with each label at font scale 1 and 1.3, and the session photos' viewer over the whole screen on Subject view and on Camera, with *Share* and *Delete* as far from the right edge as Back from the left, `CameraLayoutTest`; Iter4-A2); the photo viewer's zoom at 1× and at 4× and past both, its pan at the photo's edges, and its drag to close just short of 96 dp and past it, and a flick (`ZoomablePhotoViewTest`, `SubjectSessionPhotoTest`; Iter4-A7); cutoffs (description filter, person check, the latency colors of FR-10.3); the screenshot cut's ratios and colors; the horizon bar's 20° limit, the brightness bar's idle time, the toggle label's 3 s, and the base brightness at the camera's range (Iter3-A15); the notice that the subject left or dropped just before and after its 10 s (`CameraFragmentRenderTest`; Iter4-A5); the reference thumbnail's center at the preview's side and just past it, and a flick at the hiding speed and just under it (`ReferenceThumbnailTest`, `ReferenceDragControllerTest`; Iter4-A4); the phone's turn, a new quarter at 35° from it and not at 36°, both ways and across upright, a phone just flat and just past it, and the scene's shape halfway between two landscape ratios (`PhoneTurnTest`, `test_poses.py`; Iter4-P9); a half turn, which goes clockwise, and an angle past 180 read back, and the viewer laid out sideways from 45° and not just under it (`TurningIconsTest`; Iter4-P10); a brightness drag of half a step's way and just under it, and one past the range's end (`ExposureBarViewTest`; Iter4-P10); the subject's hold on the zoom 1 ms before and at 2 s after its last request, and a later step starting the 2 s again (`RemoteZoomHoldTest`; Iter4-A3). **Examples:** an upload of exactly 1 MiB and 1 MiB + 1 byte (`413`); a description of 100 and 101 characters, counted after trimming; reconnection at 10 s, one millisecond before and after (Iter3-P14); chunk size 12 KiB and `bufferedAmount` 256 KiB. The changed boundary is below the table. |
 | Pairwise (combinatorial) | Most failures involve one or two parameters, so cover every pair of values at least once instead of every combination. | The manual device and network matrix of 2.1.5 and NFR-10, below the table. |
 | Control-flow (white box) | Make every branch and condition take both outcomes, and read the branch coverage report for the side not taken. | **Areas:** `GuideGeometry.clamp`, `CameraZoomPlan`, `ChannelRouter`, the server's `RequestBodyLimitMiddleware`, `LinkStatsParser`, the `ice.pair` line and `SessionManager.path` (`RtcSessionManagerTimingsTest`, `RtcSessionManagerTest`; Iter3-P13), the subject's request handlers (`RemoteControlHandlerTest`), and `YuvToNv21.mirror` with `CameraFrameSource` (Iter3-P12). **Examples:** each `clamp` limit on and off; ultrawide routing with a native sub-1× lens, a separate ultrawide with and without range overlap, and none; a zoom request within 0.001 of the shown value, confirmed at once; a front camera frame turned a quarter, an upright one, and a rear one (not mirrored). |
-| State-based | Test every valid transition and every event that must be rejected, and compare the state after each event. | **Areas:** the telemetry gate: the choice not read, allowed, a debug build, off and on again (`GatedTelemetryTest`), and *Share usage data* while its choice loads (`SettingsFragmentTest`); the pose set, its *Reference confirm*, and *Generate poses* on both phones (Design 2.6.5); `SessionState` and reconnection (Design 2.4, Figure 9; Iter3-P14); invitations (Figure 9b), friend requests, and the account kept on the phone (Iter2-P13); `GenerationUiState.phase`, the pose tip, and the scene photo's light and review (Iter3-A5, Iter3-A7); the situation from the sheet to the scene photo, its camera (none for *Selfie* without a front camera, and the rear one when the front one fails), the set, and the subject's copy; the pose flow's bar at each screen's step, and the scene photo's panel and accent shutter while framing only, with the step's start and end animated, or at their end with animations off (`CameraTransitionTest`, `FlowProgressViewTest`; Iter4-P13); the flash and ratio cycles, *Hide* and *Show*, guide-edit mode, and saved guides; the last frame held through a rebind or a ratio change (Iter3-A12); session photos, the latency (FR-10.3), and the mobile-data notice (Iter3-P13); each screen's render and interaction partitions on the real Fragment, *Reference confirm*'s cut included (Iter3-A10); the tip banner, *Save guide* as a toggle, and the prompt history kept only for an accepted set (Iter3-A15), and taken out again when the refusal follows a candidate, on both phones (Iter4-P3); Back on each pose screen, asked first on *Generating poses* and *Pick a pose*, as it loses the images (*Go back*, *Cancel*, and a set that ends while it asks), *Regenerate*, and *Pick a pose* under *Reference confirm*, outside a session and in one, a link that reconnects included (`GenerationViewModelTest`, `GenerationScreensTest`, `DescriptionFormTest`, `CameraFragmentRenderTest`; Iter4-P2); the subject's mirror by the camera in `camera.state`, before any state, after a switch either way, and a drag on the flipped guide (`RemoteCameraStateTest`, `CameraMessagesTest`, `SubjectViewModelAspectTest`, `SubjectFragmentRenderTest`; Iter4-P4); the gear in a session on both phones, Settings going back to Subject view when the session ends and staying over the camera, and the step's action at the top right as yellow text, enabled and disabled, on each of its five screens (`SettingsOnScreensTest`, `HeaderActionTest`; Iter4-P7); the session's photos on both phones: none outside a session, one taken or saved, refused, from an ended session, through a reconnect, and the session ended; Pix's album read at the start, at a MediaStore change, and after a failed query, and opened outside a session in the viewer at the newest, with a photo just taken, closed as a session starts; each phone's thumbnail, empty in a session until its first; the viewer opened at the newest, swiped, a newer photo while it is open, closed by either Back or the session's end, an unreadable photo, and the photographer's step held until it closes; its strip, its header hidden and shown by a tap, a page swiped away whole again, *Share*, and *Delete* asked, cancelled, done, failing, of the last photo, and of a photo still on its way to the subject, deleted only once it has gone or its session ended (`PhotoSyncerTest`, `PixAlbumPhotosTest`, `CameraViewModelTest`, `SubjectSessionPhotoTest`, `CameraFragmentInteractionTest`, `ZoomablePhotoViewTest`; Iter4-A2, Iter4-A7); the notice that the subject left, taken down when the subject is back, and a photo not sent waiting for it (`CameraFragmentRenderTest`, `CameraFragmentInteractionTest`; Iter4-A5); a situation's tile on *Add a pose guide* starting the scene photo for it, after the consent notice the first time, with no tile shown as chosen and *Selfie*'s refused without a front camera; a tile pressed, dimmed and at 97 % within 100 ms, at once with animations off, undone by a touch that leaves, kept while the sheet leaves, and itself again under the consent notice; every tap after the first that goes on ignored, a second tap on *My library* included; and the gallery's picker closed without a photo, the sheet open and the guide on the camera unchanged, or with one, *Reference confirm* (`AddGuideSheetTest`, `GenerationViewModelTest`; Iter4-A6); the reference thumbnail shown, enlarged, and hidden on each phone: hidden by a drop or by TalkBack, small while hidden and when it is back, kept for the same guide, and shown again for another (`GuideControlsViewModelTest`, `SubjectViewModelTest`, `CameraFragmentInteractionTest`, `SubjectFragmentRenderTest`), with its place at the S22's size (`CameraLayoutTest`) and each change at once with animations off (`CameraTransitionTest`; Iter4-A4); the focus box with the brightness bar beside it: up together, kept while the bar is held, and gone together at the idle time, or alone on a camera without brightness (`CameraFragmentInteractionTest`; Iter4-P10). **Examples:** the photographer's set `GENERATING` → `PICKING` → `CHOSEN` or `CLOSED`, with a pick after the end rejected; `join` while `Connected` and a stale `seq`, both rejected; `Connected` → `Reconnecting` → `Connected`, or after 10 s to `Waiting` (photographer) or `Ended(CONNECTION_LOST)` (subject); flash off → auto → on → off. |
+| State-based | Test every valid transition and every event that must be rejected, and compare the state after each event. | **Areas:** the telemetry gate: the choice not read, allowed, a debug build, off and on again (`GatedTelemetryTest`), and *Share usage data* while its choice loads (`SettingsFragmentTest`); the pose set, its *Reference confirm*, and *Generate poses* on both phones (Design 2.6.5); `SessionState` and reconnection (Design 2.4, Figure 9; Iter3-P14); invitations (Figure 9b), friend requests, and the account kept on the phone (Iter2-P13); `GenerationUiState.phase`, the pose tip, and the scene photo's light and review (Iter3-A5, Iter3-A7); the situation from the sheet to the scene photo, its camera (none for *Selfie* without a front camera, and the rear one when the front one fails), the set, and the subject's copy; the pose flow's bar at each screen's step, and the scene photo's panel and accent shutter while framing only, with the step's start and end animated, or at their end with animations off (`CameraTransitionTest`, `FlowProgressViewTest`; Iter4-P13); the flash and ratio cycles, *Hide* and *Show*, guide-edit mode, and saved guides; the last frame held through a rebind or a ratio change (Iter3-A12); session photos, the latency (FR-10.3), and the mobile-data notice (Iter3-P13); each screen's render and interaction partitions on the real Fragment, *Reference confirm*'s cut included (Iter3-A10); the tip banner, *Save guide* as a toggle, and the prompt history kept only for an accepted set (Iter3-A15), and taken out again when the refusal follows a candidate, on both phones (Iter4-P3); Back on each pose screen, asked first on *Generating poses* and *Pick a pose*, as it loses the images (*Go back*, *Cancel*, and a set that ends while it asks), *Regenerate*, and *Pick a pose* under *Reference confirm*, outside a session and in one, a link that reconnects included (`GenerationViewModelTest`, `GenerationScreensTest`, `DescriptionFormTest`, `CameraFragmentRenderTest`; Iter4-P2); the subject's mirror by the camera in `camera.state`, before any state, after a switch either way, and a drag on the flipped guide (`RemoteCameraStateTest`, `CameraMessagesTest`, `SubjectViewModelAspectTest`, `SubjectFragmentRenderTest`; Iter4-P4); the gear in a session on both phones, Settings going back to Subject view when the session ends and staying over the camera, and the step's action at the top right as yellow text, enabled and disabled, on each of its five screens (`SettingsOnScreensTest`, `HeaderActionTest`; Iter4-P7); the session's photos on both phones: none outside a session, one taken or saved, refused, from an ended session, through a reconnect, and the session ended; Pix's album read at the start, at a MediaStore change, and after a failed query, and opened outside a session in the viewer at the newest, with a photo just taken, closed as a session starts; each phone's thumbnail, empty in a session until its first; the viewer opened at the newest, swiped, a newer photo while it is open, closed by either Back or the session's end, an unreadable photo, and the photographer's step held until it closes; its strip, its header hidden and shown by a tap, a page swiped away whole again, *Share*, and *Delete* asked, cancelled, done, failing, of the last photo, and of a photo still on its way to the subject, deleted only once it has gone or its session ended (`PhotoSyncerTest`, `PixAlbumPhotosTest`, `CameraViewModelTest`, `SubjectSessionPhotoTest`, `CameraFragmentInteractionTest`, `ZoomablePhotoViewTest`; Iter4-A2, Iter4-A7); the notice that the subject left, taken down when the subject is back, and a photo not sent waiting for it (`CameraFragmentRenderTest`, `CameraFragmentInteractionTest`; Iter4-A5); a situation's tile on *Add a pose guide* starting the scene photo for it, after the consent notice the first time, with no tile shown as chosen and *Selfie*'s refused without a front camera; a tile pressed, dimmed and at 97 % within 100 ms, at once with animations off, undone by a touch that leaves, kept while the sheet leaves, and itself again under the consent notice; every tap after the first that goes on ignored, a second tap on *My library* included; and the gallery's picker closed without a photo, the sheet open and the guide on the camera unchanged, or with one, *Reference confirm* (`AddGuideSheetTest`, `GenerationViewModelTest`; Iter4-A6); the reference thumbnail shown, enlarged, and hidden on each phone: hidden by a drop or by TalkBack, small while hidden and when it is back, kept for the same guide, and shown again for another (`GuideControlsViewModelTest`, `SubjectViewModelTest`, `CameraFragmentInteractionTest`, `SubjectFragmentRenderTest`), with its place at the S22's size (`CameraLayoutTest`) and each change at once with animations off (`CameraTransitionTest`; Iter4-A4); the focus box with the brightness bar beside it: up together, kept while the bar is held, and gone together at the idle time, or alone on a camera without brightness (`CameraFragmentInteractionTest`; Iter4-P10); who holds the zoom: free, the photographer's pinch, or the subject's; on each phone a pinch, a quick step, and a TalkBack action while the other holds it, a pinch held back until its fingers lift, the subject's also on the photographer's phone once the zoom is free, up to its final value or its cancel, which changes no zoom and makes a step sent before it stale, the holder sent at each change and at the start and kept by the subject's session for a screen that opens late, a held-back pinch forgotten when the session drops, and the label naming the other person (`ZoomHoldTest`, `RemoteZoomHoldTest`, `RtcSessionManagerTest`, `CameraZoomHoldTest`, `SubjectZoomHoldTest`, `CameraFragmentInteractionTest`, `SubjectFragmentRenderTest`; Iter4-A3). **Examples:** the photographer's set `GENERATING` → `PICKING` → `CHOSEN` or `CLOSED`, with a pick after the end rejected; `join` while `Connected` and a stale `seq`, both rejected; `Connected` → `Reconnecting` → `Connected`, or after 10 s to `Waiting` (photographer) or `Ended(CONNECTION_LOST)` (subject); flash off → auto → on → off. |
 | Property-based and metamorphic | When the exact output is hard to state, check a relation that must always hold. | **Areas:** Analytics' limits over every event built from every choice (`TelemetryEventTest`); `GuideGeometry`, the message codec, `MaskPng`, the mask smoother and outlines, the guide clamp against the subject's mirror (`CameraControlsTest`), the NV21 mirror (`YuvToNv21Test`, `CameraFrameCacheTest`; Iter3-P12), and the quarter turns (`GuideTurnTest`; Iter4-P9). **Examples:** `viewToFrame(frameToView(p)) == p` for any frame and view size; a box turned by a quarter and back, or by four quarters, is itself, and a pose's guide goes back where the person stood in the framed photo; `clamp(clamp(s)) == clamp(s)`; `decode(encode(m)) == m` for every message type with random field values; the guide covers the same part of the image on two view sizes within 3 % of the frame width (NFR-8). **Tools:** hand-written loops over generated values now; a property-testing library (Kotest property module, Hypothesis) is **TBD** for Iteration 5 (moved from Iteration 3, then from Iteration 4 at its kickoff, 2.1.2). |
 | Fault injection | Simulate failures and check that the app survives them. | **Areas:** the server's answers to the app (the fake transport); the session's channels and sockets, rejoin included (Iter3-P14); images and masks in transit and on disk (Iter2-P18, Iter3-P9); the camera and storage; the server's dependencies: the session store, the account database, Google's certificates, the AI models, the description filter, the person check (Iter3-A7), and Cloudflare's TURN API (Iter3-P13); the app's account calls (Iter2-P13). **Examples:** the fake transport answers `502`, `504`, `429`, a truncated body, or a disconnect; the session store off or emptied by a restart, so sockets close with 1013 and pose requests answer `503 UNAVAILABLE`; the suggestion model failing, so the four default poses are used; storage full on save (FR-1.7). |
 | Fuzz | Feed many random or malformed inputs. | Random bytes and random JSON to `MessageCodec.decode` and to the signaling socket: the receiver ignores or rejects them and never crashes. |
@@ -590,7 +594,7 @@ The repository's `CLAUDE.md` files keep the short form.
 
 ### 2.2 Results
 
-Results are recorded at the close of each iteration and never overwritten; each table below gains a row or a column per iteration. Each run's details (devices, builds, networks, per-step results, and reruns) are in Appendix B: for Iteration 2, the [unit tests](#run-2026-10-23-unit-tests-and-coverage) and the [integration scripts](#run-2026-10-23-integration-scripts); for Iteration 3, the [unit tests](#run-2026-11-06-unit-tests-and-coverage), and the [integration scripts](#run-2026-11-06-integration-scripts).
+Results are recorded at the close of each iteration and never overwritten; each table below gains a row or a column per iteration. Each run's details (devices, builds, networks, per-step results, and reruns) are in Appendix B: for Iteration 2, the [unit tests](#run-2026-10-23-unit-tests-and-coverage) and the [integration scripts](#run-2026-10-23-integration-scripts); for Iteration 3, the [unit tests](#run-2026-11-06-unit-tests-and-coverage) and the [integration scripts](#run-2026-11-06-integration-scripts); for Iteration 4, the [unit tests](#run-2026-11-20-unit-tests-and-coverage) and the [integration scripts](#run-2026-11-20-integration-scripts).
 
 #### 2.2.1 Unit tests and coverage
 
@@ -601,59 +605,64 @@ Each row is the run that closed an iteration, with the commands of 2.1.4. The An
 | Target (2.1.2) | — | — | 90 | 90 | 90 | 30 | — | 90 | 90 | 90 | — |
 | Iteration 2 · 2026-10-23 · `23c620a` | 755 / 755 | 431 / 431 | 93.5 / 74.0 | 95.4 / 79.2 | 91.1 / 75.7 | 43.2 / 35.9 | 79.6 / 64.7 | 97.4 / 91.2 | 99.3 / 98.6 | 98.9 / 84.6 | 98.1 / 92.5 |
 | Iteration 3 · 2026-11-06 · `c842fa1` | 1,711 / 1,711 | 791 / 791 | 94.4 / 78.6 | 97.7 / 82.0 | 93.7 / 78.1 | 50.4 / 44.7 | 86.9 / 72.2 | 97.5 / 89.8 | 99.7 / 99.3 | 99.1 / 86.7 | 98.3 / 92.9 |
+| Iteration 4 · 2026-11-20 · `752b7c3` | 2,108 / 2,108 | 881 / 881 | 94.7 / 79.4 | 97.9 / 83.4 | 94.5 / 79.0 | 49.9 / 44.5 | 88.3 / 73.8 | 97.5 / 89.8 | 99.6 / 99.0 | 99.1 / 86.7 | 98.4 / 93.4 |
 
-Evidence for Iteration 2: [Android tests](images/testing/it2_android_tests.png), [server tests](images/testing/it2_server_tests.png), [JaCoCo report](images/testing/it2_jacoco.png), and [pytest-cov report](images/testing/it2_pytest_cov.png). Evidence for Iteration 3: [Android tests](images/testing/it3_android_tests.png), [server tests](images/testing/it3_server_tests.png), [JaCoCo report](images/testing/it3_jacoco.png), and [pytest-cov report](images/testing/it3_pytest_cov.png). The earlier runs of each iteration are in the Test Log (6).
+Evidence for Iteration 2: [Android tests](images/testing/it2_android_tests.png), [server tests](images/testing/it2_server_tests.png), [JaCoCo report](images/testing/it2_jacoco.png), and [pytest-cov report](images/testing/it2_pytest_cov.png). Evidence for Iteration 3: [Android tests](images/testing/it3_android_tests.png), [server tests](images/testing/it3_server_tests.png), [JaCoCo report](images/testing/it3_jacoco.png), and [pytest-cov report](images/testing/it3_pytest_cov.png). Evidence for Iteration 4: [Android tests](images/testing/it4_android_tests.png), [server tests](images/testing/it4_server_tests.png), [JaCoCo report](images/testing/it4_jacoco.png), and [pytest-cov report](images/testing/it4_pytest_cov.png). The earlier runs of each iteration are in the Test Log (6).
 
 Failures, gaps, and follow-ups:
 
-- **Failed or skipped tests:** none in either run. No test is quarantined.
-- **Shortfalls against the targets:** none. The closest layer was Views at 91.1 % in Iteration 2 and at 93.7 % in Iteration 3. Every app layer rose in Iteration 3, and every server group held or rose in lines. The server core's branches were 89.8 % in this run and 91.8 % in a first run of the same commit (91.2 % in Iteration 2): some of its branches are taken only by timing. There is no branch target (2.1.2).
+- **Failed or skipped tests:** none in any of the three runs. No test is quarantined.
+- **Shortfalls against the targets:** none. The closest layer was Views at 91.1 % in Iteration 2, 93.7 % in Iteration 3, and 94.5 % in Iteration 4. Every app layer rose in Iteration 3, and every server group held or rose in lines. In Iteration 4 the three app layers with a 90 % target rose; the adapters fell from 50.4 % to 49.9 %, above their 30 % target, as the new `SensorPhoneTurns` runs only on a phone; the server groups held in lines, `poses` at 99.6 % against 99.7 %. The server core's branches were 89.8 % in the runs of Iterations 3 and 4, and 91.8 % and 90.6 % in first runs of the same commits (91.2 % in Iteration 2): some of its branches are taken only by timing. There is no branch target (2.1.2).
 - **Server core in Iteration 2:** `invitations` and `turn` had no code yet, so the row covers three modules (Iter2-P15, Iter2-P16). The migration versions are omitted in both runs (2.1.3).
-- **Adapters:** `CameraXController`, `WebRtcPeerConnectionClient`, and `WebRtcRuntime` have no JVM test, because CameraX and libwebrtc do not load on the JVM. The integration scripts (2.1.5) run them. Without these three, the layer stood at 80.0 % in Iteration 3. The plan to raise the layer is in 2.1.2.
+- **Adapters:** `CameraXController`, `WebRtcPeerConnectionClient`, and `WebRtcRuntime` have no JVM test, because CameraX and libwebrtc do not load on the JVM. The integration scripts (2.1.5) run them. Without these three, the layer stood at 80.0 % in Iteration 3 and 78.9 % in Iteration 4. The plan to raise the layer is in 2.1.2.
 - **Other untested regions:** calls into ML Kit, Credential Manager, and the signed-in socket; failure paths a fake does not raise (a Redis outage, FCM unreachable); the photo picker's callbacks; and glue that runs only in the app. Each run's list, with line counts, is in its record.
 - **Follow-ups:** `AppContainer.create` is a candidate for the exclusion list (2.1.3). The Iteration 2 acceptance cases without an automated test are listed in the [2026-10-23 integration record](#run-2026-10-23-integration-scripts).
-- **Mutation analysis:** not run in Iteration 2 or Iteration 3. It was first planned for Iteration 3, moved to Iteration 4, and then to Iteration 5 (2.1.7).
+- **Mutation analysis:** not run in Iterations 2 to 4. It was first planned for Iteration 3, moved to Iteration 4, and then to Iteration 5 (2.1.7).
 
 #### 2.2.2 Integration scripts
 
-Each cell is the phone run of a script of 2.1.5 in that iteration. *pass* means every step ran and passed; *pass, step not run* means the steps that ran passed and one did not run; *partial* means only part of the script ran; *covered by* names the later scripts that check the same flow; *—* means the script was not yet planned. Each iteration's column is one run; its record in Appendix B gives each script's date and build.
+Each cell is the phone run of a script of 2.1.5 in that iteration. *pass* means every step ran and passed; *pass, step not run* means the steps that ran passed and one did not run; *partial* means only part of the script ran; *covered by* names the later scripts that check the same flow; *not rerun* means the script gained no step in that iteration, so its last result stands; *—* means the script was not yet planned. Each iteration's column is one run; its record in Appendix B gives each script's date and build.
 
-| Script | Flow | Iteration 2 | Iteration 3 |
-|---|---|---|---|
-| IT-1 | Room-code session, same Wi-Fi | pass, one observation | pass |
-| IT-2 | Invitation across networks | not run | pass |
-| IT-3 | Invite link fallback | not run | pass |
-| IT-4 | Reconnection | not run | pass |
-| IT-5 | Guide sync and moves from both phones | pass, step not run | covered by IT-15, IT-32 |
-| IT-6 | Remote zoom, brightness, flash, guide moves | partial | pass |
-| IT-7 | Pose description | pass, step not run | covered by IT-17, IT-32, and the AI test (3.2) |
-| IT-8 | Aspect ratios and saved photo | pass | pass |
-| IT-9 | Saved guides | pass, step not run | covered by IT-26 |
-| IT-10 | Zoom without stutter | pass on the S23 Ultra, S21 not run | pass |
-| IT-11 | Sign-in and friends | partial, one phone | pass |
-| IT-12 | Room-code session across networks | — | pass, one note |
-| IT-13 | Korean | — | pass |
-| IT-14 | Reference thumbnail on Subject view | — | pass |
-| IT-15 | Guide from the subject's phone | — | pass |
-| IT-16 | Network switch during a session | — | pass |
-| IT-17 | Pose screens on both phones, *Save guide* on Subject view | — | pass |
-| IT-18 | Selfie mode | — | pass |
-| IT-19 | Candidates in each ratio | — | pass |
-| IT-20 | Session photos on both phones | — | pass |
-| IT-21 | Settings | — | pass, one note |
-| IT-22 | Description filter | — | pass, one defect |
-| IT-23 | First-use tutorial | — | pass |
-| IT-24 | Prompt history on both phones | — | pass |
-| IT-25 | Person check | — | pass |
-| IT-26 | Guide library | — | pass |
-| IT-27 | Saved poses | — | pass |
-| IT-28 | Screenshot cut | — | pass |
-| IT-29 | Screenshots from other apps | — | pass |
-| IT-30 | Changes on screen | — | pass |
-| IT-31 | Transitions between screens | — | pass |
-| IT-32 | The guide and the pose flow | — | pass |
-| IT-33 | Who takes the photo | — | pass |
-| IT-34 | Camera's controls after the heuristic evaluation | — | pass |
+| Script | Flow | Iteration 2 | Iteration 3 | Iteration 4 |
+|---|---|---|---|---|
+| IT-1 | Room-code session, same Wi-Fi | pass, one observation | pass | not rerun |
+| IT-2 | Invitation across networks | not run | pass | not rerun |
+| IT-3 | Invite link fallback | not run | pass | not rerun |
+| IT-4 | Reconnection | not run | pass | not rerun |
+| IT-5 | Guide sync and moves from both phones | pass, step not run | covered by IT-15, IT-32 | not rerun |
+| IT-6 | Remote zoom, brightness, flash, guide moves | partial | pass | pass |
+| IT-7 | Pose description | pass, step not run | covered by IT-17, IT-32, and the AI test (3.2) | pass |
+| IT-8 | Aspect ratios and saved photo | pass | pass | not rerun |
+| IT-9 | Saved guides | pass, step not run | covered by IT-26 | not rerun |
+| IT-10 | Zoom without stutter | pass on the S23 Ultra, S21 not run | pass | pass |
+| IT-11 | Sign-in and friends | partial, one phone | pass | not rerun |
+| IT-12 | Room-code session across networks | — | pass, one note | not rerun |
+| IT-13 | Korean | — | pass | not rerun |
+| IT-14 | Reference thumbnail on Subject view | — | pass | pass |
+| IT-15 | Guide from the subject's phone | — | pass | pass |
+| IT-16 | Network switch during a session | — | pass | pass |
+| IT-17 | Pose screens on both phones, *Save guide* on Subject view | — | pass | pass |
+| IT-18 | Selfie mode | — | pass | pass |
+| IT-19 | Candidates in each ratio | — | pass | not rerun |
+| IT-20 | Session photos on both phones | — | pass | pass |
+| IT-21 | Settings | — | pass, one note | pass |
+| IT-22 | Description filter | — | pass, one defect | pass |
+| IT-23 | First-use tutorial | — | pass | pass |
+| IT-24 | Prompt history on both phones | — | pass | pass |
+| IT-25 | Person check | — | pass | not rerun |
+| IT-26 | Guide library | — | pass | pass |
+| IT-27 | Saved poses | — | pass | not rerun |
+| IT-28 | Screenshot cut | — | pass | not rerun |
+| IT-29 | Screenshots from other apps | — | pass | not rerun |
+| IT-30 | Changes on screen | — | pass | not rerun |
+| IT-31 | Transitions between screens | — | pass | not rerun |
+| IT-32 | The guide and the pose flow | — | pass | not rerun |
+| IT-33 | Who takes the photo | — | pass | not rerun |
+| IT-34 | Camera's controls after the heuristic evaluation | — | pass | not rerun |
+| IT-35 | Back on the pose screens and the top bar | — | — | pass |
+| IT-36 | Why poses failed | — | — | pass |
+| IT-37 | Landscape photos and landscape poses | — | — | pass |
+| IT-38 | The controls that turn | — | — | pass |
 
 Notes:
 
@@ -670,6 +679,8 @@ Notes:
 - **IT-22, Iteration 3:** defect: a description the filter refuses is still kept under *Used before* in the prompt history. Fixed by Iter3-A15 ([#182]): a description is kept only once the server accepts its set (IT-34).
 - **Iteration 3:** IT-1, IT-6, IT-8, IT-10, IT-11, IT-17, IT-20, IT-23, and IT-26 to IT-34 ran last, at `c842fa1`. The other scripts ran at `7b03e9e`; their flows did not change after it, or IT-32 to IT-34 check the change.
 - **IT-30, Iteration 3:** the camera switch on Android 10 and 11 ran on an API 30 emulator; no such phone was at hand.
+- **Iteration 4:** the scripts that gained steps in Iteration 4 (IT-6, IT-7, IT-10, IT-14 to IT-18, IT-20 to IT-24, IT-26) and the new IT-35 to IT-38 ran on 11/19 at `44de211`. IT-6's two pinches at once (Iter4-A3) and the steps of Iter4-A6 on IT-7, IT-23, and IT-26 were merged on 11/20 and ran that day at `752b7c3`. Times by eye, not measured.
+- **Dropped in Iteration 4:** light mode ([#212]) and the QR connection ([#214]) were dropped on 11/20. Neither has a script, and NFR-5 over the QR hotspot was not measured.
 
 Of the 13 Iteration 2 user stories (R&S 4.4, Iter2-P21), 7 passed on the phones (US-1, 2, 3, 5, 10, 11, 13), 3 were partial (US-4, 6, 12), 2 had automated tests only (US-7, 8), and US-9 was not built. The [2026-10-23 record](#run-2026-10-23-integration-scripts) maps each story and each acceptance case to its tests and scripts.
 
@@ -677,15 +688,18 @@ Of the 13 Iteration 2 user stories (R&S 4.4, Iter2-P21), 7 passed on the phones 
 
 One row per NFR that the runs' scripts touch, measured by the method in R&S 5 ("How we check it"). The devices and logs are in the run records of 2.2.2.
 
-| NFR | Target | Iteration 2 (10/22–10/23) | Iteration 3 (11/04–11/06) |
-|---|---|---|---|
-| NFR-5 | ≤ 0.5 s on Wi-Fi; ≤ 0.8 s on cellular or relay | Not measured (no `Timings` log). The live view in `Streaming.mov` followed without a visible lag (IT-1) | 0.2 s on the same Wi-Fi and 0.3 s across networks (stopwatch); 0.3 s cellular with cellular and 0.5 s over the relay (IT-12). Sample count not recorded; about 0.3 s on one Wi-Fi by eye (IT-1) |
-| NFR-6 | 720p and ≥ 24 fps on Wi-Fi; ≥ 480p and 15 fps on a weak network | — | Above the floor in the `stats` lines while photos went, on Wi-Fi and with the subject on cellular; values not noted (IT-20) |
-| NFR-7 | ≤ 0.3 s guide; ≤ 0.5 s remote action | Not measured. The guide and the brightness change followed without a visible lag (IT-5, IT-6) | The subject's guide on both phones at once, by eye; not computed from the two phones' logs (IT-15). Typed text on the other phone in about 0.3 s, and a guide drag shown at once while a photo was sent, by eye (IT-17, IT-20); the subject's zoom, brightness, flash, and guide moves applied in about 0.3 s, by eye (IT-6) |
-| NFR-9 | push ≤ 5 s (95 %); live ≤ 10 s | Not run (Iter2-P15 moved to Iteration 3) | Push 2 s; live view 2 s after *Accept* from the push and about 1 s from *See their camera*; 3 s from the invite link to the live view. Invitation count not recorded (IT-2, IT-3, IT-33) |
-| NFR-10 | ≥ 90 % per network pair | Same Wi-Fi: every session connected, fewer than 10 per pair. Other pairs not run: campus-only server, no relay (Iter2-P16) | 10 of 10 in each of different Wi-Fi, Wi-Fi with cellular, cellular with cellular, and `relayOnly`; every same-Wi-Fi session connected (IT-12) |
-| NFR-11 | recover ≤ 10 s; no crash on a network switch | Not run (Iter2-P16 moved to Iteration 3) | About 5 s after 5 s of airplane mode on either phone, on one Wi-Fi and with the subject on cellular (IT-4); about 4 s from Wi-Fi to cellular, no crash (IT-16) |
-| NFR-19 | no stutter, no blank preview | S23 Ultra (10/22): no stutter before or after the fix, 30 fps, no lens switch (native 0.6×). S21 not run ([#93], `zoom_timings.py`) | On the S21 and the S22: no stutter or blank preview, and the last frame shown at a lens switch, by eye; frame intervals not measured (IT-10) |
+| NFR | Target | Iteration 2 (10/22–10/23) | Iteration 3 (11/04–11/06) | Iteration 4 (11/16–11/20) |
+|---|---|---|---|---|
+| NFR-1 | preview ≤ 2 s after a cold start | — | — | 1.15 s, the median of 10 cold starts on the S22, from the process start to the first preview frame (`PixTimings`, [#208]); not timed from the tap by screen recording |
+| NFR-2 | ≥ 30 fps while a guide is shown, dragged, or pinched | — | — | Not measured |
+| NFR-5 | ≤ 0.5 s on Wi-Fi; ≤ 0.8 s on cellular or relay | Not measured (no `Timings` log). The live view in `Streaming.mov` followed without a visible lag (IT-1) | 0.2 s on the same Wi-Fi and 0.3 s across networks (stopwatch); 0.3 s cellular with cellular and 0.5 s over the relay (IT-12). Sample count not recorded; about 0.3 s on one Wi-Fi by eye (IT-1) | Not run: no script with Iteration 4 steps measures it, and the QR hotspot was dropped ([#214]) |
+| NFR-6 | 720p and ≥ 24 fps on Wi-Fi; ≥ 480p and 15 fps on a weak network | — | Above the floor in the `stats` lines while photos went, on Wi-Fi and with the subject on cellular; values not noted (IT-20) | By eye, not measured (IT-20) |
+| NFR-7 | ≤ 0.3 s guide; ≤ 0.5 s remote action | Not measured. The guide and the brightness change followed without a visible lag (IT-5, IT-6) | The subject's guide on both phones at once, by eye; not computed from the two phones' logs (IT-15). Typed text on the other phone in about 0.3 s, and a guide drag shown at once while a photo was sent, by eye (IT-17, IT-20); the subject's zoom, brightness, flash, and guide moves applied in about 0.3 s, by eye (IT-6) | By eye, not measured (IT-6, IT-15, IT-17) |
+| NFR-8 | guide offset ≤ 3 % of the frame width | — | — | By eye, not measured (IT-37) |
+| NFR-9 | push ≤ 5 s (95 %); live ≤ 10 s | Not run (Iter2-P15 moved to Iteration 3) | Push 2 s; live view 2 s after *Accept* from the push and about 1 s from *See their camera*; 3 s from the invite link to the live view. Invitation count not recorded (IT-2, IT-3, IT-33) | Not run: IT-2, IT-3, and IT-33 gained no step |
+| NFR-10 | ≥ 90 % per network pair | Same Wi-Fi: every session connected, fewer than 10 per pair. Other pairs not run: campus-only server, no relay (Iter2-P16) | 10 of 10 in each of different Wi-Fi, Wi-Fi with cellular, cellular with cellular, and `relayOnly`; every same-Wi-Fi session connected (IT-12) | Not run: IT-12 gained no step |
+| NFR-11 | recover ≤ 10 s; no crash on a network switch | Not run (Iter2-P16 moved to Iteration 3) | About 5 s after 5 s of airplane mode on either phone, on one Wi-Fi and with the subject on cellular (IT-4); about 4 s from Wi-Fi to cellular, no crash (IT-16) | By eye, not measured (IT-16) |
+| NFR-19 | no stutter, no blank preview | S23 Ultra (10/22): no stutter before or after the fix, 30 fps, no lens switch (native 0.6×). S21 not run ([#93], `zoom_timings.py`) | On the S21 and the S22: no stutter or blank preview, and the last frame shown at a lens switch, by eye; frame intervals not measured (IT-10) | By eye, not measured (IT-10). The shutter, measured for [#208] on the S22 on 11/16, medians of 8: the photo taken 0.26 s after the press with the front camera and 0.39 s with the rear one in the dark; the preview without a new frame 0.13 s and 0.19 s |
 
 ---
 
@@ -745,6 +759,7 @@ Each iteration's run adds a column to the tables below; the run's details are in
 **Runs.**
 
 - **Iteration 3:** 2026-11-05; three runs (`run1`–`run3`) of the 50 cases on a local server at `430447f` (the AI modules' code is the same at `c842fa1`); judge rubric `996c7738f404`; the phone's person check on a Galaxy Note20 (Android 13). The first AI run, so nothing changed before it. [Record](#run-2026-11-05-ai-module-tests).
+- **Iteration 4:** the tips alone ([#213]). One run, `t213-run1`, of the 50 cases, made on 2026-11-16 and its tips asked again up to 2026-11-18 with the tip of [#213]; 50 of its tips checked by the four of us by 2026-11-20, so "most of us" is three of four. The judge did not run, as we check the tips ourselves (3.1), and the other modules were not measured again. [Record](#run-2026-11-20-tips-check).
 
 **Judge validation.** The judge's numbers count only for an iteration whose judge passes these checks.
 
@@ -754,21 +769,21 @@ Each iteration's run adds a column to the tables below; the run's details are in
 | Consistency: the sample judged three times | — | 1 of 306 verdicts changed (0.3 %) |
 | Negative control: 20 candidates beside another case's scene | all fail *same person* and *same background* | pass: 20 of 20 |
 
-**Results against the thresholds.** Pose generation, suggestions, and tips are pooled over the iteration's three runs, with 95 % intervals in brackets.
+**Results against the thresholds.** Pose generation, suggestions, and tips are pooled over the iteration's three runs, with 95 % intervals in brackets. Iteration 4 measured only the tips, in one run (—: not measured).
 
-| Module | Metric | Threshold | Iteration 3 |
-|---|---|---|---|
-| Pose generation | returned images that are valid | 100 % | pass: 1192 of 1192 |
-| | sets with all four candidates within 30 s | ≥ 95 % | pass: 291 of 300, 97.0 % (94–98) |
-| | candidates that break a rule | ≤ 20 % | pass: 2 of 1192, 0.2 % (0–1) |
-| | candidates that follow the request | ≥ 80 % | pass: 1124 of 1192, 94.3 % |
-| Suggestions | suggested sets with four different poses | ≥ 90 % | **fail**: 117 of 150, 78.0 % (71–84) |
-| Tips | tips that match their pose | ≥ 80 % | pass, at the threshold: 240 of 300, 80.0 % (75–84) |
-| | tips with a number or a unit | none | pass: 0 of 300 |
-| Description filter | harmful descriptions let through | ≤ 5 % | pass: 0 of 50 |
-| | harmless descriptions refused | ≤ 5 % | pass: 1 of 50, 2 % |
-| Person check (phone and server) | photos with a person refused | ≤ 5 % | **fail**: 9 of 26, 34.6 % (19–54) |
-| | photos without a person let through | ≤ 10 % | pass: 2 of 24, 8.3 % (2–26) |
+| Module | Metric | Threshold | Iteration 3 | Iteration 4 |
+|---|---|---|---|---|
+| Pose generation | returned images that are valid | 100 % | pass: 1192 of 1192 | — |
+| | sets with all four candidates within 30 s | ≥ 95 % | pass: 291 of 300, 97.0 % (94–98) | — |
+| | candidates that break a rule | ≤ 20 % | pass: 2 of 1192, 0.2 % (0–1) | — |
+| | candidates that follow the request | ≥ 80 % | pass: 1124 of 1192, 94.3 % | — |
+| Suggestions | suggested sets with four different poses | ≥ 90 % | **fail**: 117 of 150, 78.0 % (71–84) | — |
+| Tips | tips that match their pose | ≥ 80 % | pass, at the threshold: 240 of 300, 80.0 % (75–84) | pass: 46 of 50, 92.0 % (81–97), against ≥ 90 % from Iteration 4 |
+| | tips with a number or a unit | none | pass: 0 of 300 | pass: 0 of 100 |
+| Description filter | harmful descriptions let through | ≤ 5 % | pass: 0 of 50 | — |
+| | harmless descriptions refused | ≤ 5 % | pass: 1 of 50, 2 % | — |
+| Person check (phone and server) | photos with a person refused | ≤ 5 % | **fail**: 9 of 26, 34.6 % (19–54) | — |
+| | photos without a person let through | ≤ 10 % | pass: 2 of 24, 8.3 % (2–26) | — |
 
 **Other measurements** (no threshold).
 
@@ -790,6 +805,26 @@ Each iteration's run adds a column to the tables below; the run's details are in
 - **Requests without an image.** The image provider's safety system refused 7 requests as sexual content; 4 of them are one scene (s15, a woman sitting on a concrete block), and the same request is refused again when replayed. The server cannot tell these refusals from other upstream errors, so the app cannot explain them to the user. One request did not answer within the app's 60 s.
 - **Variations that repeat the description.** In 15 of 150 described sets, a variation was the description with a full stop added, which the server's duplicate check misses. For Korean descriptions, the first variation is often the English translation. Both are to be addressed with the prompt revision ([#125]). Not addressed in Iteration 4: that revision ([#211]) was dropped on 11/14; Iteration 5 **TBD**.
 - **Filter.** The one harmless description refused is a Korean idiom: "폭탄 맞은 머리로 하품하는 모습" ("yawning with bomb-hit hair", meaning messy hair).
+
+**Tips check, Iteration 4** ([#213]). 50 tips of `t213-run1`, 115 sentences, with 95 % intervals in brackets.
+
+| Measurement | Iteration 4 |
+|---|---|
+| Tips that match their pose, by each of us | 한준형 36 of 50 (72 %), 박재완 44 of 50 (88 %), 조성민 43 of 50 (86 %), 박동제 49 of 50 (98 %) |
+| Sentences right, by most of us | 111 of 115, 96.5 % (91–99) |
+| Two of us agree on a sentence | 한준형 and 박재완 84.3 %, 한준형 and 조성민 83.5 %, 한준형 and 박동제 87.0 %, 박재완 and 조성민 95.7 %, 박재완 and 박동제 95.7 %, 조성민 and 박동제 94.8 % |
+| Tips with something important left out | 0 of 50 by 한준형 and by 박동제, 1 of 50 by 조성민 (s28, suggested); 박재완 did not answer it |
+| The other 50 tips, read through Claude Code | 49 of 50, 98.0 % (90–100) |
+| Tips that ask for no change of distance or phone | 22 of 50: the same distance in 12, the guide-outline sentence in 10; 14 of them say nothing more |
+| The phone's height the same as for the scene photo | 41 of 50 |
+
+**Failure analysis, Iteration 4.**
+
+- **Tips (pass).** Most of us found four sentences wrong, one in each failing tip: "Keep the same distance." (s05, suggested), "지금 거리를 유지하세요." (s27, suggested), "폰은 눈높이에서 수평으로 드세요." (s20, suggested, a selfie), and "훨씬 뒤로 물러나세요." (s42, suggested). The page kept the words of 11/18; a big move now reads "가까이 다가가세요." or "멀리 물러나세요." ([#213]). 한준형 noted that s12 (described) should tilt the phone down, not up; 조성민, that s05, s27, and s28 (suggested) needed a move farther back or closer, and that s20's tip does not suit a selfie.
+- **The guide-outline sentence.** It stands where the two measures of the distance disagree: 14 of 50 tips. 한준형 failed 12 of the 14 and 조성민 one; 박재완 and 박동제 passed all of them. Whether it helps, or only repeats the guide on the screen, is open.
+- **Whether the tips help.** The check asks whether each sentence fits the candidate, not whether the tip helps. 22 of 50 tips ask for no change, since a candidate keeps the scene's camera: the phone's height is the same in 41 of 50. Measuring the tips' use, for example in a user test, is not planned; Iteration 5 **TBD**.
+- **How we checked.** 조성민 answered last, after seeing a summary of two others' answers, although the page asks each of us to answer alone.
+- **Not measured again.** Pose generation, suggestions, the description filter, and the person check. Their prompts and models did not change in Iteration 4 apart from the tip and the situations' own prompts, which were compared with the default ones on `situation_cases.json` in [#209] (3.1). So the failures of Iteration 3 in suggestions and the person check were not measured again; Iteration 5 **TBD**. Three runs at the iteration's commit, as [#215] planned, needed the judge, whose API key was not at hand (3).
 
 ---
 
@@ -1043,6 +1078,9 @@ One row per recorded run, newest first, so the history of the numbers shows at a
 
 | Date | Iteration | What ran | Commit | Outcome | Section |
 |---|---|---|---|---|---|
+| 2026-11-20 | 4 | AI module tests: the tips of one run, 50 of them checked by the four of us | `78287b5` | Tips pass: 46 of 50 (92.0 %) by most of us; 한준형 failed 12 of the 14 guide-outline sentences; 22 of 50 tips ask for no change | 3.2; [record](#run-2026-11-20-tips-check) |
+| 2026-11-20 | 4 | Integration scripts on the phones (IT-6, 7, 10, 14–18, 20–24, 26, 35–38), from 11/19 | `44de211`, `752b7c3` | 18 of 18 pass; the other scripts gained no step and were not rerun. Times by eye, not measured; NFR-1 1.15 s and the shutter 0.26 s from [#208] | 2.2.2, 2.2.3; [record](#run-2026-11-20-integration-scripts) |
+| 2026-11-20 | 4 | Unit, Robolectric, screen, and adapter tests; server; coverage | `752b7c3` | 2,108 + 881 tests, 0 failed; app 88.3 % (94.7 / 97.9 / 94.5 / 49.9); server 98.4 % | 2.2.1; [record](#run-2026-11-20-unit-tests-and-coverage) |
 | 2026-11-16 | 4 | UAT cycle 1 in class: two testers of other teams, the five stories in 70 steps | `d806e2a` | All five stories pass: no step rejected; 137 of 140 marks accepted, three missing. Satisfaction 3 on zooming from both phones at once and on the photo on the subject's phone; follow-ups in 4.4 | 4.4 |
 | 2026-11-06 | 3 | Integration scripts on the phones (IT-1–4, 6, 8, 10–34), from 11/04 | `7b03e9e`, `c842fa1` | 31 of 31 pass; IT-5, 7, and 9 covered by later scripts; IT-12, 21, and 22 with notes. NFR-5 0.3 s cellular, 0.5 s relay; NFR-9 push 2 s; NFR-10 10/10 per pair; NFR-11 about 5 s. The defect of IT-22 (a refused description kept in the prompt history) is fixed (IT-34) | 2.2.2, 2.2.3; [record](#run-2026-11-06-integration-scripts) |
 | 2026-11-06 | 3 | Unit, Robolectric, screen, and adapter tests; server; coverage | `c842fa1` | 1,711 + 791 tests, 0 failed; app 86.9 % (94.4 / 97.7 / 93.7 / 50.4); server 98.3 % | 2.2.1; [record](#run-2026-11-06-unit-tests-and-coverage) |
@@ -1144,11 +1182,13 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 **Steps**
 
 1. On the subject's phone, 20 times each: pinch, the brightness slider, the flash button, and, with the guide-edit toggle on, a drag and a pinch on the guide.
+2. *Added in Iter4-A3 ([#236]):* with guide-edit mode off on both phones, the photographer starts a pinch, and while it runs the subject pinches the live view. Both lift, then the subject pinches again. Repeat with the subject first, then with the subject tapping the zoom readout during the photographer's pinch. 10 times each.
 
 **Expected result**
 
 - Each is applied on the photographer's phone within 0.5 s, with the notice once per gesture. Both phones agree on release.
 - The NFR-7 number is the round trip in the subject's `PixTimings` log, from `zoom.sent`, `exposure.sent`, or `move.sent` with `final` to the echo (`zoom.echo`, `guide.applied`). No clock alignment is needed.
+- *Added in Iter4-A3:* the image does not jump on either phone. The first pinch sets the zoom; the other phone's pinch or tap changes nothing, its readout follows the zoom, and it shows "Dongje is zooming" or "Joonhyung is zooming". The subject's next pinch zooms. Both readouts end on the same ratio.
 
 ### IT-7 procedure
 
@@ -2206,6 +2246,90 @@ One request timed out: run2 s25 suggested, candidate 2 ("Turn your body slightly
 
 Found as the app runs the checks, by category: full body 4/4, from behind 3/3, group 2/2, selfie 2/2, near 3/4, sitting 2/3, partly hidden 1/2, far 0/4, low light 0/2. The phone counts a person when ML Kit finds enough body landmarks (likelihood ≥ 0.5) or a face; a small or dark figure gives neither.
 
+
+### Run 2026-11-20 tips check
+
+**Setup.** `t213-run1`: the 50 cases made once on 2026-11-16, on a local server at `d806e2a` with the tip of [#213], not yet committed. Its tips were asked again with `retip` after each change of the tip, the last on 2026-11-18 (prompts `aeb50809390f`). They follow the tip merged in `78287b5`, except a big move's words (3.2). 50 of the 100 tips, drawn with seed 3 (sample `160ab2b1f2ef`), were shown on `label-tips.html`; the other 50 were read through Claude Code (3.1). Counted with `eval_poses.py agree t213-run1 --kind tip --labels ...`, then `report t213-run1`. Our answers are committed in `server/eval/labels/` (`t213-run1-tips-joonhyung.json`, `-jaewan.json`, `-sungmin.json`, `-dongje.json`); the run's outputs are under `server/scripts/out/eval/t213-run1/` (not committed). Which tips ask for a change comes from what the model answered for each photo (`tip-seen.jsonl`), through the server's `seen` and `framing_of`.
+
+**Sentences each of us found wrong.** 한준형 14: twelve guide-outline sentences, one same distance, one phone. 박재완 6: three phone, two same distance, one big move back. 조성민 7: one guide-outline sentence, three phone, two same distance, one big move back. 박동제 1: the big move back.
+
+**Pose generation in this run** (not judged, one run): 399 of 400 candidates made (one `ReadError`), all valid; all four within 30 s in 96 of 100 sets, the first within 20 s in 82 of 100.
+
+### Run 2026-11-20 unit tests and coverage
+
+- **Build:** `752b7c3` on `dev`, with the last Iteration 4 feature merged (Iter4-A3, [#236]).
+- **Tester and machine:** Sungmin Jo, with Claude Code, on a MacBook Pro (Apple M5) with Android Studio's JBR 25.0.3 and Python 3.11.18.
+- **What ran:** the commands of 2.1.4; the server suite on fakeredis and SQLite, after `uv sync --locked`.
+- **Layers:** as in the [2026-10-23 record](#run-2026-10-23-unit-tests-and-coverage). The phone's turn from the sensor (`SensorPhoneTurns`, [#206]) counts as an adapter, as the tilt sensor does. The same split, applied to `c842fa1`, gives Iteration 3's numbers exactly.
+- **Evidence:** [Android tests](images/testing/it4_android_tests.png), [server tests](images/testing/it4_server_tests.png), [JaCoCo report](images/testing/it4_jacoco.png), and [pytest-cov report](images/testing/it4_pytest_cov.png).
+
+| Suite | Tests | Passed | Failed | Skipped | Time |
+|---|---|---|---|---|---|
+| Android (`:app:testDebugUnitTest`) | 2,108 | 2,108 | 0 | 0 | 1 min 8 s of tests; 1 min 33 s with a clean build and the JaCoCo report |
+| Server (`uv run pytest`) | 881 | 881 | 0 | 0 | 55 s |
+
+Since the close of Iteration 3 (1,711 and 791), Iteration 4 added 397 Android and 90 server tests.
+
+| Layer | Line | Branch |
+|---|---|---|
+| App · managers and repositories | 94.7 % (3,843/4,058) | 79.4 % |
+| App · ViewModels | 97.9 % (2,010/2,054) | 83.4 % |
+| App · Views and Fragments | 94.5 % (7,015/7,426) | 79.0 % |
+| App · platform adapters | 49.9 % (1,152/2,308) | 44.5 % |
+| App · whole module | 88.3 % (13,815/15,651) | 73.8 % (8,843/11,985) |
+| Server · `signaling`, `store`, `accounts`, `invitations`, `turn` | 97.5 % (1,303/1,337) | 89.8 % |
+| Server · `poses` | 99.6 % (783/786) | 99.0 % |
+| Server · `main`, `config`, `errors`, `db` | 99.1 % (318/321) | 86.7 % |
+| Server · whole package | 98.4 % (2,404/2,444) | 93.4 % (454/486) |
+
+The migration versions are omitted (2.1.3). A first run of the same commit gave 98.4 % of lines (2,405) and 93.8 % of branches (456/486); `signaling/registry.py` takes some branches only by timing. An earlier try on Python 3.13 with unlocked packages failed two tests: `test_person_check.py` expects Python 3.11's name for status 413, which 3.13 calls "Content Too Large", and a store-outage test in `test_registry.py` timed out. Both pass with the locked packages on Python 3.11, as in CI.
+
+Untested regions, read from the untaken lines and branches and not yet added as cases:
+
+- **Adapters:** `CameraXController` (0 of 622 lines), `WebRtcPeerConnectionClient` (0 of 201), and `WebRtcRuntime` (0 of 25) need CameraX or libwebrtc, which do not load on the JVM; the scripts of 2.1.5 run them on the phones. Without these three, the layer stands at 78.9 % (1,152 of 1,460 lines). Most of the rest are calls into ML Kit (`SubjectSegmenter` 2 of 50, `MlKitPersonSignals` 0 of 22), Credential Manager (`CredentialManagerGoogleIdTokens` 0 of 20), the signed-in socket (`OkHttpPresenceSockets` 0 of 23), `DataStoreSignInStore` (0 of 23), and the sensors (`CameraLevelMonitor` 19 of 36, the new `SensorPhoneTurns` 0 of 21). `RtcSessionManager` misses 57 of 630 lines and 120 of 498 branches.
+- **Managers:** `SessionMessage` misses 50 of 242 lines and 109 of 264 branches, most of them in the code kotlinx.serialization generates (not checked case by case).
+- **Screens:** `ExposureBarView` (89 of 129 lines) and `ScreenshotCutView` (46 of 87); `CameraCompositionView` 56.8 %, `SubjectFragment` 92.6 %, `CoachMarkLayout` 94.3 %, and `CameraFragment` 97.8 % of lines, with 110 and 183 untaken branches in the two Fragments. New in Iteration 4: `PhotoThumbnail.kt` (25 of 38) and `InlineIconSpan` (2 of 9).
+- **Glue:** `AppContainer` and `MainActivity` (47.0 % of 334 lines) wire the real modules and run only in the app (2.1.3).
+- **Server:** `store/session_store.py` 92.8 % of lines (the Redis-outage branch, lines 35–42), `invitations/push.py` 91.2 % (FCM unreachable, and the database failing around a push), and `signaling/registry.py` 96.5 %.
+
+Shortfalls: none. The closest layer was the app's Views at 94.5 %. The three app layers with a 90 % target rose since Iteration 3. The adapters fell from 50.4 % to 49.9 %, above their 30 % target, as `SensorPhoneTurns` runs only on a phone. The server groups held in lines, `poses` at 99.6 % against 99.7 %.
+
+Mutation analysis (2.1.7) did not run; it moved to Iteration 5.
+
+### Run 2026-11-20 integration scripts
+
+- **Build:** `dev` at `44de211` on 11/19, with landscape photos, the controls that turn, and the notice that the subject left merged (Iter4-P9, Iter4-P10, Iter4-A5). IT-6's two pinches at once (Iter4-A3, [#236]) and the steps of Iter4-A6 ([#243]) on IT-7, IT-23, and IT-26 were merged on 11/20 and ran that day at `752b7c3`.
+- **Phones:** a Galaxy S22 (Android 15) as the photographer and a Galaxy S23 Ultra (Android 16) as the subject.
+- **Server:** the AWS server, which deploys each push to `dev`.
+- **Tester:** Sungmin Jo.
+- **Evidence:** none kept. Times by eye, not measured.
+- **What ran:** the scripts that gained steps in Iteration 4, and the new IT-35 to IT-38. The other scripts gained no step and were not run again; their last results stand (2.2.2). Light mode ([#212]) and the QR connection ([#214]) were dropped on 11/20 and have no script.
+
+Each script ran with its setup in 2.1.5, except where the table says otherwise.
+
+| Script | Date | Iteration 4 steps | Setup | Result |
+|---|---|---|---|---|
+| IT-6 | 11/19, 11/20 | Two pinches at once ([#236]) | — | pass |
+| IT-7 | 11/19, 11/20 | The situation's hint and camera, its name on *Generate poses* ([#210]); the scene photo's bar, panel, and ratio ([#231]); each situation's tile as its button ([#243]) | — | pass |
+| IT-10 | 11/19 | The shutter's quick presses ([#208]) | The S22 alone | pass |
+| IT-14 | 11/19 | Hiding the reference thumbnail at the side ([#237]) | Two phones on one Wi-Fi and the AWS server, in place of the emulator and the server on the Mac | pass |
+| IT-15 | 11/19 | The guide's reference thumbnail on the photographer's Camera ([#234]) | — | pass |
+| IT-16 | 11/19 | The photographer's notice that the subject dropped or left ([#238]) | — | pass |
+| IT-17 | 11/19 | The photographer's tip on Subject view ([#213]) | — | pass |
+| IT-18 | 11/19 | The subject's video as a mirror with the rear camera ([#201]) | The S23 Ultra as the subject and the AWS server, in place of the emulator and the server on the Mac | pass |
+| IT-20 | 11/19 | The session's photos on each phone ([#235]); Pix's album in Pix's viewer ([#247]) | — | pass |
+| IT-21 | 11/19 | Settings from the gear in a session ([#204]) | The S22 and the S23 Ultra in a session | pass |
+| IT-22 | 11/19 | A refused description kept out of *Used before* ([#200]); the refusal's message ([#203]) | — | pass |
+| IT-23 | 11/19, 11/20 | A tap anywhere closes the tips ([#204]); the rings on *Add a pose guide* ([#243]) | — | pass |
+| IT-24 | 11/19 | A refused description listed on neither phone ([#200]) | — | pass |
+| IT-26 | 11/20 | A picker closed without a photo leaves the sheet open ([#243]) | — | pass |
+| IT-35 | 11/19 | The whole script ([#199]) | — | pass |
+| IT-36 | 11/19 | The whole script ([#203]) | The AWS server | pass |
+| IT-37 | 11/19 | The whole script ([#206]) | — | pass |
+| IT-38 | 11/19 | The whole script ([#207]) | — | pass |
+
+Observations: every Iteration 4 step held, and no defect was found.
+
 [#47]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/47
 [#48]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/48
 [#50]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/50
@@ -2282,9 +2406,11 @@ Found as the app runs the checks, by category: full body 4/4, from behind 3/3, g
 [#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211
 [#212]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/212
 [#213]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/213
+[#214]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/214
 [#215]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/215
 [#236]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/236
 [#238]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/238
+[#240]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/240
 [#243]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/243
 [#247]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/247
 [#254]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/254

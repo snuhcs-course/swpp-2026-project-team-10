@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-16, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.FlashMode
@@ -14,7 +14,8 @@ import org.junit.Test
 /*
  * Partitions for the subject's requests of Design 2.5.1 (#57): the Design's JSON example of each message decodes;
  * a round trip keeps every field; `final` left out means a step; `guide.state` from a phone without `by` means the
- * photographer, and the echo of a `guide.move` carries `by: SUBJECT`.
+ * photographer, and the echo of a `guide.move` carries `by: SUBJECT`; `camera.zoom.hold` naming a holder, null, or no
+ * holder at all, the last two meaning a free zoom, and a `camera.zoom.set` with `cancel`, which is false when left out (#236).
  */
 class RemoteControlMessagesTest {
     private val codec = MessageCodec(clock = { 1_759_212_345_678L })
@@ -30,6 +31,33 @@ class RemoteControlMessagesTest {
             SessionMessage.GuideMove("5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", 0.41f, 0.52f, 0.82f, final = false),
             decode(text),
         )
+    }
+
+    @Test
+    fun zoomHold_designExample_decodes() {
+        val text = """{ "v": 3, "t": "camera.zoom.hold", "seq": 4, "ts": 1759212352290,
+            "b": { "by": "PHOTOGRAPHER" } }"""
+
+        assertEquals(SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER), decode(text))
+    }
+
+    @Test
+    fun zoomHold_nullOrNoHolder_meansAFreeZoom() {
+        val none = """{ "v": 3, "t": "camera.zoom.hold", "seq": 5, "ts": 1759212352400, "b": { "by": null } }"""
+        val missing = """{ "v": 3, "t": "camera.zoom.hold", "seq": 6, "ts": 1759212352500, "b": { } }"""
+
+        assertEquals(SessionMessage.ZoomHoldUpdate(null), decode(none))
+        assertEquals(SessionMessage.ZoomHoldUpdate(null), decode(missing))
+    }
+
+    @Test
+    fun zoomCancel_designExample_decodes() {
+        val text = """{ "v": 3, "t": "camera.zoom.set", "seq": 32, "ts": 1759212352340,
+            "b": { "ratio": 1.4, "final": true, "cancel": true } }"""
+        val older = """{ "v": 3, "t": "camera.zoom.set", "seq": 33, "ts": 1759212352400, "b": { "ratio": 2.0 } }"""
+
+        assertEquals(SessionMessage.ZoomSet(1.4f, final = true, cancel = true), decode(text))
+        assertEquals(SessionMessage.ZoomSet(2f), decode(older))
     }
 
     @Test

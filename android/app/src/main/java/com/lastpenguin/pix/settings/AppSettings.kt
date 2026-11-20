@@ -3,6 +3,7 @@ package com.lastpenguin.pix.settings
 
 import android.content.Context
 import android.util.Log
+import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -140,11 +141,12 @@ private val Context.appSettingsStore by preferencesDataStore(name = "app_setting
 
 /**
  * Kept in Jetpack DataStore (Design 1.2), read into the flows on [scope] from the start. Until the first read, and after
- * a storage error, the flows hold the defaults; a choice that cannot be saved is lost with the process.
+ * a storage error, the flows hold the defaults, except [shareUsage], which stays unread; a choice that cannot be saved
+ * is lost with the process. [store] is the app's own outside tests.
  */
-class DataStoreAppSettings(context: Context, scope: CoroutineScope) : AppSettings {
+class DataStoreAppSettings(private val store: DataStore<Preferences>, scope: CoroutineScope) : AppSettings {
 
-    private val store = context.applicationContext.appSettingsStore
+    constructor(context: Context, scope: CoroutineScope) : this(context.applicationContext.appSettingsStore, scope)
 
     private val preferences = store.data
         .catch { error ->
@@ -169,8 +171,18 @@ class DataStoreAppSettings(context: Context, scope: CoroutineScope) : AppSetting
             TutorialScreen.entries.filter { it.name in names }.toSet()
         }.stateIn(scope, SharingStarted.Eagerly, null)
 
+    /**
+     * Read apart from the other settings: a read that fails keeps the last answer, or none, and never takes the default,
+     * which would turn sharing on for a user who turned it off (FR-10.6).
+     */
     override val shareUsage: StateFlow<Boolean?> =
-        preferences.map<Preferences, Boolean?> { it[SHARE_USAGE] ?: true }.stateIn(scope, SharingStarted.Eagerly, null)
+        store.data
+            .map<Preferences, Boolean?> { it[SHARE_USAGE] ?: true }
+            .catch { error ->
+                if (error !is IOException) throw error
+                Log.w(TAG, "Could not read whether usage data is shared", error)
+            }
+            .stateIn(scope, SharingStarted.Eagerly, null)
 
     override suspend fun setGuideColor(color: GuideColor) = save { it[GUIDE_COLOR] = color.name }
 

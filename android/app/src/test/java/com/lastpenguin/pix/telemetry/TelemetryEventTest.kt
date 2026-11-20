@@ -17,8 +17,8 @@ import org.junit.Test
 
 /*
  * The usage events as Analytics receives them (Design 2.8, Telemetry; NFR-13).
- * Partitions: each event's name and fields; each optional field present and absent (a pose set that ended with poses
- * or with each failure, a try that connected or failed, a photo the camera took or never took); every session entry
+ * Partitions: each event's name and fields; each optional field present and absent (a pose set that ended with poses,
+ * with each failure, or cancelled, a try that connected or failed, a photo the camera took or never took); every session entry
  * and every choice of each enum field, which become lowercase names; Analytics' limits on every event built from every
  * choice (name and keys of at most 40 letters, digits, and `_`, starting with a letter; none of its reserved names or
  * prefixes; at most 25 fields; only `String` values of at most 100 characters and `Long` values); and no field holding
@@ -72,6 +72,22 @@ class TelemetryEventTest {
 
         assertEquals("described", event.params["request"])
         assertEquals("rate_limited", event.params["outcome"])
+    }
+
+    @Test
+    fun posesEnded_cancelled_saysCancelled_whateverFailedBefore() {
+        val event = TelemetryEvent.PosesEnded(
+            described = false,
+            situation = Situation.DEFAULT,
+            failure = GenerationError.OFFLINE,
+            ready = 1,
+            total = 4,
+            ms = 9_000,
+            cancelled = true,
+        )
+
+        assertEquals("cancelled", event.params["outcome"])
+        assertEquals(1L, event.params["ready"])
     }
 
     @Test
@@ -166,7 +182,19 @@ class TelemetryEventTest {
         Situation.entries.forEach { situation ->
             (GenerationError.entries + null).forEach { failure ->
                 listOf(true, false).forEach { described ->
-                    add(TelemetryEvent.PosesEnded(described, situation, failure, ready = 1, total = 4, ms = 1))
+                    listOf(true, false).forEach { cancelled ->
+                        add(
+                            TelemetryEvent.PosesEnded(
+                                described,
+                                situation,
+                                failure,
+                                1,
+                                4,
+                                ms = 1,
+                                cancelled = cancelled,
+                            ),
+                        )
+                    }
                 }
             }
         }

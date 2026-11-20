@@ -31,7 +31,8 @@ sealed interface TelemetryEvent {
 
     /**
      * A set of poses at its end (FR-4.7, NFR-4): suggested or described, the situation, how it ended ([failure] null
-     * when a pose came), how many of its poses came, and how long it took.
+     * when a pose came; [cancelled] when the user left it while it was generating), how many of its poses came, and how
+     * long it took.
      */
     data class PosesEnded(
         val described: Boolean,
@@ -40,12 +41,13 @@ sealed interface TelemetryEvent {
         val ready: Int,
         val total: Int,
         val ms: Long,
+        val cancelled: Boolean = false,
     ) : TelemetryEvent {
         override val name = "poses_ended"
         override val params: Map<String, Any> = mapOf(
             "request" to if (described) "described" else "suggested",
             "situation" to situation.apiName,
-            "outcome" to (failure?.label ?: "ok"),
+            "outcome" to if (cancelled) "cancelled" else (failure?.label ?: "ok"),
             "ready" to ready.toLong(),
             "total" to total.toLong(),
             "ms" to ms,

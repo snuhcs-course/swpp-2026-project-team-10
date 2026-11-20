@@ -2920,7 +2920,7 @@ The settings screen (FR-10.1, R&S 6.10; Iter3-P23, [#123]) opens from a gear on 
 - **The other rows.**
   - *Notifications* shows whether Pix's notifications are on and opens Android's page for them.
   - *AI pose generation* follows `GenerationViewModel.consentGiven` (FR-4.2). After a confirmation, `withdrawConsent` withdraws the agreement, and Pix asks again before the next scene photo.
-  - *Share usage data* (FR-10.6) is a switch, on by default, kept as `AppSettings.shareUsage` (DataStore `share_usage`). It is disabled until the stored choice is read, so neither a tap nor the switch's restored state saves the default. A change applies at once (2.8, *Telemetry*).
+  - *Share usage data* (FR-10.6) is a switch, on by default, kept as `AppSettings.shareUsage` (DataStore `share_usage`). It is disabled until the stored choice is read, so neither a tap nor the switch's restored state saves the default. A choice that cannot be read stays unread, never the default. A change applies at once (2.8, *Telemetry*).
   - *Pix account* shows the Pix ID and opens the account sheet. Signed out, it opens *Sign in*, which returns to Settings.
   - *How to use Pix* explains guides, poses, shooting together, and the subject's controls. *About Pix* shows the version and the open-source licenses.
 - **First-use tutorial (FR-10.4).** Each `TutorialScreen` shows tips over its live view the first time it opens: Camera, *Add a pose guide* from Camera, the guide on Camera, *Generate poses* on either phone, and Subject view, titled "When you're the subject".
@@ -3169,19 +3169,20 @@ erDiagram
 **Telemetry** (AD-19, FR-10.6; Iter4-A8, [#254])
 
 - `telemetry/Telemetry` is the one entry point, like `Timings`: `Telemetry.event(TelemetryEvent)` and `Telemetry.error(where, error)`. Until `AppContainer.create` installs the real sink, and in tests, both do nothing.
-- `GatedTelemetry` sends only while the build allows it (`BuildConfig.TELEMETRY`: release builds; a debug build only with `pix.telemetry=true`) and the switch does, from the stored choice on. Off turns Crashlytics' and Analytics' collection off, which they keep for the next start, and deletes the reports not yet sent.
+- `GatedTelemetry` sends only while the build allows it (`BuildConfig.TELEMETRY`: release builds; a debug build only with `pix.telemetry=true`) and the switch does, from the stored choice on. Off stops our events and Analytics at once and turns Crashlytics off; both keep the answer for the next start.
+- Crashlytics decides at each start whether to send the reports it holds. So they are deleted at the first start with it off, and it collects again only at a start, after that deletion: turned on again in the run that turned it off, it stays off until the next start.
 - The manifest turns collection on in release builds and off in debug builds, so a crash before the stored choice is read is caught as the user last chose.
 - Crashlytics catches crashes and freezes (ANRs) itself, with the exception's message. `Telemetry.error` reports a failure the app survived: each `catch` that logs with `Log.e`, and the guide maker's. Each place's error goes once per process, as a `ReportedError` with the place, the classes, and the stack traces, and no message.
 - No report has a user ID, an advertising ID, or an SSAID. The manifest removes the advertising-ID permissions that Analytics adds.
 - Analytics also sends its automatic events: `first_open`, `session_start`, `user_engagement`, and `app_exception` at a crash. Each carries the phone's model, the Android version, the app's version, and a random ID per install. Its automatic `screen_view` is off in the manifest, since Pix has one activity and every screen would read `MainActivity`.
-- Each of Pix's own events is one class of `TelemetryEvent`, so the app sends no other. Its fields are fixed choices, counts, and times in ms:
+- Each of Pix's own events is one class of `TelemetryEvent`, so the app sends no other. Its fields are fixed choices, counts, and times in ms from `elapsedRealtime`, which is never set back:
 
 | Event | Sent | Fields | For |
 |----|----|----|----|
 | `guide_made` | Each guide from a gallery photo or a generated pose | `source`, `outcome` (`made`, `no_person`, `failed`), `ms` | NFR-3 |
-| `poses_ended` | Each pose set's end | `request` (`suggested`, `described`), `situation`, `outcome` (`ok` or the `GenerationError`), `ready`, `total`, `ms` | FR-4.7, NFR-4 |
+| `poses_ended` | Each pose set's end, also when Back leaves it while generating | `request` (`suggested`, `described`), `situation`, `outcome` (`ok`, `cancelled`, or the `GenerationError`), `ready`, `total`, `ms` | FR-4.7, NFR-4 |
 | `session_connect` | Each try to connect, the subject's from its start and the photographer's from the subject joining | `entry`, `role`, `outcome` (`connected` or the `EndReason`), `ms` | NFR-10 |
-| `session_drop` | Each link that dropped while connected | `role`, `recovered` (1 or 0), `ms` | NFR-11 |
+| `session_drop` | Each link that dropped while connected, once: back within the 10 s, or not, also when the session or its subject ends first | `role`, `recovered` (1 or 0), `ms` | NFR-11 |
 | `photo_taken` | Each shutter press | `outcome` (`saved`, `failed`), `shutter_ms` (until the camera took it), `ms`, `in_session` | NFR-19 |
 
 - Each field is an event-scoped custom definition in the linked Analytics property: a dimension, or a metric for a count or a time (milliseconds for `ms` and `shutter_ms`). Analytics' reports show only registered fields, from their registration on, so a new field is registered before its release.

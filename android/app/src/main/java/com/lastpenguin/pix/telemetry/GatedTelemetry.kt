@@ -15,15 +15,34 @@ class GatedTelemetry(private val backend: TelemetryBackend, private val buildAll
 
     private val reported = ConcurrentHashMap.newKeySet<String>()
 
+    /** Whether this run turned Crashlytics off: then it collects again only from a later start. */
+    @Volatile
+    private var crashlyticsOffThisRun = false
+
     /**
-     * The Settings switch, applied once the stored choice is read and at each change. Off, Crashlytics also drops the
-     * reports it still holds, so nothing from before goes out later.
+     * The Settings switch, applied once the stored choice is read and at each change. Off stops our events and
+     * Analytics at once and turns Crashlytics off, whose reports from before are deleted. Crashlytics decides at each
+     * start whether to send the reports it holds, so they are deleted at the first start with it off, and it is turned
+     * on again only at a start, after that deletion: on again in the run that turned it off, it stays off until then.
      */
     fun setAllowed(allowed: Boolean) {
         val next = allowed && buildAllows
         on = next
-        backend.setCollection(next)
-        if (!next) backend.deleteUnsent()
+        backend.setAnalytics(next)
+        when {
+            !next -> {
+                backend.setCrashlytics(false)
+                backend.deleteUnsent()
+                crashlyticsOffThisRun = true
+            }
+
+            crashlyticsOffThisRun -> Unit
+
+            else -> {
+                if (!backend.crashlyticsOn) backend.deleteUnsent()
+                backend.setCrashlytics(true)
+            }
+        }
     }
 
     override fun event(event: TelemetryEvent) {
@@ -37,9 +56,19 @@ class GatedTelemetry(private val backend: TelemetryBackend, private val buildAll
 
 /** What [GatedTelemetry] needs from Firebase, so its rules run in JVM tests; `FirebaseTelemetry` in the app. */
 interface TelemetryBackend {
-    /** Crashlytics' and Analytics' collection; both keep the answer for the next start. */
-    fun setCollection(on: Boolean)
+    /** Analytics' collection, at once; Analytics keeps the answer for the next start. */
+    fun setAnalytics(on: Boolean)
 
+    /** Whether Crashlytics collects: its kept answer, or the manifest's. */
+    val crashlyticsOn: Boolean
+
+    /** Crashlytics' collection; Crashlytics keeps the answer for the next start. */
+    fun setCrashlytics(on: Boolean)
+
+    /**
+     * Deletes the reports Crashlytics holds. It decides at each start whether to send them, and holds them only in a run
+     * that started with it off, so only there does this delete anything.
+     */
     fun deleteUnsent()
 
     fun log(name: String, params: Map<String, Any>)

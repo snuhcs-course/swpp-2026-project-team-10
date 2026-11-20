@@ -508,15 +508,18 @@ class CameraViewModelTest {
     }
 
     // The `photo_taken` event (NFR-19; Design 2.8, Telemetry): a photo saved in a session, with the time the camera
-    // took it and the time it was saved, from the press; a photo that failed before the camera took it, outside one.
+    // took it and the time it was saved, from the press, on the clock for durations while the wall clock jumps; a photo
+    // that failed before the camera took it, outside one.
     @Test
     fun aSavedPhoto_sendsWhenTheCameraTookIt_andWhenItWasSaved() = runTest {
         var now = 1_000L
-        val sharing = CameraViewModel(camera, guides, photos = RecordingShare(), clock = { now })
+        var wall = 5_000_000L
+        val sharing = CameraViewModel(camera, guides, photos = RecordingShare(), clock = { wall }, elapsed = { now })
 
         sharing.onShutter()
         runCurrent()
         now = 1_150
+        wall -= 3_600_000
         camera.captured.single()()
         now = 1_900
         camera.capture.complete(Result.success(Uri.parse("content://media/external/images/media/1")))
@@ -531,7 +534,8 @@ class CameraViewModelTest {
     @Test
     fun aPhotoThatFailedBeforeTheCameraTookIt_sendsFailed_withoutAShutterTime() = runTest {
         var now = 1_000L
-        val alone = CameraViewModel(camera, guides, photos = RecordingShare().apply { session = null }, clock = { now })
+        val alone =
+            CameraViewModel(camera, guides, photos = RecordingShare().apply { session = null }, elapsed = { now })
 
         alone.onShutter()
         runCurrent()

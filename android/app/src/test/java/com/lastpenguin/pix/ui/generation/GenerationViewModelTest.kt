@@ -1060,7 +1060,8 @@ class GenerationViewModelTest {
     }
 
     // The `poses_ended` event (Design 2.8, Telemetry): one per set at its end, a failed set with why, a set with poses
-    // as ok with how many came, and never the description.
+    // as ok with how many came, a set left with Back while generating as cancelled with how many had come, and never
+    // the description.
     @Test
     fun eachSetsEnd_isSentOnce_withHowItEnded() = runTest {
         generateFromAPhoto()
@@ -1085,6 +1086,24 @@ class GenerationViewModelTest {
             ended.map { it.failure to it.ready },
         )
         assertEquals(listOf(4, 4), ended.map { it.total })
+    }
+
+    @Test
+    fun aSetLeftWhileGenerating_isSentOnceAsCancelled_withHowManyPosesHadCome() = runTest {
+        generateFromAPhoto()
+        generator.runs.single().apply {
+            plan()
+            send(ready("pose-1"), failed("pose-2", GenerationError.OFFLINE))
+        }
+        runCurrent()
+
+        model.stopGenerating()
+        runCurrent()
+
+        val ended = telemetry.sent<TelemetryEvent.PosesEnded>().single()
+        assertTrue(ended.cancelled)
+        assertEquals("cancelled", ended.params["outcome"])
+        assertEquals(1 to 4, ended.ready to ended.total)
     }
 
     @Test

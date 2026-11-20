@@ -15,10 +15,11 @@ class FirebaseTelemetry(context: Context) : TelemetryBackend {
     private val analytics = FirebaseAnalytics.getInstance(context.applicationContext)
     private val crashlytics = FirebaseCrashlytics.getInstance()
 
-    override fun setCollection(on: Boolean) {
-        crashlytics.setCrashlyticsCollectionEnabled(on)
-        analytics.setAnalyticsCollectionEnabled(on)
-    }
+    override fun setAnalytics(on: Boolean) = analytics.setAnalyticsCollectionEnabled(on)
+
+    override val crashlyticsOn: Boolean get() = crashlytics.isCrashlyticsCollectionEnabled
+
+    override fun setCrashlytics(on: Boolean) = crashlytics.setCrashlyticsCollectionEnabled(on)
 
     override fun deleteUnsent() = crashlytics.deleteUnsentReports()
 

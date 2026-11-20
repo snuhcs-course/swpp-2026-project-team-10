@@ -52,6 +52,9 @@ class RtcSessionManagerTest {
     /** The manager's clock; 0 unless a test moves it, as for the round trip of a ping. */
     private var now = 0L
 
+    /** The manager's clock for durations (the telemetry's times), apart from [now]; 0 unless a test moves it. */
+    private var elapsedNow = 0L
+
     private fun TestScope.manager(
         haveGuideId: () -> String? = { null },
         haveReferenceId: () -> String? = { null },
@@ -67,6 +70,7 @@ class RtcSessionManagerTest {
             identity = SessionIdentity("Dongje", "0.1.0"),
             dispatcher = StandardTestDispatcher(testScheduler),
             clock = { now },
+            elapsed = { elapsedNow },
             haveGuideId = haveGuideId,
             haveReferenceId = haveReferenceId,
             accessToken = accessToken,
@@ -408,11 +412,13 @@ class RtcSessionManagerTest {
     // The `session_connect` and `session_drop` events (NFR-10, NFR-11; Design 2.8, Telemetry). Partitions: the subject's
     // try from its start and the photographer's from the subject joining, each connected once and nothing more at the
     // end; a try that failed by the connecting timeout and by an unknown code; a photographer no subject joined (none);
-    // a drop recovered within 10 s and one that was not, with the time since the link dropped.
+    // a drop recovered within 10 s, one that was not, one that ended with the session before the 10 s, and one a new
+    // subject replaced, each sent once, with the time since the link dropped on the clock for durations, never the wall
+    // clock.
     @Test
     fun `the subject's try runs from its start and is sent once, connected`() = runTest {
         val manager = manager()
-        now = 1_000
+        elapsedNow = 1_000
         manager.start(SessionEntry.RoomCode("482915"), Role.SUBJECT)
         runCurrent()
         signaling.push(SignalEvent.Opened)
@@ -421,7 +427,7 @@ class RtcSessionManagerTest {
         val peer = peers.created.last()
         signaling.receive(SignalMessage.Signal(sdp = SessionDescription("offer", "v=0 offer")))
         peer.open()
-        now = 2_500
+        elapsedNow = 2_500
         peer.deliver(hello(Role.PHOTOGRAPHER, "Dongje"))
         runCurrent()
         manager.leave()
@@ -441,13 +447,13 @@ class RtcSessionManagerTest {
         signaling.push(SignalEvent.Opened)
         signaling.receive(SignalMessage.RoomCreated("482915", "s_1"))
         runCurrent()
-        now = 60_000
+        elapsedNow = 60_000
         signaling.receive(SignalMessage.PeerJoined())
         runCurrent()
         val peer = peers.created.last()
         signaling.receive(SignalMessage.Signal(sdp = SessionDescription("answer", "v=0 answer")))
         peer.open()
-        now = 60_800
+        elapsedNow = 60_800
         peer.deliver(hello(Role.SUBJECT, "Joonhyung"))
         runCurrent()
         manager.leave()
@@ -502,19 +508,19 @@ class RtcSessionManagerTest {
     fun `a drop is sent recovered with its time, and one that stays down as not recovered`() = runTest {
         val (manager, peer) = connectedPhotographer()
 
-        now = 10_000
+        elapsedNow = 10_000
         peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
         advanceTimeBy(5_000)
         runCurrent()
-        now = 14_000
+        elapsedNow = 14_000
         peer.push(PeerEvent.Link(LinkState.CONNECTED))
         advanceTimeBy(6_000)
         runCurrent()
 
-        now = 30_000
+        elapsedNow = 30_000
         peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
         runCurrent()
-        now = 40_000
+        elapsedNow = 40_000
         advanceTimeBy(10_100)
         runCurrent()
         assertEquals(SessionState.Waiting("482915"), manager.state.value)
@@ -526,6 +532,48 @@ class RtcSessionManagerTest {
             ),
             telemetry.sent<SessionDrop>(),
         )
+    }
+
+    @Test
+    fun `a drop that ends with the session is sent once, as not recovered`() = runTest {
+        val (manager, peer) = connectedSubject()
+
+        elapsedNow = 10_000
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+        assertTrue(manager.state.value is SessionState.Reconnecting)
+        elapsedNow = 13_000
+        // The wall clock set back meanwhile, as when the network returns, changes no time.
+        now = -60_000
+        manager.leave()
+        runCurrent()
+        advanceTimeBy(11_000)
+        runCurrent()
+
+        assertEquals(
+            listOf(SessionDrop(Role.SUBJECT, recovered = false, ms = 3_000)),
+            telemetry.sent<SessionDrop>(),
+        )
+    }
+
+    @Test
+    fun `a new subject while the link is down closes the drop as not recovered`() = runTest {
+        val (manager, peer) = connectedPhotographer()
+
+        elapsedNow = 10_000
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+        assertTrue(manager.state.value is SessionState.Reconnecting)
+        elapsedNow = 12_000
+        signaling.receive(SignalMessage.PeerJoined())
+        runCurrent()
+
+        assertEquals(SessionState.Connecting("s_1"), manager.state.value)
+        assertEquals(
+            listOf(SessionDrop(Role.PHOTOGRAPHER, recovered = false, ms = 2_000)),
+            telemetry.sent<SessionDrop>(),
+        )
+        manager.leave()
     }
 
     @Test

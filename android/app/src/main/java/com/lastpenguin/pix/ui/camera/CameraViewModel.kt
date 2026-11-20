@@ -2,6 +2,7 @@
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
+import android.os.SystemClock
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -233,6 +234,8 @@ class CameraViewModel(
     /** The base brightness in EV from the settings (FR-1.11): each tap to focus starts from it again. */
     private val baseBrightness: StateFlow<Float> = MutableStateFlow(0f),
     private val clock: () -> Long = System::currentTimeMillis,
+    /** For durations, the telemetry's times (Design 2.8): never set back, unlike [clock], which dates the photos. */
+    private val elapsed: () -> Long = SystemClock::elapsedRealtime,
     /** How the phone is held: each photo is saved as it was at its shutter press (FR-1.5). */
     private val phoneTurns: PhoneTurns = PhoneTurns.Fixed(),
     /** Who holds the zoom in a session (`RemoteControlHandler.zoomHold`, FR-7.6); free outside one. */
@@ -510,6 +513,7 @@ class CameraViewModel(
             )
         }
         val takenAt = clock()
+        val pressedAt = elapsed()
         // At the press, like the time: the phone may turn while an earlier photo is still being saved.
         val turn = phoneTurns.turn.value
         // Now, not once it is saved: the photo belongs to the session running at the shutter.
@@ -531,7 +535,7 @@ class CameraViewModel(
                     camera.setPhotoTurn(turn)
                     camera.takePhoto(
                         onCaptured = {
-                            capturedAt = clock()
+                            capturedAt = elapsed()
                             free()
                         },
                     )
@@ -542,15 +546,15 @@ class CameraViewModel(
                 }
                 // A camera that never said "taken", or a photo that failed before it.
                 free()
-                val endedAt = clock()
+                val endedAt = elapsed()
                 // In shutter order, whatever order the saves end in: the thumbnail is the newest photo, and the
                 // session sends the photos as they were taken (PhotoSyncer).
                 earlier?.join()
                 Telemetry.event(
                     TelemetryEvent.PhotoTaken(
                         saved = result.isSuccess,
-                        shutterMs = capturedAt?.let { it - takenAt },
-                        ms = endedAt - takenAt,
+                        shutterMs = capturedAt?.let { it - pressedAt },
+                        ms = endedAt - pressedAt,
                         inSession = sessionId != null,
                     ),
                 )

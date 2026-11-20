@@ -11,12 +11,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /*
- * What reaches Firebase (Design 2.8, Telemetry; FR-10.6, NFR-13), through a fake backend.
- * Partitions: the stored choice not read yet (nothing sent); allowed in a build that allows it (events and errors
- * sent, collection on); allowed in a build that does not, a debug build (nothing, collection off); turned off after
- * being on (nothing more, collection off, the held reports deleted) and on again; the same place's error twice (sent
- * once) and two places' (each once); an error's message, its causes' messages, a chain that loops back, and a chain
- * longer than the limit (each scrubbed, the stack traces kept, the chain cut).
+ * What reaches Firebase (Design 2.8, Telemetry; FR-10.6, NFR-13), through a fake backend that records its calls in order.
+ * Partitions: the stored choice not read yet (nothing sent, nothing switched); allowed in a build that allows it, at a
+ * start with Crashlytics on (events and errors sent, both collections on, nothing deleted) and at a start with it off
+ * (its held reports deleted before it collects again); allowed in a debug build (nothing sent, both off); turned off
+ * after being on (nothing more sent, both off, the held reports deleted) and on again in the same run (events and
+ * Analytics again, Crashlytics off until the next start); the same place's error twice (sent once) and two places'
+ * (each once); an error's message, its causes' messages, a chain that loops back, and a chain longer than the limit
+ * (each scrubbed, the stack traces kept, the chain cut).
  * The facade: no sink (nothing, no failure), a sink installed (reached), and reset (nothing again).
  */
 class GatedTelemetryTest {
@@ -32,7 +34,7 @@ class GatedTelemetryTest {
 
         assertTrue(backend.logged.isEmpty())
         assertTrue(backend.recorded.isEmpty())
-        assertNull(backend.collection)
+        assertTrue(backend.calls.isEmpty())
     }
 
     @Test
@@ -43,10 +45,20 @@ class GatedTelemetryTest {
         telemetry.event(drop)
         telemetry.error("session.peer", IOException())
 
-        assertEquals(true, backend.collection)
+        assertEquals(listOf("analytics on", "crashlytics on"), backend.calls)
         assertEquals(listOf(drop.name to drop.params), backend.logged)
         assertEquals(1, backend.recorded.size)
-        assertEquals(0, backend.deletes)
+    }
+
+    @Test
+    fun allowed_atAStartWithCrashlyticsOff_deletesItsHeldReports_beforeItCollectsAgain() {
+        // The run before turned sharing off, then on again: Crashlytics waited for this start.
+        backend.crashlyticsOn = false
+        val telemetry = GatedTelemetry(backend, buildAllows = true)
+
+        telemetry.setAllowed(true)
+
+        assertEquals(listOf("analytics on", "delete", "crashlytics on"), backend.calls)
     }
 
     @Test
@@ -57,28 +69,39 @@ class GatedTelemetryTest {
         telemetry.event(drop)
         telemetry.error("session.peer", IOException())
 
-        assertEquals(false, backend.collection)
+        assertEquals(listOf("analytics off", "crashlytics off", "delete"), backend.calls)
         assertTrue(backend.logged.isEmpty())
         assertTrue(backend.recorded.isEmpty())
     }
 
     @Test
-    fun turnedOff_sendsNothingMore_andDeletesHeldReports_thenOnAgain() {
+    fun turnedOff_sendsNothingMore_turnsBothOff_andDeletesHeldReports() {
         val telemetry = GatedTelemetry(backend, buildAllows = true)
         telemetry.setAllowed(true)
+        backend.calls.clear()
 
         telemetry.setAllowed(false)
         telemetry.event(drop)
         telemetry.error("camera.bind", IllegalStateException())
 
-        assertEquals(false, backend.collection)
-        assertEquals(1, backend.deletes)
+        assertEquals(listOf("analytics off", "crashlytics off", "delete"), backend.calls)
         assertTrue(backend.logged.isEmpty())
         assertTrue(backend.recorded.isEmpty())
+    }
+
+    @Test
+    fun onAgainInTheRunThatTurnedItOff_sendsEventsAgain_butLeavesCrashlyticsOffUntilTheNextStart() {
+        val telemetry = GatedTelemetry(backend, buildAllows = true)
+        telemetry.setAllowed(true)
+        telemetry.setAllowed(false)
+        backend.calls.clear()
 
         telemetry.setAllowed(true)
         telemetry.event(drop)
-        assertEquals(true, backend.collection)
+
+        // Crashlytics would send the reports held from before the opt-out at the next start; that start deletes them.
+        assertEquals(listOf("analytics on"), backend.calls)
+        assertEquals(false, backend.crashlyticsOn)
         assertEquals(1, backend.logged.size)
     }
 
@@ -147,19 +170,27 @@ class GatedTelemetryTest {
     }
 }
 
-/** Records what [GatedTelemetry] passes on; [collection] is null until it is set. */
+/**
+ * Records what [GatedTelemetry] passes on: the switches and deletes in [calls], in order. [crashlyticsOn] starts on,
+ * as the manifest of a release build has it.
+ */
 class FakeTelemetryBackend : TelemetryBackend {
-    var collection: Boolean? = null
-    var deletes = 0
+    override var crashlyticsOn = true
+    val calls = mutableListOf<String>()
     val logged = mutableListOf<Pair<String, Map<String, Any>>>()
     val recorded = mutableListOf<Throwable>()
 
-    override fun setCollection(on: Boolean) {
-        collection = on
+    override fun setAnalytics(on: Boolean) {
+        calls += "analytics " + if (on) "on" else "off"
+    }
+
+    override fun setCrashlytics(on: Boolean) {
+        crashlyticsOn = on
+        calls += "crashlytics " + if (on) "on" else "off"
     }
 
     override fun deleteUnsent() {
-        deletes++
+        calls += "delete"
     }
 
     override fun log(name: String, params: Map<String, Any>) {

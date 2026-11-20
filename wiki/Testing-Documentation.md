@@ -116,6 +116,7 @@
 | 3.33 | 2026-11-20 | Iteration 4 results (Iter4-P18, [#215]): suites and coverage at `752b7c3`, integration scripts at `44de211` and `752b7c3`, the NFRs, and the Test Log; the tips check with 조성민's answers, by the four of us (2.2, 3.2, 6, Appendix B). |
 | 3.34 | 2026-11-20 | Crash reports and usage data (Iter4-A8, [#254]): its owner, `TelemetryEventTest`, `GatedTelemetryTest`, the events in their modules' tests, `TelemetryRecorder` and `FakeTelemetryBackend`, `FirebaseTelemetry` by hand, and IT-39 (1.1, 2.1.3, 2.1.5, 2.1.6, 2.1.8, Appendix A). |
 | 3.35 | 2026-11-20 | Light mode ([#212]) and the QR connection ([#214]) dropped on 11/20 as not needed; what Iteration 4 built, and why the rest stays open, for the problems of the user test and the heuristic evaluation; IT-39's run on emulators (1.1, 2.1.8, 2.2.2, 4.1, 4.2, Appendix B). |
+| 3.36 | 2026-11-20 | What Iteration 4 built for each UAT problem, and the live view after a reconnection left open; T2's final sheet: every step accepted and scored, the outline comment, and the overall comment (4.4, 6). |
 
 </details>
 
@@ -1024,29 +1025,32 @@ UAT cycle 1, held in class on 11/16. Two students of other teams ran the five st
 | Story | Result | Date | Tester | Deviations |
 |---|---|---|---|---|
 | US-2 | Pass: 16 of 16 steps accepted by both | 11/16 | T1, T2 | — |
-| US-4 | Pass: 17 of 17 steps accepted by T1, 14 by T2 | 11/16 | T1, T2 | T2 left steps 15–17 unmarked |
+| US-4 | Pass: 17 of 17 steps accepted by both | 11/16 | T1, T2 | — |
 | US-9 | Pass: 13 of 13 steps accepted by both | 11/16 | T1, T2 | — |
 | US-10 | Pass: 13 of 13 steps accepted by both | 11/16 | T1, T2 | — |
 | US-12 | Pass: 11 of 11 steps accepted by both | 11/16 | T1, T2 | — |
 
 **Summary.**
 
-- All five stories pass. No step was rejected: of 140 marks, 137 are *Accepted* and three are missing.
-- T1 scored every step: 67 at 5, one at 4, and two at 3. T2 scored seven steps: six at 5 and one at 3.
-- All three 3s are in US-12: zooming from both phones at once (both testers), and the photo on the subject's phone (T1).
+- All five stories pass. Both testers accepted every step: 140 of 140 marks.
+- Each tester scored every step: 67 at 5, one at 4, and two at 3, a mean of 4.93.
+- All four 3s are in US-12: zooming from both phones at once (both testers), the photo on the subject's phone (T1), and the guide's outline (T2). The two 4s are the notice that the subject left (T1) and the photo on the subject's phone (T2).
 - T1's overall comment: Pix is clean to use, and the planned actions give the intended results. What is left is small errors and the usability problems found on the way.
+- T2's overall comment: the two roles, and what both or only one of them must check, are well set apart. The outline could be better, and a camera app for two people could do more: group photos, selfies, video, and swapping the roles.
 - The 70 steps hardly fit in the session's 45 minutes.
 
-**Problems found and what follows.** The testers' comments in the sheet, lowest satisfaction first, then what they said during the session, outside the sheet's steps.
+**Problems found and what follows.** The testers' comments in the sheet, lowest satisfaction first, then T2's overall comment and what the testers said during the session, outside the sheet's steps.
 
 | Problem | Story · step · tester · satisfaction | What follows |
 |---|---|---|
-| While both phones pinch the zoom at once, the zoom jumps back and forth between the two, so the image shakes and the readout flickers. T2 suggests that while one phone zooms, the other cannot | US-12 · 3 · T1, T2 · 3, 3 | Iteration 4: one phone zooms at a time (Iter4-A3, [#236]) |
-| The subject cannot see the session's photos in Pix. *Subject view* has no thumbnail, and after leaving, Camera's thumbnail does not show them: they are only in the phone's gallery | US-12 · 11 · T1, T2 · 3, — | Iteration 4: a photo thumbnail on *Subject view*, and the received photos in Camera's thumbnail (Iter4-A2, [#235]) |
-| The notice that the subject left shows only briefly on the photographer's phone. A photographer who is not looking at the screen misses it | US-10 · 6 · T1 · 4 | Iteration 4: the notice stays longer (Iter4-A5, [#238]) |
-| The live view is a little less sharp after reconnecting | US-10 · 5 · T2 · — | Iteration 4: measured first, then fixed or its cause recorded (Iter4-A5, [#238]) |
-| A guide that the subject adds shows no reference thumbnail on the photographer's phone (FR-3.9): the guide's image is sent without its photo | Said by the testers in the session | Iteration 4: the subject's phone sends the photo too (Iter4-A1, [#234]) |
-| The reference thumbnail cannot be hidden | Said by the testers in the session | Iteration 4: a swipe to the side hides it, and its changes are animated (Iter4-A4, [#237]) |
+| While both phones pinch the zoom at once, the zoom jumps back and forth between the two, so the image shakes and the readout flickers. T2 suggests that while one phone zooms, the other cannot | US-12 · 3 · T1, T2 · 3, 3 | Built: the pinch that starts first holds the zoom until its fingers lift, and the other phone says who is zooming (Iter4-A3, [#236]) |
+| The subject cannot see the session's photos in Pix. *Subject view* has no thumbnail, and after leaving, Camera's thumbnail does not show them: they are only in the phone's gallery | US-12 · 11 · T1, T2 · 3, 4 | Built: in a session, *Subject view* and Camera show the session's photos as their thumbnail and open them in Pix's own viewer; outside a session, Camera's thumbnail opens Pix's album (Iter4-A2, [#235]; Iter4-A7, [#247]) |
+| The guide's outline is too simple: only a cutout, so hair or clothes blur or distort it. T2 would like the limbs and the face drawn | US-12 · 5 · T2 · 3 | *Open after Iteration 4:* on hold, as for the same feedback in 4.1: ML Kit's detection may err too much, and the tips help instead ([#213]) |
+| The notice that the subject left shows only briefly on the photographer's phone. A photographer who is not looking at the screen misses it | US-10 · 6 · T1 · 4 | Built: the notice stays 10 s instead of 3 s, and goes once the subject is back (Iter4-A5, [#238]) |
+| The live view is a little less sharp after reconnecting | US-10 · 5 · T2 · 5 | *Open after Iteration 4:* not measured; [#238] was closed with the notice alone. Iteration 5 **TBD** |
+| Group photos, selfies, and video; swapping the photographer and the subject | T2's overall comment | No fix decided. A guide from a photo keeps every person in it (FR-2.5), and selfie mode works in a session too (FR-1.14), but no UAT step showed them. Video is out of scope before Iteration 5, and the roles are set for each session (R&S 2.3, 7) |
+| A guide that the subject adds shows no reference thumbnail on the photographer's phone (FR-3.9): the guide's image is sent without its photo | Said by the testers in the session | Built: the subject's phone sends the guide's photo just before its image (Iter4-A1, [#234]) |
+| The reference thumbnail cannot be hidden | Said by the testers in the session | Built: a drag past the side or a flick hides it and leaves a strip to bring it back, and its changes are animated (Iter4-A4, [#237]) |
 
 **For UAT cycle 2** (11/23, Iteration 5). The changes that follow from cycle 1:
 
@@ -1084,7 +1088,7 @@ One row per recorded run, newest first, so the history of the numbers shows at a
 | 2026-11-20 | 4 | AI module tests: the tips of one run, 50 of them checked by the four of us | `78287b5` | Tips pass: 46 of 50 (92.0 %) by most of us; 한준형 failed 12 of the 14 guide-outline sentences; 22 of 50 tips ask for no change | 3.2; [record](#run-2026-11-20-tips-check) |
 | 2026-11-20 | 4 | Integration scripts on the phones (IT-6, 7, 10, 14–18, 20–24, 26, 35–38), from 11/19 | `44de211`, `752b7c3` | 18 of 18 pass; the other scripts gained no step and were not rerun. Times by eye, not measured; NFR-1 1.15 s and the shutter 0.26 s from [#208] | 2.2.2, 2.2.3; [record](#run-2026-11-20-integration-scripts) |
 | 2026-11-20 | 4 | Unit, Robolectric, screen, and adapter tests; server; coverage | `752b7c3` | 2,108 + 881 tests, 0 failed; app 88.3 % (94.7 / 97.9 / 94.5 / 49.9); server 98.4 % | 2.2.1; [record](#run-2026-11-20-unit-tests-and-coverage) |
-| 2026-11-16 | 4 | UAT cycle 1 in class: two testers of other teams, the five stories in 70 steps | `d806e2a` | All five stories pass: no step rejected; 137 of 140 marks accepted, three missing. Satisfaction 3 on zooming from both phones at once and on the photo on the subject's phone; follow-ups in 4.4 | 4.4 |
+| 2026-11-16 | 4 | UAT cycle 1 in class: two testers of other teams, the five stories in 70 steps | `d806e2a` | All five stories pass: 140 of 140 marks accepted. Satisfaction 3 on zooming from both phones at once, the photo on the subject's phone, and the guide's outline; follow-ups in 4.4 | 4.4 |
 | 2026-11-06 | 3 | Integration scripts on the phones (IT-1–4, 6, 8, 10–34), from 11/04 | `7b03e9e`, `c842fa1` | 31 of 31 pass; IT-5, 7, and 9 covered by later scripts; IT-12, 21, and 22 with notes. NFR-5 0.3 s cellular, 0.5 s relay; NFR-9 push 2 s; NFR-10 10/10 per pair; NFR-11 about 5 s. The defect of IT-22 (a refused description kept in the prompt history) is fixed (IT-34) | 2.2.2, 2.2.3; [record](#run-2026-11-06-integration-scripts) |
 | 2026-11-06 | 3 | Unit, Robolectric, screen, and adapter tests; server; coverage | `c842fa1` | 1,711 + 791 tests, 0 failed; app 86.9 % (94.4 / 97.7 / 93.7 / 50.4); server 98.3 % | 2.2.1; [record](#run-2026-11-06-unit-tests-and-coverage) |
 | 2026-11-05 | 3 | AI module tests: three runs of the 50 cases, the judge's validation, the description filter, and the person check on a Galaxy Note20 | `430447f` | Suggestions (78.0 %) and the person check (34.6 % of people refused) fail; the other nine thresholds pass, tips at the threshold (80.0 %) | [3.2](#32-results), [record](#run-2026-11-05-ai-module-tests) |

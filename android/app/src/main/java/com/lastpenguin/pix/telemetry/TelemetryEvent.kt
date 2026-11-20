@@ -20,9 +20,12 @@ sealed interface TelemetryEvent {
 
     val params: Map<String, Any>
 
-    /** A guide from a gallery photo or a generated pose, made or not, and how long the step took (NFR-3). */
+    /**
+     * A guide from a gallery photo or a generated pose, made or not, or left before it was made ([Outcome.CANCELLED]),
+     * and how long the step took (NFR-3).
+     */
     data class GuideMade(val source: GuideSource, val outcome: Outcome, val ms: Long) : TelemetryEvent {
-        enum class Outcome { MADE, NO_PERSON, FAILED }
+        enum class Outcome { MADE, NO_PERSON, FAILED, CANCELLED }
 
         override val name = "guide_made"
         override val params: Map<String, Any> =

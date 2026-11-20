@@ -44,6 +44,10 @@ class MlKitReferenceGuideMaker(
             val result = try {
                 Result.success(block())
             } catch (e: CancellationException) {
+                // Left before it was made (Back on Reference confirm, or another photo), often while the model downloads:
+                // its time until then still counts (NFR-3).
+                val ms = SystemClock.elapsedRealtime() - startedAt
+                Telemetry.event(TelemetryEvent.GuideMade(source, Outcome.CANCELLED, ms))
                 throw e
             } catch (e: Exception) {
                 // No person is an expected answer; anything else is worth the stack trace in logcat.

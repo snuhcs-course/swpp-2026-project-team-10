@@ -3179,7 +3179,7 @@ erDiagram
 
 | Event | Sent | Fields | For |
 |----|----|----|----|
-| `guide_made` | Each guide from a gallery photo or a generated pose | `source`, `outcome` (`made`, `no_person`, `failed`), `ms` | NFR-3 |
+| `guide_made` | Each guide from a gallery photo or a generated pose, also when it is left before it is made | `source`, `outcome` (`made`, `no_person`, `failed`, `cancelled`), `ms` | NFR-3 |
 | `poses_ended` | Each pose set's end, also when Back leaves it while generating | `request` (`suggested`, `described`), `situation`, `outcome` (`ok`, `cancelled`, or the `GenerationError`), `ready`, `total`, `ms` | FR-4.7, NFR-4 |
 | `session_connect` | Each try to connect, the subject's from its start and the photographer's from the subject joining | `entry`, `role`, `outcome` (`connected` or the `EndReason`), `ms` | NFR-10 |
 | `session_drop` | Each link that dropped while connected, once: back within the 10 s, or not, also when the session or its subject ends first | `role`, `recovered` (1 or 0), `ms` | NFR-11 |

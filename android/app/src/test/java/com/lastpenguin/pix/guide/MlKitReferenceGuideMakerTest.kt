@@ -12,6 +12,11 @@ import com.lastpenguin.pix.telemetry.TelemetryEvent.GuideMade.Outcome
 import com.lastpenguin.pix.telemetry.TelemetryRecorder
 import java.io.File
 import kotlin.math.abs
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -31,8 +36,8 @@ import org.robolectric.annotation.GraphicsMode
  * and the thumbnail have the photo alone, and the guide keeps the screenshot and where the photo was), a screenshot of a
  * photo centered in an image viewer (cut at its sides too), the same with the whole image asked for (not cut), and a
  * camera photo (not cut); a generated pose shaped like a screenshot is never cut.
- * Its `guide_made` event (Design 2.8, Telemetry): a guide made, no person (no error sent), and another failure (its
- * error sent too).
+ * Its `guide_made` event (Design 2.8, Telemetry): a guide made, no person (no error sent), another failure (its
+ * error sent too), and a guide left while it is made, as Back on Reference confirm does (cancelled, no error).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -60,6 +65,16 @@ class MlKitReferenceGuideMakerTest {
                 if (person(index % width, index / width, width, height)) 1f else 0f
             }
             return Result.success(Segmentation(confidence, width, height))
+        }
+    }
+
+    /** A model that never answers until its caller is cancelled; [reached] completes once it is asked. */
+    private class HangingSegmenter : SubjectSegmenter(ApplicationProvider.getApplicationContext()) {
+        val reached = CompletableDeferred<Unit>()
+
+        override suspend fun segment(bitmap: Bitmap): Result<Segmentation> {
+            reached.complete(Unit)
+            awaitCancellation()
         }
     }
 
@@ -154,6 +169,24 @@ class MlKitReferenceGuideMakerTest {
             },
         )
         assertEquals(listOf("guide.make" to failure), telemetry.errors.toList())
+    }
+
+    @Test
+    fun aGuideLeftWhileItIsMade_sendsCancelled_andNoError() = runBlocking {
+        val segmenter = HangingSegmenter()
+        val making = launch(Dispatchers.Default) { maker(segmenter).make(photo(100, 100), GuideSource.GALLERY) }
+        segmenter.reached.await()
+
+        making.cancelAndJoin()
+
+        assertEquals(
+            listOf(GuideSource.GALLERY to Outcome.CANCELLED),
+            telemetry.sent<GuideMade>().map {
+                it.source to
+                    it.outcome
+            },
+        )
+        assertTrue(telemetry.errors.isEmpty())
     }
 
     @Test

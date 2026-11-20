@@ -51,6 +51,9 @@ class ChannelRouterTest {
         // Who holds the zoom, each change in order (#236).
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER)))
         assertFalse(router.latestOnly(SessionMessage.ZoomHoldUpdate()))
+        // The end of a held-back pinch, after its steps and never dropped (#236).
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ZoomCancel))
+        assertFalse(router.latestOnly(SessionMessage.ZoomCancel))
     }
 
     @Test

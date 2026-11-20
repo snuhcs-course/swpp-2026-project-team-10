@@ -599,18 +599,14 @@ class SubjectViewModel(
     /**
      * The photographer's pinch holds the zoom: this phone's change is not sent, the readout follows the photographer's
      * applied zoom, and a label says who is zooming. A pinch that [gestureGoesOn] stays held back until its final value.
-     * A pinch that already sent steps ends there with a final value of that zoom, since the photographer's phone drops
-     * a pinch it held back up to its final value (`RemoteControlHandler`).
+     * A pinch that already sent steps ends there with `camera.zoom.cancel`, which changes no zoom, since the
+     * photographer's phone drops a pinch it held back until its end (`RemoteControlHandler`).
      */
     private fun holdBack(gestureGoesOn: Boolean) {
-        val photographerZoom = session.peerCamera.value?.zoom
-        if (zoomSender.adjusting && photographerZoom != null) {
-            zoomSender.finish(photographerZoom)
-        } else {
-            zoomSender.cancel()
-        }
+        if (zoomSender.adjusting) session.send(SessionMessage.ZoomCancel)
+        zoomSender.cancel()
         zoomHeldBack = gestureGoesOn
-        photographerZoom?.let { zoom -> _uiState.update { it.copy(zoom = zoom) } }
+        session.peerCamera.value?.let { camera -> _uiState.update { it.copy(zoom = camera.zoom) } }
         _toggleLabels.trySend(ToggleLabel.ZoomHeld)
     }
 

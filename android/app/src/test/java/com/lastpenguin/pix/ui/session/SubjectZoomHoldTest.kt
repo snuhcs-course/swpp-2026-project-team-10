@@ -32,8 +32,9 @@ import org.junit.Test
  * - The photographer holds it, then a pinch: nothing sent, the readout on the photographer's zoom, one label.
  * - The photographer's hold kept by the session before this screen listened: the pinch held back all the same.
  * - A pinch held back: still held back to its final value when the zoom is free meanwhile; the next pinch is sent.
- * - The photographer's hold arriving during a pinch: the pinch ends there with a final value of the photographer's
- *   zoom, no further step, the readout back on the photographer's zoom, one label.
+ * - The photographer's hold arriving during a pinch: the pinch ends there with `camera.zoom.cancel`, no further step
+ *   and no final value, the readout back on the photographer's zoom, one label. A pinch held back before any step
+ *   sends no cancel.
  * - The subject holds it (its own pinch): the pinch goes on.
  * - A quick step while the photographer holds it: nothing sent, a label.
  * - The session dropping during a held-back pinch: the hold-back forgotten, so a pinch after the reconnect is sent once
@@ -57,7 +58,9 @@ class SubjectZoomHoldTest {
         Dispatchers.resetMain()
     }
 
-    private fun requests(): List<SessionMessage.ZoomSet> = session.sent.filterIsInstance<SessionMessage.ZoomSet>()
+    /** The zoom requests and cancels this phone sent. */
+    private fun requests(): List<SessionMessage> =
+        session.sent.filter { it is SessionMessage.ZoomSet || it is SessionMessage.ZoomCancel }
 
     /** Connected to a photographer whose camera shows 1.4×, with the labels collected. */
     private fun TestScope.connected() {
@@ -122,7 +125,7 @@ class SubjectZoomHoldTest {
     }
 
     @Test
-    fun photographerHold_duringAPinch_endsItWithThePhotographersZoom() = runTest(dispatcher) {
+    fun photographerHold_duringAPinch_cancelsIt() = runTest(dispatcher) {
         connected()
         viewModel.onZoomGesture(2f, final = false)
         runCurrent()
@@ -133,7 +136,7 @@ class SubjectZoomHoldTest {
         viewModel.onZoomGesture(3f, final = true)
         runCurrent()
 
-        assertEquals(listOf(SessionMessage.ZoomSet(2f), SessionMessage.ZoomSet(1.4f, final = true)), requests())
+        assertEquals(listOf(SessionMessage.ZoomSet(2f), SessionMessage.ZoomCancel), requests())
         assertEquals(1.4f, viewModel.uiState.value.zoom, 0f)
         assertEquals(listOf<ToggleLabel>(ToggleLabel.ZoomHeld), labels)
     }

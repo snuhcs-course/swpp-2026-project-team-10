@@ -172,14 +172,14 @@ Every worker brings the schema to the newest revision at start, before it takes 
 
 ## Deploy
 
-The server runs on the two course servers and on two AWS servers ([Design 2.8][d28], *Hosting* and *Deployment*). Each course server is reachable only through the course's HTTP proxy on port 80, and only from the campus network. So the course servers have no HTTPS or WSS, and they cannot reach each other. The AWS servers stay on permanently, answer from every network, cellular data included, and serve HTTPS ([HTTPS](#https)).
+Pix has one server for `main` and one for `dev`. Each runs in two versions with the same setup: on a course server and on AWS ([Design 2.8][d28], *Hosting* and *Deployment*). Each course server is reachable only through the course's HTTP proxy on port 80, and only from the campus network. So the course servers have no HTTPS or WSS, and they cannot reach each other. The AWS servers stay on permanently, answer from every network, cellular data included, and serve HTTPS ([HTTPS](#https)). So the app's builds use the AWS servers.
 
-| Server | Address | Branch | Use |
+| Branch | Course server | AWS server (`ap-southeast-2`) | Builds |
 | --- | --- | --- | --- |
-| A (`ssh swpp-a`) | `http://swpp26t10.147-46-242-169.sslip.io` | `main` | The state of `main`. To use it, set `pix.serverUrl` in a debug build. |
-| B (`ssh swpp-b`) | `http://swpp26t10.147-46-242-174.sslip.io` | `dev` | Staging. To use it, set `pix.serverUrl` in a debug build. |
-| AWS main (`ap-southeast-2`) | `https://swpp26t10.15-134-147-114.sslip.io` | `main` | Release builds use it. |
-| AWS dev (`ap-southeast-2`) | `https://swpp26t10.3-105-185-251.sslip.io` | `dev` | Debug builds use it by default. |
+| `main` | Server A (`ssh swpp-a`), `http://swpp26t10.147-46-242-169.sslip.io` | AWS main, `https://swpp26t10.15-134-147-114.sslip.io` | Release builds use AWS main. |
+| `dev` | Server B (`ssh swpp-b`), `http://swpp26t10.147-46-242-174.sslip.io` | AWS dev, `https://swpp26t10.3-105-185-251.sslip.io` | Debug builds use AWS dev by default. |
+
+To use a course server, set `pix.serverUrl` in a debug build.
 
 [`deploy/docker-compose.yml`](deploy/docker-compose.yml) runs these services:
 
@@ -233,10 +233,10 @@ The server needs git, curl, and Docker with the Compose and Buildx plugins (`sud
 
 ```sh
 sudo git clone https://github.com/snuhcs-course/swpp-2026-project-team-10.git /opt/pix/repo
-sudo /opt/pix/repo/server/deploy/setup.sh dev        # "main" on Server A
+sudo /opt/pix/repo/server/deploy/setup.sh dev        # the server's branch: main or dev
 sudoedit /opt/pix/.env                               # fill in the names left empty
 sudo /opt/pix/repo/server/deploy/deploy.sh deploy    # the first deploy, by hand
-sudo systemctl enable --now pix-deploy.timer         # then automatic deploys
+sudo systemctl enable --now pix-deploy.timer         # automatic deploys, on a course server only
 ```
 
 [`setup.sh`](deploy/setup.sh) installs no packages and creates no users. It does these steps:

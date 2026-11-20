@@ -1,7 +1,7 @@
-# AI-generated with Claude Code, 2026-10-16, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
 # shellcheck shell=bash
-# Shortcuts for operating the Pix server on a course server (server/README.md, Deploy). It is not run but loaded
-# into your shell, from the checkout that deploys update, so every account gets the same commands:
+# Shortcuts for operating the Pix server on a course server or an AWS server (server/README.md, Deploy). It is not
+# run but loaded into your shell, from the checkout that deploys update, so every account gets the same commands:
 #
 #   echo '[ -f /opt/pix/repo/server/deploy/pix.sh ] && . /opt/pix/repo/server/deploy/pix.sh' >> ~/.bashrc
 #

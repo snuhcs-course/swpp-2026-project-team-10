@@ -92,7 +92,7 @@
 | 3.30 | 2026-11-20 | Crash reports and usage data: *Share usage data* in the settings, on by default, and what release builds send (4.1, 4.2, FR-10.1, FR-10.6, NFR-13, 6.10; Iter4-A8, [#254]). |
 | 3.31 | 2026-11-20 | Dropped on 11/20 as not needed: the QR connection (F9, FR-9.1–9.5, [#214]) and light mode (FR-10.1, [#212]), now out of scope; Iteration 4's scope as built, with the UAT's fixes (1, 3.3, 4.1–4.3, 5, 6.8, 6.9, 7, 8). |
 | 3.32 | 2026-11-20 | The Iteration 4 scope names the tips as built: the distance and the phone, not the background (4.1). |
-| 3.33 | 2026-11-21 | Release builds use the AWS main server and debug builds the AWS dev server, both over HTTPS; release builds allow no unencrypted traffic (NFR-14, 7). |
+| 3.33 | 2026-11-21 | One server each for `main` and `dev`, in two versions, on the course servers and on AWS; the builds use AWS over HTTPS, and release builds allow no unencrypted traffic (NFR-14, 7). |
 
 </details>
 
@@ -886,8 +886,8 @@ These screens follow from the requirements but are not in the wireframe yet. Eac
 
 **Constraints**
 - OpenRouter's Image API bills each generated image and has rate limits. Pose generation needs no account, so the server limits requests per network address per hour (by default 20 poses, 10 suggestion requests, and 20 tips; phones behind one address share them) and for all phones per day (by default 500 poses).
-- The Pix server runs with Docker and nginx on the two course servers, one for the stable build and one for development. They are reachable only over HTTP on port 80, so there is no HTTPS or WSS (NFR-14). They cannot host a TURN relay, so sessions across networks use Cloudflare's managed relay.
-- The course servers answer only on the campus network. So two AWS servers with the same setup, one for `main` and one for `dev`, serve release and debug builds on every network, over HTTPS. GitHub hosting serves only static pages and cannot run the server.
+- The Pix server runs with Docker and nginx as two servers, one for the stable build (`main`) and one for development (`dev`). Each runs in two versions with the same setup: on a course server, reachable only from the campus network and only over HTTP on port 80 (NFR-14), and on AWS, reachable from every network over HTTPS. The app uses the AWS versions.
+- The course servers cannot host a TURN relay, so sessions across networks use Cloudflare's managed relay. GitHub hosting serves only static pages and cannot run the server.
 - Development follows the course schedule: about 10 hours of work per member per iteration.
 
 **Out of scope**

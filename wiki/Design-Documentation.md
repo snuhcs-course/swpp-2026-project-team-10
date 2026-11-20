@@ -112,7 +112,7 @@
 | 3.32 | 2026-11-20 | The design as built through Iteration 4: the QR connection ([#214]) and light mode ([#212]) dropped on 11/20 as not needed, so *Still open* is empty; the Iteration 4 tasks' status, with the UAT's fixes and the scene photo step added, and what is left for Iteration 5 (2.1, 2.8, 2.9, 3). |
 | 3.33 | 2026-11-20 | The live view's sharpness after a reconnection, left for Iteration 5 ([#238]) (2.9). |
 | 3.34 | 2026-11-20 | The Iteration 4 tasks as their issues stand: the owners of Iter4-P7 and Iter4-P11, the name and date of Iter4-P16, and when the prompt templates were dropped (2.9). |
-| 3.35 | 2026-11-21 | Two AWS servers over HTTPS: AWS main for release builds, AWS dev for debug builds (1.1.1, 1.1.3, 1.2, AD-11, 2.5.2, 2.5.3, 2.6.6, 2.8, 2.10). |
+| 3.35 | 2026-11-21 | One server each for `main` and `dev`, in two versions: a course server, and an AWS server over HTTPS, which the builds use (1.1.1, 1.1.3, 1.2, AD-11, 2.5.2, 2.5.3, 2.6.6, 2.7, 2.8, 2.10). |
 
 </details>
 
@@ -149,7 +149,7 @@ None at the close of Iteration 4. The QR connection ([#214]) and light mode ([#2
 
 Pix is one Android app in two roles, **photographer** and **subject**, plus a small **Pix server**. A control plane and a media plane are kept apart:
 
-- **Control plane (client-server).** The server connects the phones (signaling), keeps accounts, friends, and invitations, and sends push notifications. It forwards pose requests to external models once a decision model has checked the text and the scene photo (2.6.3). It runs behind nginx on the course servers, over HTTP and WS on port 80, and on two AWS servers, over HTTPS and WSS (AD-11, 2.8).
+- **Control plane (client-server).** The server connects the phones (signaling), keeps accounts, friends, and invitations, and sends push notifications. It forwards pose requests to external models once a decision model has checked the text and the scene photo (2.6.3). It runs behind nginx as two servers, one for `main` and one for `dev`, each in two versions: on a course server, over HTTP and WS on port 80, and on AWS, over HTTPS and WSS (AD-11, 2.8).
 - **Media plane (peer-to-peer).** The live video and all messages between the phones go directly over WebRTC. Without a direct path, as often on cellular data, a managed TURN relay forwards the still-encrypted packets (AD-14).
 
 ![Architecture](images/design_target_architecture.png)
@@ -338,7 +338,7 @@ App versions are from `android/gradle/libs.versions.toml`; server versions are t
 | AD-8 | **One session abstraction with pluggable entry points (room code, invitation)** | Streaming and sync work without accounts, and each entry point only yields a `sessionId`. | Building accounts and invitations first |
 | AD-9 | **One app for both roles** | Friends swap roles between shots: one codebase, one install, the role chosen per session. | A separate viewer app |
 | AD-10 | **One frame in the chosen aspect ratio (3:4, 9:16, or 1:1), shown whole (fit) on both phones** | One CameraX `ViewPort` makes what you see what is captured, with the same guide coordinates on both phones; 9:16 fits Instagram stories. The crops: 2.6.2. | Fixed 3:4; full-screen 9:16 with cropping |
-| AD-11 | **The server runs on the course-provided servers with Docker and nginx, over HTTP and WS, and on two AWS servers over HTTPS and WSS** | The course servers open only HTTP on port 80, without TLS (NFR-14), and only to the campus network. They stay, as Servers A and B. Two AWS servers with the same setup answer from every network, cellular data included: AWS main runs `main` for release builds (the store's build), and AWS dev runs `dev` for debug builds. Each has its own instance, so a deploy of `dev`, which builds on the server, never slows `main`. They add HTTPS with a Let's Encrypt certificate for an sslip.io hostname, which needs no domain (2.8, Hosting). | AWS as the only hosting (cost); both branches on one AWS instance (a deploy builds on the server, beside the live `main`); an AWS load balancer with an ACM certificate (cost, and a domain of our own); a TLS front such as a Cloudflare Tunnel (domain and approval); GitHub hosting; a laptop with port forwarding |
+| AD-11 | **One server for `main` and one for `dev`, each with Docker and nginx in two versions: on a course server and on AWS** | Both versions have the same setup. The course servers (Server A, Server B) open only HTTP on port 80, without TLS (NFR-14), and only to the campus network. The AWS servers (AWS main, AWS dev) answer from every network, cellular data included, over HTTPS with a Let's Encrypt certificate for an sslip.io hostname, which needs no domain. So the builds use the AWS servers: release builds (the store's build) AWS main, and debug builds AWS dev. Each AWS server has its own instance, so a deploy of `dev`, which builds on the server, never slows `main` (2.8, Hosting). | One version only, on the course servers (campus network only) or on AWS (cost); both branches on one AWS instance (a deploy builds on the server, beside the live `main`); an AWS load balancer with an ACM certificate (cost, and a domain of our own); a TLS front such as a Cloudflare Tunnel (domain and approval); GitHub hosting; a laptop with port forwarding |
 | AD-12 | **Sign-in with a Pix ID and a password or with Google; the server issues its own tokens** | No Google account is needed, and Google is one tap. The Pix ID is the login name, with no email; either account can add the other (FR-5.13). Tokens and password hashes: 2.8, Accounts. | Email and password; Kakao sign-in (not on every test phone) |
 | AD-13 | **Invitations by Firebase Cloud Messaging, with an invite link as the fallback** | Only a push reaches a friend whose Pix is closed, and a link through any messenger covers a lost push. | WebSocket presence only; KakaoTalk-only invitations |
 | AD-14 | **A managed TURN relay (Cloudflare Realtime TURN), with short-lived credentials from the server** | STUN often fails behind carrier NAT, and the course servers cannot host a relay (port 80 only). Cloudflare's needs no host, fits its free allowance, and also listens on TCP 80 and TLS 443. The key stays on the server, and media stays SRTP-encrypted (NFR-14). | coturn on the server host (no open ports) or on AWS (cost, upkeep); a media server (SFU); no relay |
@@ -2939,7 +2939,7 @@ The settings screen (FR-10.1, R&S 6.10; Iter3-P23, [#123]) opens from a gear on 
 
 ### 2.7 Database
 
-Accounts, friends, and invitations are in a relational database: PostgreSQL 18 in a container on the course servers, a SQLite file on a laptop and in the tests. One schema serves both, through SQLAlchemy and Alembic (`pix_server.db`). Short-lived state, such as sessions, room codes, and presence, is in the Redis session store below (AD-18). The app keeps small preferences in DataStore and saved guides in its private files (2.8).
+Accounts, friends, and invitations are in a relational database: PostgreSQL 18 in a container on each server, a SQLite file on a laptop and in the tests. One schema serves both, through SQLAlchemy and Alembic (`pix_server.db`). Short-lived state, such as sessions, room codes, and presence, is in the Redis session store below (AD-18). The app keeps small preferences in DataStore and saved guides in its private files (2.8).
 
 ```mermaid
 erDiagram
@@ -3015,7 +3015,7 @@ erDiagram
 - **Invitations.** A pending invitation past `expires_at` has expired, without a write. Rows are deleted a day after they were created, when a later invitation is sent. `session_id` names a session in the session store, not a row.
 - **Indexes.** Besides the keys and unique columns: `sessions.user_id`, `spent_refresh_tokens.session_id`, `devices.user_id`, `friend_requests.to_user_id`, `friendships.user_b`, and `invitations` on `from_user_id`, `to_user_id`, and `created_at`.
 - **Privacy.** No table stores a Google ID token, a scene photo, a guide, or anything from the live view or a session (NFR-13). Logs never contain tokens, or Pix IDs with request bodies (2.8, Privacy).
-- **Storage.** On the course servers PostgreSQL's files are in `/opt/pix/postgres`, a directory on the server's disk mounted into the container, not a Docker volume. They outlive a crash of PostgreSQL (its write-ahead log replays what was committed), a restart of any container, a deploy, a reboot, and `docker compose down -v`. Deleting that directory deletes every account, and nothing backs it up yet.
+- **Storage.** On every server, PostgreSQL's files are in `/opt/pix/postgres`, a directory on the server's disk mounted into the container, not a Docker volume. They outlive a crash of PostgreSQL (its write-ahead log replays what was committed), a restart of any container, a deploy, a reboot, and `docker compose down -v`. Deleting that directory deletes every account, and nothing backs it up yet.
 - **Failure.** An account request that cannot reach PostgreSQL, loses its connection, or finds no free pool connection answers `503 UNAVAILABLE`; signaling and pose generation keep working. An `OSError` counts only when the database driver raised it; any other is a bug and answers `500`. Log-in ends its transaction before the password check, and `PUT /me/google` before Google's check, so neither holds a connection or SQLite's write lock while it waits.
 - **Migrations.** Every worker runs Alembic's `upgrade head` before it takes requests (`pix_server.db.migrate`), under an advisory lock on PostgreSQL: of the two workers in each of two copies, one migrates and the others find the schema current. The revisions are `0001` (accounts and friends) and `0002` (invitations). New ones come from `uv run alembic revision --autogenerate` in `server/`, and a test checks that the migrations build exactly the models' schema.
 - **Compatible revisions.** The old copy serves during a deploy, so a revision must not break the release before it: add a column before the code needs it, and drop one a release after the code stops using it.
@@ -3152,7 +3152,7 @@ erDiagram
 | `POST /pose-tips` | 20 per hour | 1000 per 24 h | `PIX_TIP_RATE_LIMIT`, `PIX_TIP_GLOBAL_LIMIT` |
 | `room.join` with a wrong code | 100 per 10 min | — | `PIX_JOIN_FAILURE_LIMIT`, `PIX_JOIN_FAILURE_WINDOW_SECONDS` (2.5.2) |
 
-- The global limits bound a day's model cost, however many addresses send. The OpenRouter key's spending limit, set in its dashboard, is the last bound. On the course servers, the address is the last `X-Forwarded-For` value (*Hosting*).
+- The global limits bound a day's model cost, however many addresses send. The OpenRouter key's spending limit, set in its dashboard, is the last bound. On the course servers, the address is the last `X-Forwarded-For` value, and on the AWS servers the address that connects (*Hosting*).
 - Requests to the AWS servers are encrypted with TLS. Over plain HTTP to a course server or a laptop, a scene photo, a sign-in password, and the tokens travel unencrypted (AD-11). The live view goes phone to phone, encrypted (NFR-14).
 - No URL holds a Pix ID or other personal data, because nginx's error log prints a failed request's whole request line. The lookup is `POST /users/lookup`. nginx and Uvicorn access logs leave out query strings.
 - Password hashes run two at a time per worker. A burst of sign-ins, which needs no account, then queues instead of taking a 64 MiB argon2id buffer per pool thread.
@@ -3190,15 +3190,13 @@ erDiagram
 
 **Hosting** (AD-11)
 
-| Server | Address | Branch | Use |
+| Branch | Course server: campus network, HTTP | AWS server: every network, HTTPS | Builds |
 |----|----|----|----|
-| A | `http://swpp26t10.147-46-242-169.sslip.io` | `main` | The state of `main`; campus network only |
-| B | `http://swpp26t10.147-46-242-174.sslip.io` | `dev` | Staging; campus network only |
-| AWS main | `https://swpp26t10.15-134-147-114.sslip.io` | `main` | Release builds; reachable from every network, cellular data included |
-| AWS dev | `https://swpp26t10.3-105-185-251.sslip.io` | `dev` | Debug builds; reachable from every network, cellular data included |
+| `main` | Server A, `http://swpp26t10.147-46-242-169.sslip.io` | AWS main, `https://swpp26t10.15-134-147-114.sslip.io` | Release builds use AWS main |
+| `dev` | Server B, `http://swpp26t10.147-46-242-174.sslip.io` | AWS dev, `https://swpp26t10.3-105-185-251.sslip.io` | Debug builds use AWS dev |
 
-- The course servers are reachable only through the course's HTTP proxy on port 80, and only from the campus network. They cannot reach each other, so each has its own database and session store.
-- The AWS servers run the same Compose setup, each on its own instance with its own database and session store. They stay on and answer from every network.
+- Each branch's server runs in two versions with the same Compose setup, each with its own database and session store. The builds use the AWS versions, which stay on and answer from every network, cellular data included. A debug build reaches a course server through `pix.serverUrl`.
+- The course servers are reachable only through the course's HTTP proxy on port 80, and only from the campus network. They cannot reach each other.
 - The AWS servers serve HTTPS on port 443 with a Let's Encrypt certificate for a hostname that sslip.io resolves to their Elastic IP. certbot renews it through nginx on port 80 (`/.well-known/acme-challenge/`). `deploy.sh` adds `docker-compose.https.yml`, which publishes port 443, once the certificate exists, so the course servers serve port 80 only. nginx passes the scheme on (`X-Forwarded-Proto`), so invite links from the AWS servers start with `https://`.
 - `server/deploy/docker-compose.yml` runs:
   - `nginx` on port 80, and on 443 on the AWS servers, which forwards `/api/v1`, `/ws`, `/health`, and the invite link's page `/i/<id>`, serves `/version` and Let's Encrypt's check, and answers `404` to the rest, so FastAPI's `/docs` is not public;

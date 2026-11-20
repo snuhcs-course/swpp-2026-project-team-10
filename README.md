@@ -36,9 +36,15 @@ This branch is the **Iteration 4 build**, after the user test, the heuristic eva
 
 ## Demo videos
 
-The video shows the photographer's phone and the subject's phone side by side, on a debug build of Iteration 4 with the AWS server.
+Both videos show the photographer's phone (Galaxy S23 Ultra) and the subject's phone (Galaxy S25 Ultra) side by side. The phones run a debug build of Iteration 4 with the AWS server. Steps marked *New in Iteration 4* show what this iteration added.
 
-<!-- TODO: the Iteration 4 demo video. Paste the uploaded video's URL on its own line here. -->
+**1. Pose guide from a photo**
+
+https://github.com/user-attachments/assets/c6cd98a5-1176-4274-8924-8f56a1410762
+
+**2. AI pose generation**
+
+https://github.com/user-attachments/assets/067c8315-2ce3-43a0-9a34-da860641df29
 
 ## Features implemented
 

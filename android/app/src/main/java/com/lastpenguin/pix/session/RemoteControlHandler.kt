@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraController
@@ -38,12 +38,17 @@ sealed interface RemoteAction {
  * Photographer: applies the subject's requests and echoes what was applied (Design 2.6.5, Figure 3).
  *
  * **Zoom.** The echo follows the camera's *applied* zoom, not the request, so the subject also sees the
- * photographer's own zoom changes and both phones always end on the same value (FR-7.6). A pinch arrives as a
+ * photographer's own zoom changes and both phones always end on the same value. A pinch arrives as a
  * stream of non-final requests followed by one final value: every step is applied, but only the final one is
  * reported as an action (one notice per pinch) and, when the camera does not apply it within [ECHO_TIMEOUT_MS],
  * answered with the current zoom so the subject's readout snaps back. The camera may hold a request while it
  * opens another lens or finishes saving a photo, so an answered request keeps its attribution for [PENDING_MS]:
  * when the held request is applied later, it is still the subject's and still gets its one notice.
+ *
+ * **One phone zooms at a time (FR-7.6, #236).** The subject's pinch takes [zoomHold] at its first step and frees it
+ * at its final value, or [HOLD_TIMEOUT_MS] after its last request when the final value never comes. While the
+ * photographer's pinch holds it, the subject's requests are dropped, and a final one is answered with the camera's
+ * zoom so the subject's readout comes back. Each change of the holder goes to the subject as `camera.zoom.hold`.
  *
  * **Brightness and flash (It 2, FR-7.3).** `camera.exposure.set` is clamped to the exposure range and applied
  * with the same step-then-final pattern, and `camera.flash.set` is applied when the camera has a flash; a request
@@ -69,6 +74,8 @@ class RemoteControlHandler(
     private val guides: GuideRepository,
     private val attributeGuideChanges: (Role?) -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
+    /** Who holds the zoom; `CameraViewModel` takes it for the photographer's own pinch. */
+    val zoomHold: ZoomHold = ZoomHold(),
 ) {
     private val _actions = MutableSharedFlow<RemoteAction>(extraBufferCapacity = 16)
 
@@ -78,6 +85,8 @@ class RemoteControlHandler(
     private var scope: CoroutineScope? = null
     private var zoomJob: Job? = null
     private var settingsJob: Job? = null
+    private var holderJob: Job? = null
+    private var holdTimeoutJob: Job? = null
     private var finalJob: Job? = null
     private var timeoutJob: Job? = null
     private var exposureTimeoutJob: Job? = null
@@ -101,6 +110,8 @@ class RemoteControlHandler(
                 .drop(1)
                 .collect { (settings, _) -> onSettingsApplied(settings.first, settings.second) }
         }
+        // The current holder first, so a subject that connects or reconnects mid-pinch knows it.
+        holderJob = scope.launch { zoomHold.holder.collect { session.send(SessionMessage.ZoomHoldUpdate(it)) } }
     }
 
     fun stop() {
@@ -110,9 +121,14 @@ class RemoteControlHandler(
             zoomSettled = true
             camera.setZoom(camera.zoom.value, final = true)
         }
+        zoomHold.release(Role.SUBJECT)
         zoomJob?.cancel()
         settingsJob?.cancel()
         settingsJob = null
+        holderJob?.cancel()
+        holderJob = null
+        holdTimeoutJob?.cancel()
+        holdTimeoutJob = null
         finalJob?.cancel()
         timeoutJob?.cancel()
         exposureTimeoutJob?.cancel()
@@ -145,6 +161,12 @@ class RemoteControlHandler(
         val ratio = if (caps == null) request.ratio else request.ratio.coerceIn(caps.minZoom, caps.maxZoom)
         if (!ratio.isFinite()) return
         Timings.mark("zoom.received", "$ratio${if (request.final) " final" else ""}")
+        if (!holdForSubject(request.final)) {
+            // The photographer's pinch holds the zoom: nothing changes, and a final request learns where the camera is.
+            Timings.mark("zoom.held", "$ratio")
+            if (request.final) send(camera.zoom.value, Role.PHOTOGRAPHER, final = true)
+            return
+        }
         zoomSettled = request.final
         timeoutJob?.cancel()
         timeoutJob = null
@@ -177,6 +199,33 @@ class RemoteControlHandler(
                 send(ratio, Role.SUBJECT, final = true)
             }
         }
+    }
+
+    /**
+     * Whether the subject's request may zoom now (FR-7.6): not while the photographer's pinch holds [zoomHold]. A step
+     * takes it, or keeps it for another [HOLD_TIMEOUT_MS]; a final value frees it.
+     */
+    private fun holdForSubject(final: Boolean): Boolean {
+        holdTimeoutJob?.cancel()
+        holdTimeoutJob = null
+        if (final) {
+            if (!zoomHold.mayChange(Role.SUBJECT)) return false
+            zoomHold.release(Role.SUBJECT)
+            return true
+        }
+        if (!zoomHold.take(Role.SUBJECT)) return false
+        holdTimeoutJob = scope?.launch {
+            delay(HOLD_TIMEOUT_MS)
+            holdTimeoutJob = null
+            // The pinch's last value never came (a lost link, a stuck gesture): the zoom is free again, and the camera
+            // settles its lens where it is, as in stop().
+            zoomHold.release(Role.SUBJECT)
+            if (!zoomSettled) {
+                zoomSettled = true
+                camera.setZoom(camera.zoom.value, final = true)
+            }
+        }
+        return true
     }
 
     /**
@@ -375,5 +424,11 @@ class RemoteControlHandler(
         const val PENDING_MS = 5_000L
         const val ECHO_TIMEOUT_MS = 500L
         const val FINAL_DELAY_MS = 100L
+
+        /**
+         * How long the subject's pinch keeps the zoom after its last request. A still finger sends nothing, so it is
+         * well above the 50 ms between steps; a pinch ended normally frees it at its final value.
+         */
+        const val HOLD_TIMEOUT_MS = 2_000L
     }
 }

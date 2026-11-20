@@ -107,6 +107,7 @@
 | 3.27 | 2026-11-19 | The package layout names `TurningIcons` and `PhoneTurns` (2.1; [#207]). |
 | 3.28 | 2026-11-19 | The notice that the subject left (Iter4-A5, [#238]): 10 s on Camera, gone once the subject is back, and a photo not sent shown after it (2.6.5). |
 | 3.29 | 2026-11-19 | *Add a pose guide* (Iter4-A6, [#243]): each situation's tile starts its scene photo, with no preselection, a pressed look, *Top pick* on *Auto*, and no second tap, then a guide from a photo; a closed picker leaves its screen open; an edge caption on a seam (`seamRing`) (2.4, 2.6.2, 2.6.3, 2.6.5, 2.6.8). |
+| 3.30 | 2026-11-20 | One phone zooms at a time (Iter4-A3, [#236]): `ZoomHold` on the photographer's phone, `camera.zoom.hold`, and the label of the phone held back (AD-7, 2.5.1, 2.6.5, 2.8, Figure 7). |
 
 </details>
 
@@ -330,7 +331,7 @@ App versions are from `android/gradle/libs.versions.toml`; server versions are t
 | AD-4 | **CameraX is the only camera owner and feeds frames to WebRTC** | Only one client can open the camera, and one viewport keeps preview, capture, and stream on the same framing. | WebRTC's camera capturer |
 | AD-5 | **Two data channels: *realtime* (unordered, no retransmission) and *reliable* (ordered)** | Continuous values need only the newest value; images, commands, and results must arrive exactly once. | One reliable channel; relaying through the server |
 | AD-6 | **Each phone draws the guide itself; only the smoothed mask (once) and small state updates are sent** | The guide stays sharp, out of the video and the photo, and free of reference pixels. A reference copy of at most 512 px goes once per guide, only for the subject's thumbnail. It is never drawn as the guide, saved, or sent through the server (FR-3.9, [#132]). | Burning the overlay into the video; mirroring the screen |
-| AD-7 | **The photographer's phone is the single source of truth for camera and guide state** | The subject only requests, and the photographer applies requests in arrival order and echoes them, so the later change wins (FR-7.6). The first request decides a shared pose step (2.6.5). | Shared editing on both phones |
+| AD-7 | **The photographer's phone is the single source of truth for camera and guide state** | The subject only requests, and the photographer applies requests in arrival order and echoes them, so the later change wins (FR-7.6). The zoom is the exception: the photographer's phone gives it to one pinch at a time (2.6.5). The first request decides a shared pose step (2.6.5). | Shared editing on both phones |
 | AD-8 | **One session abstraction with pluggable entry points (room code, invitation)** | Streaming and sync work without accounts, and each entry point only yields a `sessionId`. | Building accounts and invitations first |
 | AD-9 | **One app for both roles** | Friends swap roles between shots: one codebase, one install, the role chosen per session. | A separate viewer app |
 | AD-10 | **One frame in the chosen aspect ratio (3:4, 9:16, or 1:1), shown whole (fit) on both phones** | One CameraX `ViewPort` makes what you see what is captured, with the same guide coordinates on both phones; 9:16 fits Instagram stories. The crops: 2.6.2. | Fixed 3:4; full-screen 9:16 with cropping |
@@ -926,9 +927,16 @@ classDiagram
   }
   class RemoteControlHandler {
     +actions SharedFlow~RemoteAction~
+    +zoomHold ZoomHold
     +start(scope)
     +stop()
     +handle(message)
+  }
+  class ZoomHold {
+    +holder StateFlow~Role~
+    +take(role) Boolean
+    +release(role)
+    +mayChange(role) Boolean
   }
   class SubjectViewModel {
     +uiState StateFlow~SubjectUiState~
@@ -980,6 +988,7 @@ classDiagram
   RemoteControlHandler --> SessionManager
   RemoteControlHandler --> CameraController
   RemoteControlHandler --> GuideRepository
+  RemoteControlHandler --> ZoomHold
   SubjectViewModel --> SessionManager
   SubjectViewModel --> GuideRepository
   SubjectViewModel --> MirrorReference
@@ -1572,6 +1581,7 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `camera.capabilities` | P→S | reliable | `capabilities` | Zoom and exposure ranges, flash, aspect ratios |
 | `camera.state` | P→S | steps realtime, final reliable | `zoom`, `exposure`, `flash`, `aspect`, `facing`, `by`, `final` | The applied camera values, and who changed them |
 | `camera.zoom.set` | S→P | steps realtime, final reliable | `ratio`, `final` | The subject's pinch or readout tap (FR-7.1) |
+| `camera.zoom.hold` | P→S | reliable | `by` | Whose pinch holds the zoom, or null when it is free (FR-7.6) |
 | `camera.exposure.set` | S→P | steps realtime, final reliable | `index`, `final` | The subject's brightness slider (FR-7.3) |
 | `camera.flash.set` | S→P | reliable | `mode` | The subject's flash choice (FR-7.3) |
 | `camera.focus.set` | S→P | reliable | `x`, `y` | The subject's focus point (FR-7.7; Could, Iteration 5) |
@@ -1752,6 +1762,17 @@ The center and height the subject asks for, in frame coordinates. The photograph
 ```
 
 A tap on the readout (a quick step, 2.6.2) and its *Zoom in* / *Zoom out* accessibility actions send one final request. The photographer clamps, applies, and echoes it (2.6.5).
+
+</details>
+
+<details>
+<summary><code>camera.zoom.hold</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "camera.zoom.hold", "seq": 4, "ts": 1759212352290, "b": { "by": "PHOTOGRAPHER" } }
+```
+
+`by` is `PHOTOGRAPHER`, `SUBJECT`, or null when the zoom is free. The photographer sends it at each change and when the session connects (2.6.5). An older phone ignores it.
 
 </details>
 
@@ -2726,6 +2747,11 @@ Camera shows `text` in its banner. In a session `TipSyncer` sends the tip of the
 Subject view's controls are requests. The photographer's phone applies them in arrival order and echoes the result (AD-7).
 
 - **Zoom.** With guide-edit mode off, the subject's pinch zooms the photographer's camera (AD-17). The readout shows each step at once (`SubjectViewModel.onZoomGesture`). `StepSender` sends steps as non-final `camera.zoom.set` on the realtime channel, at most every 50 ms, the newest winning. The pinch's end, a cancel, or the screen pausing sends one final request on the reliable channel. The photographer clamps it to `[minZoom, maxZoom]` and calls `CameraController.setZoom(ratio, final)`, which holds the lens during the pinch. It echoes the applied zoom in `camera.state`.
+- **One phone zooms at a time (It 4, FR-7.6, [#236]).** `ZoomHold`, on the photographer's phone, keeps whose pinch holds the zoom. A pinch's first step takes it, and its final value frees it.
+  - `CameraViewModel` takes it for the photographer's pinch. `RemoteControlHandler` takes it for the subject's, and frees it 2 s after the subject's last request when the final value never comes; the camera then settles its lens, as in `stop()`.
+  - While one phone holds it, the other's pinch changes nothing until its own fingers lift. A quick step or a zoom action never takes it, and changes nothing while the other phone holds it. The photographer drops the subject's requests and answers a final one with the current zoom.
+  - Each change of the holder goes to the subject as `camera.zoom.hold`, and again when the session connects. Subject view then sends nothing, stops a pinch that is running, and its readout follows the echo.
+  - The phone held back says who is zooming in its toggle label (2.8).
 - **Unanswered requests.** `RemoteControlHandler` gives a final zoom, brightness, or flash request 500 ms, and longer while the camera is `STARTING`. It then confirms a request the camera holds, or answers with the current state, `by: PHOTOGRAPHER`, so the control snaps back. A request applied within 5 s still counts as the subject's.
 - **Brightness and flash (It 2, FR-7.3).** Subject view's brightness button opens a slider over the exposure range from `camera.capabilities`. It stays a slider, since the subject sets no focus for Camera's bar (2.8, [#182]). The flash button is in the top bar. Each control hides when the camera lacks it.
   - The slider sends `camera.exposure.set` like zoom. The flash button sends `camera.flash.set` and shows the tapped mode until the echo.
@@ -3201,7 +3227,7 @@ erDiagram
 
 **Camera labels and brightness** ([#182])
 
-- Toggles say in words what they did. One chip with an icon at the top of the image (`toggleLabel`) shows *Hide* / *Show* ("Guide hidden", "Guide shown"), a tap on the zoom readout (the step, such as "2×"), and *Save guide*'s notices.
+- Toggles say in words what they did. One chip with an icon at the top of the image (`toggleLabel`) shows *Hide* / *Show* ("Guide hidden", "Guide shown"), a tap on the zoom readout (the step, such as "2×"), a zoom held back while the other phone zooms ("Jaewan is zooming", FR-7.6), and *Save guide*'s notices.
 - The chip shows for 3 s (`CameraViewModel.NOTICE_MS`), and a new label replaces it at once. It is a live region for TalkBack. The hint chip steps aside for it, and opening the ratios takes it down (FR-1.13).
 - The guide-edit mode toggle shows `pinchModeLabel` above it for 3 s: *Guide* in the guide's color while drags and pinches move the guide, *Camera* in white while a pinch zooms. TalkBack reads "Pinch moves the guide" or "Pinch zooms the camera".
 - Subject view shows the same labels for its zoom step, its *Save guide* (no toast), and its toggle.
@@ -3443,6 +3469,7 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#231]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/231
 [#234]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/234
 [#235]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/235
+[#236]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/236
 [#237]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/237
 [#238]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/238
 [#243]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/243

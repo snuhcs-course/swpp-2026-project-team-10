@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -85,7 +85,8 @@ import org.robolectric.shadows.ShadowToast
  * button, a set still picking shown before the confirm that follows it, and a guide the photographer uses after Back,
  * which says so; the photographer's Generate poses (FR-6.15): "describing a pose" in place of "camera paused", Generate
  * poses opened once per description and then by the same button, opened once Add a pose guide closes when it came
- * under the sheet, a set held here shown before it, and a close after Back, which says so.
+ * under the sheet, a set held here shown before it, and a close after Back, which says so. A tap on the readout while
+ * the photographer's pinch holds the zoom: nothing sent, and the label names the photographer (FR-7.6, #236).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -654,6 +655,23 @@ class SubjectFragmentRenderTest {
             assertTrue(binding.toggleLabel.isShown)
             assertTrue(binding.toggleLabel.text.toString().endsWith("×"))
         }
+    }
+
+    @Test
+    fun aTapOnTheReadout_whileThePhotographerZooms_namesThePhotographer() {
+        val modules = launch()
+        connect(modules)
+        modules.session.deliver(SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER))
+        idle()
+
+        onScreen { binding, _ -> binding.zoomReadout.performClick() }
+        idle()
+
+        onScreen { binding, _ ->
+            assertTrue(binding.toggleLabel.isShown)
+            assertEquals(string(R.string.zoom_held_label, "Dongje"), binding.toggleLabel.text.toString())
+        }
+        assertTrue(modules.session.sent.none { it is SessionMessage.ZoomSet })
     }
 
     private fun poseStep(modules: TestAppContainer, step: PoseSetStep, poseIds: List<String> = emptyList()) {

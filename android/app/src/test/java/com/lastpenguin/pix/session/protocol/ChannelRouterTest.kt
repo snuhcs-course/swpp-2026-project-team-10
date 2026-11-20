@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-16, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.FlashMode
@@ -48,6 +48,9 @@ class ChannelRouterTest {
         // The slots and a failure come in order with the set's other messages (Iter3-A13).
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PosePlanned("set1", listOf("pose-1"))))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PoseCandidateFailed("set1", "pose-1")))
+        // Who holds the zoom, each change in order (#236).
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER)))
+        assertFalse(router.latestOnly(SessionMessage.ZoomHoldUpdate()))
     }
 
     @Test

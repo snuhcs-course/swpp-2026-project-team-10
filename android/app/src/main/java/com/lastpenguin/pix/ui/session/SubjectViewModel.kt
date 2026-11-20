@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -241,6 +241,11 @@ class SubjectViewModel(
     // does not take the readout, and the next tap, back to it (FR-7.1).
     private var pendingZoomStep: Float? = null
 
+    // Whether the photographer's pinch holds the zoom (`camera.zoom.hold`, FR-7.6), and whether this phone's pinch was
+    // held back by it until its fingers lift.
+    private var photographerZooming = false
+    private var zoomHeldBack = false
+
     private val exposureSender = StepSender<Int>(viewModelScope, SEND_INTERVAL_MS) { index, final ->
         session.send(SessionMessage.ExposureSet(index, final))
         Timings.mark("exposure.sent", "$index${if (final) " final" else ""}")
@@ -312,6 +317,7 @@ class SubjectViewModel(
         }
         viewModelScope.launch {
             session.incoming.collect { message ->
+                if (message is SessionMessage.ZoomHoldUpdate) onZoomHolder(message.by)
                 if (message !is SessionMessage.CameraStateUpdate) return@collect
                 // While a pinch or the slider is moving its own steps rule the display; the echo wins once it ends.
                 _uiState.update {
@@ -570,7 +576,35 @@ class SubjectViewModel(
      */
     fun onZoomGesture(ratio: Float, final: Boolean) {
         pendingZoomStep = null
+        if (zoomHeldBack) {
+            if (final) zoomHeldBack = false
+            return
+        }
+        if (photographerZooming) {
+            holdBack(gestureGoesOn = !final)
+            return
+        }
         zoomTo(ratio, final)
+    }
+
+    /**
+     * The photographer's phone says whose pinch holds the zoom (FR-7.6, #236). When it is the photographer's, a pinch of
+     * this phone that is running was held back there: it stops sending until its fingers lift.
+     */
+    private fun onZoomHolder(by: Role?) {
+        photographerZooming = by == Role.PHOTOGRAPHER
+        if (photographerZooming && zoomSender.adjusting) holdBack(gestureGoesOn = true)
+    }
+
+    /**
+     * The photographer's pinch holds the zoom: this phone's change is not sent, the readout follows the photographer's
+     * applied zoom, and a label says who is zooming. A pinch that [gestureGoesOn] stays held back until its final value.
+     */
+    private fun holdBack(gestureGoesOn: Boolean) {
+        zoomSender.cancel()
+        zoomHeldBack = gestureGoesOn
+        session.peerCamera.value?.let { camera -> _uiState.update { it.copy(zoom = camera.zoom) } }
+        _toggleLabels.trySend(ToggleLabel.ZoomHeld)
     }
 
     /**
@@ -580,6 +614,10 @@ class SubjectViewModel(
     fun onZoomTap() {
         val ui = _uiState.value
         val step = nextZoomStep(quickZoomSteps(ui.minZoom, ui.maxZoom), ui.zoom) ?: return
+        if (photographerZooming) {
+            holdBack(gestureGoesOn = false)
+            return
+        }
         if (zoomTo(step, final = true)) {
             pendingZoomStep = step
             _toggleLabels.trySend(ToggleLabel.Zoom(step))
@@ -644,6 +682,8 @@ class SubjectViewModel(
 
     private fun endInteractions() {
         pendingZoomStep = null
+        photographerZooming = false
+        zoomHeldBack = false
         zoomSender.cancel()
         exposureSender.cancel()
         guideSender.cancel()

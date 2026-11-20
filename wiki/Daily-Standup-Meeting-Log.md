@@ -435,6 +435,78 @@ Weekend standups are flexible.
 
 </details>
 
+<details>
+<summary><b>2026-11-14 (Sat)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Iter4-P16: better pose tips ([#213]) | Continue the tips | – |
+| 박재완 | Finished the prompt for each situation and its tests ([#209]) | Open its PR; Iter4-P13: the situation choice before the scene photo ([#210]) | – |
+| 조성민 | Checked the UAT sheet against the merged UI fixes ([#225]) and fixed the changed labels ([#205]) | Check the sheet against the situation choice | – |
+| 한준형 | Merged the UI fixes ([#225]) | Iter4-P9: landscape photos ([#206]) | – |
+
+</details>
+
+<details>
+<summary><b>2026-11-15 (Sun)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Iter4-P11: take the photo sooner and free the shutter while it saves ([#208]) | Open its PR | – |
+| 박재완 | Merged the prompt for each situation ([#227]), the situation choice before the scene photo ([#228]), and a fix for a flaky signaling test ([#229]) | UAT cycle 1 in class | – |
+| 조성민 | Rewrote the UAT sheet for the situation choice: 10 steps fixed, 2 added (68 → 70) ([#205]) | Run UAT cycle 1 in class | – |
+| 한준형 | Landscape photos ([#206]) | Continue landscape photos | – |
+
+</details>
+
+<details>
+<summary><b>2026-11-16 (Mon)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Merged taking the photo sooner ([#230]) and Iter4-P21: the scene photo step on a small phone ([#232]); UAT cycle 1 in class | Better pose tips ([#213]) | – |
+| 박재완 | UAT cycle 1 in class | The UAT fixes | – |
+| 조성민 | Ran UAT cycle 1 in class ([#205]) | Record the results; open issues for the problems found | – |
+| 한준형 | UAT cycle 1 in class; landscape photos ([#206]) | Continue landscape photos | – |
+
+</details>
+
+<details>
+<summary><b>2026-11-17 (Tue)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Better pose tips ([#213]) | Open its PR; Iter4-A4: hide the reference thumbnail ([#237]) | – |
+| 박재완 | Iter4-A2: the session's photos on the subject's phone ([#235]) | Open its PR; Iter4-A1: the reference thumbnail for a guide from the subject ([#234]) | – |
+| 조성민 | Opened the UAT results PR ([#233]) and the issues for the problems found, Iter4-A1–A5 ([#234]–[#238]) | The TA meeting slides and the alpha prep survey; the TA meeting on 11/18 | – |
+| 한준형 | Landscape photos ([#206]) | Open its PR; Iter4-P10: the controls turn with the phone ([#207]) | – |
+
+</details>
+
+<details>
+<summary><b>2026-11-18 (Wed)</b> · 17:30–18:00</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Merged better pose tips ([#240]) and hiding the reference thumbnail with a swipe ([#241]) | Iter4-P15: light mode ([#212]) | – |
+| 박재완 | Opened the session's photos on the subject's phone ([#239]); started Iter4-A1 ([#234]) | Merge [#239]; open the PR for [#234] | – |
+| 조성민 | Presented Iteration 4 at the TA meeting; wrote the alpha prep survey's answers; brought [#233] up to `dev` | Merge [#233] | – |
+| 한준형 | Opened landscape photos ([#242]) | Iter4-P10: the controls turn with the phone ([#207]) | – |
+
+</details>
+
+<details>
+<summary><b>2026-11-19 (Thu)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Light mode ([#212]) | Open the light mode PR | – |
+| 박재완 | Merged the session's photos ([#239]), the reference thumbnail for a guide from the subject ([#245]), Pix's album in Pix's viewer ([#248]), and the notice that the subject left kept on screen ([#249]); dropped Iter4-P14 ([#211]); opened Iter4-A6 ([#250]) | Merge [#250] | – |
+| 조성민 | Merged the UAT results ([#233]); set up two phones with the latest `dev` | Iter4-P18: integration tests ([#215]); the Iteration 4 documents ([#217]) | – |
+| 한준형 | Opened and merged the controls that turn with the phone ([#246]); merged landscape photos ([#242]) | The Iteration 4 documents and demo README ([#217]) | – |
+
+</details>
+
 [#5]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/5
 [#6]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/6
 [#11]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/11
@@ -585,3 +657,27 @@ Weekend standups are flexible.
 [#223]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/223
 [#224]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/224
 [#225]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/225
+[#207]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/207
+[#208]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/208
+[#211]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/211
+[#215]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/215
+[#217]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/217
+[#227]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/227
+[#228]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/228
+[#229]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/229
+[#230]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/230
+[#232]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/232
+[#233]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/233
+[#234]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/234
+[#235]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/235
+[#237]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/237
+[#238]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/238
+[#239]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/239
+[#240]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/240
+[#241]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/241
+[#242]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/242
+[#245]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/245
+[#246]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/246
+[#248]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/248
+[#249]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/249
+[#250]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/250

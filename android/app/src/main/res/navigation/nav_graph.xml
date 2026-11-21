@@ -8,7 +8,7 @@
     android:id="@+id/nav_graph"
     app:startDestination="@id/cameraFragment">
 
-    <!-- The privacy policy, from Settings › Privacy, Sign up, and Sign up with Google (FR-10.7, FR-5.18). -->
+    <!-- The privacy policy, from Settings › Privacy, Sign up, and Sign up with Google (FR-10.7, FR-5.19). -->
     <action
         android:id="@+id/action_global_privacyPolicy"
         app:destination="@id/privacyPolicyFragment" />
@@ -257,7 +257,7 @@
         android:label="Sent requests" />
 
     <!-- Sign in, and Sign up or Pix ID setup after it, go back to the screen that opened Sign in: Share my camera,
-         Invitation, or Settings. Sign up starts with the agreement, before any account is made (FR-5.18). -->
+         Invitation, or Settings. Sign up starts with the agreement, before any account is made (FR-5.19). -->
     <fragment
         android:id="@+id/signInFragment"
         android:name="com.lastpenguin.pix.ui.account.SignInFragment"

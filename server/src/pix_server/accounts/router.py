@@ -309,7 +309,7 @@ async def update_me(body: AccountUpdate, request: Request, caller: SignedIn, db:
 
 @router.delete("/me", status_code=204)
 async def delete_me(caller: SignedIn, db: Database) -> None:
-    """Deletes the caller's account with everything the server keeps about it (FR-5.19): its sign-ins on every phone,
+    """Deletes the caller's account with everything the server keeps about it (FR-5.18): its sign-ins on every phone,
     their spent refresh tokens and devices, its friendships, the friend requests it sent or received, and its
     invitations. Its Pix ID and its Google account are free for a new account at once. The account's other phones
     sign out at their next request: their access tokens name a user who no longer exists, and their refresh tokens

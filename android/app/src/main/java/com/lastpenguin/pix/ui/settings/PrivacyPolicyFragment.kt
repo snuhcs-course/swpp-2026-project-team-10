@@ -30,7 +30,7 @@ fun Fragment.openPrivacyPolicy(@IdRes from: Int) {
 }
 
 /**
- * The privacy policy (R&S 6.10; FR-10.7, FR-5.18), from Settings › Privacy and the sign-up screens: the server's page
+ * The privacy policy (R&S 6.10; FR-10.7, FR-5.19), from Settings › Privacy and the sign-up screens: the server's page
  * in the screens' language, so Pix, the store's link, and the web show one text (Design 2.5.3). Owner: Accounts (#54).
  */
 class PrivacyPolicyFragment : Fragment(R.layout.fragment_privacy_policy) {

@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 /**
  * Sign in (R&S 6.4, 6.8; FR-5.2, FR-5.13): a Pix ID and a password, *Continue with Google*, or *Sign up*. A Google
  * account that no Pix account uses asks "Do you already have a Pix account?"; *Yes* stays here and adds Google to the
- * account the person signs in to, and *No* opens Sign up with Google (FR-5.18). Signed in, it goes back to the screen
+ * account the person signs in to, and *No* opens Sign up with Google (FR-5.19). Signed in, it goes back to the screen
  * that opened it: Share my camera, Invitation, or Settings. Owner: Accounts (#54).
  */
 class SignInFragment : Fragment(R.layout.fragment_sign_in) {
@@ -68,7 +68,7 @@ class SignInFragment : Fragment(R.layout.fragment_sign_in) {
                 .setTitle(R.string.existing_account_title)
                 .setMessage(R.string.existing_account_message)
                 .setPositiveButton(R.string.existing_account_yes) { _, _ -> viewModel.signInToAddGoogle() }
-                // What the new account keeps, and the agreement, come before the account is made (FR-5.18).
+                // What the new account keeps, and the agreement, come before the account is made (FR-5.19).
                 .setNegativeButton(R.string.existing_account_no) { _, _ -> openGoogleSignUp() }
                 .setOnCancelListener { viewModel.forgetGoogle() }
                 .show()

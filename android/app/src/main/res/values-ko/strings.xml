@@ -310,7 +310,7 @@
     <string name="checking_pix_id">확인 중…</string>
     <string name="pix_id_available">사용할 수 있는 ID예요</string>
     <string name="sign_up">회원가입</string>
-    <!-- The sign-up agreement, before the account is made (FR-5.18): three required consents, two with their details. -->
+    <!-- The sign-up agreement, before the account is made (FR-5.19): three required consents, two with their details. -->
     <string name="sign_up_consent_title">Pix 계정을 만들려면 동의가 필요해요</string>
     <string name="sign_up_consent_all">모두 동의</string>
     <string name="sign_up_consent_required">(필수)</string>

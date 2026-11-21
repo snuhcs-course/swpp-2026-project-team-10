@@ -59,7 +59,7 @@ sealed interface AccountEvent {
 
     data object SignedOut : AccountEvent
 
-    /** The account is gone from the server, and this phone is signed out (FR-5.19). */
+    /** The account is gone from the server, and this phone is signed out (FR-5.18). */
     data object AccountDeleted : AccountEvent
 }
 
@@ -119,7 +119,7 @@ class AccountViewModel(private val auth: AuthRepository, private val google: Goo
     }
 
     /**
-     * *Agree* on Sign up with Google, once the person read what the account keeps (FR-5.13, FR-5.18): the waiting
+     * *Agree* on Sign up with Google, once the person read what the account keeps (FR-5.13, FR-5.19): the waiting
      * Google account makes a new Pix account, which chooses its Pix ID next. The Google account keeps waiting until the
      * account is made, so *Agree* can be tried again after a failure.
      */
@@ -191,7 +191,7 @@ class AccountViewModel(private val auth: AuthRepository, private val google: Goo
         _events.emit(AccountEvent.SignedOut)
     }
 
-    /** *Delete account* on Account, after asking (FR-5.19). A failure keeps the account and the sign-in. */
+    /** *Delete account* on Account, after asking (FR-5.18). A failure keeps the account and the sign-in. */
     fun deleteAccount() = call {
         auth.deleteAccount().getOrThrow()
         _events.emit(AccountEvent.AccountDeleted)

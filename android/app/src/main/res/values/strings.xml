@@ -330,7 +330,7 @@
     <string name="checking_pix_id">Checking…</string>
     <string name="pix_id_available">This Pix ID is available</string>
     <string name="sign_up">Sign up</string>
-    <!-- The sign-up agreement, before the account is made (FR-5.18): three required consents, two with their details. -->
+    <!-- The sign-up agreement, before the account is made (FR-5.19): three required consents, two with their details. -->
     <string name="sign_up_consent_title">Agree to create your Pix account</string>
     <string name="sign_up_consent_all">Agree to all</string>
     <string name="sign_up_consent_required">(Required)</string>

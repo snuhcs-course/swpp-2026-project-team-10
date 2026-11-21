@@ -1,5 +1,5 @@
 # AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
-"""Deleting an account through `DELETE /me` (Design 2.5.3, 2.7; R&S FR-5.19, NFR-13).
+"""Deleting an account through `DELETE /me` (Design 2.5.3, 2.7; R&S FR-5.18, NFR-13).
 
 Partitions:
 - the account: a password account; a Google account without a Pix ID; without a sign-in; deleted twice

@@ -26,7 +26,7 @@ import com.lastpenguin.pix.ui.settings.openPrivacyPolicy
 import kotlinx.coroutines.launch
 
 /**
- * The sign-up agreement (R&S 6.4; FR-5.13, FR-5.18), before any account is made: the three required consents with
+ * The sign-up agreement (R&S 6.4; FR-5.13, FR-5.19), before any account is made: the three required consents with
  * their details, the privacy policy, and *Agree and continue*. Sign in's *Sign up* opens it as Sign up's first page,
  * and *Agree and continue* opens the form (`SignUpFragment`) over it. "Do you already have a Pix account?" answered
  * *No, make one* opens it as Sign up with Google ([ARG_GOOGLE]): *Agree and continue* makes the account from the

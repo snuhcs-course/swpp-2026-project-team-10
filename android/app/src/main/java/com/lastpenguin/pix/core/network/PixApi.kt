@@ -104,7 +104,7 @@ interface PixAccountApi {
 
     /**
      * Deletes the account with its sign-ins on every phone, devices, friendships, friend requests, and invitations
-     * (FR-5.19); `204`. Its Pix ID is free again at once.
+     * (FR-5.18); `204`. Its Pix ID is free again at once.
      */
     @DELETE("api/v1/me")
     suspend fun deleteMe()

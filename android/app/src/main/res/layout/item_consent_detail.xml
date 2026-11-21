@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One line of a consent's details on the sign-up agreement (FR-5.18): its label in a column of its own, then the
+<!-- One line of a consent's details on the sign-up agreement (FR-5.19): its label in a column of its own, then the
      value, so the two never read as one text. SignUpAgreement fills it. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"

@@ -28,7 +28,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /*
- * The privacy policy on the real screen (R&S 6.10; FR-10.7, FR-5.18), with Robolectric's WebView, which records what
+ * The privacy policy on the real screen (R&S 6.10; FR-10.7, FR-5.19), with Robolectric's WebView, which records what
  * it loads and lets the test call the page's callbacks. Partitions: the address (English screens, Korean screens; a
  * server address with and without its last slash); the page (loading: the spinner; loaded: the page; the page itself
  * failed or answered an error: the reason and *Try again*, which a finish after the failure does not hide; a part of

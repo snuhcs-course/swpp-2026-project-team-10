@@ -32,7 +32,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 
 /*
- * The sign-up agreement on the real Fragment (R&S 6.4; FR-5.13, FR-5.18), opened from Sign in as the app opens it, over
+ * The sign-up agreement on the real Fragment (R&S 6.4; FR-5.13, FR-5.19), opened from Sign in as the app opens it, over
  * Share my camera and Sign in. Partitions: the consents (none, some, all three given by hand, all through Agree to all,
  * one taken back; Agree and continue waits for all three, and Agree to all follows them); the details (hidden at first,
  * shown and hidden by their chevron, the password or the Google account among what is collected); a recreated screen

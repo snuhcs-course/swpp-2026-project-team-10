@@ -31,7 +31,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Account, opened from the account button on Share my camera and from Settings (R&S 6.4; FR-5.12, FR-5.14, FR-5.17,
- * FR-5.19): the name, which can be edited, the Pix ID, *Add Google* or *Add a password* for the way the account cannot
+ * FR-5.18): the name, which can be edited, the Pix ID, *Add Google* or *Add a password* for the way the account cannot
  * sign in yet, *Sign out*, and *Delete account*, which asks first and then deletes the account on the server and signs
  * this phone out. Owner: Accounts (#54).
  */
@@ -105,7 +105,7 @@ class AccountSheet : BottomSheetDialogFragment() {
         binding.addPasswordOption.isVisible = !account.hasPassword && account.pixId != null
     }
 
-    /** "Delete your Pix account?", which says what goes and what stays (FR-5.19). */
+    /** "Delete your Pix account?", which says what goes and what stays (FR-5.18). */
     private fun confirmDeletion() {
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.delete_account_title)

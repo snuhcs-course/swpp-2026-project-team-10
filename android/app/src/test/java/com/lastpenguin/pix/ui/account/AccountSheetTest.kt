@@ -28,7 +28,7 @@ import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowToast
 
 /*
- * Account on the real bottom sheet (R&S 6.4; FR-5.12, FR-5.14, FR-5.19), with the account fakes behind the
+ * Account on the real bottom sheet (R&S 6.4; FR-5.12, FR-5.14, FR-5.18), with the account fakes behind the
  * ViewModel. Partitions: an account with a password only (Add Google offered), with Google only and no Pix ID (neither;
  * a password needs a Pix ID first), with Google and a Pix ID (Add a password), with both (neither); Edit name with a
  * name that breaks the rule (Save waits) and one that holds (saved, a message); Add a password equal to the Pix ID

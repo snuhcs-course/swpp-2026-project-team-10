@@ -24,7 +24,7 @@ import org.junit.Test
  * addGoogle GOOGLE_IN_USE, setPixId (the account changes, the tokens stay), the display name trimmed. The account read
  * again: answered (a Pix ID chosen on another phone shows), no answer (OFFLINE, the account kept). Any call without an
  * answer: OFFLINE. Sign-out: answered, and without an answer (the phone signs out either way). Deleting the account
- * (FR-5.19): answered (the phone signs out and forgets the sign-in), and without an answer (OFFLINE; the account and
+ * (FR-5.18): answered (the phone signs out and forgets the sign-in), and without an answer (OFFLINE; the account and
  * the sign-in stay).
  */
 @OptIn(ExperimentalCoroutinesApi::class)

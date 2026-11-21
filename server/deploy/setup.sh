@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
-# One-time setup of a course server for the Pix server (server/README.md, Deploy). It installs no packages and
+# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
+# One-time setup of a Pix server, on a course server or on AWS (server/README.md, Deploy). It installs no packages and
 # creates no users. Run it as root from the checkout, with the branch this server follows:
 #
 #   sudo git clone https://github.com/snuhcs-course/swpp-2026-project-team-10.git /opt/pix/repo
-#   sudo /opt/pix/repo/server/deploy/setup.sh dev     # Server B; use "main" on Server A
+#   sudo /opt/pix/repo/server/deploy/setup.sh dev     # Server B and AWS dev; "main" on Server A and AWS main
 #
 # Running it again is safe: it keeps an existing .env and the other settings in deploy.conf, and only changes the
 # branch and the systemd units.
@@ -16,7 +16,7 @@ REPO=$PIX_HOME/repo
 die() { echo "ERROR: $*" >&2; exit 1; }
 
 BRANCH=${1:-}
-[ -n "$BRANCH" ] || die "usage: setup.sh <branch>   (dev on Server B, main on Server A)"
+[ -n "$BRANCH" ] || die "usage: setup.sh <branch>   (main on Server A and AWS main, dev on Server B and AWS dev)"
 [ "$(id -u)" = 0 ] || die "run this with sudo"
 [ -f "$REPO/server/deploy/deploy.sh" ] || die "clone the repository to $REPO first (see the top of this file)"
 
@@ -54,7 +54,8 @@ else
     echo "  1. $PIX_HOME/.env already exists and was kept."
 fi
 echo "  2. Deploy once by hand:   sudo $REPO/server/deploy/deploy.sh deploy"
-echo "  3. Turn on automatic deploys:   sudo systemctl enable --now pix-deploy.timer"
+echo "  3. On a course server, turn on automatic deploys:   sudo systemctl enable --now pix-deploy.timer"
+echo "     (GitHub deploys an AWS server; see server/README.md, The AWS servers.)"
 echo
 echo "For the pix shortcuts in your own account (each account adds them once, without sudo):"
 echo "  echo '[ -f $REPO/server/deploy/pix.sh ] && . $REPO/server/deploy/pix.sh' >> ~/.bashrc"

@@ -112,6 +112,7 @@
 | 3.32 | 2026-11-20 | The design as built through Iteration 4: the QR connection ([#214]) and light mode ([#212]) dropped on 11/20 as not needed, so *Still open* is empty; the Iteration 4 tasks' status, with the UAT's fixes and the scene photo step added, and what is left for Iteration 5 (2.1, 2.8, 2.9, 3). |
 | 3.33 | 2026-11-20 | The live view's sharpness after a reconnection, left for Iteration 5 ([#238]) (2.9). |
 | 3.34 | 2026-11-20 | The Iteration 4 tasks as their issues stand: the owners of Iter4-P7 and Iter4-P11, the name and date of Iter4-P16, and when the prompt templates were dropped (2.9). |
+| 3.35 | 2026-11-21 | One server each for `main` and `dev`, in two versions: a course server, and an AWS server over HTTPS, which the builds use (1.1.1, 1.1.3, 1.2, AD-11, 2.5.2, 2.5.3, 2.6.6, 2.7, 2.8, 2.10). |
 
 </details>
 
@@ -148,12 +149,12 @@ None at the close of Iteration 4. The QR connection ([#214]) and light mode ([#2
 
 Pix is one Android app in two roles, **photographer** and **subject**, plus a small **Pix server**. A control plane and a media plane are kept apart:
 
-- **Control plane (client-server).** The server connects the phones (signaling), keeps accounts, friends, and invitations, and sends push notifications. It forwards pose requests to external models once a decision model has checked the text and the scene photo (2.6.3). It runs behind nginx on the course servers, over HTTP and WS on port 80, and on an AWS server (AD-11, 2.8).
+- **Control plane (client-server).** The server connects the phones (signaling), keeps accounts, friends, and invitations, and sends push notifications. It forwards pose requests to external models once a decision model has checked the text and the scene photo (2.6.3). It runs behind nginx as two servers, one for `main` and one for `dev`, each in two versions: on a course server, over HTTP and WS on port 80, and on AWS, over HTTPS and WSS (AD-11, 2.8).
 - **Media plane (peer-to-peer).** The live video and all messages between the phones go directly over WebRTC. Without a direct path, as often on cellular data, a managed TURN relay forwards the still-encrypted packets (AD-14).
 
 ![Architecture](images/design_target_architecture.png)
 
-*Figure 1. High-level architecture. The phones talk to each other over WebRTC and to the Pix server over HTTP and WS on port 80. Through OpenRouter, a decision model checks each text and scene photo before the vision and image models see it. Saved guides stay on the phone. Push notifications and the relay, drawn dashed, are built (Iter3-P13, Iter3-P15). The relay is Cloudflare's service, not a process on the Pix server (AD-11, AD-14, AD-18). Release builds send crash reports and usage events to Firebase, while the user allows it (AD-19).*
+*Figure 1. High-level architecture. The phones talk to each other over WebRTC and to the Pix server over HTTPS and WSS on an AWS server, or over HTTP and WS on port 80 on a course server. Through OpenRouter, a decision model checks each text and scene photo before the vision and image models see it. Saved guides stay on the phone. Push notifications and the relay, drawn dashed, are built (Iter3-P13, Iter3-P15). The relay is Cloudflare's service, not a process on the Pix server (AD-11, AD-14, AD-18). Release builds send crash reports and usage events to Firebase, while the user allows it (AD-19).*
 
 #### 1.1.2 Components and interfaces
 
@@ -178,7 +179,7 @@ Pix is one Android app in two roles, **photographer** and **subject**, plus a sm
 | Flow | Path | Transport | Latency budget |
 |----|----|----|----|
 | **Reference photo → guide** | Photo → downscale → screenshot cut (FR-2.10) → ML Kit segmentation → mask smoothing → person box and outline → guide store | On device | ≤ 2 s (NFR-3) |
-| **Pose generation** | Scene photo → person check on the phone → *Use* → resized JPEG, no EXIF → `POST /pose-suggestions` (filter) → four parallel `POST /poses` (filter, person check) → image model → candidates → reference flow → `POST /pose-tips`. A description's own `POST /poses` starts at once. | HTTP to the server, HTTPS to OpenRouter | First ≤ 20 s, all ≤ 30 s (NFR-4) |
+| **Pose generation** | Scene photo → person check on the phone → *Use* → resized JPEG, no EXIF → `POST /pose-suggestions` (filter) → four parallel `POST /poses` (filter, person check) → image model → candidates → reference flow → `POST /pose-tips`. A description's own `POST /poses` starts at once. | HTTPS to the server (HTTP to a course server) and to OpenRouter | First ≤ 20 s, all ≤ 30 s (NFR-4) |
 | **Session setup** | Room code or invitation → signaling → SDP and ICE → peer connection | WebSocket, then WebRTC | ≤ 10 s after Join (US-13) |
 | **Live view** | CameraX frames → NV21 (`NV21Buffer`), cropped to the frame → H.264 or VP8 → subject's renderer | SRTP, peer-to-peer | ≤ 0.5 s on Wi-Fi, ≤ 0.8 s on cellular or relay (NFR-5) |
 | **Guide sync** | Guide store → `guide.image.*` (the mask, once per guide), `guide.reference.*` (thumbnail photo), `guide.state` → the other phone's mirror → overlay. The photographer adopts a guide made on the subject's phone. | Data channel | ≤ 0.3 s (NFR-7) |
@@ -321,7 +322,7 @@ App versions are from `android/gradle/libs.versions.toml`; server versions are t
 | SQLAlchemy 2.1 (asyncio), Alembic 1.20, asyncpg, aiosqlite | Schema, migrations, and queries on PostgreSQL or a SQLite file (2.7) | Server |
 | Redis 8, `redis-py` 8.1 | The session store and pub/sub between server processes (AD-18, 2.7) | Host, Server |
 | fakeredis 2.39 with `lupa` | An in-process Redis that runs the store's Lua, for tests and a laptop; development only (2.7) | Server |
-| Docker Compose, nginx 1.30, PostgreSQL 18 | Hosting on the course servers; nginx on port 80 switches between the two app copies during a deploy (2.8) | Host |
+| Docker Compose, nginx 1.30, PostgreSQL 18, certbot | Hosting on the course servers and the AWS servers; nginx switches between the two app copies during a deploy. On the AWS servers, it also serves HTTPS with a certificate that certbot gets from Let's Encrypt (2.8) | Host |
 
 ### 1.3 Architectural decisions
 
@@ -337,7 +338,7 @@ App versions are from `android/gradle/libs.versions.toml`; server versions are t
 | AD-8 | **One session abstraction with pluggable entry points (room code, invitation)** | Streaming and sync work without accounts, and each entry point only yields a `sessionId`. | Building accounts and invitations first |
 | AD-9 | **One app for both roles** | Friends swap roles between shots: one codebase, one install, the role chosen per session. | A separate viewer app |
 | AD-10 | **One frame in the chosen aspect ratio (3:4, 9:16, or 1:1), shown whole (fit) on both phones** | One CameraX `ViewPort` makes what you see what is captured, with the same guide coordinates on both phones; 9:16 fits Instagram stories. The crops: 2.6.2. | Fixed 3:4; full-screen 9:16 with cropping |
-| AD-11 | **The server runs on the course-provided servers with Docker and nginx, over HTTP and WS, and an AWS server serves other networks** | The course servers open only HTTP on port 80, without TLS (NFR-14), and only to the campus network. They stay the main hosting, as Servers A and B. An AWS server with the same setup serves other networks, cellular data included (2.8, Hosting). | AWS as the only hosting (cost); a TLS front such as a Cloudflare Tunnel (domain and approval; revisit if `ws://` fails on cellular); GitHub hosting; a laptop with port forwarding |
+| AD-11 | **One server for `main` and one for `dev`, each with Docker and nginx in two versions: on a course server and on AWS** | Both versions have the same setup. The course servers (Server A, Server B) open only HTTP on port 80, without TLS (NFR-14), and only to the campus network. The AWS servers (AWS main, AWS dev) answer from every network, cellular data included, over HTTPS with a Let's Encrypt certificate for an sslip.io hostname, which needs no domain. So the builds use the AWS servers: release builds (the store's build) AWS main, and debug builds AWS dev. Each AWS server has its own instance, so a deploy of `dev`, which builds on the server, never slows `main` (2.8, Hosting). | One version only, on the course servers (campus network only) or on AWS (cost); both branches on one AWS instance (a deploy builds on the server, beside the live `main`); an AWS load balancer with an ACM certificate (cost, and a domain of our own); a TLS front such as a Cloudflare Tunnel (domain and approval); GitHub hosting; a laptop with port forwarding |
 | AD-12 | **Sign-in with a Pix ID and a password or with Google; the server issues its own tokens** | No Google account is needed, and Google is one tap. The Pix ID is the login name, with no email; either account can add the other (FR-5.13). Tokens and password hashes: 2.8, Accounts. | Email and password; Kakao sign-in (not on every test phone) |
 | AD-13 | **Invitations by Firebase Cloud Messaging, with an invite link as the fallback** | Only a push reaches a friend whose Pix is closed, and a link through any messenger covers a lost push. | WebSocket presence only; KakaoTalk-only invitations |
 | AD-14 | **A managed TURN relay (Cloudflare Realtime TURN), with short-lived credentials from the server** | STUN often fails behind carrier NAT, and the course servers cannot host a relay (port 80 only). Cloudflare's needs no host, fits its free allowance, and also listens on TCP 80 and TLS 443. The key stays on the server, and media stays SRTP-encrypted (NFR-14). | coturn on the server host (no open ports) or on AWS (cost, upkeep); a media server (SFU); no relay |
@@ -2087,7 +2088,7 @@ Every 2 s from both phones, once connected; `pong` echoes the `ping`'s `ts`. The
 
 #### 2.5.2 Signaling protocol (phone ↔ server, WebSocket)
 
-- **Transport.** JSON text frames over `ws://<host>/ws`, each with a `type` field; an `https` server URL gives `wss://`. The course servers have no TLS (AD-11). A socket holds at most one place.
+- **Transport.** JSON text frames, each with a `type` field, over `wss://<host>/ws` on the AWS servers and `ws://<host>/ws` on the course servers, which have no TLS (AD-11). The app takes the scheme from the server URL: `https` gives `wss`. A socket holds at most one place.
 - **Sign-in.** A signed-in phone sends its access token in the `Authorization: Bearer` header of the upgrade. The server checks it once, when the socket opens, without the database. A missing, unknown, or expired token leaves the socket anonymous: room codes still work, and the user does not show as online.
 - **Presence (FR-5.9).** While someone is signed in and Pix is in front, `PresenceConnection` holds one socket that sends no messages and joins no session. It opens again 1 s after a close, doubling up to 30 s while it fails, and closes in the background or at sign-out. A session's socket carries the token too. So a friend in a session, a waiting room or an invitation's included, shows *In a session* and is `BUSY` for an invitation (FR-6.9).
 - **Keep-alive.** The app pings every 15 s, so the course's proxy does not close the socket as idle. Uvicorn pings every 20 s and waits 20 s for the answer.
@@ -2244,7 +2245,7 @@ The sender gets no answer. The photographer's `leave` ends the session. The subj
 
 #### 2.5.3 REST API (phone ↔ server)
 
-Base URL `http://<host>/api/v1`, plain HTTP on the course servers (AD-11). Requests and answers are JSON, except the multipart pose requests.
+Base URL `https://<host>/api/v1` on the AWS servers, and `http://<host>/api/v1`, plain HTTP, on the course servers (AD-11). Requests and answers are JSON, except the multipart pose requests.
 
 - **Errors.** One shape: `{"error": {"code": "UNKNOWN_TEMPLATE", "message": "..."}}`. A missing or malformed field is `400 INVALID_REQUEST`; `422` is only `REJECTED`, `DECLINED`, or `NO_PERSON`, and `429` is `RATE_LIMITED` or `DAILY_LIMITED`. Framework answers: a plain `413` for a request over 1 MiB, before reading it; `404 {"detail": "Not Found"}`; `405 {"detail": "Method Not Allowed"}`; a plain `500` for an unexpected failure.
 - **Access.** *auth* needs `Authorization: Bearer <access token>` (*Session tokens* below), otherwise `401 UNAUTHENTICATED`. *Pix ID* also needs a chosen Pix ID, otherwise `403 PIX_ID_REQUIRED`. "—" works without an account (FR-5.1).
@@ -2855,7 +2856,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
 3.  **Deliver.** `PixMessagingService` shows "Dongje invites you to shoot together" on a high-importance channel, also with Pix in front, until expiry.
     - The tap opens `pix://invite/<invitationId>` over what Pix shows (`MainActivity` is single-top, `onNewIntent`). A link that starts Pix opens over Camera.
     - *Invitation* reads `GET /invitations/{id}` again, so a stale notification says it is no longer available. Signed out, it offers *Sign in*, which returns to it.
-4.  **Link fallback (AD-13).** *Share invite link* and *Copy link* pass on `http://<host>/i/<invitationId>`. nginx sends it to the app, whose page button, `intent://invite/<id>#Intent;scheme=pix;package=com.lastpenguin.pix;end`, opens *Invitation* through `pix://invite/<id>`. Without Pix, the page says to get it. App Links need HTTPS, which the course servers lack (AD-11). The page reads nothing and names nobody.
+4.  **Link fallback (AD-13).** *Share invite link* and *Copy link* pass on `<server URL>/i/<invitationId>`, which starts with `https://` on the AWS servers. nginx sends it to the app, whose page button, `intent://invite/<id>#Intent;scheme=pix;package=com.lastpenguin.pix;end`, opens *Invitation* through `pix://invite/<id>`. Without Pix, the page says to get it. Pix declares no App Links, so the link always opens the page. The page reads nothing and names nobody.
 5.  **Answer.**
     - *Accept* (`POST /invitations/{id}/accept`) returns the subject's place. The friend joins with `session.join`, the photographer hears `peer.joined`, and Figure 2 follows.
     - The photographer waits at most 80 s in `Inviting`: 60 s, the friend's 15 s, and a margin.
@@ -2938,7 +2939,7 @@ The settings screen (FR-10.1, R&S 6.10; Iter3-P23, [#123]) opens from a gear on 
 
 ### 2.7 Database
 
-Accounts, friends, and invitations are in a relational database: PostgreSQL 18 in a container on the course servers, a SQLite file on a laptop and in the tests. One schema serves both, through SQLAlchemy and Alembic (`pix_server.db`). Short-lived state, such as sessions, room codes, and presence, is in the Redis session store below (AD-18). The app keeps small preferences in DataStore and saved guides in its private files (2.8).
+Accounts, friends, and invitations are in a relational database: PostgreSQL 18 in a container on each server, a SQLite file on a laptop and in the tests. One schema serves both, through SQLAlchemy and Alembic (`pix_server.db`). Short-lived state, such as sessions, room codes, and presence, is in the Redis session store below (AD-18). The app keeps small preferences in DataStore and saved guides in its private files (2.8).
 
 ```mermaid
 erDiagram
@@ -3014,7 +3015,7 @@ erDiagram
 - **Invitations.** A pending invitation past `expires_at` has expired, without a write. Rows are deleted a day after they were created, when a later invitation is sent. `session_id` names a session in the session store, not a row.
 - **Indexes.** Besides the keys and unique columns: `sessions.user_id`, `spent_refresh_tokens.session_id`, `devices.user_id`, `friend_requests.to_user_id`, `friendships.user_b`, and `invitations` on `from_user_id`, `to_user_id`, and `created_at`.
 - **Privacy.** No table stores a Google ID token, a scene photo, a guide, or anything from the live view or a session (NFR-13). Logs never contain tokens, or Pix IDs with request bodies (2.8, Privacy).
-- **Storage.** On the course servers PostgreSQL's files are in `/opt/pix/postgres`, a directory on the server's disk mounted into the container, not a Docker volume. They outlive a crash of PostgreSQL (its write-ahead log replays what was committed), a restart of any container, a deploy, a reboot, and `docker compose down -v`. Deleting that directory deletes every account, and nothing backs it up yet.
+- **Storage.** On every server, PostgreSQL's files are in `/opt/pix/postgres`, a directory on the server's disk mounted into the container, not a Docker volume. They outlive a crash of PostgreSQL (its write-ahead log replays what was committed), a restart of any container, a deploy, a reboot, and `docker compose down -v`. Deleting that directory deletes every account, and nothing backs it up yet.
 - **Failure.** An account request that cannot reach PostgreSQL, loses its connection, or finds no free pool connection answers `503 UNAVAILABLE`; signaling and pose generation keep working. An `OSError` counts only when the database driver raised it; any other is a bug and answers `500`. Log-in ends its transaction before the password check, and `PUT /me/google` before Google's check, so neither holds a connection or SQLite's write lock while it waits.
 - **Migrations.** Every worker runs Alembic's `upgrade head` before it takes requests (`pix_server.db.migrate`), under an advisory lock on PostgreSQL: of the two workers in each of two copies, one migrates and the others find the schema current. The revisions are `0001` (accounts and friends) and `0002` (invitations). New ones come from `uv run alembic revision --autogenerate` in `server/`, and a test checks that the migrations build exactly the models' schema.
 - **Compatible revisions.** The old copy serves during a deploy, so a revision must not break the release before it: add a column before the code needs it, and drop one a release after the code stops using it.
@@ -3128,9 +3129,9 @@ erDiagram
 
 **Configuration and secrets**
 
-- `BuildConfig.SERVER_URL` is Server A in release builds. Debug builds use the AWS server, `http://3.105.185.251/`, or any server set in `pix.serverUrl`, such as a laptop on the test Wi-Fi. A debug build's `pix.relayOnly=true` forces the relay (2.6.7).
+- `BuildConfig.SERVER_URL` is AWS main, `https://swpp26t10.15-134-147-114.sslip.io/`, in release builds, so the store's build works on every network. Debug builds use AWS dev, `https://swpp26t10.3-105-185-251.sslip.io/`, or any server set in `pix.serverUrl`, such as a laptop on the test Wi-Fi. A debug build's `pix.relayOnly=true` forces the relay (2.6.7).
 - `BuildConfig.GOOGLE_SERVER_CLIENT_ID`, one constant in `app/build.gradle.kts`, equals the servers' `PIX_GOOGLE_CLIENT_ID`. Google accepts sign-in only from an APK whose signing key is registered as an Android OAuth client in that project.
-- The course servers have no TLS (AD-11). Release builds allow plain HTTP and WebSocket traffic only to the two course hostnames (`network_security_config.xml`); debug builds allow any host.
+- Release builds allow no plain HTTP or WebSocket traffic (`network_security_config.xml`), so their server must use HTTPS. Debug builds allow it to any host, for a laptop or a course server, which have no TLS (AD-11).
 - `server/.env.example` lists every setting, and a test keeps it in step with the code. Each server must set the names left empty: `OPENROUTER_API_KEY` (never committed), `PIX_GOOGLE_CLIENT_ID`, and Cloudflare's TURN key, `PIX_TURN_KEY_ID` and `PIX_TURN_API_TOKEN` (AD-14). The rest are commented with the app's default, such as `PIX_POSE_MODEL`.
 - On a server, Compose sets `PIX_REDIS_URL`, `PIX_DATABASE_URL`, `PIX_JWT_SECRET`, and `PIX_FCM_CREDENTIALS_FILE`. `deploy.sh` makes the database password and the JWT secret once, in `/opt/pix/db-password` and `/opt/pix/jwt-secret`.
 - The FCM key belongs to a service account of the app's Firebase project that may only send FCM messages. Compose mounts it from `/opt/pix/secrets/`, readable only by the app's user; without it, no push goes out. Other secrets live only in each server's `/opt/pix/.env`.
@@ -3151,8 +3152,8 @@ erDiagram
 | `POST /pose-tips` | 20 per hour | 1000 per 24 h | `PIX_TIP_RATE_LIMIT`, `PIX_TIP_GLOBAL_LIMIT` |
 | `room.join` with a wrong code | 100 per 10 min | — | `PIX_JOIN_FAILURE_LIMIT`, `PIX_JOIN_FAILURE_WINDOW_SECONDS` (2.5.2) |
 
-- The global limits bound a day's model cost, however many addresses send. The OpenRouter key's spending limit, set in its dashboard, is the last bound. On the course servers, the address is the last `X-Forwarded-For` value (*Hosting*).
-- Over plain HTTP to the course servers, a scene photo, a sign-in password, and the tokens travel unencrypted (AD-11). The live view goes phone to phone, encrypted (NFR-14).
+- The global limits bound a day's model cost, however many addresses send. The OpenRouter key's spending limit, set in its dashboard, is the last bound. On the course servers, the address is the last `X-Forwarded-For` value, and on the AWS servers the address that connects (*Hosting*).
+- Requests to the AWS servers are encrypted with TLS. Over plain HTTP to a course server or a laptop, a scene photo, a sign-in password, and the tokens travel unencrypted (AD-11). The live view goes phone to phone, encrypted (NFR-14).
 - No URL holds a Pix ID or other personal data, because nginx's error log prints a failed request's whole request line. The lookup is `POST /users/lookup`. nginx and Uvicorn access logs leave out query strings.
 - Password hashes run two at a time per worker. A burst of sign-ins, which needs no account, then queues instead of taking a 64 MiB argon2id buffer per pool thread.
 - Cloud backups are off (`allowBackup="false"`); `data_extraction_rules.xml` keeps the sign-in, `guides/`, and the prompt history out of transfers to a new phone.
@@ -3189,16 +3190,16 @@ erDiagram
 
 **Hosting** (AD-11)
 
-| Server | Address | Branch | Use |
+| Branch | Course server: campus network, HTTP | AWS server: every network, HTTPS | Builds |
 |----|----|----|----|
-| A | `http://swpp26t10.147-46-242-169.sslip.io` | `main` | Production; release builds |
-| B | `http://swpp26t10.147-46-242-174.sslip.io` | `dev` | Staging |
-| AWS | `http://3.105.185.251` | `dev` | Debug builds; reachable from every network, cellular data included |
+| `main` | Server A, `http://swpp26t10.147-46-242-169.sslip.io` | AWS main, `https://swpp26t10.15-134-147-114.sslip.io` | Release builds use AWS main |
+| `dev` | Server B, `http://swpp26t10.147-46-242-174.sslip.io` | AWS dev, `https://swpp26t10.3-105-185-251.sslip.io` | Debug builds use AWS dev |
 
-- The course servers are reachable only through the course's HTTP proxy on port 80, and only from the campus network. They cannot reach each other, so each has its own database and session store.
-- The AWS server runs the same Compose setup. It stays on and answers from every network, so debug builds and sessions across networks use it.
+- Each branch's server runs in two versions with the same Compose setup, each with its own database and session store. The builds use the AWS versions, which stay on and answer from every network, cellular data included. A debug build reaches a course server through `pix.serverUrl`.
+- The course servers are reachable only through the course's HTTP proxy on port 80, and only from the campus network. They cannot reach each other.
+- The AWS servers serve HTTPS on port 443 with a Let's Encrypt certificate for a hostname that sslip.io resolves to their Elastic IP. certbot renews it through nginx on port 80 (`/.well-known/acme-challenge/`). `deploy.sh` adds `docker-compose.https.yml`, which publishes port 443, once the certificate exists, so the course servers serve port 80 only. On a server with the certificate, it refuses to deploy or roll back to a commit without that file, which would close port 443. nginx passes the scheme on (`X-Forwarded-Proto`), so invite links from the AWS servers start with `https://`.
 - `server/deploy/docker-compose.yml` runs:
-  - `nginx` on port 80, which forwards `/api/v1`, `/ws`, `/health`, and the invite link's page `/i/<id>`, serves `/version`, and answers `404` to the rest, so FastAPI's `/docs` is not public;
+  - `nginx` on port 80, and on 443 on the AWS servers, which forwards `/api/v1`, `/ws`, `/health`, and the invite link's page `/i/<id>`, serves `/version` and Let's Encrypt's check, and answers `404` to the rest, so FastAPI's `/docs` is not public;
   - `app-blue` and `app-green`, two copies of the app, each Uvicorn with two workers, set explicitly because the servers report 38 CPUs for our 8 cores;
   - `redis`, which writes nothing to disk;
   - `postgres`, with its files in `/opt/pix/postgres` on the server's disk, not a Docker volume, so no Docker cleanup can delete them.
@@ -3217,15 +3218,15 @@ erDiagram
 - A failed step leaves the running copy serving, and a commit with the same `server/` is not tried again. `deploy.sh rollback` switches back to the previous image.
 - Why wait for rooms: phones take their place again after a socket drop, on either copy (2.6.7, AD-18). An app from before reconnection cannot (Iter3-P14). In a room spanning both copies, the phone on the new copy would hear that its peer was lost, ending the subject's live session.
 - GitHub's runners build the image for every pull request. After a merge, a workflow waits until `/version` shows the commit, so a failed deploy shows on the commit.
-- GitHub reaches the AWS server, so it has no timer. After each push to `dev`, a workflow runs `deploy.sh deploy` there through AWS Systems Manager, as the `PixDeploy` command document, then checks `/version` at the public address.
-- The workflow's IAM user key may run only that document on that one instance. It is a secret of a GitHub environment that only `dev` may use, and no SSH port is open.
+- GitHub reaches the AWS servers, so they have no timer. After each push to `main` or `dev`, a workflow runs `deploy.sh deploy` on that branch's server through AWS Systems Manager, as the `PixDeploy` command document, then checks `/version` at the public HTTPS address.
+- The workflow's IAM user key may run only that document on those two instances, and each deploys only its own branch. It is a secret of a GitHub environment that only `main` and `dev` may use, and no SSH port is open.
 
 **Accounts** (AD-12)
 
 - The app sends the access token as a bearer header on REST calls and on the signaling upgrade. Everything but friends and invitations works without one (FR-5.1).
 - Sign-up takes a Pix ID, a display name, and a password, or Google. Either account can add the other sign-in (`PUT /me/google`, `PUT /me/password`; 2.5.3). Without email, a lost password cannot be reset.
 - Passwords are hashed with argon2id (`argon2-cffi`'s defaults: 3 passes over 64 MiB) on a worker thread, so a hash does not hold up the worker's sockets. Only the hash is stored.
-- Passwords cross plain HTTP to the course servers (AD-11, NFR-14). Log-in attempts are not limited.
+- Passwords cross HTTPS to the AWS servers, and plain HTTP to a course server (AD-11, NFR-14). Log-in attempts are not limited.
 - Whether a Pix ID exists is not secret: the lookup tells any signed-in user, and `POST /auth/check-pix-id` anyone, for an exact Pix ID only (NFR-15). Neither is limited. A failed log-in answers alike for an unknown Pix ID and a wrong password.
 - `google-auth` verifies Google ID tokens against Google's published keys and our web client ID. The server stores only the Google subject.
 - A sign-in gives a 15-minute access token (`PIX_ACCESS_TOKEN_MINUTES`), a JWT that `PyJWT` signs with HS256 and `PIX_JWT_SECRET`. It also gives a refresh token valid 30 days from its last use (`PIX_SESSION_TTL_DAYS`; 2.5.3, *Session tokens*). The app keeps both in DataStore, in its private files, without Keystore encryption (*Privacy*).
@@ -3419,7 +3420,7 @@ swpp-2026-project-team-10/
 │                  architecture figure, the wireframes one file per flow, and render.py, which renders them); the
 │                  wiki-sync workflow mirrors it on every push to dev
 └─ .github/        pull-request template; CI (Android lint and tests, server lint and tests, the server image), the
-                   deploy watcher, the AWS server's deploy, and the wiki-sync workflow
+                   deploy watcher, the AWS servers' deploy, and the wiki-sync workflow
 ```
 
 - **main**: stable; updated from **dev** with a merge commit at the end of each iteration. `iteration-N-demo` is created from main for each demo (`iteration-2-demo` for the midterm).

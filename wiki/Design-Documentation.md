@@ -114,6 +114,7 @@
 | 3.34 | 2026-11-20 | The Iteration 4 tasks as their issues stand: the owners of Iter4-P7 and Iter4-P11, the name and date of Iter4-P16, and when the prompt templates were dropped (2.9). |
 | 3.35 | 2026-11-21 | One server each for `main` and `dev`, in two versions: a course server, and an AWS server over HTTPS, which the builds use (1.1.1, 1.1.3, 1.2, AD-11, 2.5.2, 2.5.3, 2.6.6, 2.7, 2.8, 2.10). |
 | 3.36 | 2026-11-21 | Server logs and alerts: the AWS servers' logs in CloudWatch, with an alarm on 5xx answers (1.2, AD-20, 2.8). |
+| 4.0 | 2026-11-21 | Iteration 5 plan from the kickoff of 11/21: the task table with owners and due dates (2.9); the open decisions (*Still open*: the cutout, the options on *Generate poses*, pose generation started by the subject, the self-timer, the live view after a reconnection, a deleted account's Pix ID, remote focus next to the guide's gestures). Remote focus is planned, and the remote-control switch is dropped (2.5.1, 2.6.5, 2.9). |
 
 </details>
 
@@ -121,7 +122,17 @@ Audience: the development team. This page describes Pix's design as built throug
 
 **Still open**
 
-None at the close of Iteration 4. The QR connection ([#214]) and light mode ([#212]) were dropped on 11/20 as not needed. The tips' open question (Testing Documentation 3.2) and the work left out of Iteration 4 (2.9) wait for the kickoff of Iteration 5.
+| Decision | Current proposal | Owner | Decide by |
+|----|----|----|----|
+| The cutout as a guide (FR-2.2) | A guide can show the person's cutout from the reference photo, on both phones, drawn with the guide's opacity and never in a photo or the stream. Open: how the user switches between the outline and the cutout, for each guide or in the settings, and what is sent to the subject's phone, the reference copy it already gets or a larger one (AD-6, NFR-13; [#275]). | 한준형 | Iteration 5 |
+| Options on *Generate poses* (FR-4.15) | The screen offers options to choose, so a set starts with nothing typed. Open: what the options are and where they come from (a fixed list, the AI's suggestions, or both), and how they sit next to typing ([#274]). | 박동제 | Iteration 5 |
+| Pose generation started by the subject (FR-6.15) | The subject's *Add a pose guide* offers the situations, and the flow then runs on both phones as today. Open: how the scene photo is taken, since it comes from the photographer's camera: who takes it, and who reviews it ([#276]). | 한준형 | Iteration 5 |
+| The self-timer (FR-1.17) | A countdown over the preview before the photo. Open: the delays, and whether the subject's phone shows the countdown, which needs a message ([#272]). | 박재완 | Iteration 5 |
+| The live view after a reconnection (NFR-6) | Measure the resolution, bitrate, and frame rate before a drop and after the reconnection first. Open: fix it, show a notice while the quality is low, or record it as a limit ([#269]). | 박재완 | Iteration 5 |
+| A deleted account's Pix ID (FR-5.18) | `DELETE /me` removes the account with what belongs to it. Open: whether its Pix ID is free again ([#266]). | 박재완 | Iteration 5 |
+| Remote focus next to the guide's gestures (FR-7.7) | A tap on the video sets the photographer's focus. Open: the tap while guide-edit mode is on, and next to the pinch ([#273]). | 박동제 | Iteration 5 |
+
+The tips' open question (Testing Documentation 3.2) is not planned: the kickoff of 11/21 left it out.
 
 **Contents**
 
@@ -1593,8 +1604,8 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `camera.zoom.hold` | P→S | reliable | `by` | Whose pinch holds the zoom, or null when it is free (FR-7.6) |
 | `camera.exposure.set` | S→P | steps realtime, final reliable | `index`, `final` | The subject's brightness slider (FR-7.3) |
 | `camera.flash.set` | S→P | reliable | `mode` | The subject's flash choice (FR-7.3) |
-| `camera.focus.set` | S→P | reliable | `x`, `y` | The subject's focus point (FR-7.7; Could, Iteration 5) |
-| `control.permission` | P→S | reliable | `allowed` | Whether remote control is allowed (FR-7.5; Could, Iteration 5) |
+| `camera.focus.set` | S→P | reliable | `x`, `y` | The subject's focus point (FR-7.7; Could, Iteration 5, [#273]) |
+| `control.permission` | P→S | reliable | `allowed` | Whether remote control is allowed (FR-7.5, dropped at the kickoff of 11/21; never sent) |
 | `guide.image.begin` / `.chunk` / `.end` | both | reliable | chunks | The guide's mask; S→P for a guide made on the subject's phone |
 | `guide.reference.begin` / `.chunk` / `.end` | both | reliable | chunks | The guide's reference photo, for the other phone's thumbnail (FR-3.9); S→P for a guide made on the subject's phone |
 | `guide.state` | P→S | steps realtime, final reliable | `state`, `final`, `by` | The guide's place, opacity, and visibility |
@@ -2823,8 +2834,8 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - Outside a session, Camera's thumbnail is the newest photo in Pix's album, taken here or received, and a tap opens the whole album in the same viewer, at the newest (`PixAlbumPhotos`, FR-1.6, [#247]). A photo just taken is a page at once, before MediaStore tells of it. The viewer closes when a session starts or ends, so it never turns from one list to the other. The phone's gallery, given one photo through `ACTION_VIEW`, would show that photo alone, in Pix's task. The album is read from MediaStore at the app's start and at each MediaStore change, so a photo deleted in the gallery leaves it. Without a storage permission Pix sees only the photos it saved, so after a reinstall the album is empty until the next.
   - Ending the session drops unconfirmed photos without asking. 3 s later Camera says "Couldn't send 2 photos to Joonhyung". The subject deletes partial files, also at each session start.
   - IT-20 measures the live view while photos go (NFR-6). FR-6.13's notice is unchanged.
-- **Remote focus (Could, FR-7.7).** A tap on the video would send `camera.focus.set` to `setFocusPoint`, with no echo. Planned for Iteration 5 (Iter2-P17; left out of Iteration 4 at its kickoff); only the message exists.
-- **Permission (Could, FR-7.5).** `control.permission` with `allowed: false` would disable the subject's controls and drop its requests. Planned for Iteration 5 (Iter2-P17; left out of Iteration 4 at its kickoff); only the message exists, so remote control is always allowed.
+- **Remote focus (Could, FR-7.7).** A tap on the video would send `camera.focus.set` to `setFocusPoint`, with no echo. Planned for Iteration 5 (Iter5-P9, [#273]), with the brightness beside the focus box (FR-7.3); only the message exists.
+- **Permission (Could, FR-7.5).** `control.permission` with `allowed: false` would disable the subject's controls and drop its requests. Dropped at the kickoff of 11/21: short of time, and judged less important. Only the message exists, so remote control is always allowed.
 - **Ultrawide routing.** `CameraZoomPlan` prefers the primary camera's native sub-1× zoom. A separate rear ultrawide extends the range only when its range reaches the primary's. The controller converts each request to the bound camera's native `setZoomRatio`, and `ZoomState` back, so every ratio is primary-relative.
 - **Zoom without stutter (It 2, Must, NFR-19).**
   - `CameraXController.setZoom` applies only the newest request, once per `Choreographer` frame, and skips a native ratio already asked for. This is a precaution: the S23 Ultra showed no stutter either way.
@@ -3307,7 +3318,7 @@ Owners follow the README's *Team* section. The Iteration 3 table names who built
 
 | Module | Owner | Iteration 1 | Iteration 2 | Provides to |
 |----|----|----|----|----|
-| **App shell, design, and integration** | 한준형 (PM in Iteration 2); 박재완 (PM in Iteration 3); 조성민 (PM in Iteration 4) | Activity, navigation graph, permission flow, `AppContainer` | The design and the shared contracts (Iter2-P3, [#45]); integration (Iter2-P22, [#60]); integration tests (Iter2-P21, [#59]); demo README (Iter2-P23, [#61]); schedule and issues | All screens |
+| **App shell, design, and integration** | 한준형 (PM in Iteration 2); 박재완 (PM in Iteration 3); 조성민 (PM in Iterations 4 and 5) | Activity, navigation graph, permission flow, `AppContainer` | The design and the shared contracts (Iter2-P3, [#45]); integration (Iter2-P22, [#60]); integration tests (Iter2-P21, [#59]); demo README (Iter2-P23, [#61]); schedule and issues | All screens |
 | **Camera** | 박동제 | Preview, capture to MediaStore, zoom, the viewport, `setFrameSink` (한준형, #3) | Tap to focus, brightness, flash, aspect ratios; `CameraController` and `CameraCapabilities` additions (Iter2-P10, [#51]) | Session, remote control |
 | **Reference guide** | 박동제 | Picker, segmentation, cutout, outline, *No person found* | Smooth outlines (Iter2-P7, [#49]); the `anchor` and the thumbnail copy of the reference (Iter2-P11, [#52]). Lines for arms and legs in front of the body are out of scope (2.6.1). | Guide overlay |
 | **Guide overlay and controls** | 박동제 | `GuideRepository`, `GuideGeometry`, overlay gestures, opacity (한준형, #6) | Hide and replace, reference thumbnail, starting position, guide-edit mode on Camera (Iter2-P11, [#52]); saved guides (Iter2-P18, [#58]) | Guide sync, Subject view |
@@ -3321,7 +3332,7 @@ Owners follow the README's *Team* section. The Iteration 3 table names who built
 | **Settings and tutorial** (`SettingsViewModel`, `AppSettings`, `TutorialFragment`) | 조성민 (settings), 한준형 (tutorial) | — | — | All screens |
 | **Telemetry** (`telemetry/`) | 박재완 | — | — | All modules |
 
-The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 passed on the S21 and the S22 in Iteration 3, by eye. Remote focus and the remote-control switch (Iter2-P17, Could) move to Iteration 5, left out of Iteration 4 at its kickoff of 11/7.
+The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 passed on the S21 and the S22 in Iteration 3, by eye. Remote focus and the remote-control switch (Iter2-P17, Could) move to Iteration 5, left out of Iteration 4 at its kickoff of 11/7. Remote focus is planned for Iteration 5 (Iter5-P9, [#273]); the switch was dropped at its kickoff of 11/21.
 
 **Iteration 3 tasks** (from the kickoff of 2026-10-25; the tasks due 10/30 were for the user test of 10/31–11/1):
 
@@ -3402,6 +3413,34 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 | The Iteration 4 documents, demo README, and `iteration-4-demo` (Iter4-P20, [#217]) | All | 11/20 | Done | — |
 
 Left out of Iteration 4 at its kickoff, for the UAT and its fixes: the remote-control switch and remote focus (FR-7.5, FR-7.7), and search, situations, and memos in the library (FR-3.11), both for Iteration 5. Dropped on 11/14 after a trial: the prompt templates ([#211]). Dropped on 11/20 as not needed: the QR connection ([#214]) and light mode ([#212]). Also left for Iteration 5: the changes for UAT cycle 2 and the live view's sharpness after a reconnection ([#238]; Testing Documentation 4.4), and the open problems of the user test and the heuristic evaluation (Testing Documentation 4.1, 4.2). Marking the face, the limbs, or the background on the guide (Testing Documentation 4.1) is on hold: ML Kit's pose detection or segmentation may err too much, and a background overlay did not work well; the tips take its place ([#213]).
+
+**Iteration 5 tasks** (from the kickoff of 2026-11-21; Iteration 5 runs 11/22–12/4, with UAT cycle 2 in class on 11/23 and the alpha test on 11/30):
+
+| Task | Owner | Due | Status | Design |
+|----|----|----|----|----|
+| The documents and the issues (Iter5-P1, [#265]) | 조성민 | 11/23 | Open | — |
+| Privacy in the app: what Sign up collects, and deleting an account (Iter5-P2, [#266]) | 박재완 | 11/22 | Open | 2.5.3, 2.7, *Still open* |
+| UAT cycle 2 (Iter5-P3, [#267]) | 조성민 | 11/23 | Open | Testing Documentation 4.3, 4.4 |
+| A guide from an earlier session stays on the subject's phone (Iter5-P4, [#268]) | 박동제 | 11/25 | Open | 2.5.1, 2.6.5 |
+| The live view's sharpness after a reconnection (Iter5-P5, [#269]) | 박재완 | 11/25 | Open | 2.6.7, *Still open* |
+| The library's situations and memos (Iter5-P6, [#270]) | 한준형 | 11/26 | Open | 2.6.2, AD-16 |
+| UI fixes: switches for the grid and the horizon bar, "up to 30 s", and UAT cycle 2's opinions (Iter5-P7, [#271]) | 박재완 | 11/27 | Open | 2.6.2, 2.6.8 |
+| A self-timer for the shutter (Iter5-P8, [#272]) | 박재완 | 11/27 | Open | 2.6.2, *Still open* |
+| Remote focus, with the brightness beside the focus box (Iter5-P9, [#273]) | 박동제 | 11/27 | Open | 2.5.1, 2.6.5, *Still open* |
+| Options to choose on *Generate poses* (Iter5-P10, [#274]) | 박동제 | 11/27 | Open | 2.6.3, *Still open* |
+| The cutout as a guide (Iter5-P11, [#275]) | 한준형 | 11/27 | Open | AD-6, 2.5.1, 2.6.1, 2.6.8, *Still open* |
+| Pose generation started by the subject (Iter5-P12, [#276]) | 한준형 | 11/27 | Open | 2.5.1, 2.6.3, 2.6.5, *Still open* |
+| ONE store: requested by 11/22, registered by 11/29 (Iter5-P13, [#277]) | 조성민 | 11/29 | Open | 2.8 |
+| The beta testing plan (Iter5-P14, [#278]) | 조성민 | 11/29 | Open | Testing Documentation 5 |
+| The alpha test in class (Iter5-P15, [#279]) | 조성민 | 11/30 | Open | Testing Documentation 5 |
+| AI module test: the outline on 100 photos (Iter5-P16, [#280]) | 박재완 | 12/1 | Open | 2.6.1; Testing Documentation 3 |
+| AI module test: the person check's precision and recall (Iter5-P17, [#281]) | 한준형 | 12/1 | Open | 2.6.3; Testing Documentation 3 |
+| Design patterns (Iter5-P18, [#282]) | 조성민 | 12/2 | Open | 3 |
+| Integration tests for the Iteration 5 flows (Iter5-P19, [#283]) | 조성민 | 12/3 | Open | Testing Documentation |
+| Integrate the Iteration 5 features (Iter5-P20, [#284]) | 조성민 | 12/3 | Open | — |
+| The Iteration 5 documents, demo README, and `iteration-5-demo` (Iter5-P21, [#285]) | All | 12/4 | Open | — |
+
+Done before the kickoff, as part of [#277]: release builds on the AWS servers over HTTPS ([#261]) and the privacy policy ([#264]). Dropped at the kickoff of 11/21, short of time and judged less important: the remote-control switch (FR-7.5), the library's search (FR-3.11), a zoom slider, more work on latency, and the UAT's suggestions of group photos, video, and switching roles. Light mode stays dropped. The coverage measures and the mutation run are not planned either (Testing Documentation 2.1.2, 2.1.7).
 
 **Iteration 2 build order** (the schedule of 2026-10-11; the issues' due dates). All was delivered by 10/23, except as noted:
 
@@ -3535,3 +3574,26 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#217]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/217
 [#247]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/247
 [#254]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/254
+[#261]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/261
+[#264]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/264
+[#265]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/265
+[#266]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/266
+[#267]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/267
+[#268]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/268
+[#269]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/269
+[#270]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/270
+[#271]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/271
+[#272]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/272
+[#273]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/273
+[#274]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/274
+[#275]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/275
+[#276]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/276
+[#277]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/277
+[#278]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/278
+[#279]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/279
+[#280]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/280
+[#281]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/281
+[#282]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/282
+[#283]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/283
+[#284]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/284
+[#285]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/285

@@ -242,7 +242,8 @@ async def send_friend_request(
     # this insert; the pair's unique constraint is the database's own guard.
     await db.commit()
     push = {"type": "friend.request", "requestId": sent.id, "fromName": caller.user.display_name}
-    background.add_task(push_to_user, request.app, other_id, push, REQUEST_PUSH_TTL_SECONDS)
+    still_sent = select(FriendRequest.id).where(FriendRequest.id == sent.id)
+    background.add_task(push_to_user, request.app, other_id, push, REQUEST_PUSH_TTL_SECONDS, about=still_sent)
     return OutgoingRequest(id=sent.id, to=UserOut.of(other), createdAt=millis(sent.created_at))
 
 

@@ -324,8 +324,8 @@
     <string name="sign_up_consent_label_period">보유 기간</string>
     <string name="sign_up_consent_label_recipients">받는 곳</string>
     <string name="sign_up_consent_label_when">시기·방법</string>
-    <string name="sign_up_consent_items_password">Pix ID, 이름, 비밀번호(해시로만 저장), 로그인 세션 정보(갱신 토큰의 해시), 접속 기록(IP 주소, 접속 시각, 요청 경로). 이후 친구, 친구 요청, 초대 기록, 이 휴대폰의 푸시 알림 토큰</string>
-    <string name="sign_up_consent_items_google">Google 계정 식별자와 이름, 직접 정하는 Pix ID, 로그인 세션 정보(갱신 토큰의 해시), 접속 기록(IP 주소, 접속 시각, 요청 경로). 이후 친구, 친구 요청, 초대 기록, 이 휴대폰의 푸시 알림 토큰</string>
+    <string name="sign_up_consent_items_password">Pix ID, 이름, 비밀번호(해시로만 저장), 로그인 세션 정보(갱신 토큰의 해시), 접속 기록(IP 주소, 접속 시각, 요청 방식과 경로, 응답 상태와 크기, 이전 페이지 주소, 앱이나 브라우저의 이름과 버전). 이후 친구, 친구 요청, 초대 기록, 이 휴대폰의 푸시 알림 토큰</string>
+    <string name="sign_up_consent_items_google">Google 계정 식별자와 이름, 직접 정하는 Pix ID, 로그인 세션 정보(갱신 토큰의 해시), 접속 기록(IP 주소, 접속 시각, 요청 방식과 경로, 응답 상태와 크기, 이전 페이지 주소, 앱이나 브라우저의 이름과 버전). 이후 친구, 친구 요청, 초대 기록, 이 휴대폰의 푸시 알림 토큰</string>
     <string name="sign_up_consent_purpose">로그인과 로그인 유지, 친구 찾기와 초대, 장애 대응과 요청 횟수 제한</string>
     <string name="sign_up_consent_period">설정 › Pix 계정에서 계정을 삭제할 때까지. 초대 기록은 만든 지 하루 뒤, 로그인 세션 정보는 마지막 사용 후 30일 뒤, 접속 기록은 로그 보관소에서 30일 뒤 삭제</string>
     <string name="sign_up_consent_refusal">동의하지 않을 수 있어요. 이 경우 계정은 만들 수 없지만, 카메라, 포즈 가이드, AI 포즈, 참여 코드는 계정 없이 쓸 수 있어요.</string>

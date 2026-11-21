@@ -169,7 +169,9 @@ async def invite(
         "fromName": me.display_name,
         "expiresAt": str(millis(expires_at)),
     }
-    background.add_task(push_to_user, request.app, friend.id, push, math.ceil(settings.invitation_ttl_seconds))
+    still_pending = select(Invitation.id).where(Invitation.id == invitation.id, Invitation.status == "PENDING")
+    ttl = math.ceil(settings.invitation_ttl_seconds)
+    background.add_task(push_to_user, request.app, friend.id, push, ttl, about=still_pending)
     return SentInvitation(
         id=invitation.id,
         to=UserOut.of(friend),

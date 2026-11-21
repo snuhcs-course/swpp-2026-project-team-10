@@ -3286,7 +3286,7 @@ erDiagram
 - The account is read even without a Pix ID, so one chosen on another phone brings the lists at once. Received invitations are read every 5 s (2.6.6).
 - FCM carries data messages only; the app renders each notification (`push/PushNotifications`). An invitation's uses the high-importance *Invitations* channel for the invitation's lifetime. A friend request's uses *Friend requests* and opens *Share my camera* (`pix://friends`).
 - An invitation opened after it left `PENDING` shows "This invitation is no longer available".
-- The server pushes from a background task after its response, so FCM never slows or fails a request. It keeps FCM's access token, from the service account's key, until a minute before it expires.
+- The server pushes from a background task after its response, so FCM never slows or fails a request. The task first reads the row the push tells of, the friend request or the pending invitation, and sends nothing when it is gone, so no push names an account deleted after its request. It keeps FCM's access token, from the service account's key, until a minute before it expires.
 - The server deletes a device row whose token FCM reports unregistered (404). A log line holds FCM's status, never a token.
 
 **Aspect ratio and camera controls**

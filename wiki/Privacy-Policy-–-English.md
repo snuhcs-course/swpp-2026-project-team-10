@@ -17,11 +17,11 @@ The Last Penguin team ("the team") runs the Pix app and handles its users' perso
 | Friendships, friend requests, invitations | Using friends and invitations | The friend list, invitations to share the camera |
 | Push notification token (a device identifier) | Signing in | Alerts for invitations and friend requests |
 | Sign-in sessions (hashes of refresh tokens) | Signing in | Keeping you signed in, detecting stolen sign-ins |
-| Access records (IP address, time, requested path) | Each connection to the server | Fixing outages, limiting how often requests are made |
+| Access records (IP address, time, request method and path, response status and size, the referring page, and the app or browser's name and version) | Each connection to the server | Fixing outages, limiting how often requests are made |
 | Scene photo, pose description | When you ask for AI poses, only after you agree | Suggesting and generating AI poses |
 | Error reports and app usage data (including the phone model, the Android version, and a random ID made for each install) | While you use the app, with "Share usage data" on | Fixing errors, improving quality |
 
-Before an account is made, the sign-up screen tells you what is collected, why, how long it is kept, and who receives it, and asks for your agreement. Without it, no account is made, but the camera, pose guides, AI poses, and room codes all work without an account. Then no account information is collected.
+Before an account is made, the sign-up screen tells you what is collected, why, how long it is kept, and who receives it, and asks for your agreement. Without it, no account is made, but the camera, pose guides, AI poses, and room codes all work without an account. Then no account information is collected. "Continue with Google" sends the Google sign-in to the Pix server to check whether a Pix account uses that Google account; if none does, nothing is kept, and an account is made only after you agree on "Sign up with Google".
 
 ## 2. What the server does not keep
 

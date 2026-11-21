@@ -16,7 +16,8 @@ Partitions:
   photographer; a cancel frees the photographer's socket
 - the push: to each of the friend's phones, with the data the app needs, at high priority, for the invitation's 60 s;
   not to the photographer; not to a phone whose sign-in expired; a device FCM no longer knows is removed; FCM failing
-  leaves the invitation working
+  leaves the invitation working; not when the photographer's account is deleted before the push runs, nor a friend
+  request's
 - the link: an invitation id gives the page that opens Pix and names nobody; anything else is not found
 """
 
@@ -28,8 +29,10 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
+from pix_server.accounts import friends as friends_router
 from pix_server.accounts.auth import TokenClaims
 from pix_server.accounts.router import delete_me
+from pix_server.invitations import router as invitations_router
 
 INVITATION_ID = re.compile(r"inv_[0-9A-HJKMNP-TV-Z]{26}")
 
@@ -511,6 +514,40 @@ def test_the_invitation_is_pushed_to_each_of_the_friends_phones(client, friends,
         assert push["authorization"] == "Bearer test-fcm-access"
         assert push["url"] == "https://fcm.googleapis.com/v1/projects/pix-test/messages:send"
     assert len(fcm_api.token_requests) == 1
+
+
+def deleted_before_the_push(client, monkeypatch, module, user):
+    """The sender's account deleted after the request committed and before its queued push runs."""
+    push = module.push_to_user
+
+    async def after_the_deletion(app, *args, **kwargs):
+        async with app.state.database() as db:
+            await delete_me(TokenClaims(user_id=user["id"], session_id="ses_other_phone"), db)
+        await push(app, *args, **kwargs)
+
+    monkeypatch.setattr(module, "push_to_user", after_the_deletion)
+
+
+def test_no_invitation_is_pushed_once_its_photographer_deleted_the_account(client, friends, fcm_api, monkeypatch):
+    (_, dongje_user), (joonhyung, _) = friends
+    register_device(client, joonhyung, "joonhyung-phone")
+    deleted_before_the_push(client, monkeypatch, invitations_router, dongje_user)
+
+    assert invite(client, friends[0][0], friends[1][1]).status_code == 201
+
+    assert fcm_api.pushes == []
+
+
+def test_no_friend_request_is_pushed_once_its_sender_deleted_the_account(client, sign_up, fcm_api, monkeypatch):
+    sender, sender_user = sign_up("test1", "Test Account 1")
+    receiver, receiver_user = sign_up("test2", "Test Account 2")
+    register_device(client, receiver, "test2-phone")
+    deleted_before_the_push(client, monkeypatch, friends_router, sender_user)
+
+    sent = client.post("/api/v1/friend-requests", headers=sender, json={"userId": receiver_user["id"]})
+    assert sent.status_code == 201, sent.text
+
+    assert fcm_api.pushes == []
 
 
 def test_a_phone_whose_sign_in_expired_gets_no_push(client, clock, friends, fcm_api):

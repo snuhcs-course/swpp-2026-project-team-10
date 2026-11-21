@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
 """Push notifications through Firebase Cloud Messaging's HTTP v1 API (Design Documentation 2.6.6, AD-13).
 
 The server signs in as a service account of the app's Firebase project: it signs a JWT with the account's key and
@@ -17,7 +17,7 @@ from dataclasses import dataclass
 import httpx2
 from fastapi import FastAPI
 from google.auth import crypt, jwt
-from sqlalchemy import delete, select
+from sqlalchemy import Select, delete, select
 from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 
@@ -145,15 +145,21 @@ class PushSender:
         return False
 
 
-async def push_to_user(app: FastAPI, user_id: str, data: dict[str, str], ttl_seconds: int) -> None:
+async def push_to_user(app: FastAPI, user_id: str, data: dict[str, str], ttl_seconds: int, *, about: Select) -> None:
     """Sends a push to every phone the user is signed in on, and removes the devices FCM no longer knows. A device of
-    an expired session gets nothing; its row stays until the user's next sign-in removes the session. Runs after the
-    response (a background task), so a slow FCM never holds up the request that caused it."""
+    an expired session gets nothing; the hourly retention pass removes its row. Runs after the response (a background
+    task), so a slow FCM never holds up the request that caused it.
+
+    [about] selects the row the push tells of, a friend request or an invitation, read with the devices: a push whose
+    row is gone by then is not sent, so one from an account deleted (`DELETE /me`) after its request committed never
+    arrives. A deletion that commits between this read and FCM's answer can still let one through."""
     sender: PushSender = app.state.push
     if not sender.enabled:
         return
     try:
         async with app.state.database() as db:
+            if await db.scalar(about) is None:
+                return
             signed_in = (
                 select(Device.fcm_token)
                 .join(AuthSession, AuthSession.id == Device.session_id)

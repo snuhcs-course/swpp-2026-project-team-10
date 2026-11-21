@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
 """Sign-up, sign-in, the caller's account, and device tokens through the REST API (Design 2.5.3, R&S F5).
 
 Partitions:

@@ -6,7 +6,7 @@ import logging
 import secrets
 import time
 from collections.abc import AsyncIterator, Callable
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 import httpx2
 from argon2 import PasswordHasher
@@ -46,6 +46,7 @@ from pix_server.poses.router import router as poses_router
 from pix_server.poses.suggester import PoseSuggester
 from pix_server.poses.tips import PoseTipper
 from pix_server.privacy.router import router as privacy_router
+from pix_server.retention import keep_pruning, prune_now
 from pix_server.signaling.registry import SessionRegistry
 from pix_server.signaling.router import router as signaling_router
 from pix_server.store import SessionStore, open_redis
@@ -153,9 +154,15 @@ def create_app(
                 registry = SessionRegistry(config, store, TurnRelay(config, turn_http).ice_servers)
                 app.state.signaling = registry
                 await registry.start()
+                # What is past its retention period goes before this worker serves, then every hour.
+                await prune_now(app)
+                pruner = asyncio.create_task(keep_pruning(app))
                 try:
                     yield
                 finally:
+                    pruner.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await pruner
                     await registry.stop()
         finally:
             await connection.aclose()

@@ -115,7 +115,7 @@
 | 3.35 | 2026-11-21 | One server each for `main` and `dev`, in two versions: a course server, and an AWS server over HTTPS, which the builds use (1.1.1, 1.1.3, 1.2, AD-11, 2.5.2, 2.5.3, 2.6.6, 2.7, 2.8, 2.10). |
 | 3.36 | 2026-11-21 | Server logs and alerts: the AWS servers' logs in CloudWatch, with an alarm on 5xx answers (1.2, AD-20, 2.8). |
 | 4.0 | 2026-11-21 | Iteration 5 plan from the kickoff of 11/21: the task table with owners and due dates (2.9); the open decisions (*Still open*: the cutout, the options on *Generate poses*, pose generation started by the subject, the self-timer, the live view after a reconnection, a deleted account's Pix ID, remote focus next to the guide's gestures). Remote focus is planned, and the remote-control switch is dropped (2.5.1, 2.6.5, 2.9). |
-| 4.1 | 2026-11-21 | What an account keeps and the agreement before it is made, deleting an account, the privacy policy in Pix and at `/privacy`, and the screens above the keyboard (Iter5-P2, [#266]) (*Still open*, 2.1, 2.5.3, 2.6.8, 2.7, 2.8). |
+| 4.1 | 2026-11-21 | What an account keeps and the agreement before it is made, deleting an account, the privacy policy in Pix and at `/privacy`, the screens above the keyboard, and the retention pass (Iter5-P2, [#266]) (*Still open*, 2.1, 2.5.3, 2.6.8, 2.7, 2.8). |
 
 </details>
 
@@ -580,7 +580,7 @@ interface AuthRepository {                              // FR-5.1–5.3, FR-5.11
     suspend fun refreshAccount(): Result<Unit>          // GET /me again: another phone may have changed the account
     suspend fun freshAccessToken(): String?             // for a signaling socket, which sends it only when it opens
     suspend fun signOut()                               // on the server if it answers, on the phone always
-    suspend fun deleteAccount(): Result<Unit>           // DELETE /me, then signs out; OFFLINE keeps the account
+    suspend fun deleteAccount(): Result<Unit>           // DELETE /me, then signs out; OFFLINE keeps the sign-in until a retry
 }
 
 interface FriendsRepository {                           // FR-5.4–5.10, FR-5.16; failures are AccountException
@@ -2424,6 +2424,8 @@ Outside `/api/v1`:
 - **Sign-out.** `DELETE /auth/session` deletes the session and its device row at once. The access token works until it expires, at most 15 minutes later; the app deletes both tokens. A signaling socket stays online after its token expires, since the token is checked only at the upgrade.
 - **Several phones.** Each phone has its own session, so a refresh or sign-out on one never affects another. A change reaches other phones only through the server: *Share my camera* and *Sent requests* read `GET /me` every 10 s while shown (`AuthRepository.refreshAccount`, 2.8 *Push*). `AuthTokens.reload` drops a read that a change on this phone overtook, and does not write an unchanged account.
 - **Deleting the account (FR-5.18).** `DELETE /me` locks the user row, then deletes its invitations, friend requests (sent and received), friendships, devices, spent refresh tokens, sessions, and the user, in one transaction. Its Pix ID and Google account are free for a new account at once. The account's other phones sign out at their next request: their access tokens name a missing user (`401 UNAUTHENTICATED`), and the refresh that follows finds no session (`401 INVALID_REFRESH_TOKEN`). The app deletes this phone's tokens itself.
+- **Deleting again.** `DELETE /me` checks only the access token, so a token whose account is already gone also gets `204`. A phone whose first answer was lost tries again and signs out. User ids are never reused (`new_id`), so such a token cannot name another account.
+- **Racing a deletion.** A friend request or an answer to one takes both user rows with `lock_pair`. A deletion that commits meanwhile leaves the lock fewer rows: a missing other user answers `404`, and a missing caller `401`, never a row that names a missing user.
 - **In the app (Iter2-P13).** `BearerTokens` adds the token and answers `401 UNAUTHENTICATED` with one refresh and one retry. `AuthTokens` also refreshes a minute before expiry. It runs one refresh at a time and gives waiting callers its new token, since a spent token ends the session. A refused refresh signs the phone out; an unanswered one keeps the tokens. `PixAuthApi` has its own client, so a refresh never waits behind account or pose calls.
 
 </details>
@@ -3033,10 +3035,16 @@ erDiagram
 - **Deleted users.** Deleting an account deletes every row that names it, in the order of the foreign keys (2.5.3, *Deleting the account*), so no table keeps the ID of a deleted user.
 - **Friends.** `friendships` has one row per pair, `user_a < user_b` (the server orders them), with the pair as its primary key. `friend_requests` has at most one request per pair, in either direction: (`user_a`, `user_b`) is unique. A request is deleted when it is accepted (the friendship is created), declined, or withdrawn, or when either user removes the other.
 - **Opposite requests.** A request in the opposite direction is accepted instead of duplicated, also when both come at once: sending locks both users, so the second finds the first's request and accepts it. The unique pair is the database's own guard.
-- **Sign-in sessions.** Each sign-in on a phone is a `sessions` row with only the hash of its current refresh token (2.5.3, *Session tokens*); access tokens are not stored. A sign-in removes the user's expired sessions; a refresh moves `expires_at` forward. Exchanged refresh tokens go to `spent_refresh_tokens`, so one that comes back ends the session. One spent longer ago than a session lasts is ignored, as it would have expired, and dropped at the next refresh.
+- **Sign-in sessions.** Each sign-in on a phone is a `sessions` row with only the hash of its current refresh token (2.5.3, *Session tokens*); access tokens are not stored. A refresh moves `expires_at` forward. Exchanged refresh tokens go to `spent_refresh_tokens`, so one that comes back ends the session. One spent longer ago than a session lasts is ignored, as it would have expired.
 - **Devices.** A device row belongs to the session that registered it, and `session_id` is unique. `POST /devices` is one upsert on `session_id`, so a rotated FCM token replaces the old one in place, even when two registrations arrive at once. When two sessions register one token at once, the second meets the first's row, rolls back, and moves the token on its retry. Ending the session deletes the row (`ON DELETE CASCADE`).
-- **Push targets.** A session that expired without a sign-out keeps its device row until the user signs in again. The push sender skips such a row: it sends only to devices whose session has not expired. It deletes a row whose token FCM no longer knows (Iter3-P15, [#119]).
-- **Invitations.** A pending invitation past `expires_at` has expired, without a write. Rows are deleted a day after they were created, when a later invitation is sent. `session_id` names a session in the session store, not a row.
+- **Push targets.** A session that expired without a sign-out keeps its device row until the next retention pass (*Retention*). The push sender skips such a row: it sends only to devices whose session has not expired. It deletes a row whose token FCM no longer knows (Iter3-P15, [#119]).
+- **Invitations.** A pending invitation past `expires_at` has expired, without a write. Rows are deleted a day after they were created. `session_id` names a session in the session store, not a row.
+- **Retention.** The privacy policy's periods hold also for an account nobody uses. Each worker deletes, when it starts and then every hour (`retention.py`):
+  - invitations made more than a day ago;
+  - expired sessions, with their devices and spent refresh tokens;
+  - spent refresh tokens older than one session lifetime.
+
+  A pass gives the same result run twice or by two workers at once, so the workers share no lock. A sign-in, a refresh, and a new invitation also delete some of these rows on the way.
 - **Indexes.** Besides the keys and unique columns: `sessions.user_id`, `spent_refresh_tokens.session_id`, `devices.user_id`, `friend_requests.to_user_id`, `friendships.user_b`, and `invitations` on `from_user_id`, `to_user_id`, and `created_at`.
 - **Privacy.** No table stores a Google ID token, a scene photo, a guide, or anything from the live view or a session (NFR-13). Logs never contain tokens, or Pix IDs with request bodies (2.8, Privacy).
 - **Storage.** On every server, PostgreSQL's files are in `/opt/pix/postgres`, a directory on the server's disk mounted into the container, not a Docker volume. They outlive a crash of PostgreSQL (its write-ahead log replays what was committed), a restart of any container, a deploy, a reboot, and `docker compose down -v`. Deleting that directory deletes every account, and nothing backs it up yet.

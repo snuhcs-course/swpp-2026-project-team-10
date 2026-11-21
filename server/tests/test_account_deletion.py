@@ -2,17 +2,22 @@
 """Deleting an account through `DELETE /me` (Design 2.5.3, 2.7; R&S FR-5.18, NFR-13).
 
 Partitions:
-- the account: a password account; a Google account without a Pix ID; without a sign-in; deleted twice
+- the account: a password account; a Google account without a Pix ID; without a sign-in; deleted again with the same
+  token, as a phone whose first answer was lost does (success)
 - what goes with it: this phone's sign-in and another phone's, spent refresh tokens, devices, friendships, friend
   requests sent and received, invitations sent and received
 - afterwards: its access and refresh tokens on every phone; its Pix ID and its Google account, free for a new account;
   a friend's list, requests, and invitations; the friendships of other accounts, untouched
+- a friend request that read the account just before it was deleted and takes the pair lock after: the other user
+  gone (not found), the caller gone (signed out), never a row naming a missing user
 """
 
 import pytest
 from sqlalchemy import or_, select
 
+from pix_server.accounts.friends import lock_pair
 from pix_server.db.models import AuthSession, Device, FriendRequest, Friendship, Invitation, SpentRefreshToken, User
+from pix_server.errors import ApiError
 
 PASSWORD = "sunset2026"
 
@@ -190,7 +195,28 @@ def test_delete_needs_a_sign_in(client, headers):
     assert_error(delete_account(client, headers), 401, "UNAUTHENTICATED")
 
 
-def test_deleting_twice_finds_no_account_the_second_time(client, sign_up):
+def test_deleting_again_with_the_same_token_succeeds(client, sign_up):
+    """A phone whose first answer was lost tries again with the same access token, and learns the account is gone."""
     headers, _ = sign_up("test1", "Test Account 1")
     assert delete_account(client, headers).status_code == 204
-    assert_error(delete_account(client, headers), 401, "UNAUTHENTICATED")
+    assert delete_account(client, headers).status_code == 204
+    assert_error(client.get("/api/v1/me", headers=headers), 401, "UNAUTHENTICATED")
+
+
+def test_the_pair_lock_finds_an_account_deleted_meanwhile(client, sign_up):
+    """`send_friend_request` reads the other user, then waits for the pair lock; on PostgreSQL a deletion that commits
+    meanwhile leaves the lock with one row. The lock tells, so the request answers instead of inserting a row that
+    names a missing user."""
+    headers, me = sign_up("test1", "Test Account 1")
+    other_headers, other = sign_up("test2", "Test Account 2")
+    assert delete_account(client, other_headers).status_code == 204
+
+    async def lock(first, second):
+        async with client.app.state.database() as db:
+            try:
+                return await lock_pair(db, first, second)
+            except ApiError as error:
+                return error.status, error.code
+
+    assert client.portal.call(lock, me["id"], other["id"]) is False
+    assert client.portal.call(lock, other["id"], me["id"]) == (401, "UNAUTHENTICATED")

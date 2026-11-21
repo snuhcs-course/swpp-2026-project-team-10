@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
 """Exact-match lookup, friend requests, and the friend list with presence (Design Documentation 2.5.3, R&S
 FR-5.5–5.10). Only users with a Pix ID take part: nobody can be found or added before choosing one."""
 
@@ -107,12 +107,22 @@ async def take_request(db: AsyncSession, *conditions) -> FriendRequest | None:
     return FriendRequest(id=row.id, from_user_id=row.from_user_id, to_user_id=row.to_user_id) if row else None
 
 
-async def lock_pair(db: AsyncSession, first: str, second: str) -> None:
+async def lock_pair(db: AsyncSession, me: str, other: str) -> bool:
     """Holds both user rows until the transaction ends, so that sending and accepting between the same two users run
     one after the other on PostgreSQL. Without it, a request sent while its reverse is being accepted could miss the
     reverse request and be saved next to the new friendship. On SQLite every transaction holds the write lock from
-    its start instead (`db.engine.open_database`)."""
-    await db.execute(select(User.id).where(User.id.in_(ordered(first, second))).order_by(User.id).with_for_update())
+    its start instead (`db.engine.open_database`).
+
+    Returns whether [other] still exists, and answers 401 when the caller's own account is gone: a deletion
+    (`DELETE /me`) that commits while this waits leaves only the rows that survive it, and a row inserted for a
+    missing user would fail its foreign key."""
+    locked = await db.execute(
+        select(User.id).where(User.id.in_(ordered(me, other))).order_by(User.id).with_for_update()
+    )
+    found = set(locked.scalars())
+    if me not in found:
+        raise ApiError(401, "UNAUTHENTICATED", "Sign in to use this")
+    return other in found
 
 
 async def befriend(request: Request, db: AsyncSession, me: str, other: User) -> NewFriend:
@@ -207,7 +217,8 @@ async def send_friend_request(
     other = await db.get(User, body.userId)
     if other is None or other.pix_id is None:
         raise ApiError(404, "NOT_FOUND", "No user with this id")
-    await lock_pair(db, me, other.id)
+    if not await lock_pair(db, me, other.id):
+        raise ApiError(404, "NOT_FOUND", "No user with this id")
     if await are_friends(db, me, other.id):
         raise ApiError(409, "ALREADY_FRIENDS", "You are already friends")
     if await pending(db, me, other.id) is not None:
@@ -245,7 +256,8 @@ async def accept_friend_request(request_id: str, request: Request, caller: Membe
     found = await db.get(FriendRequest, request_id)
     if found is None or found.to_user_id != me:
         raise no_such_request()
-    await lock_pair(db, me, found.from_user_id)
+    if not await lock_pair(db, me, found.from_user_id):
+        raise no_such_request()
     taken = await take_request(db, FriendRequest.id == request_id, FriendRequest.to_user_id == me)
     if taken is None:
         raise no_such_request()

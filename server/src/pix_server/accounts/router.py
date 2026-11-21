@@ -14,7 +14,16 @@ from sqlalchemy import delete, or_, select, update
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.exc import IntegrityError
 
-from pix_server.accounts.auth import Caller, Database, SignedIn, Tokens, hash_token, new_refresh_token, now_of
+from pix_server.accounts.auth import (
+    Caller,
+    Claims,
+    Database,
+    SignedIn,
+    Tokens,
+    hash_token,
+    new_refresh_token,
+    now_of,
+)
 from pix_server.accounts.google import GoogleAccount, GoogleUnavailable, GoogleVerifier, InvalidGoogleToken
 from pix_server.accounts.passwords import Passwords
 from pix_server.accounts.rules import DISPLAY_NAME_MAX, normalize_pix_id, password_problem, pix_id_problem
@@ -308,7 +317,7 @@ async def update_me(body: AccountUpdate, request: Request, caller: SignedIn, db:
 
 
 @router.delete("/me", status_code=204)
-async def delete_me(caller: SignedIn, db: Database) -> None:
+async def delete_me(claims: Claims, db: Database) -> None:
     """Deletes the caller's account with everything the server keeps about it (FR-5.18): its sign-ins on every phone,
     their spent refresh tokens and devices, its friendships, the friend requests it sent or received, and its
     invitations. Its Pix ID and its Google account are free for a new account at once. The account's other phones
@@ -316,10 +325,14 @@ async def delete_me(caller: SignedIn, db: Database) -> None:
     are gone. A session the phones already hold goes on, since the video goes phone to phone.
 
     The caller's row is locked first, so a friend request or an answer to one that runs at the same moment waits and
-    then finds the account gone (`friends.lock_pair`). The rows go in the order of their foreign keys."""
-    user = await locked_user(db, caller)
+    then finds the account gone (`friends.lock_pair`). The rows go in the order of their foreign keys.
+
+    An access token whose account is already gone answers the same 204: a phone whose first answer was lost tries
+    again with the same token, and learns that the account it asked to delete is deleted. User ids are never used
+    again (`new_id`), so the token cannot name another account."""
+    user = await db.scalar(select(User).where(User.id == claims.user_id).with_for_update())
     if user is None:
-        raise ApiError(401, "UNAUTHENTICATED", "Sign in to use this")
+        return
     sessions = select(AuthSession.id).where(AuthSession.user_id == user.id)
     await db.execute(
         delete(Invitation).where(or_(Invitation.from_user_id == user.id, Invitation.to_user_id == user.id))

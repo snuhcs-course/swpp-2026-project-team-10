@@ -179,15 +179,18 @@ cloudwatch_on() {
     [ -n "$CLOUDWATCH_GROUP" ] && [ -f "$REPO/server/deploy/docker-compose.cloudwatch.yml" ]
 }
 
-# Tries the log group with a container that only starts: it fails when the server's role cannot write there or
-# CloudWatch does not answer. Then the logs stay on this server for this run. The containers themselves would still
-# start, since their driver does not block, but every line they write would be lost.
+# Tries the log group with a container that writes one line: it fails when the server's role cannot make a log stream
+# there or CloudWatch does not answer. Then the logs stay on this server for this run. The containers themselves would
+# still start, since their driver does not block, but every line they write would be lost. Docker does not report a
+# failed upload of the line to docker run, only in its own journal, so this proves the stream, not the upload; the
+# README's policy grants both together, and its last step checks that a line arrives.
 check_cloudwatch() {
     local image output
     cloudwatch_on || return 0
     image=$(sed -n 's/^ *image: *\(nginx:[^ ]*\) *$/\1/p' "$REPO/server/deploy/docker-compose.yml")
     if ! output=$(docker run --rm --log-driver awslogs --log-opt awslogs-region="$CLOUDWATCH_REGION" \
-        --log-opt awslogs-group="$CLOUDWATCH_GROUP" --log-opt awslogs-stream=deploy-check "$image" true 2>&1); then
+        --log-opt awslogs-group="$CLOUDWATCH_GROUP" --log-opt awslogs-stream=deploy-check \
+        "$image" echo "deploy.sh checked this log group" 2>&1); then
         log "WARNING: cannot write to the CloudWatch log group $CLOUDWATCH_GROUP, so the logs stay on this server:"
         log "  $(printf '%s\n' "$output" | head -n 1)"
         CLOUDWATCH_GROUP=""

@@ -4,8 +4,8 @@
 Partitions:
 - language: none (Korean, the one that applies); `ko`; `en`; another one (404)
 - what a page holds: the policy's title as its heading, its tables, the language switch with its own language marked;
-  the contents linking to every numbered section; each table cell labeled with its column, and a table of more than
-  three columns marked to show as blocks on a phone; the logo inline; nothing
+  the contents linking to every numbered section; every table in a box of its own, which scrolls sideways on a
+  phone; the logo inline; nothing
   loaded from elsewhere and no script; no sign-in
 - a policy laid out another way (a section without its number, a line before the sections that is not "Term: value"):
   refused when the pages are made
@@ -52,16 +52,15 @@ def test_privacy_in_english(client):
 
 
 @pytest.mark.parametrize("path", ["/privacy", "/privacy/en"])
-def test_a_page_has_contents_labeled_tables_and_the_logo_and_loads_nothing_else(client, path):
+def test_a_page_has_contents_scrolling_tables_and_the_logo_and_loads_nothing_else(client, path):
     text = page(client, path)
     sections = re.findall(r'<section aria-labelledby="s(\d+)-title" id="s\1">', text)
     assert sections == [str(n) for n in range(1, 10)]
     for number in sections:
         assert f'<a href="#s{number}">{number}. ' in text
         assert f'<h2 id="s{number}-title">{number}. ' in text
-    assert text.count('<div class="table">') == 2 and text.count('<div class="table wide">') == 1
-    cells = re.findall(r"<td( [^>]*)?>", text)
-    assert cells and all('data-label="' in (attributes or "") for attributes in cells)
+    assert text.count('<div class="table">\n<table>') == text.count("<table>") == 3
+    assert ".table { margin: 16px 0 20px; overflow-x: auto;" in text
     assert (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -14 533 270" class="logo" role="img" aria-label="Pix">'
         in text

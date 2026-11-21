@@ -6,9 +6,9 @@ pages copy (`tests/test_privacy.py`).
 
 A page lays the text out as a plain document: the Pix logo (`pix-logo.svg`, a copy of `branding/pix-horizontal.svg`)
 and the language switch, the title with the effective date and the contact, the opening paragraph, the contents, and
-one part per numbered section, set in the text's own colors with thin rules. On a narrow screen a table stays a table,
-except one wider than three columns, whose rows become blocks of labeled cells two to a line. The page needs no JavaScript,
-which the app's WebView keeps off, and loads nothing from elsewhere.
+one part per numbered section, set in the text's own colors with thin rules. A table keeps its columns' widths and, on
+a narrow screen, scrolls sideways in its own box. The page needs no JavaScript, which the app's WebView keeps off, and
+loads nothing from elsewhere.
 
 Both pages are rendered once, when the module is imported, so a file that cannot be read, or a policy laid out in
 another way, fails the tests and the image's build instead of a request. They name nobody and read nothing from the
@@ -46,7 +46,7 @@ PAGE = Template("""<!doctype html>
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--ground); color: var(--text); font-size: 16px; line-height: 1.7;
+body { margin: 0; background: var(--ground); color: var(--text); font-size: 15px; line-height: 1.7;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   overflow-wrap: anywhere; }
 html[lang="ko"] body { word-break: keep-all; }
@@ -55,53 +55,44 @@ a { color: inherit; text-underline-offset: 3px; }
 .top-in, main, .foot-in { max-width: 720px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
 .top-in { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; }
 .logo { display: block; height: 28px; width: auto; color: var(--text); }
-.lang { font-size: 14px; white-space: nowrap; }
+.lang { font-size: 13px; white-space: nowrap; }
 .lang a { color: var(--muted); text-decoration: none; }
 .lang a:hover { text-decoration: underline; }
 .lang span { font-weight: 600; }
 .lang > * + *::before { content: "|"; margin: 0 10px; color: var(--line); font-weight: 400; }
 main { padding-top: 48px; padding-bottom: 64px; }
-h1 { margin: 0 0 10px; font-size: 28px; line-height: 1.3; letter-spacing: -0.01em; }
-.meta { display: flex; flex-wrap: wrap; gap: 2px 20px; margin: 0 0 28px; color: var(--muted); font-size: 14px; }
+h1 { margin: 0 0 10px; font-size: 25px; line-height: 1.3; letter-spacing: -0.01em; }
+.meta { display: flex; flex-wrap: wrap; gap: 2px 20px; margin: 0 0 28px; color: var(--muted); font-size: 13px; }
 .meta div { display: flex; gap: 6px; }
 .meta dd { margin: 0; }
 .lead { margin: 0 0 32px; }
 .toc { padding: 20px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-.toc h2 { margin: 0 0 6px; font-size: 15px; }
-.toc ol { margin: 0; padding: 0; list-style: none; color: var(--muted); font-size: 15px; line-height: 2; }
+.toc h2 { margin: 0 0 6px; font-size: 14px; }
+.toc ol { margin: 0; padding: 0; list-style: none; color: var(--muted); font-size: 14px; line-height: 2; }
 .toc a { text-decoration: none; }
 .toc a:hover { color: var(--text); text-decoration: underline; }
 section { padding-top: 40px; }
-section h2 { margin: 0 0 12px; font-size: 19px; line-height: 1.45; }
+section h2 { margin: 0 0 12px; font-size: 17px; line-height: 1.45; }
 section p, section ul { margin: 0 0 14px; }
 section ul { padding-left: 20px; }
 section li { margin: 6px 0; }
 code { padding: 1px 5px; border-radius: 4px; background: var(--code);
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.88em; }
-.table { margin: 16px 0 20px; }
-table { width: 100%; border-collapse: collapse; font-size: 14.5px; line-height: 1.6; }
-th { padding: 0 16px 10px 0; border-bottom: 1px solid var(--text); font-size: 13.5px; font-weight: 600;
+.table { margin: 16px 0 20px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; line-height: 1.6; }
+th { min-width: 9em; padding: 0 16px 10px 0; border-bottom: 1px solid var(--text); font-size: 12.5px; font-weight: 600;
   text-align: left; vertical-align: bottom; }
-td { padding: 12px 16px 12px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+td { min-width: 9em; padding: 12px 16px 12px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th:first-child, td:first-child { min-width: 12em; }
 th:last-child, td:last-child { padding-right: 0; }
 footer { border-top: 1px solid var(--line); color: var(--faint); font-size: 13px; }
 .foot-in { padding-top: 20px; padding-bottom: 32px; }
 @media (max-width: 640px) {
   .top-in, main, .foot-in { padding-left: 20px; padding-right: 20px; }
   main { padding-top: 32px; }
-  h1 { font-size: 24px; }
-  section h2 { font-size: 18px; }
-  table { font-size: 13.5px; line-height: 1.55; }
-  th { padding: 0 10px 8px 0; font-size: 12.5px; }
-  td { padding: 10px 10px 10px 0; }
-  .wide thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-  .wide table, .wide tbody { display: block; }
-  .wide table { border-top: 1px solid var(--text); }
-  .wide tr { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; padding: 12px 0;
-    border-bottom: 1px solid var(--line); }
-  .wide td { display: block; padding: 0; border: 0; }
-  .wide td:first-child { grid-column: 1 / -1; font-weight: 600; }
-  .wide td + td::before { content: attr(data-label); display: block; color: var(--faint); font-size: 12.5px; }
+  body { font-size: 14px; }
+  h1 { font-size: 22px; }
+  section h2 { font-size: 16px; }
 }
 @media print {
   .lang, .toc { display: none; }
@@ -139,17 +130,12 @@ LANGUAGES = {
 
 SECTION_HEADING = re.compile(r"(\d+)\.\s+(.+)")
 
-# The most columns a table keeps as a table on a phone. A wider one (the outside services) shows each row as its first
-# cell over a two-column grid of the others, each under its column's name.
-MAX_PHONE_COLUMNS = 3
-
 
 class PolicyLayout(Treeprocessor):
     """Puts the policy's Markdown in the page's parts: what comes before the first section becomes the title block
     (the title, the list as the effective date and the contact, then the paragraph), each `## n. Name` starts a
-    section, the contents link to them, and every table cell carries its column's name, which a narrow screen shows as
-    the cell's label in a wide table. The roles keep the tables tables for a screen reader when CSS lays them out as
-    blocks."""
+    section, the contents link to them, and each table goes in a box of its own, which scrolls sideways when the table
+    is wider than the screen."""
 
     def __init__(self, md: markdown.Markdown, title: str, contents: str) -> None:
         super().__init__(md)
@@ -176,9 +162,7 @@ class PolicyLayout(Treeprocessor):
                 else:
                     leads.append(lead(block))
             elif block.tag == "table":
-                labeled(block)
-                wide = len(list(block.iter("th"))) > MAX_PHONE_COLUMNS
-                ET.SubElement(section, "div", {"class": "table wide" if wide else "table"}).append(block)
+                ET.SubElement(section, "div", {"class": "table"}).append(block)
             else:
                 section.append(block)
         if section is None:
@@ -215,20 +199,6 @@ def meta(items: ET.Element) -> ET.Element:
         ET.SubElement(row, "dt").text = term
         ET.SubElement(row, "dd").text = value
     return terms
-
-
-def labeled(table: ET.Element) -> None:
-    columns = ["".join(cell.itertext()).strip() for cell in table.iter("th")]
-    for part, role in (("thead", "rowgroup"), ("tbody", "rowgroup")):
-        for group in table.findall(part):
-            group.set("role", role)
-    for row in table.iter("tr"):
-        row.set("role", "row")
-        for cell in row.findall("th"):
-            cell.set("role", "columnheader")
-        for column, cell in zip(columns, row.findall("td"), strict=False):
-            cell.set("role", "cell")
-            cell.set("data-label", column)
 
 
 class PolicyLayoutExtension(Extension):

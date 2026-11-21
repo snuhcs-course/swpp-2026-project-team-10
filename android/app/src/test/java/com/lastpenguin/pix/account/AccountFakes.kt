@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.account
 
 import android.content.Context
@@ -137,6 +137,8 @@ class FakeAccountApi : PixAccountApi {
     }
 
     override suspend fun signOut() = call("signOut")
+
+    override suspend fun deleteMe() = call("deleteMe")
 
     override suspend fun me(): AccountDto = me.also { call("me") }
 
@@ -338,6 +340,13 @@ class FakeAuthRepository(state: AuthState = AuthState.SignedOut) : AuthRepositor
     override suspend fun signOut() {
         calls += "signOut"
         _state.value = AuthState.SignedOut
+    }
+
+    override suspend fun deleteAccount(): Result<Unit> {
+        calls += "deleteAccount"
+        (failures["deleteAccount"] ?: failure)?.let { return Result.failure(it) }
+        _state.value = AuthState.SignedOut
+        return Result.success(Unit)
     }
 }
 

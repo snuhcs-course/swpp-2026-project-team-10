@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.content.DialogInterface
@@ -30,9 +30,10 @@ import com.lastpenguin.pix.ui.PixViewModels
 import kotlinx.coroutines.launch
 
 /**
- * Account, opened from the account button on Share my camera (R&S 6.8; FR-5.12, FR-5.14; decided in Iter2-P13, until
- * the settings screen of Iterations 3–4): the name, which can be edited, the Pix ID, *Add Google* or *Add a password*
- * for the way the account cannot sign in yet, and *Sign out*. Owner: Accounts (#54).
+ * Account, opened from the account button on Share my camera and from Settings (R&S 6.4; FR-5.12, FR-5.14, FR-5.17,
+ * FR-5.19): the name, which can be edited, the Pix ID, *Add Google* or *Add a password* for the way the account cannot
+ * sign in yet, *Sign out*, and *Delete account*, which asks first and then deletes the account on the server and signs
+ * this phone out. Owner: Accounts (#54).
  */
 class AccountSheet : BottomSheetDialogFragment() {
 
@@ -48,6 +49,7 @@ class AccountSheet : BottomSheetDialogFragment() {
         binding.addGoogleOption.setOnClickListener { viewModel.addGoogle(requireActivity()) }
         binding.addPasswordOption.setOnClickListener { addPassword() }
         binding.signOutButton.setOnClickListener { viewModel.signOut() }
+        binding.deleteAccountButton.setOnClickListener { confirmDeletion() }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -65,6 +67,7 @@ class AccountSheet : BottomSheetDialogFragment() {
                         binding.errorText.isVisible = state.error != null
                         binding.errorText.text = state.error?.let(requireContext()::accountMessage)
                         binding.signOutButton.isEnabled = !state.busy
+                        binding.deleteAccountButton.isEnabled = !state.busy
                         binding.addGoogleOption.isEnabled = !state.busy
                         binding.addPasswordOption.isEnabled = !state.busy
                     }
@@ -76,6 +79,7 @@ class AccountSheet : BottomSheetDialogFragment() {
                             AccountEvent.GoogleAdded -> R.string.google_added
                             AccountEvent.PasswordAdded -> R.string.password_added
                             AccountEvent.SignedOut -> R.string.signed_out
+                            AccountEvent.AccountDeleted -> R.string.account_deleted
                             else -> null
                         }
                         message?.let { Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show() }
@@ -99,6 +103,16 @@ class AccountSheet : BottomSheetDialogFragment() {
         binding.addGoogleOption.isVisible = !account.hasGoogle
         // The Pix ID is the login name, so a password needs one first (FR-5.14).
         binding.addPasswordOption.isVisible = !account.hasPassword && account.pixId != null
+    }
+
+    /** "Delete your Pix account?", which says what goes and what stays (FR-5.19). */
+    private fun confirmDeletion() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.delete_account_title)
+            .setMessage(R.string.delete_account_message)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.delete_account) { _, _ -> viewModel.deleteAccount() }
+            .show()
     }
 
     private fun editName() {

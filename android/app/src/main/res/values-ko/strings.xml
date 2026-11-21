@@ -310,6 +310,21 @@
     <string name="checking_pix_id">확인 중…</string>
     <string name="pix_id_available">사용할 수 있는 ID예요</string>
     <string name="sign_up">회원가입</string>
+    <!-- What an account keeps, on Sign up and Sign up with Google, before the account is made (FR-5.18). -->
+    <string name="sign_up_notice_title">Pix 계정에 저장하는 정보</string>
+    <string name="sign_up_notice_what_label">항목</string>
+    <string name="sign_up_notice_what_password">Pix ID, 이름, 비밀번호(해시로만 저장). 이후 친구, 친구 요청, 초대 기록, 이 휴대폰의 푸시 알림 토큰.</string>
+    <string name="sign_up_notice_what_google">Google 계정 식별자와 이름, 직접 정하는 Pix ID. 이후 친구, 친구 요청, 초대 기록, 이 휴대폰의 푸시 알림 토큰.</string>
+    <string name="sign_up_notice_why_label">목적</string>
+    <string name="sign_up_notice_why">로그인하고, 친구가 나를 찾아 초대할 수 있게 하려고요.</string>
+    <string name="sign_up_notice_how_long_label">보유 기간</string>
+    <string name="sign_up_notice_how_long">설정 › Pix 계정에서 계정을 삭제할 때까지예요. 초대 기록은 하루 뒤에 지워져요.</string>
+    <string name="sign_up_notice_who_label">받는 곳</string>
+    <string name="sign_up_notice_who">호주의 AWS에서 운영하는 Pix 서버, 그리고 알림을 전하는 Google이에요.</string>
+    <string name="sign_up_notice_policy">개인정보 처리방침 보기</string>
+    <string name="sign_up_agree">만 14세 이상이며, Pix가 이 정보를 수집하고 이용하는 데 동의해요.</string>
+    <string name="google_sign_up_title">Google로 회원가입</string>
+    <string name="google_sign_up_body">이 Google 계정으로 새 Pix 계정을 만들어요. Pix ID는 다음 화면에서 정해요.</string>
     <string name="pix_id_setup_title">Pix ID 정하기</string>
     <string name="pix_id_setup_body">친구가 이 ID로 나를 검색해요. 대문자와 띄어쓰기는 사용할 수 없어요.</string>
     <string name="save">저장</string>
@@ -339,6 +354,10 @@
     <string name="google_added">Google 계정을 연결했어요. 이제 Google로도 로그인할 수 있어요.</string>
     <string name="password_added">비밀번호를 추가했어요. 이제 Pix ID로 로그인할 수 있어요.</string>
     <string name="signed_out">로그아웃했어요</string>
+    <string name="delete_account">계정 삭제</string>
+    <string name="delete_account_title">Pix 계정을 삭제할까요?</string>
+    <string name="delete_account_message">Pix ID, 이름, 친구, 친구 요청, 초대 기록이 Pix 서버에서 삭제되고, 이 계정으로 로그인한 모든 휴대폰이 로그아웃돼요. 이 휴대폰의 가이드와 사진은 남아요.</string>
+    <string name="account_deleted">계정을 삭제했어요</string>
 
     <!-- Flow 6: Who takes the photo, Room code, See their camera (R&S 6.7) -->
     <string name="who_takes_the_photo">누가 찍나요?</string>
@@ -450,6 +469,9 @@
     <string name="settings_withdraw">철회</string>
     <string name="settings_usage">사용 정보 보내기</string>
     <string name="settings_usage_body">문제를 고칠 수 있게 오류 보고와 앱 동작 정보를 보내요. 사진, 이름, 입력한 글은 보내지 않아요.</string>
+    <string name="settings_privacy_policy">개인정보 처리방침</string>
+    <string name="privacy_policy_title">개인정보 처리방침</string>
+    <string name="privacy_policy_failed">개인정보 처리방침을 불러오지 못했어요. 연결을 확인하세요.</string>
     <string name="settings_section_account">계정</string>
     <string name="settings_account">Pix 계정</string>
     <string name="settings_signed_out">로그인 안 함</string>

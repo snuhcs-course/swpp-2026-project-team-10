@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.content.ActivityNotFoundException
@@ -85,6 +85,9 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         binding.notificationsRow.root.setOnClickListener { openNotificationSettings() }
         binding.consentRow.settingTitle.setText(R.string.settings_ai_consent)
         binding.consentRow.root.setOnClickListener { confirmWithdrawal() }
+        binding.privacyPolicyRow.settingTitle.setText(R.string.settings_privacy_policy)
+        binding.privacyPolicyRow.settingValue.isVisible = false
+        binding.privacyPolicyRow.root.setOnClickListener { openPrivacyPolicy(R.id.settingsFragment) }
         binding.accountRow.settingTitle.setText(R.string.settings_account)
         binding.accountRow.root.setOnClickListener { openAccount() }
         binding.helpRow.settingTitle.setText(R.string.settings_how_to)

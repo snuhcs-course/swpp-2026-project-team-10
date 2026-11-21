@@ -122,6 +122,12 @@ For a `502 UPSTREAM_ERROR`, the server log gives OpenRouter's status code, for e
 
 The account and friend endpoints are in [`src/pix_server/accounts/`](src/pix_server/accounts/). [Design 2.5.3][d253] gives the endpoints, the bodies, the error codes, and the session tokens. [Design 2.8][d28] (*Accounts*) gives the password hashing and the token settings. Most of these endpoints need `Authorization: Bearer <access token>`.
 
+`DELETE /me` deletes the caller's account with its sign-ins, devices, friendships, friend requests, and invitations, and frees its Pix ID ([Design 2.5.3][d253]). The app's *Account* sheet calls it after asking.
+
+## Privacy policy
+
+The privacy policy is [`src/pix_server/privacy/policy.ko.md`](src/pix_server/privacy/policy.ko.md) and [`policy.en.md`](src/pix_server/privacy/policy.en.md). The server renders both when it starts and serves them at `/privacy`, in Korean, the version that applies, and at `/privacy/en`. The store links to `https://swpp26t10.15-134-147-114.sslip.io/privacy`, and the app shows the same page in *Settings › Privacy* and on its sign-up screens. The wiki's *Privacy Policy* pages copy the two files: change all four together, and `tests/test_privacy.py` fails until the copies match.
+
 ## Invitations and push
 
 The invitation endpoints are in [`src/pix_server/invitations/`](src/pix_server/invitations/). [Design 2.6.6][d266] gives the flow, and [Design 2.5.3][d253] gives the bodies and the errors. The invite link, `http://<host>/i/<id>`, opens a small page whose button passes the invitation to Pix.
@@ -183,7 +189,7 @@ To use a course server, set `pix.serverUrl` in a debug build.
 
 [`deploy/docker-compose.yml`](deploy/docker-compose.yml) runs these services:
 
-- **nginx** on port 80, and on the AWS servers also on port 443 for HTTPS ([HTTPS](#https)). It forwards `/api/v1/`, `/ws`, `/health`, and `/i/` (the invite link's page) to the serving copy. It answers `/version` with the commit that is live, Let's Encrypt's check from `/opt/pix/acme`, and `404` for everything else. So FastAPI's `/docs` and the server's `/internal` routes are not public.
+- **nginx** on port 80, and on the AWS servers also on port 443 for HTTPS ([HTTPS](#https)). It forwards `/api/v1/`, `/ws`, `/health`, `/i/` (the invite link's page), and `/privacy` (the privacy policy) to the serving copy. It answers `/version` with the commit that is live, Let's Encrypt's check from `/opt/pix/acme`, and `404` for everything else. So FastAPI's `/docs` and the server's `/internal` routes are not public.
 - **`app-blue` and `app-green`**, two copies of the server, built from the [`Dockerfile`](Dockerfile). One copy serves, and the other does not run. Each copy runs two workers.
 - **Redis**, which both copies use. Its port is not published, and it writes nothing to disk.
 - **PostgreSQL**, which both copies use. Its port is not published either. Its files are in `/opt/pix/postgres` on the server's own disk, and nothing makes a backup of them yet.
@@ -220,7 +226,7 @@ A failure at any step leaves the serving copy as it was, and the timer does not 
 
 - Keep `deploy.sh` runnable by bash 3.2, so you can try it on macOS with `PIX_HOME` set to a scratch directory. Keep everything in it inside functions, because a deploy checks out another version of the file while it runs.
 - Operators source [`deploy/pix.sh`](deploy/pix.sh) and do not run it ([Operate it](#operate-it)). When a `deploy.sh` command or a container name changes, change it in `pix.sh` too.
-- nginx forwards only `/api/v1/`, `/ws`, `/health`, and `/i/` (the invite link's page). Add a new public route to [`deploy/nginx/nginx.conf`](deploy/nginx/nginx.conf), but never add `/internal/*` to it. `deploy.sh` reads `/internal/stats` inside the container, to wait for open rooms before it switches copies. Its one server block serves both ports, so a route needs nothing more for HTTPS.
+- nginx forwards only `/api/v1/`, `/ws`, `/health`, `/i/` (the invite link's page), and `/privacy` (the privacy policy). Add a new public route to [`deploy/nginx/nginx.conf`](deploy/nginx/nginx.conf), but never add `/internal/*` to it. `deploy.sh` reads `/internal/stats` inside the container, to wait for open rooms before it switches copies. Its one server block serves both ports, so a route needs nothing more for HTTPS.
 - HTTPS is [`docker-compose.https.yml`](deploy/docker-compose.https.yml) and [`deploy/nginx/https/`](deploy/nginx/https/). `deploy.sh` adds the Compose file only on a server with a certificate, so a course server never publishes port 443. Anything else that runs Compose on an AWS server passes both files, or nginx loses port 443.
 - nginx's `pix` log format and the server's `HideQuery` filter omit query strings from the access logs. But nginx's error log prints the whole request line of a failed request. So nothing personal, such as a Pix ID, goes in a path or a query, and the lookup is `POST /users/lookup`.
 - `deploy.sh` makes two secrets once and passes them to Compose. One is PostgreSQL's password (`/opt/pix/db-password`, `PIX_DB_PASSWORD`). PostgreSQL keeps the password that it got when it first created its files, so never generate that file again. The other is the access-token key (`/opt/pix/jwt-secret`, `PIX_JWT_SECRET`).

@@ -168,4 +168,14 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
         android:text="@string/sign_out" />
+
+    <!-- After asking, deletes the account on the server and signs every phone out (FR-5.19). -->
+    <Button
+        android:id="@+id/deleteAccountButton"
+        style="@style/Widget.Pix.Button.Text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/delete_account"
+        android:textColor="@color/pix_danger_text" />
 </LinearLayout>

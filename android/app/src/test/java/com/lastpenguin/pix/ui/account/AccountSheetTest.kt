@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.account
 
 import android.content.DialogInterface
@@ -28,11 +28,13 @@ import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowToast
 
 /*
- * Account on the real bottom sheet (R&S 6.8; FR-5.12, FR-5.14), with the account fakes behind the ViewModel.
- * Partitions: an account with a password only (Add Google offered), with Google only and no Pix ID (neither; a
- * password needs a Pix ID first), with Google and a Pix ID (Add a password), with both (neither); Edit name with a
+ * Account on the real bottom sheet (R&S 6.4; FR-5.12, FR-5.14, FR-5.19), with the account fakes behind the
+ * ViewModel. Partitions: an account with a password only (Add Google offered), with Google only and no Pix ID (neither;
+ * a password needs a Pix ID first), with Google and a Pix ID (Add a password), with both (neither); Edit name with a
  * name that breaks the rule (Save waits) and one that holds (saved, a message); Add a password equal to the Pix ID
- * (refused) and a valid one; Add Google; a refused change (the message on the sheet); Sign out, which closes it.
+ * (refused) and a valid one; Add Google; a refused change (the message on the sheet); Sign out, which closes it; Delete
+ * account, which asks first (Cancel keeps everything; *Delete account* deletes, says so, and closes the sheet) and
+ * whose failure keeps the account with the reason on the sheet.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -192,5 +194,55 @@ class AccountSheetTest {
         assertTrue(modules.auth.calls.contains("signOut"))
         assertEquals(string(R.string.signed_out), ShadowToast.getTextOfLatestToast())
         assertFalse(sheet.isAdded)
+    }
+
+    @Test
+    fun deleteAccount_asksFirst_andCancelKeepsEverything() {
+        val modules = launch()
+
+        onSheet { it.deleteAccountButton.performClick() }
+        idle()
+        val dialog = latestDialog()
+        assertEquals(
+            string(R.string.delete_account_message),
+            dialog.findViewById<TextView>(android.R.id.message)!!.text,
+        )
+        dialog.getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
+        idle()
+
+        assertFalse(modules.auth.calls.contains("deleteAccount"))
+        assertTrue(sheet.isAdded)
+    }
+
+    @Test
+    fun deleteAccount_confirmed_deletesSaysSoAndClosesTheSheet() {
+        val modules = launch()
+
+        onSheet { it.deleteAccountButton.performClick() }
+        idle()
+        latestDialog().getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idle()
+
+        assertEquals(listOf("deleteAccount"), modules.auth.calls)
+        assertEquals(string(R.string.account_deleted), ShadowToast.getTextOfLatestToast())
+        assertFalse(sheet.isAdded)
+    }
+
+    @Test
+    fun deleteAccount_failed_keepsTheAccountAndShowsWhy() {
+        val modules = TestAppContainer()
+        modules.auth.failures["deleteAccount"] = AccountException(AccountError.OFFLINE)
+        launch(modules = modules)
+
+        onSheet { it.deleteAccountButton.performClick() }
+        idle()
+        latestDialog().getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idle()
+
+        assertTrue(sheet.isAdded)
+        onSheet { binding ->
+            assertEquals(string(R.string.offline_error), binding.errorText.text.toString())
+            assertTrue(binding.deleteAccountButton.isEnabled)
+        }
     }
 }

@@ -9,10 +9,27 @@
 <x-dc>
 <helmet>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&family=Manrope:wght@400;500;600;700;800&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&family=Manrope:wght@400;500;600;700;800&family=DM+Mono:wght@500&family=Roboto:wght@400;600;700&family=Roboto+Mono:wght@400&family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 body{margin:0;background:#1B1D22}
 a{color:#8FA7D6;text-decoration:none}a:hover{color:#AFC1E4}
+.pp-web{font-family:'Roboto','Noto Sans KR',sans-serif;font-size:16px;line-height:1.6;color:#F4F4F2;background:#0B0B0D}
+.pp-web *{word-break:normal;overflow-wrap:inherit}
+.pp-main{padding:16px 16px 48px;overflow-wrap:anywhere}
+.pp-web nav{text-align:right;font-size:15px}
+.pp-web a{color:#F2C14E;text-decoration:underline}
+.pp-lang::after{content:"한국어"}
+html[lang="ko"] .pp-lang::after{content:"English"}
+.pp-when-signing-in::after{content:"Signing in"}
+html[lang="ko"] .pp-when-signing-in::after{content:"로그인할 때"}
+.pp-web h1{font-size:26px;line-height:1.3;margin:16px 0 12px;font-weight:700}
+.pp-web h2{font-size:19px;margin:32px 0 8px;font-weight:700}
+.pp-web p,.pp-web ul{margin:16px 0}
+.pp-web ul{padding-left:40px}
+.pp-web table{display:block;overflow-x:auto;border-collapse:collapse;font-size:14px;margin:12px 0}
+.pp-web th,.pp-web td{border:1px solid #2C2F35;padding:8px 10px;text-align:left;vertical-align:top;min-width:96px}
+.pp-web th{color:#A3A7AD;font-weight:600}
+.pp-web code{font-family:'Roboto Mono',monospace;font-size:0.95em}
 </style>
 </helmet>
 <div style="position: relative; width: 1160px; height: 981px; background: #1B1D22; color: #DDE0E6; font-family: 'IBM Plex Sans', 'Helvetica Neue', system-ui, sans-serif">
@@ -99,18 +116,19 @@ a{color:#8FA7D6;text-decoration:none}a:hover{color:#AFC1E4}
 <div style="position: absolute; left: 640px; top: 96px; width: 168px; height: 364px; box-sizing: border-box; border: 1.5px solid #3A404B; border-radius: 20px; background: #0B0B0D; overflow: hidden">
 <div style="position: absolute; left: 12px; top: 4px; font-size: 8px; font-weight: 600; letter-spacing: 0.08em; color: #9AA1AD; line-height: 10px">SETTINGS, SCROLLED</div>
 <div style="position: absolute; left: 0; top: 0; width: 165px; height: 341.1px; overflow: hidden">
-<div style="position: absolute; box-sizing: border-box; left: 9.2px; top: 18.0px; width: 146.7px; height: 33.3px; background: #1F2024; border-radius: 8.2px"></div>
-<div style="position: absolute; left: 9.2px; top: 62.3px; width: 23.4px; height: 7.3px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 5.96px; font-weight: 700; line-height: 7.33px; color: #B8BBC0; letter-spacing: 0.06em; text-transform: uppercase"><span style="text-align: left; white-space: nowrap">Privacy</span></div>
-<div style="position: absolute; box-sizing: border-box; left: 9.2px; top: 73.3px; width: 146.7px; height: 53.2px; background: #1F2024; border-radius: 8.2px"></div>
-<div style="position: absolute; left: 16.5px; top: 82.5px; width: 69.3px; height: 11.0px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 6.88px; font-weight: 500; line-height: 11.0px; color: #E6E7E9"><span style="text-align: left; white-space: nowrap">AI pose generation</span></div>
-<div data-fit="right" style="position: absolute; left: 117.8px; top: 83.4px; width: 21.6px; height: 9.2px; display: flex; align-items: flex-start; justify-content: flex-end; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 6.42px; font-weight: 500; line-height: 9.17px; color: #B8BBC0"><span style="text-align: right; white-space: nowrap">Agreed</span></div>
-<div style="position: absolute; left: 141.2px; top: 82.5px; width: 11.0px; height: 11.0px; display: flex; align-items: center; justify-content: center"><svg width="11.0px" height="11.0px" viewBox="0 0 24 24" style="display: block; flex: none"><path d="M9,6l6,6l-6,6" fill="none" stroke="#8A8E94" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
-<div style="position: absolute; left: 16.5px; top: 95.3px; width: 132.0px; height: 27.5px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 5.96px; font-weight: 500; line-height: 9.17px; color: #B8BBC0"><span style="text-align: left; white-space: normal">A scene photo goes to the AI service only after you agree. If you withdraw, Pix asks again before the next one.</span></div>
-<div style="position: absolute; box-sizing: border-box; left: 9.2px; top: 130.2px; width: 146.7px; height: 46.2px; background: #1F2024; border-radius: 8.2px"></div>
-<div style="position: absolute; left: 16.5px; top: 134.9px; width: 56.2px; height: 11.0px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 6.88px; font-weight: 500; line-height: 11.0px; color: #E6E7E9"><span style="text-align: left; white-space: nowrap">Share usage data</span></div>
-<div style="position: absolute; left: 16.5px; top: 146.1px; width: 104.5px; height: 24.8px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 5.96px; font-weight: 500; line-height: 8.25px; color: #B8BBC0"><span style="text-align: left; white-space: normal">Crash reports and how Pix runs, so we can fix problems. Never your photos, names, or what you write.</span></div>
-<div style="position: absolute; box-sizing: border-box; left: 126.5px; top: 146.0px; width: 23.8px; height: 14.7px; background: #F2C14E; border-radius: 7.3px"></div>
-<div style="position: absolute; box-sizing: border-box; left: 137.5px; top: 147.8px; width: 11.0px; height: 11.0px; background: #141413; border-radius: 5.5px"></div>
+<div style="position: absolute; box-sizing: border-box; left: 9.2px; top: 40.3px; width: 146.7px; height: 53.2px; background: #1F2024; border-radius: 8.2px"></div>
+<div style="position: absolute; left: 16.5px; top: 49.5px; width: 69.3px; height: 11.0px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 6.88px; font-weight: 500; line-height: 11.0px; color: #E6E7E9"><span style="text-align: left; white-space: nowrap">AI pose generation</span></div>
+<div data-fit="right" style="position: absolute; left: 117.8px; top: 50.4px; width: 21.6px; height: 9.2px; display: flex; align-items: flex-start; justify-content: flex-end; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 6.42px; font-weight: 500; line-height: 9.17px; color: #B8BBC0"><span style="text-align: right; white-space: nowrap">Agreed</span></div>
+<div style="position: absolute; left: 141.2px; top: 49.5px; width: 11.0px; height: 11.0px; display: flex; align-items: center; justify-content: center"><svg width="11.0px" height="11.0px" viewBox="0 0 24 24" style="display: block; flex: none"><path d="M9,6l6,6l-6,6" fill="none" stroke="#8A8E94" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+<div style="position: absolute; left: 16.5px; top: 62.3px; width: 132.0px; height: 27.5px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 5.96px; font-weight: 500; line-height: 9.17px; color: #B8BBC0"><span style="text-align: left; white-space: normal">A scene photo goes to the AI service only after you agree. If you withdraw, Pix asks again before the next one.</span></div>
+<div style="position: absolute; box-sizing: border-box; left: 9.2px; top: 97.2px; width: 146.7px; height: 46.2px; background: #1F2024; border-radius: 8.2px"></div>
+<div style="position: absolute; left: 16.5px; top: 101.9px; width: 56.2px; height: 11.0px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 6.88px; font-weight: 500; line-height: 11.0px; color: #E6E7E9"><span style="text-align: left; white-space: nowrap">Share usage data</span></div>
+<div style="position: absolute; left: 16.5px; top: 113.1px; width: 104.5px; height: 24.8px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 5.96px; font-weight: 500; line-height: 8.25px; color: #B8BBC0"><span style="text-align: left; white-space: normal">Crash reports and how Pix runs, so we can fix problems. Never your photos, names, or what you write.</span></div>
+<div style="position: absolute; box-sizing: border-box; left: 126.5px; top: 113.0px; width: 23.8px; height: 14.7px; background: #F2C14E; border-radius: 7.3px"></div>
+<div style="position: absolute; box-sizing: border-box; left: 137.5px; top: 114.8px; width: 11.0px; height: 11.0px; background: #141413; border-radius: 5.5px"></div>
+<div style="position: absolute; box-sizing: border-box; left: 9.2px; top: 147.1px; width: 146.7px; height: 29.3px; background: #1F2024; border-radius: 8.2px"></div>
+<div style="position: absolute; left: 16.5px; top: 156.3px; width: 51.6px; height: 11.0px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 6.88px; font-weight: 500; line-height: 11.0px; color: #E6E7E9"><span style="text-align: left; white-space: nowrap">Privacy policy</span></div>
+<div style="position: absolute; left: 141.2px; top: 156.3px; width: 11.0px; height: 11.0px; display: flex; align-items: center; justify-content: center"><svg width="11.0px" height="11.0px" viewBox="0 0 24 24" style="display: block; flex: none"><path d="M9,6l6,6l-6,6" fill="none" stroke="#8A8E94" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
 <div style="position: absolute; left: 9.2px; top: 187.3px; width: 23.4px; height: 7.3px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 5.96px; font-weight: 700; line-height: 7.33px; color: #B8BBC0; letter-spacing: 0.06em; text-transform: uppercase"><span style="text-align: left; white-space: nowrap">Account</span></div>
 <div style="position: absolute; box-sizing: border-box; left: 9.2px; top: 198.3px; width: 146.7px; height: 29.3px; background: #1F2024; border-radius: 8.2px"></div>
 <div style="position: absolute; left: 16.5px; top: 207.5px; width: 42.4px; height: 11.0px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 6.88px; font-weight: 500; line-height: 11.0px; color: #E6E7E9"><span style="text-align: left; white-space: nowrap">Pix account</span></div>
@@ -183,6 +201,42 @@ a{color:#8FA7D6;text-decoration:none}a:hover{color:#AFC1E4}
 <div style="position: absolute; left: 16.5px; top: 344.4px; width: 83.4px; height: 9.2px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 5.96px; font-weight: 500; line-height: 9.17px; color: #B8BBC0"><span style="text-align: left; white-space: nowrap">SIL Open Font License 1.1</span></div>
 <div style="position: absolute; left: 16.5px; top: 360.9px; width: 132.0px; height: 7.3px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 5.96px; font-weight: 600; line-height: 7.33px; color: #E6E7E9"><span style="text-align: left; white-space: nowrap">Manrope</span></div>
 <div style="position: absolute; left: 16.5px; top: 369.1px; width: 83.4px; height: 9.2px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 5.96px; font-weight: 500; line-height: 9.17px; color: #B8BBC0"><span style="text-align: left; white-space: nowrap">SIL Open Font License 1.1</span></div>
+</div>
+<div style="position: absolute; left: 0; top: 341.1px; width: 165px; height: 19.9px; background: #0B0B0D"></div><div style="position: absolute; left: 64.5px; top: 349.6px; width: 36px; height: 3px; border-radius: 1.5px; background: rgba(244,244,242,0.45)"></div>
+</div>
+<svg width="240" height="96" viewBox="0 0 240 96" preserveAspectRatio="none" style="position: absolute; left: 432px; top: 460px; width: 240px; height: 96px; overflow: visible; fill: none; stroke: #7C8494; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled" orient="auto" markerWidth="5" markerHeight="5" refX="3.2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#7C8494" stroke="none" style="fill: context-stroke"></path></marker></defs><path d="M 236 0 L 236 48 L 4 48 L 4 94" marker-end="url(#dc-arrow-head-filled)"></path></svg>
+<div style="position: absolute; left: 448px; top: 484px; width: 212px; text-align: center; font-size: 13px; line-height: 16px; color: #A9AFBA">tap <span data-ui>Privacy policy</span></div>
+<div style="position: absolute; left: 352px; top: 556px; width: 168px; height: 364px; box-sizing: border-box; border: 1.5px solid #3A404B; border-radius: 20px; background: #0B0B0D; overflow: hidden">
+<div style="position: absolute; left: 12px; top: 4px; font-size: 8px; font-weight: 600; letter-spacing: 0.08em; color: #9AA1AD; line-height: 10px">PRIVACY POLICY</div>
+<div style="position: absolute; left: 0; top: 0; width: 165px; height: 341.1px; overflow: hidden">
+<div style="position: absolute; left: 3.7px; top: 21.7px; width: 22.0px; height: 22.0px; display: flex; align-items: center; justify-content: center"><svg width="11.0px" height="11.0px" viewBox="0 0 24 24" style="display: block; flex: none"><path d="M19,12H5M11,6l-6,6l6,6" fill="none" stroke="#F4F4F2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+<div style="position: absolute; left: 27.5px; top: 26.9px; width: 54.7px; height: 11.5px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 8.25px; font-weight: 700; line-height: 11.46px; color: #F4F4F2"><span style="text-align: left; white-space: nowrap">Privacy policy</span></div>
+<div style="position: absolute; left: 0; top: 43.67px; width: 165px; height: 297.43px; overflow: hidden; background: #0B0B0D">
+<div class="pp-web" style="width: 360px; transform: scale(0.458333); transform-origin: 0 0">
+<div class="pp-main">
+<nav><a class="pp-lang"></a></nav>
+<h1>Pix Privacy Policy</h1>
+<p>The Last Penguin team ("the team") runs the Pix app (<code>com.lastpenguin.pix</code>) and handles its users' personal information as described below. This is a translation of the Korean policy; if the two differ, the Korean text applies.</p>
+<ul>
+<li>Effective: November 21, 2026</li>
+<li>Contact: csmking7@gmail.com</li>
+</ul>
+<h2>1. Personal information we handle, and why</h2>
+<table>
+<thead>
+<tr><th>Information</th><th>When it is collected</th><th>Purpose</th></tr>
+</thead>
+<tbody>
+<tr><td>Name (display name), Pix ID</td><td>Sign-up, Pix ID setup</td><td>Identifying the account; shown when friends find and invite you</td></tr>
+<tr><td>Password (stored only as a hash)</td><td>Sign-up with a Pix ID</td><td>Signing in</td></tr>
+<tr><td>Google account identifier</td><td>Signing in with Google</td><td>Signing in</td></tr>
+<tr><td>Friendships, friend requests, invitations</td><td>Using friends and invitations</td><td>The friend list, invitations to share the camera</td></tr>
+<tr><td>Push notification token (a device identifier)</td><td class="pp-when-signing-in"></td><td>Alerts for invitations and friend requests</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
 </div>
 <div style="position: absolute; left: 0; top: 341.1px; width: 165px; height: 19.9px; background: #0B0B0D"></div><div style="position: absolute; left: 64.5px; top: 349.6px; width: 36px; height: 3px; border-radius: 1.5px; background: rgba(244,244,242,0.45)"></div>
 </div>

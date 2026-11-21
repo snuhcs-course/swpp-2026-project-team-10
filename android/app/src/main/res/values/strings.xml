@@ -330,6 +330,21 @@
     <string name="checking_pix_id">Checking…</string>
     <string name="pix_id_available">This Pix ID is available</string>
     <string name="sign_up">Sign up</string>
+    <!-- What an account keeps, on Sign up and Sign up with Google, before the account is made (FR-5.18). -->
+    <string name="sign_up_notice_title">What your Pix account keeps</string>
+    <string name="sign_up_notice_what_label">What</string>
+    <string name="sign_up_notice_what_password">Your Pix ID, your name, and your password, kept only as a hash. Then your friends, friend requests, and invitations, and a push token for this phone.</string>
+    <string name="sign_up_notice_what_google">Your Google account\'s ID and name, and the Pix ID you choose. Then your friends, friend requests, and invitations, and a push token for this phone.</string>
+    <string name="sign_up_notice_why_label">Why</string>
+    <string name="sign_up_notice_why">To sign you in, and so friends can find and invite you.</string>
+    <string name="sign_up_notice_how_long_label">How long</string>
+    <string name="sign_up_notice_how_long">Until you delete the account in Settings › Pix account. Invitations go after a day.</string>
+    <string name="sign_up_notice_who_label">Who receives it</string>
+    <string name="sign_up_notice_who">Pix\'s server, run on AWS in Australia, and Google, which delivers the alerts.</string>
+    <string name="sign_up_notice_policy">Read the privacy policy</string>
+    <string name="sign_up_agree">I\'m 14 or older, and I agree to Pix keeping this information.</string>
+    <string name="google_sign_up_title">Sign up with Google</string>
+    <string name="google_sign_up_body">Your Google account makes a new Pix account. You choose your Pix ID next.</string>
     <string name="pix_id_setup_title">Choose your Pix ID</string>
     <string name="pix_id_setup_body">Friends find you by this ID, so it has no capitals or spaces.</string>
     <string name="save">Save</string>
@@ -359,6 +374,10 @@
     <string name="google_added">Google added. You can sign in with it now.</string>
     <string name="password_added">Password added. You can sign in with your Pix ID now.</string>
     <string name="signed_out">Signed out</string>
+    <string name="delete_account">Delete account</string>
+    <string name="delete_account_title">Delete your Pix account?</string>
+    <string name="delete_account_message">Your Pix ID, name, friends, requests, and invitations are deleted from Pix\'s server, and every phone signed in to it signs out. Guides and photos on this phone stay.</string>
+    <string name="account_deleted">Account deleted</string>
 
     <!-- Flow 6: Who takes the photo, Room code, See their camera (R&S 6.7) -->
     <string name="who_takes_the_photo">Who takes the photo?</string>
@@ -480,6 +499,9 @@
     <string name="settings_withdraw">Withdraw</string>
     <string name="settings_usage">Share usage data</string>
     <string name="settings_usage_body">Crash reports and how Pix runs, so we can fix problems. Never your photos, names, or what you write.</string>
+    <string name="settings_privacy_policy">Privacy policy</string>
+    <string name="privacy_policy_title">Privacy policy</string>
+    <string name="privacy_policy_failed">Couldn\'t load the privacy policy. Check your connection.</string>
     <string name="settings_section_account">Account</string>
     <string name="settings_account">Pix account</string>
     <string name="settings_signed_out">Not signed in</string>

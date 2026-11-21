@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Sign up with a Pix ID, a name, and a password (R&S 6.8; FR-5.2, FR-5.3, FR-5.11, FR-5.15, US-6). Each rule shows
-     under its field, in the danger color once it is broken, and Sign up waits until all hold. Check tells whether the
-     Pix ID is free, under the field too. -->
+<!-- Sign up with a Pix ID, a name, and a password (R&S 6.4; FR-5.2, FR-5.3, FR-5.11, FR-5.15, FR-5.18, US-6). Each rule
+     shows under its field, in the danger color once it is broken, and Sign up waits until all hold and the person agrees
+     to what the account keeps. Check tells whether the Pix ID is free, under the field too. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -151,6 +151,13 @@
             android:text="@string/password_rule"
             android:textAppearance="@style/TextAppearance.Pix.Body.Small"
             android:textColor="@color/pix_text_faint" />
+
+        <include
+            android:id="@+id/notice"
+            layout="@layout/view_sign_up_notice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp" />
 
         <TextView
             android:id="@+id/errorText"

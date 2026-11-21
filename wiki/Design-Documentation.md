@@ -114,6 +114,7 @@
 | 3.34 | 2026-11-20 | The Iteration 4 tasks as their issues stand: the owners of Iter4-P7 and Iter4-P11, the name and date of Iter4-P16, and when the prompt templates were dropped (2.9). |
 | 3.35 | 2026-11-21 | One server each for `main` and `dev`, in two versions: a course server, and an AWS server over HTTPS, which the builds use (1.1.1, 1.1.3, 1.2, AD-11, 2.5.2, 2.5.3, 2.6.6, 2.7, 2.8, 2.10). |
 | 3.36 | 2026-11-21 | Server logs and alerts: the AWS servers' logs in CloudWatch, with an alarm on 5xx answers (1.2, AD-20, 2.8). |
+| 3.37 | 2026-11-21 | What an account keeps and the agreement before it is made, deleting an account, and the privacy policy in Pix and at `/privacy` (Iter5-P2, [#266]) (2.1, 2.5.3, 2.7, 2.8). |
 
 </details>
 
@@ -358,7 +359,7 @@ App versions are from `android/gradle/libs.versions.toml`; server versions are t
 ```mermaid
 flowchart TB
   subgraph UI["UI layer: Fragments with XML layouts"]
-    C1["Camera"] --- C2["Add a pose guide with My library · Library · Reference confirm"] --- C3["Generate poses · Generating poses · Pick a pose"] --- C4["Sign in · Sign up · Pix ID setup · Account · Share my camera · Add a friend · Sent requests"] --- C5["Who takes the photo? · Room code · See their camera · Invite sent · Invite not accepted · Invitation"] --- C6["Subject view and its Generate poses · Generating poses · Pick a pose · Your reference · Connection lost"] --- C7["Settings · How to use Pix · About Pix · tutorial tips"]
+    C1["Camera"] --- C2["Add a pose guide with My library · Library · Reference confirm"] --- C3["Generate poses · Generating poses · Pick a pose"] --- C4["Sign in · Sign up · Sign up with Google · Pix ID setup · Account · Share my camera · Add a friend · Sent requests"] --- C5["Who takes the photo? · Room code · See their camera · Invite sent · Invite not accepted · Invitation"] --- C6["Subject view and its Generate poses · Generating poses · Pick a pose · Your reference · Connection lost"] --- C7["Settings · How to use Pix · About Pix · Privacy policy · tutorial tips"]
   end
   subgraph VM["ViewModels: StateFlow of UI state"]
     V1["CameraViewModel"] --- V2["ReferenceViewModel"] --- V3["GenerationViewModel · PoseSaveViewModel"] --- V4["AccountViewModel · FriendsViewModel"] --- V5["SessionViewModel · InvitationViewModel · IncomingInvitationsViewModel"] --- V6["SubjectViewModel · SubjectDescribeViewModel · SubjectGeneratingViewModel · SubjectPickViewModel · SubjectConfirmViewModel"] --- V7["SettingsViewModel"]
@@ -431,7 +432,8 @@ android/app/src/main/java/com/lastpenguin/pix/
 - *I'll be in the photo* opens *See their camera* (`joinCodeFragment`, `JoinCodeFragment`): received invitations above the code field. The button counts them, so a dismissed invitation can still be accepted within its minute (2.6.6, FR-6.17).
 - A photographer whose subject left still waits in its room (`Waiting`, 2.4), unseen on Camera, and `SessionManager.start` ignores a second session. So *I'll be in the photo* and *Accept* (on *Invitation* and *See their camera*) first end that room (`SessionViewModel.endWaitingRoom` awaits `leave(CANCELLED)`). A session with someone in it, or on its way, still refuses them (FR-6.9).
 - *Room code* has no join field; it says which phone enters the code, and where. The code screens name the other phone's buttons by their own labels (`room_code_path`, `join_hint`, `withColoredPart`), so a renamed button renames them.
-- *Sign in* returns to the screen that opened it (`popBackStack(signInFragment, inclusive)`); *Sign up* closes with it, and *Pix ID setup* replaces it. So *Invitation* and Settings open *Sign in* themselves.
+- *Sign in* returns to the screen that opened it (`popBackStack(signInFragment, inclusive)`); *Sign up* closes with it, and *Pix ID setup* replaces it, and *Sign up with Google* with it. So *Invitation* and Settings open *Sign in* themselves.
+- *Privacy policy* (`privacyPolicyFragment`, `PrivacyPolicyFragment`) opens through one global action from Settings, *Sign up*, and *Sign up with Google*. It shows the server's `/privacy/ko` or `/privacy/en` page, in the screens' language, in a WebView without JavaScript; a page that cannot load shows the reason and *Try again*.
 - Screens say *friend* only for the Pix friend list; elsewhere they name the role or say *the other person* (R&S 6.9).
 
 #### Module interfaces
@@ -566,6 +568,7 @@ interface AuthRepository {                              // FR-5.1–5.3, FR-5.11
     suspend fun refreshAccount(): Result<Unit>          // GET /me again: another phone may have changed the account
     suspend fun freshAccessToken(): String?             // for a signaling socket, which sends it only when it opens
     suspend fun signOut()                               // on the server if it answers, on the phone always
+    suspend fun deleteAccount(): Result<Unit>           // DELETE /me, then signs out; OFFLINE keeps the account
 }
 
 interface FriendsRepository {                           // FR-5.4–5.10, FR-5.16; failures are AccountException
@@ -2270,6 +2273,7 @@ Base URL `https://<host>/api/v1` on the AWS servers, and `http://<host>/api/v1`,
 | `GET /me`, `PUT /me` (It 2) | auth | The caller's account; set the Pix ID, the display name, or both | `400 PIX_ID_INVALID`, `401 INVALID_CREDENTIALS`, `409 PIX_ID_TAKEN` |
 | `PUT /me/google` (It 2) | auth | Add a Google account (FR-5.12, FR-5.13) | `401 INVALID_TOKEN`, `409 GOOGLE_IN_USE`, `409 GOOGLE_ALREADY_ADDED`, `503 UNAVAILABLE` |
 | `PUT /me/password` (It 2) | auth | Add a password to a Google account (FR-5.14) | `400 PASSWORD_INVALID`, `403 PIX_ID_REQUIRED`, `409 PASSWORD_ALREADY_SET` |
+| `DELETE /me` (It 5) | auth | Delete the account with everything the server keeps about it (FR-5.19); `204` | — |
 | `POST /devices` (It 2) | auth | Register or refresh the FCM token | `401 UNAUTHENTICATED` after sign-out, even with an unexpired token |
 | `POST /users/lookup` (It 2) | auth, Pix ID | Exact-match lookup with the relation to the caller (FR-5.5, FR-5.8) | `404 NOT_FOUND` |
 | `GET /friend-requests` (It 2) | auth, Pix ID | Pending requests, received and sent (FR-5.7) | — |
@@ -2284,6 +2288,7 @@ Outside `/api/v1`:
 
 - `/ws`: the signaling WebSocket (2.5.2).
 - `GET /i/{invitationId}` (It 3): the invite link's page (2.6.6).
+- `GET /privacy`, `GET /privacy/{ko|en}` (It 5): the privacy policy's page, in Korean, the version that applies, or in English (FR-10.7). Each links to the other language; another language is `404`.
 - `GET /health`: `{"status": "ok"}`, or `503` when Redis does not answer within 2 s (2.8, Deployment).
 - `GET /internal/stats`: open sessions and sockets, for `deploy.sh`; nginx does not forward it.
 
@@ -2406,6 +2411,7 @@ Outside `/api/v1`:
 - **`refreshToken`.** 32 random bytes, stored only as a SHA-256 hash in `sessions` (2.7), valid 30 days from its last use. `POST /auth/refresh` `{ "refreshToken": "kq3V9x0Rz8..." }` answers `{ "accessToken", "refreshToken", "expiresIn" }`, and the old token stops working. A spent token that comes back ends the session for every holder. An unknown or expired one also gets `401 INVALID_REFRESH_TOKEN`.
 - **Sign-out.** `DELETE /auth/session` deletes the session and its device row at once. The access token works until it expires, at most 15 minutes later; the app deletes both tokens. A signaling socket stays online after its token expires, since the token is checked only at the upgrade.
 - **Several phones.** Each phone has its own session, so a refresh or sign-out on one never affects another. A change reaches other phones only through the server: *Share my camera* and *Sent requests* read `GET /me` every 10 s while shown (`AuthRepository.refreshAccount`, 2.8 *Push*). `AuthTokens.reload` drops a read that a change on this phone overtook, and does not write an unchanged account.
+- **Deleting the account (FR-5.19).** `DELETE /me` locks the user row, then deletes its invitations, friend requests (sent and received), friendships, devices, spent refresh tokens, sessions, and the user, in one transaction. Its Pix ID and Google account are free for a new account at once. The account's other phones sign out at their next request: their access tokens name a missing user (`401 UNAUTHENTICATED`), and the refresh that follows finds no session (`401 INVALID_REFRESH_TOKEN`). The app deletes this phone's tokens itself.
 - **In the app (Iter2-P13).** `BearerTokens` adds the token and answers `401 UNAUTHENTICATED` with one refresh and one retry. `AuthTokens` also refreshes a minute before expiry. It runs one refresh at a time and gives waiting callers its new token, since a spent token ends the session. A refused refresh signs the phone out; an unanswered one keeps the tokens. `PixAuthApi` has its own client, so a refresh never waits behind account or pose calls.
 
 </details>
@@ -2428,7 +2434,7 @@ Outside `/api/v1`:
 - **Verification.** The server checks the signature against Google's published keys, kept as long as Google's `Cache-Control` allows. The audience must be our web client ID (`PIX_GOOGLE_CLIENT_ID`, the server client ID the app passes to Credential Manager), and the issuer Google. Only the Google `sub` is kept (AD-12). Without the client ID or Google's keys, all three answer `503 UNAVAILABLE`.
 - **New account.** It is named after the Google account, up to 30 characters, or "Pix user" without a name. Its Pix ID is `null` until `PUT /me` sets one.
 
-**Signing up with Google (FR-5.13).** The app calls `POST /auth/google` first. On `NOT_REGISTERED` it asks "Do you already have a Pix account?" *Yes:* the person signs in with Pix ID and password, and the app sends the same ID token to `PUT /me/google`. *No:* `POST /auth/google/signup` creates the account, and the Pix ID setup follows. A password account can add Google later the same way (FR-5.12).
+**Signing up with Google (FR-5.13).** The app calls `POST /auth/google` first. On `NOT_REGISTERED` it asks "Do you already have a Pix account?" *Yes:* the person signs in with Pix ID and password, and the app sends the same ID token to `PUT /me/google`. *No:* *Sign up with Google* (`GoogleSignUpFragment`) says what the account keeps and waits for the agreement (FR-5.18); its *Sign up* calls `POST /auth/google/signup`, which creates the account, and the Pix ID setup follows. Its Back forgets the Google account, as closing the question does, or the next sign-in with a password would add it. A password account can add Google later the same way (FR-5.12).
 
 **Adding a password (FR-5.14).** `PUT /me/password` `{ "password": "sunset2026" }` answers `200` with `"hasPassword": true`; the Pix ID and password then sign in too. The Pix ID is the login name, so an account without one gets `403 PIX_ID_REQUIRED`. The rules are those of sign-up. An account with a password gets `409 PASSWORD_ALREADY_SET`, since changing a password is not offered. There is no email, so a forgotten password cannot be reset.
 
@@ -3010,6 +3016,7 @@ erDiagram
 *Figure 10. Database schema. The `invitations` table comes with invitations (Iteration 3).*
 
 - **Users.** A check constraint requires a Google subject, a password hash, or both, so every user can sign in. `pix_id` and `google_sub` are unique; many users may have neither yet.
+- **Deleted users.** Deleting an account deletes every row that names it, in the order of the foreign keys (2.5.3, *Deleting the account*), so no table keeps the ID of a deleted user.
 - **Friends.** `friendships` has one row per pair, `user_a < user_b` (the server orders them), with the pair as its primary key. `friend_requests` has at most one request per pair, in either direction: (`user_a`, `user_b`) is unique. A request is deleted when it is accepted (the friendship is created), declined, or withdrawn, or when either user removes the other.
 - **Opposite requests.** A request in the opposite direction is accepted instead of duplicated, also when both come at once: sending locks both users, so the second finds the first's request and accepts it. The unique pair is the database's own guard.
 - **Sign-in sessions.** Each sign-in on a phone is a `sessions` row with only the hash of its current refresh token (2.5.3, *Session tokens*); access tokens are not stored. A sign-in removes the user's expired sessions; a refresh moves `expires_at` forward. Exchanged refresh tokens go to `spent_refresh_tokens`, so one that comes back ends the session. One spent longer ago than a session lasts is ignored, as it would have expired, and dropped at the next refresh.
@@ -3143,6 +3150,8 @@ erDiagram
 
 **Privacy** (NFR-13)
 
+- Before an account is made, *Sign up* and *Sign up with Google* say what it keeps, why, for how long, and who receives it, link to the privacy policy, and wait for "I'm 14 or older, and I agree" (`SignUpNotice`, FR-5.18). The app keeps no record of the agreement; the account exists only with it.
+- The privacy policy is one text in two languages, `server/src/pix_server/privacy/policy.ko.md` and `policy.en.md`. The server renders both once at start and serves them at `/privacy` (Korean) and `/privacy/en`, the address the store links to; Pix shows the same page (2.1). The wiki's *Privacy Policy* pages copy them, and a test keeps the copies the same.
 - The server never logs request bodies, images, the image API's response bodies, passwords, or tokens. Nor does it log descriptions, suggested poses, or variations, which describe the person in the photo.
 - A scene photo stays in memory until the response. nginx and the app refuse a request over 1 MiB before reading it, so no upload reaches the disk.
 - Each description and pose also goes, without the photo, to the description filter's decision model, TypeSafe's Jev on OpenRouter (2.6.3). A refusal logs only the question and its probability. Each `POST /poses` scene goes to the same model for the person check, which logs only its probability.
@@ -3211,7 +3220,7 @@ erDiagram
 - The course servers are reachable only through the course's HTTP proxy on port 80, and only from the campus network. They cannot reach each other.
 - The AWS servers serve HTTPS on port 443 with a Let's Encrypt certificate for a hostname that sslip.io resolves to their Elastic IP. certbot renews it through nginx on port 80 (`/.well-known/acme-challenge/`). `deploy.sh` adds `docker-compose.https.yml`, which publishes port 443, once the certificate exists, so the course servers serve port 80 only. On a server with the certificate, it refuses to deploy or roll back to a commit without that file, which would close port 443. nginx passes the scheme on (`X-Forwarded-Proto`), so invite links from the AWS servers start with `https://`.
 - `server/deploy/docker-compose.yml` runs:
-  - `nginx` on port 80, and on 443 on the AWS servers, which forwards `/api/v1`, `/ws`, `/health`, and the invite link's page `/i/<id>`, serves `/version` and Let's Encrypt's check, and answers `404` to the rest, so FastAPI's `/docs` is not public;
+  - `nginx` on port 80, and on 443 on the AWS servers, which forwards `/api/v1`, `/ws`, `/health`, the invite link's page `/i/<id>`, and the privacy policy's `/privacy`, serves `/version` and Let's Encrypt's check, and answers `404` to the rest, so FastAPI's `/docs` is not public;
   - `app-blue` and `app-green`, two copies of the app, each Uvicorn with two workers, set explicitly because the servers report 38 CPUs for our 8 cores;
   - `redis`, which writes nothing to disk;
   - `postgres`, with its files in `/opt/pix/postgres` on the server's disk, not a Docker volume, so no Docker cleanup can delete them.
@@ -3237,6 +3246,7 @@ erDiagram
 
 - The app sends the access token as a bearer header on REST calls and on the signaling upgrade. Everything but friends and invitations works without one (FR-5.1).
 - Sign-up takes a Pix ID, a display name, and a password, or Google. Either account can add the other sign-in (`PUT /me/google`, `PUT /me/password`; 2.5.3). Without email, a lost password cannot be reset.
+- *Account* › *Delete account* deletes the account after asking (`DELETE /me`, FR-5.19); this phone signs out at once and the others at their next request. Guides and photos on the phone stay.
 - Passwords are hashed with argon2id (`argon2-cffi`'s defaults: 3 passes over 64 MiB) on a worker thread, so a hash does not hold up the worker's sockets. Only the hash is stored.
 - Passwords cross HTTPS to the AWS servers, and plain HTTP to a course server (AD-11, NFR-14). Log-in attempts are not limited.
 - Whether a Pix ID exists is not secret: the lookup tells any signed-in user, and `POST /auth/check-pix-id` anyone, for an exact Pix ID only (NFR-15). Neither is limited. A failed log-in answers alike for an unknown Pix ID and a wrong password.
@@ -3535,3 +3545,4 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#217]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/217
 [#247]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/247
 [#254]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/254
+[#266]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/266

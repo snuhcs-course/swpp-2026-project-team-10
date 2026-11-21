@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.os.Bundle
@@ -21,12 +21,14 @@ import com.lastpenguin.pix.account.passwordProblem
 import com.lastpenguin.pix.account.pixIdProblem
 import com.lastpenguin.pix.databinding.FragmentSignUpBinding
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.settings.openPrivacyPolicy
 import kotlinx.coroutines.launch
 
 /**
- * Sign up with a Pix ID, a name, and a password (R&S 6.8; FR-5.2, FR-5.3, FR-5.11, FR-5.15, US-6). *Check* tells
- * whether the Pix ID is free before the form is sent. The account is signed in at once, and Sign up and Sign in under it
- * close, back to the screen that opened Sign in. Owner: Accounts (#54).
+ * Sign up with a Pix ID, a name, and a password (R&S 6.4; FR-5.2, FR-5.3, FR-5.11, FR-5.15, FR-5.18, US-6). *Check*
+ * tells whether the Pix ID is free before the form is sent, and *Sign up* waits for the agreement to what the account
+ * keeps. The account is signed in at once, and Sign up and Sign in under it close, back to the screen that opened Sign
+ * in. Owner: Accounts (#54).
  */
 class SignUpFragment : Fragment(R.layout.fragment_sign_up) {
 
@@ -40,6 +42,7 @@ class SignUpFragment : Fragment(R.layout.fragment_sign_up) {
             onCheck = viewModel::checkPixId,
             onSignUp = viewModel::signUp,
             onEdited = viewModel::clearError,
+            onPolicy = { openPrivacyPolicy(R.id.signUpFragment) },
         )
         binding.backButton.setOnClickListener { findNavController().popBackStack() }
 
@@ -57,18 +60,21 @@ class SignUpFragment : Fragment(R.layout.fragment_sign_up) {
 }
 
 /**
- * The fields of Sign up, each with its rule under it (US-6). A rule shows faint until the field breaks it; the answer
- * to *Check*, and the server's answer for a taken Pix ID or a refused password, show in the same place. Apart from the
- * fragment, so it can be tested on the real layout.
+ * The fields of Sign up, each with its rule under it (US-6), and what the account keeps with the agreement (FR-5.18).
+ * A rule shows faint until the field breaks it; the answer to *Check*, and the server's answer for a taken Pix ID or a
+ * refused password, show in the same place. *Sign up* waits until every rule holds and the person agrees. Apart from
+ * the fragment, so it can be tested on the real layout.
  */
 class SignUpForm(
     private val binding: FragmentSignUpBinding,
     onCheck: (pixId: String) -> Unit,
     onSignUp: (pixId: String, displayName: String, password: String) -> Unit,
     private val onEdited: () -> Unit,
+    onPolicy: () -> Unit,
 ) {
     private val context = binding.root.context
     private var state = AccountUiState()
+    private val notice = SignUpNotice(binding.notice, google = false, onPolicy = onPolicy, onAgreed = { renderRules() })
 
     init {
         val submit = {
@@ -126,7 +132,7 @@ class SignUpForm(
         binding.errorText.isVisible = state.error != null && !shownAtField
         binding.errorText.text = state.error?.let(context::accountMessage)
         binding.signUpButton.isEnabled =
-            !state.busy && pixIdProblem(pixId) == null && isValidDisplayName(name) && problem == null
+            !state.busy && pixIdProblem(pixId) == null && isValidDisplayName(name) && problem == null && notice.agreed
     }
 
     private companion object {

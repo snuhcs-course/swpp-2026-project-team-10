@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.content.DialogInterface
@@ -36,7 +36,8 @@ import org.robolectric.shadows.ShadowToast
  * Sign in, Share my camera here; `SignInWayBackTest` opens it from Settings) or whose account has no Pix ID yet (to
  * Pix ID setup, in Sign in's place); one refused (the message, cleared on the next edit); Continue with
  * Google for a registered account, and for one no Pix account uses (the question: Yes keeps the screen in its
- * linking state and the next sign-in adds Google, with the failure of that step as a message; No makes an account);
+ * linking state and the next sign-in adds Google, with the failure of that step as a message; No opens Sign up with
+ * Google and makes no account yet, `GoogleSignUpFragmentTest`);
  * Sign up; Back, which forgets the waiting Google account.
  */
 @RunWith(AndroidJUnit4::class)
@@ -181,7 +182,7 @@ class SignInFragmentTest {
     }
 
     @Test
-    fun googleForANewAccount_noMakesOne_andGoesToTheSetup() {
+    fun googleForANewAccount_noOpensSignUpWithGoogle_beforeAnyAccountIsMade() {
         val modules = TestAppContainer()
         modules.auth.googleResult = GoogleSignIn.NotRegistered
         launch(modules)
@@ -191,8 +192,9 @@ class SignInFragmentTest {
         (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
         idle()
 
-        assertTrue(modules.auth.calls.contains("googleSignUp:google-token"))
-        assertEquals(R.id.pixIdSetupFragment, nav.currentDestination?.id)
+        assertEquals(listOf("google:google-token"), modules.auth.calls)
+        assertEquals(R.id.googleSignUpFragment, nav.currentDestination?.id)
+        assertTrue(accountViewModel.waitingGoogle)
     }
 
     @Test

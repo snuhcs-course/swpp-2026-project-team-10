@@ -8,6 +8,11 @@
     android:id="@+id/nav_graph"
     app:startDestination="@id/cameraFragment">
 
+    <!-- The privacy policy, from Settings › Privacy, Sign up, and Sign up with Google (FR-10.7, FR-5.18). -->
+    <action
+        android:id="@+id/action_global_privacyPolicy"
+        app:destination="@id/privacyPolicyFragment" />
+
     <!-- Flow 1: Camera (also Camera + guide, Photo saved, and the photographer's live badge) -->
     <fragment
         android:id="@+id/cameraFragment"
@@ -260,9 +265,25 @@
         <action
             android:id="@+id/action_signIn_to_signUp"
             app:destination="@id/signUpFragment" />
-        <!-- A new Google account chooses its Pix ID next, in Sign in's place (FR-5.13). -->
+        <!-- An account without a Pix ID chooses one next, in Sign in's place (FR-5.13). -->
         <action
             android:id="@+id/action_signIn_to_pixIdSetup"
+            app:destination="@id/pixIdSetupFragment"
+            app:popUpTo="@id/signInFragment"
+            app:popUpToInclusive="true" />
+        <!-- "Do you already have a Pix account?" answered No: what the account keeps, before it is made (FR-5.18). -->
+        <action
+            android:id="@+id/action_signIn_to_googleSignUp"
+            app:destination="@id/googleSignUpFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/googleSignUpFragment"
+        android:name="com.lastpenguin.pix.ui.account.GoogleSignUpFragment"
+        android:label="Sign up with Google">
+        <!-- The new account chooses its Pix ID next, in the place of Sign in and this screen (FR-5.13). -->
+        <action
+            android:id="@+id/action_googleSignUp_to_pixIdSetup"
             app:destination="@id/pixIdSetupFragment"
             app:popUpTo="@id/signInFragment"
             app:popUpToInclusive="true" />
@@ -282,6 +303,11 @@
         android:id="@+id/accountSheet"
         android:name="com.lastpenguin.pix.ui.account.AccountSheet"
         android:label="Account" />
+
+    <fragment
+        android:id="@+id/privacyPolicyFragment"
+        android:name="com.lastpenguin.pix.ui.settings.PrivacyPolicyFragment"
+        android:label="Privacy policy" />
 
     <!-- Flow 6: Room code (photographer) -->
     <dialog

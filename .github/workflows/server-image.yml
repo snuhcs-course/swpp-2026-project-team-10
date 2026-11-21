@@ -80,6 +80,10 @@ jobs:
           # The page an invite link opens, for an invitation id only.
           curl -fsS http://127.0.0.1:8080/i/inv_01JB2C3D4E5F6G7H8J9KAMNPQR | grep -F 'intent://invite/inv_01JB2C3D4E5F6G7H8J9KAMNPQR#Intent;scheme=pix;'
           test "$(status http://127.0.0.1:8080/i/not-an-invitation)" = 404
+          # The privacy policy in both languages, which the store and the app link to.
+          curl -fsS http://127.0.0.1:8080/privacy | grep -F '<html lang="ko">'
+          curl -fsS http://127.0.0.1:8080/privacy/en | grep -F '<h1>Pix Privacy Policy</h1>'
+          test "$(status http://127.0.0.1:8080/privacy/fr)" = 404
           # FastAPI's documentation and the app's internal routes are not public.
           test "$(status http://127.0.0.1:8080/docs)" = 404
           test "$(status http://127.0.0.1:8080/openapi.json)" = 404

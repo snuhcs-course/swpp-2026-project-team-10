@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
 """Invitations to shoot together (Design Documentation 2.5.3, 2.6.6; R&S FR-6.1–6.4, FR-6.9, FR-6.17).
 
 Inviting a friend opens the session at once, with only the photographer's place: the answer carries that place's
@@ -285,7 +285,7 @@ a { display: block; padding: 14px; border-radius: 12px; background: #f2c14e; col
 @pages.get("/i/{invitation_id}", response_class=HTMLResponse)
 async def invite_link(invitation_id: str) -> HTMLResponse:
     """The page an invite link opens (Design 2.6.6): a button that opens the Invitation screen in Pix through its
-    `pix://invite/<id>` scheme, since a verified App Link that opens Pix directly needs HTTPS (AD-11). The page reads
+    `pix://invite/<id>` scheme, since Pix declares no App Links that would open it directly. The page reads
     nothing and names nobody, because a link can travel further than the friend."""
     if not INVITATION_ID.fullmatch(invitation_id):
         raise HTTPException(404)

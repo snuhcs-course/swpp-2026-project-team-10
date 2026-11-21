@@ -114,7 +114,7 @@
 | 3.34 | 2026-11-20 | The Iteration 4 tasks as their issues stand: the owners of Iter4-P7 and Iter4-P11, the name and date of Iter4-P16, and when the prompt templates were dropped (2.9). |
 | 3.35 | 2026-11-21 | One server each for `main` and `dev`, in two versions: a course server, and an AWS server over HTTPS, which the builds use (1.1.1, 1.1.3, 1.2, AD-11, 2.5.2, 2.5.3, 2.6.6, 2.7, 2.8, 2.10). |
 | 3.36 | 2026-11-21 | Server logs and alerts: the AWS servers' logs in CloudWatch, with an alarm on 5xx answers (1.2, AD-20, 2.8). |
-| 3.37 | 2026-11-21 | What an account keeps and the agreement before it is made, deleting an account, and the privacy policy in Pix and at `/privacy` (Iter5-P2, [#266]) (2.1, 2.5.3, 2.7, 2.8). |
+| 3.37 | 2026-11-21 | What an account keeps and the agreement before it is made, deleting an account, the privacy policy in Pix and at `/privacy`, and the screens above the keyboard (Iter5-P2, [#266]) (2.1, 2.5.3, 2.7, 2.8). |
 
 </details>
 
@@ -426,14 +426,16 @@ android/app/src/main/java/com/lastpenguin/pix/
 | Any other two screens | `SHARED_AXIS` along x: the next screen comes 30 dp in from the right, the last goes 30 dp left; back reverses it | A deeper step: *Share my camera* → *Add a friend*, the library → *Reference confirm*, *Generate poses* → *Generating poses* → *Pick a pose* |
 | A sheet (*Add a pose guide*, *Who takes the photo?*, *Account*, *Room code*, *Invite sent*) and the screen under it | None: the sheet keeps its own slide | `ScreenNavigator` does not move dialog destinations. A screen a sheet opens moves from the screen under it: Camera → *Reference confirm* fades. |
 
+**Insets and the keyboard (R&S 6.9).** From Android 15, Pix draws behind the system bars, and the window no longer shrinks for the keyboard. So `MainActivity` pads the screens by the bars and, while it is open, by the keyboard. A form's `ScrollView` then shrinks above the keyboard and scrolls the focused field into view.
+
 **Who takes the photo (Iter3-A17, [#188]; R&S 6.7).** The phone that shows a room code or sends an invitation is the photographer. *Shoot together* opens `ShootTogetherSheet`, a dialog over Camera. Each choice replaces it (`popUpTo` inclusive), so Back goes to Camera.
 
 - *I'll take the photo* opens *Share my camera* (`friendsFragment`, `FriendsFragment`): friends to invite, and *Show a code*, signed in or not.
 - *I'll be in the photo* opens *See their camera* (`joinCodeFragment`, `JoinCodeFragment`): received invitations above the code field. The button counts them, so a dismissed invitation can still be accepted within its minute (2.6.6, FR-6.17).
 - A photographer whose subject left still waits in its room (`Waiting`, 2.4), unseen on Camera, and `SessionManager.start` ignores a second session. So *I'll be in the photo* and *Accept* (on *Invitation* and *See their camera*) first end that room (`SessionViewModel.endWaitingRoom` awaits `leave(CANCELLED)`). A session with someone in it, or on its way, still refuses them (FR-6.9).
 - *Room code* has no join field; it says which phone enters the code, and where. The code screens name the other phone's buttons by their own labels (`room_code_path`, `join_hint`, `withColoredPart`), so a renamed button renames them.
-- *Sign in* returns to the screen that opened it (`popBackStack(signInFragment, inclusive)`); *Sign up* closes with it, and *Pix ID setup* replaces it, and *Sign up with Google* with it. So *Invitation* and Settings open *Sign in* themselves.
-- *Privacy policy* (`privacyPolicyFragment`, `PrivacyPolicyFragment`) opens through one global action from Settings, *Sign up*, and *Sign up with Google*. It shows the server's `/privacy/ko` or `/privacy/en` page, in the screens' language, in a WebView without JavaScript; a page that cannot load shows the reason and *Try again*.
+- *Sign in* returns to the screen that opened it (`popBackStack(signInFragment, inclusive)`). *Sign up* and its agreement page close with it. *Pix ID setup* replaces it, and *Sign up with Google* with it. So *Invitation* and Settings open *Sign in* themselves.
+- *Privacy policy* (`privacyPolicyFragment`, `PrivacyPolicyFragment`) opens through one global action from Settings and the sign-up agreement. It shows the server's `/privacy/ko` or `/privacy/en` page, in the screens' language, in a WebView without JavaScript; a page that cannot load shows the reason and *Try again*.
 - Screens say *friend* only for the Pix friend list; elsewhere they name the role or say *the other person* (R&S 6.9).
 
 #### Module interfaces
@@ -2434,7 +2436,7 @@ Outside `/api/v1`:
 - **Verification.** The server checks the signature against Google's published keys, kept as long as Google's `Cache-Control` allows. The audience must be our web client ID (`PIX_GOOGLE_CLIENT_ID`, the server client ID the app passes to Credential Manager), and the issuer Google. Only the Google `sub` is kept (AD-12). Without the client ID or Google's keys, all three answer `503 UNAVAILABLE`.
 - **New account.** It is named after the Google account, up to 30 characters, or "Pix user" without a name. Its Pix ID is `null` until `PUT /me` sets one.
 
-**Signing up with Google (FR-5.13).** The app calls `POST /auth/google` first. On `NOT_REGISTERED` it asks "Do you already have a Pix account?" *Yes:* the person signs in with Pix ID and password, and the app sends the same ID token to `PUT /me/google`. *No:* *Sign up with Google* (`GoogleSignUpFragment`) says what the account keeps and waits for the agreement (FR-5.18); its *Sign up* calls `POST /auth/google/signup`, which creates the account, and the Pix ID setup follows. Its Back forgets the Google account, as closing the question does, or the next sign-in with a password would add it. A password account can add Google later the same way (FR-5.12).
+**Signing up with Google (FR-5.13).** The app calls `POST /auth/google` first. On `NOT_REGISTERED` it asks "Do you already have a Pix account?" *Yes:* the person signs in with Pix ID and password, and the app sends the same ID token to `PUT /me/google`. *No:* *Sign up with Google*, the agreement page for the Google account (`SignUpAgreementFragment` with `google`), says what the account keeps (FR-5.18); its *Agree* calls `POST /auth/google/signup`, which creates the account, and the Pix ID setup follows. Its Back forgets the Google account, as closing the question does, or the next sign-in with a password would add it. A password account can add Google later the same way (FR-5.12).
 
 **Adding a password (FR-5.14).** `PUT /me/password` `{ "password": "sunset2026" }` answers `200` with `"hasPassword": true`; the Pix ID and password then sign in too. The Pix ID is the login name, so an account without one gets `403 PIX_ID_REQUIRED`. The rules are those of sign-up. An account with a password gets `409 PASSWORD_ALREADY_SET`, since changing a password is not offered. There is no email, so a forgotten password cannot be reset.
 
@@ -3150,8 +3152,9 @@ erDiagram
 
 **Privacy** (NFR-13)
 
-- Before an account is made, *Sign up* and *Sign up with Google* say what it keeps, why, for how long, and who receives it, link to the privacy policy, and wait for "I'm 14 or older, and I agree" (`SignUpNotice`, FR-5.18). The app keeps no record of the agreement; the account exists only with it.
+- Before an account is made, the agreement page (`SignUpAgreementFragment`) says what it keeps, why, for how long, and who receives it, and links to the privacy policy. Its *Agree* confirms that the person is 14 or older and agrees (FR-5.18). As *Sign up*'s first page, it then opens the form; as *Sign up with Google*, it makes the account. The app keeps no record of the agreement; the account exists only with it.
 - The privacy policy is one text in two languages, `server/src/pix_server/privacy/policy.ko.md` and `policy.en.md`. The server renders both once at start and serves them at `/privacy` (Korean) and `/privacy/en`, the address the store links to; Pix shows the same page (2.1). The wiki's *Privacy Policy* pages copy them, and a test keeps the copies the same.
+- The page lays the text out as a document: the Pix logo and a language switch, the title with the effective date and the contact, the contents, and one part per numbered section. On a narrow screen, each table row becomes labeled lines. The page has no script and loads nothing from elsewhere, so the app's WebView keeps JavaScript off. The renderer refuses a policy laid out otherwise: sections as `## n. Name`, and `Term: value` lines before them.
 - The server never logs request bodies, images, the image API's response bodies, passwords, or tokens. Nor does it log descriptions, suggested poses, or variations, which describe the person in the photo.
 - A scene photo stays in memory until the response. nginx and the app refuse a request over 1 MiB before reading it, so no upload reaches the disk.
 - Each description and pose also goes, without the photo, to the description filter's decision model, TypeSafe's Jev on OpenRouter (2.6.3). A refusal logs only the question and its probability. Each `POST /poses` scene goes to the same model for the person check, which logs only its probability.

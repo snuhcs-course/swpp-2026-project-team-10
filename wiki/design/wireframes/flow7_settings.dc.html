@@ -13,23 +13,30 @@
 <style>
 body{margin:0;background:#1B1D22}
 a{color:#8FA7D6;text-decoration:none}a:hover{color:#AFC1E4}
-.pp-web{font-family:'Roboto','Noto Sans KR',sans-serif;font-size:16px;line-height:1.6;color:#F4F4F2;background:#0B0B0D}
-.pp-web *{word-break:normal;overflow-wrap:inherit}
-.pp-main{padding:16px 16px 48px;overflow-wrap:anywhere}
-.pp-web nav{text-align:right;font-size:15px}
-.pp-web a{color:#F2C14E;text-decoration:underline}
-.pp-lang::after{content:"한국어"}
-html[lang="ko"] .pp-lang::after{content:"English"}
-.pp-when-signing-in::after{content:"Signing in"}
-html[lang="ko"] .pp-when-signing-in::after{content:"로그인할 때"}
-.pp-web h1{font-size:26px;line-height:1.3;margin:16px 0 12px;font-weight:700}
-.pp-web h2{font-size:19px;margin:32px 0 8px;font-weight:700}
-.pp-web p,.pp-web ul{margin:16px 0}
-.pp-web ul{padding-left:40px}
-.pp-web table{display:block;overflow-x:auto;border-collapse:collapse;font-size:14px;margin:12px 0}
-.pp-web th,.pp-web td{border:1px solid #2C2F35;padding:8px 10px;text-align:left;vertical-align:top;min-width:96px}
-.pp-web th{color:#A3A7AD;font-weight:600}
-.pp-web code{font-family:'Roboto Mono',monospace;font-size:0.95em}
+.pp-web{font-family:'Roboto','Noto Sans KR',sans-serif;font-size:16px;line-height:1.65;color:#F4F4F2;background:#0B0B0D;overflow-wrap:anywhere}
+.pp-web,.pp-web *{box-sizing:border-box;word-break:normal;overflow-wrap:inherit}
+html[lang="ko"] .pp-web,html[lang="ko"] .pp-web *{word-break:keep-all}
+.pp-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:61px;padding:0 16px;background:#16171A;border-bottom:1px solid rgba(255,255,255,0.12)}
+.pp-logo{display:block;height:26px;width:auto;color:#F4F4F2}
+.pp-lang{display:flex;padding:3px;border:1px solid rgba(255,255,255,0.12);border-radius:999px;font-size:14px;line-height:1.4;white-space:nowrap}
+.pp-lang span{padding:5px 12px;border-radius:999px;color:#B8BBC0}
+.pp-lang .pp-en,html[lang="ko"] .pp-lang .pp-ko{background:#F2C14E;color:#16171A;font-weight:600}
+html[lang="ko"] .pp-lang .pp-en{background:none;color:#B8BBC0;font-weight:400}
+.pp-main{padding:30px 16px 56px}
+.pp-web h1{margin:0 0 14px;font-size:27px;line-height:1.25;letter-spacing:-0.015em;font-weight:700}
+.pp-lead{margin:0 0 22px;color:#B8BBC0}
+.pp-web code{padding:1px 6px;border:1px solid rgba(255,255,255,0.12);border-radius:6px;background:#1C1D21;font-family:'Roboto Mono',monospace;font-size:0.88em}
+.pp-meta{display:flex;flex-wrap:wrap;gap:6px 28px;margin:0;padding-top:16px;border-top:1px solid rgba(255,255,255,0.12);font-size:14px}
+.pp-meta div{display:flex;gap:10px}
+.pp-meta dt{color:#8A8E94}
+.pp-meta dd{margin:0;font-weight:600}
+.pp-contact::after{content:"Contact"}
+html[lang="ko"] .pp-contact::after{content:"문의"}
+.pp-toc{margin:36px 0 4px;padding:16px 16px 12px;background:#16171A;border:1px solid rgba(255,255,255,0.12);border-radius:16px}
+.pp-toc h2{margin:0 0 6px;color:#8A8E94;font-size:13px;line-height:1.65;font-weight:600;letter-spacing:0.06em;text-transform:uppercase}
+.pp-toc ol{margin:0;padding:0;list-style:none}
+.pp-toc li{display:flex;align-items:baseline;gap:12px;padding:7px 0}
+.pp-num{flex:none;min-width:26px;padding:2px 6px;border-radius:8px;background:rgba(242,193,78,0.16);color:#F2C14E;font-size:13px;font-weight:700;line-height:1.6;text-align:center}
 </style>
 </helmet>
 <div style="position: relative; width: 1160px; height: 981px; background: #1B1D22; color: #DDE0E6; font-family: 'IBM Plex Sans', 'Helvetica Neue', system-ui, sans-serif">
@@ -213,27 +220,31 @@ html[lang="ko"] .pp-when-signing-in::after{content:"로그인할 때"}
 <div style="position: absolute; left: 27.5px; top: 26.9px; width: 54.7px; height: 11.5px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 8.25px; font-weight: 700; line-height: 11.46px; color: #F4F4F2"><span style="text-align: left; white-space: nowrap">Privacy policy</span></div>
 <div style="position: absolute; left: 0; top: 43.67px; width: 165px; height: 297.43px; overflow: hidden; background: #0B0B0D">
 <div class="pp-web" style="width: 360px; transform: scale(0.458333); transform-origin: 0 0">
+<div class="pp-bar">
+<svg viewBox="0 -14 533 270" class="pp-logo"><g transform="translate(-34 0)"><path fill="currentColor" d="M146 76.37 L84.72 40.99 A70 70 0 0 1 146 28.35 Z M120 70.6 L58 106.39 L58 96 A70 70 0 0 1 78.42 46.59 Z M102 90.23 L102 188 L60 230 L58 230 L58 115.63 Z M110 115.63 L171.28 151.01 A70 70 0 0 1 110 163.65 Z M136 121.4 L197.28 86.02 A70 70 0 0 1 177.58 145.41 Z M154 101.77 L154 31.01 A70 70 0 0 1 195.58 77.77 Z"></path><path fill="#F2C14E" d="M154 111.01 L128 126.02 L102 111.01 L102 80.99 L128 65.98 L154 80.99 Z"></path></g><g transform="translate(208 26) scale(0.88)"><path fill="currentColor" d="M66.49645390070921 105.98581560283688H44.48226950354609V160.0H0.0V0.0H66.49645390070921Q85.78723404255318 0.0 99.29078014184395 6.808510638297875Q112.79432624113474 13.61702127659575 119.6028368794326 25.64539007092199Q126.41134751773048 37.67375886524823 126.41134751773048 53.33333333333334Q126.41134751773048 67.8581560283688 119.71631205673758 79.77304964539007Q113.02127659574468 91.68794326241135 99.51773049645391 98.83687943262412Q86.01418439716312 105.98581560283688 66.49645390070921 105.98581560283688ZM81.02127659574468 53.33333333333334Q81.02127659574468 35.858156028368796 62.184397163120565 35.858156028368796H44.48226950354609V70.58156028368795H62.184397163120565Q81.02127659574468 70.58156028368795 81.02127659574468 53.33333333333334Z M188.82269503546098 32.68085106382979V160.0H144.3404255319149V32.68085106382979Z M293.67375886524826 160.0 270.7517730496454 128.0 252.59574468085106 160.0H203.80141843971631L246.24113475177305 93.95744680851064L201.98581560283688 32.68085106382979H251.91489361702128L274.83687943262413 64.68085106382979L293.2198581560284 32.68085106382979H342.01418439716315L298.6666666666667 97.58865248226951L343.60283687943263 160.0Z"></path><path fill="#F2C14E" d="M191.16 -21.50 L166.70 -35.62 L142.23 -21.50 L142.23 6.75 L166.70 20.88 L191.16 6.75 Z"></path></g></svg>
+<div class="pp-lang"><span class="pp-ko">한국어</span><span class="pp-en">English</span></div>
+</div>
 <div class="pp-main">
-<nav><a class="pp-lang"></a></nav>
 <h1>Pix Privacy Policy</h1>
-<p>The Last Penguin team ("the team") runs the Pix app (<code>com.lastpenguin.pix</code>) and handles its users' personal information as described below. This is a translation of the Korean policy; if the two differ, the Korean text applies.</p>
-<ul>
-<li>Effective: November 21, 2026</li>
-<li>Contact: csmking7@gmail.com</li>
-</ul>
-<h2>1. Personal information we handle, and why</h2>
-<table>
-<thead>
-<tr><th>Information</th><th>When it is collected</th><th>Purpose</th></tr>
-</thead>
-<tbody>
-<tr><td>Name (display name), Pix ID</td><td>Sign-up, Pix ID setup</td><td>Identifying the account; shown when friends find and invite you</td></tr>
-<tr><td>Password (stored only as a hash)</td><td>Sign-up with a Pix ID</td><td>Signing in</td></tr>
-<tr><td>Google account identifier</td><td>Signing in with Google</td><td>Signing in</td></tr>
-<tr><td>Friendships, friend requests, invitations</td><td>Using friends and invitations</td><td>The friend list, invitations to share the camera</td></tr>
-<tr><td>Push notification token (a device identifier)</td><td class="pp-when-signing-in"></td><td>Alerts for invitations and friend requests</td></tr>
-</tbody>
-</table>
+<p class="pp-lead">The Last Penguin team ("the team") runs the Pix app (<code>com.lastpenguin.pix</code>) and handles its users' personal information as described below. This is a translation of the Korean policy; if the two differ, the Korean text applies.</p>
+<dl class="pp-meta">
+<div><dt>Effective</dt><dd>November 21, 2026</dd></div>
+<div><dt class="pp-contact"></dt><dd>csmking7@gmail.com</dd></div>
+</dl>
+<div class="pp-toc">
+<h2>Contents</h2>
+<ol>
+<li><span class="pp-num">1</span>Personal information we handle, and why</li>
+<li><span class="pp-num">2</span>What the server does not keep</li>
+<li><span class="pp-num">3</span>How long we keep it, and deletion</li>
+<li><span class="pp-num">4</span>Outside services and transfer abroad</li>
+<li><span class="pp-num">5</span>Your rights</li>
+<li><span class="pp-num">6</span>How we keep it safe</li>
+<li><span class="pp-num">7</span>Children's personal information</li>
+<li><span class="pp-num">8</span>Contact</li>
+<li><span class="pp-num">9</span>Changes to this policy</li>
+</ol>
+</div>
 </div>
 </div>
 </div>

@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The sign-up agreement (FR-5.18), before any account is made: what the account keeps (what, why, how long, and who
+     receives it), the privacy policy, and Agree. As Sign up's first page, Agree opens the form; as Sign up with Google,
+     after "Do you already have a Pix account?" answered No, it makes the account, and Pix ID setup comes next.
+     SignUpAgreement sets the title, the body, and what is kept. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="56dp">
+
+            <ImageButton
+                android:id="@+id/backButton"
+                style="@style/Widget.Pix.Header.Back"
+                android:contentDescription="@string/back" />
+
+            <TextView
+                android:id="@+id/titleText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:accessibilityHeading="true"
+                android:text="@string/sign_up_title"
+                android:textAppearance="@style/TextAppearance.Pix.Header" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/bodyText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:lineSpacingMultiplier="1.2"
+            android:text="@string/sign_up_agreement_body"
+            android:textAppearance="@style/TextAppearance.Pix.BodyLarge"
+            android:textColor="@color/pix_text_muted" />
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/Widget.Pix.Card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingTop="16dp"
+                android:paddingBottom="8dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:accessibilityHeading="true"
+                    android:text="@string/sign_up_notice_title"
+                    android:textAppearance="@style/TextAppearance.Pix.Action"
+                    android:textColor="@color/pix_text" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/sign_up_notice_what_label"
+                    android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+                    android:textColor="@color/pix_text_muted" />
+
+                <TextView
+                    android:id="@+id/whatText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/sign_up_notice_what_password"
+                    android:textAppearance="@style/TextAppearance.Pix.Body"
+                    android:textColor="@color/pix_text" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/sign_up_notice_why_label"
+                    android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+                    android:textColor="@color/pix_text_muted" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/sign_up_notice_why"
+                    android:textAppearance="@style/TextAppearance.Pix.Body"
+                    android:textColor="@color/pix_text" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/sign_up_notice_how_long_label"
+                    android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+                    android:textColor="@color/pix_text_muted" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/sign_up_notice_how_long"
+                    android:textAppearance="@style/TextAppearance.Pix.Body"
+                    android:textColor="@color/pix_text" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/sign_up_notice_who_label"
+                    android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+                    android:textColor="@color/pix_text_muted" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/sign_up_notice_who"
+                    android:textAppearance="@style/TextAppearance.Pix.Body"
+                    android:textColor="@color/pix_text" />
+
+                <Button
+                    android:id="@+id/policyButton"
+                    style="@style/Widget.Pix.Button.Text.Small"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="-12dp"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/sign_up_notice_policy" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            android:id="@+id/agreeText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/sign_up_agree"
+            android:textAppearance="@style/TextAppearance.Pix.Body"
+            android:textColor="@color/pix_text_muted" />
+
+        <TextView
+            android:id="@+id/errorText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:accessibilityLiveRegion="polite"
+            android:textAppearance="@style/TextAppearance.Pix.Body"
+            android:textColor="@color/pix_danger_text"
+            android:visibility="gone" />
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:minHeight="24dp" />
+
+        <Button
+            android:id="@+id/agreeButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/agree" />
+    </LinearLayout>
+</ScrollView>

@@ -1,10 +1,15 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix
 
 import android.app.Application
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
+import android.view.View
+import android.view.ViewGroup
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import androidx.test.core.app.ApplicationProvider
@@ -28,7 +33,8 @@ import org.robolectric.annotation.GraphicsMode
  * Pix in another app's task, such as a browser's, or in a task of its own, such as a notification's (its screen over
  * Camera either way, so Decline returns to Camera); a link while Pix runs (on top of what is shown); the activity
  * recreated after a link started it (the link not opened again). The screens' language for the server's text taken
- * from the activity (FR-10.2).
+ * from the activity (FR-10.2). The screens' room: inside the system bars with the keyboard closed, and above the
+ * keyboard while it is open, since Android 15 and later no longer shrink the window for it.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -61,6 +67,27 @@ class MainActivityTest {
     private fun ActivityController<MainActivity>.shown(): FragmentFailureBinding {
         val navHost = get().supportFragmentManager.findFragmentById(R.id.navHost) as NavHostFragment
         return FragmentFailureBinding.bind(navHost.childFragmentManager.primaryNavigationFragment!!.requireView())
+    }
+
+    @Test
+    fun theScreens_stayInsideTheBars_andAboveAnOpenKeyboard() {
+        val root = (start(Intent(Intent.ACTION_MAIN)).get().findViewById<View>(android.R.id.content) as ViewGroup)
+            .getChildAt(0)
+        fun apply(keyboard: Int) {
+            val insets = WindowInsetsCompat.Builder()
+                .setInsets(WindowInsetsCompat.Type.statusBars(), Insets.of(0, 96, 0, 0))
+                .setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, 48))
+                .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, keyboard))
+                .setVisible(WindowInsetsCompat.Type.ime(), keyboard > 0)
+                .build()
+            ViewCompat.dispatchApplyWindowInsets(root, insets)
+        }
+
+        apply(keyboard = 0)
+        assertEquals(listOf(96, 48), listOf(root.paddingTop, root.paddingBottom))
+
+        apply(keyboard = 900)
+        assertEquals(listOf(96, 900), listOf(root.paddingTop, root.paddingBottom))
     }
 
     @Test

@@ -74,10 +74,10 @@ import com.lastpenguin.pix.ui.account.AccountSheet
 import com.lastpenguin.pix.ui.account.AccountViewModel
 import com.lastpenguin.pix.ui.account.AddFriendFragment
 import com.lastpenguin.pix.ui.account.FriendsFragment
-import com.lastpenguin.pix.ui.account.GoogleSignUpFragment
 import com.lastpenguin.pix.ui.account.PixIdSetupFragment
 import com.lastpenguin.pix.ui.account.SentRequestsFragment
 import com.lastpenguin.pix.ui.account.SignInFragment
+import com.lastpenguin.pix.ui.account.SignUpAgreementFragment
 import com.lastpenguin.pix.ui.account.SignUpFragment
 import com.lastpenguin.pix.ui.camera.CameraFragment
 import com.lastpenguin.pix.ui.generation.DescribePoseFragment
@@ -136,7 +136,8 @@ import org.robolectric.shadows.ShadowDialog
  * Generate poses; Generating poses with a candidate ready; Pick a pose, alone, with a pose saved by its ♥, and in a
  * session; Couldn't create poses,
  * failed, refused, and without a person; Who takes the photo?; Share my camera signed out, and with a friend, a request,
- * and a sent request; Sent requests; Add a friend; Sign in; Sign up; Sign up with Google; Pix ID setup; Account, with
+ * and a sent request; Sent requests; Add a friend; Sign in; the sign-up agreement; Sign up; Sign up with Google;
+ * Pix ID setup; Account, with
  * "Delete your Pix account?"; the room code; See their
  * camera; Session not found; Subject view, with the photographer's tip closed and open,
  * and while the photographer picks a pose, with a guide to save, and with the session's photos open in the viewer,
@@ -656,12 +657,21 @@ class KoreanScreensTest {
     }
 
     @Test
+    fun signUpAgreement_isInKorean() {
+        accountScreen<SignUpAgreementFragment>(R.id.signUpAgreementFragment, signedIn = false)
+        assertKorean(screen())
+    }
+
+    @Test
     fun googleSignUp_isInKorean() {
         val modules = TestAppContainer()
         modules.auth.googleResult = GoogleSignIn.NotRegistered
         modules.install()
         // The screen needs the waiting Google account before its view is made.
-        scenario = launchPrepared<GoogleSignUpFragment>(R.id.googleSignUpFragment) { activity ->
+        scenario = launchPrepared<SignUpAgreementFragment>(
+            R.id.signUpAgreementFragment,
+            bundleOf(SignUpAgreementFragment.ARG_GOOGLE to true),
+        ) { activity ->
             activity.viewModel<AccountViewModel>().continueWithGoogle(activity)
         }.first
         assertKorean(screen())

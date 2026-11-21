@@ -346,7 +346,7 @@ class ScreenTransitionsTest {
             R.id.sentRequestsFragment to Kind.SCREEN,
             R.id.signInFragment to Kind.SCREEN,
             R.id.signUpFragment to Kind.SCREEN,
-            R.id.googleSignUpFragment to Kind.SCREEN,
+            R.id.signUpAgreementFragment to Kind.SCREEN,
             R.id.pixIdSetupFragment to Kind.SCREEN,
             R.id.privacyPolicyFragment to Kind.SCREEN,
             R.id.accountSheet to Kind.SHEET,

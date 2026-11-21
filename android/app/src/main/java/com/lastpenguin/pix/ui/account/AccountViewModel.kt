@@ -66,7 +66,7 @@ sealed interface AccountEvent {
 /**
  * Sign in, Sign up, Sign up with Google, Pix ID setup, and the Account sheet (R&S 6.4; FR-5.2, FR-5.3, FR-5.11–5.14,
  * FR-5.18, FR-5.19). Shared by those screens (activity scope), because the Google account of "Do you already have a Pix
- * account?" waits here while the person signs in, or agrees on Sign up with Google. One call at a time. Owner:
+ * account?" waits here while the person signs in, or taps *Agree* on Sign up with Google. One call at a time. Owner:
  * Accounts (#54).
  */
 class AccountViewModel(private val auth: AuthRepository, private val google: GoogleIdTokens) : ViewModel() {
@@ -119,9 +119,9 @@ class AccountViewModel(private val auth: AuthRepository, private val google: Goo
     }
 
     /**
-     * *Sign up* on Sign up with Google, once the person agreed to what the account keeps (FR-5.13, FR-5.18): the waiting
+     * *Agree* on Sign up with Google, once the person read what the account keeps (FR-5.13, FR-5.18): the waiting
      * Google account makes a new Pix account, which chooses its Pix ID next. The Google account keeps waiting until the
-     * account is made, so *Sign up* can be tried again after a failure.
+     * account is made, so *Agree* can be tried again after a failure.
      */
     fun signUpWithGoogle() {
         val token = pendingGoogleToken ?: return

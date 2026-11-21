@@ -37,8 +37,8 @@ import org.robolectric.shadows.ShadowToast
  * Pix ID setup, in Sign in's place); one refused (the message, cleared on the next edit); Continue with
  * Google for a registered account, and for one no Pix account uses (the question: Yes keeps the screen in its
  * linking state and the next sign-in adds Google, with the failure of that step as a message; No opens Sign up with
- * Google and makes no account yet, `GoogleSignUpFragmentTest`);
- * Sign up; Back, which forgets the waiting Google account.
+ * Google and makes no account yet, `SignUpAgreementFragmentTest`);
+ * Sign up (its agreement first); Back, which forgets the waiting Google account.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -193,18 +193,20 @@ class SignInFragmentTest {
         idle()
 
         assertEquals(listOf("google:google-token"), modules.auth.calls)
-        assertEquals(R.id.googleSignUpFragment, nav.currentDestination?.id)
+        assertEquals(R.id.signUpAgreementFragment, nav.currentDestination?.id)
+        assertEquals(true, nav.currentBackStackEntry?.arguments?.getBoolean(SignUpAgreementFragment.ARG_GOOGLE))
         assertTrue(accountViewModel.waitingGoogle)
     }
 
     @Test
-    fun signUp_opensSignUp() {
+    fun signUp_opensItsAgreementFirst() {
         launch()
 
         onScreen { it.signUpButton.performClick() }
         idle()
 
-        assertEquals(R.id.signUpFragment, nav.currentDestination?.id)
+        assertEquals(R.id.signUpAgreementFragment, nav.currentDestination?.id)
+        assertEquals(false, nav.currentBackStackEntry?.arguments?.getBoolean(SignUpAgreementFragment.ARG_GOOGLE))
     }
 
     @Test

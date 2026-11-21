@@ -322,7 +322,9 @@
     <string name="sign_up_notice_who_label">받는 곳</string>
     <string name="sign_up_notice_who">호주의 AWS에서 운영하는 Pix 서버, 그리고 알림을 전하는 Google이에요.</string>
     <string name="sign_up_notice_policy">개인정보 처리방침 보기</string>
-    <string name="sign_up_agree">만 14세 이상이며, Pix가 이 정보를 수집하고 이용하는 데 동의해요.</string>
+    <string name="sign_up_agree">동의를 누르면 만 14세 이상이며, Pix가 이 정보를 수집하고 이용하는 데 동의하는 거예요.</string>
+    <string name="agree">동의</string>
+    <string name="sign_up_agreement_body">먼저 새 Pix 계정에 저장하는 정보를 확인하세요. Pix ID, 이름, 비밀번호는 다음 화면에서 정해요.</string>
     <string name="google_sign_up_title">Google로 회원가입</string>
     <string name="google_sign_up_body">이 Google 계정으로 새 Pix 계정을 만들어요. Pix ID는 다음 화면에서 정해요.</string>
     <string name="pix_id_setup_title">Pix ID 정하기</string>

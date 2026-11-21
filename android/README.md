@@ -48,11 +48,11 @@ Every screen except the tutorial's tips is a destination in `res/navigation/nav_
 | Who takes the photo? (bottom sheet), See their camera, Session not found | `session/ShootTogetherSheet`, `JoinCodeFragment`, `SessionNotFoundFragment` | `IncomingInvitationsViewModel`, `SessionViewModel` |
 | Share my camera | `account/FriendsFragment` | `FriendsViewModel`, `SessionViewModel` |
 | Add a friend, No user found, Sent requests | `account/AddFriendFragment`, `SentRequestsFragment` | `FriendsViewModel` |
-| Sign in, Sign up, Pix ID setup, Account (bottom sheet) | `account/SignInFragment`, `SignUpFragment`, `PixIdSetupFragment`, `AccountSheet` | `AccountViewModel` |
+| Sign in, Sign up with its agreement, Sign up with Google, Pix ID setup, Account (bottom sheet) | `account/SignInFragment`, `SignUpAgreementFragment`, `SignUpFragment`, `PixIdSetupFragment`, `AccountSheet` | `AccountViewModel` |
 | Room code and Invite sent (bottom sheets), Invite not accepted | `session/RoomCodeSheet`, `InviteSentSheet`, `InviteNotAcceptedFragment` | `SessionViewModel` |
 | Invitation (deep link `pix://invite/{invitationId}`) | `session/InvitationFragment` | `InvitationViewModel`, `SessionViewModel` |
 | Subject view, the subject's Generate poses, Generating poses, Pick a pose, and Your reference, Connection lost | `session/SubjectFragment`, `SubjectDescribeFragment`, `SubjectGeneratingFragment`, `SubjectPickPoseFragment`, `SubjectConfirmFragment`, `ConnectionLostFragment` | `SubjectViewModel`, `SubjectDescribeViewModel`, `SubjectGeneratingViewModel`, `SubjectPickViewModel`, `SubjectConfirmViewModel`, `SessionViewModel`, `SettingsViewModel`, `PoseSaveViewModel` |
-| Settings, How to use Pix, About Pix | `settings/SettingsFragment`, `HelpFragment`, `AboutFragment` | `SettingsViewModel`, `GenerationViewModel` (the AI agreement) |
+| Settings, How to use Pix, About Pix, Privacy policy | `settings/SettingsFragment`, `HelpFragment`, `AboutFragment`, `PrivacyPolicyFragment` | `SettingsViewModel`, `GenerationViewModel` (the AI agreement) |
 | The tutorial's tips (a dialog, not a destination, FR-10.4) | `settings/TutorialFragment` | `SettingsViewModel` |
 
 ## How to work on it

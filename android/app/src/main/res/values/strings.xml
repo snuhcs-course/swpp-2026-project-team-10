@@ -342,7 +342,9 @@
     <string name="sign_up_notice_who_label">Who receives it</string>
     <string name="sign_up_notice_who">Pix\'s server, run on AWS in Australia, and Google, which delivers the alerts.</string>
     <string name="sign_up_notice_policy">Read the privacy policy</string>
-    <string name="sign_up_agree">I\'m 14 or older, and I agree to Pix keeping this information.</string>
+    <string name="sign_up_agree">By tapping Agree, you confirm that you\'re 14 or older and agree to Pix keeping this information.</string>
+    <string name="agree">Agree</string>
+    <string name="sign_up_agreement_body">First, what your new Pix account keeps. You choose your Pix ID, name, and password next.</string>
     <string name="google_sign_up_title">Sign up with Google</string>
     <string name="google_sign_up_body">Your Google account makes a new Pix account. You choose your Pix ID next.</string>
     <string name="pix_id_setup_title">Choose your Pix ID</string>

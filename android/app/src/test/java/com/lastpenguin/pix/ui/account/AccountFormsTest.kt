@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-10-27, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.account
 
 import android.view.LayoutInflater
@@ -25,10 +25,9 @@ import org.junit.runner.RunWith
 
 /*
  * Partitions for the account forms on their real layouts (US-6, US-7; FR-5.2, FR-5.3, FR-5.5, FR-5.8, FR-5.11,
- * FR-5.15, FR-5.18). Sign up: empty (rules faint, button off), "Test User!" (the Pix ID rule in red, US-6), a password
- * without a digit, the password equal to the Pix ID, all valid and agreed (button on), all valid without the agreement
- * or with it taken back (button off), PIX_ID_TAKEN from the server (at the field; editing clears it; it wins over a
- * Check that said free), busy; its notice names the password and opens the privacy policy. Check on Sign up: an empty or broken Pix ID (off), a valid one
+ * FR-5.15). Sign up: empty (rules faint, button off), "Test User!" (the Pix ID rule in red, US-6), a password without a
+ * digit, the password equal to the Pix ID, all valid (button on), PIX_ID_TAKEN from the server (at the field; editing
+ * clears it; it wins over a Check that said free), busy. Check on Sign up: an empty or broken Pix ID (off), a valid one
  * (asks for it), checking (off, "Checking…"), free (in green), taken (in red), failed (the reason in red), an answer for
  * another Pix ID than the field's (the rule instead). Pix ID setup: invalid and valid input, TAKEN with the input kept,
  * Check. Sign in: both fields needed, a refused
@@ -58,7 +57,6 @@ class AccountFormsTest {
             onCheck = { calls += "check:$it" },
             onSignUp = { id, name, _ -> calls += "signUp:$id:$name" },
             onEdited = { calls += "edited" },
-            onPolicy = { calls += "policy" },
         )
         return binding to form
     }
@@ -75,7 +73,6 @@ class AccountFormsTest {
     @Test
     fun signUp_aPixIdWithASpaceAndASymbol_showsTheRuleInRed() {
         val (binding, _) = signUp()
-        binding.notice.agreeCheck.performClick()
 
         binding.pixIdInput.setText("Test User!")
 
@@ -86,7 +83,6 @@ class AccountFormsTest {
     @Test
     fun signUp_passwordWithoutADigit_orEqualToThePixId_waits() {
         val (binding, _) = signUp()
-        binding.notice.agreeCheck.performClick()
         binding.pixIdInput.setText("testuser1")
         binding.nameInput.setText("Test Account 1")
 
@@ -105,39 +101,11 @@ class AccountFormsTest {
         binding.pixIdInput.setText("test1")
         binding.nameInput.setText("Test Account 1")
         binding.passwordInput.setText("sunset2026")
-        binding.notice.agreeCheck.performClick()
 
         assertTrue(binding.signUpButton.isEnabled)
         binding.signUpButton.performClick()
 
         assertEquals(listOf("signUp:test1:Test Account 1"), calls)
-    }
-
-    @Test
-    fun signUp_withoutTheAgreement_waits() {
-        val (binding, _) = signUp()
-        binding.pixIdInput.setText("test1")
-        binding.nameInput.setText("Test Account 1")
-        binding.passwordInput.setText("sunset2026")
-        assertFalse(binding.signUpButton.isEnabled)
-
-        binding.notice.agreeCheck.performClick()
-        assertTrue(binding.signUpButton.isEnabled)
-        binding.notice.agreeCheck.performClick()
-        assertFalse(binding.signUpButton.isEnabled)
-        binding.signUpButton.performClick()
-
-        assertEquals(emptyList<String>(), calls)
-    }
-
-    @Test
-    fun signUp_notice_namesThePassword_andOpensThePrivacyPolicy() {
-        val (binding, _) = signUp()
-
-        assertEquals(activity.getString(R.string.sign_up_notice_what_password), binding.notice.whatText.text.toString())
-        binding.notice.policyButton.performClick()
-
-        assertEquals(listOf("policy"), calls)
     }
 
     @Test
@@ -225,7 +193,6 @@ class AccountFormsTest {
     @Test
     fun signUp_busy_waits() {
         val (binding, form) = signUp()
-        binding.notice.agreeCheck.performClick()
         binding.pixIdInput.setText("test1")
         binding.nameInput.setText("Test Account 1")
         binding.passwordInput.setText("sunset2026")

@@ -81,31 +81,26 @@
       "Google APIs Terms of Service",
       "Android Software Development Kit License",
       "SIL Open Font License 1.1",
-      "com.lastpenguin.pix"
+      "com.lastpenguin.pix",
+      "English",
+      "csmking7@gmail.com"
     ],
     "texts": {
       "Pix Privacy Policy": "Pix 개인정보 처리방침",
       "The Last Penguin team (\"the team\") runs the Pix app (": "Last Penguin 팀(이하 \"팀\")은 Pix 앱(",
       ") and handles its users' personal information as described below. This is a translation of the Korean policy; if the two differ, the Korean text applies.": ")을 운영하며, 이용자의 개인정보를 아래와 같이 처리합니다.",
-      "Effective: November 21, 2026": "시행일: 2026년 11월 21일",
-      "Contact: csmking7@gmail.com": "문의: csmking7@gmail.com",
-      "1. Personal information we handle, and why": "1. 처리하는 개인정보와 목적",
-      "Information": "항목",
-      "When it is collected": "수집 시점",
-      "Purpose": "목적",
-      "Name (display name), Pix ID": "이름(표시 이름), Pix ID",
-      "Sign-up, Pix ID setup": "회원가입, Pix ID 설정",
-      "Identifying the account; shown when friends find and invite you": "계정 식별, 친구 찾기와 초대에 표시",
-      "Password (stored only as a hash)": "비밀번호 (해시로만 저장)",
-      "Sign-up with a Pix ID": "Pix ID로 가입할 때",
-      "Signing in": "로그인",
-      "Google account identifier": "Google 계정 식별자",
-      "Signing in with Google": "Google로 로그인할 때",
-      "Friendships, friend requests, invitations": "친구 관계, 친구 요청, 초대 기록",
-      "Using friends and invitations": "친구와 초대 기능을 쓸 때",
-      "The friend list, invitations to share the camera": "친구 목록, 카메라 공유 초대",
-      "Push notification token (a device identifier)": "푸시 알림 토큰 (기기 식별값)",
-      "Alerts for invitations and friend requests": "초대와 친구 요청 알림"
+      "Effective": "시행일",
+      "November 21, 2026": "2026년 11월 21일",
+      "Contents": "목차",
+      "Personal information we handle, and why": "처리하는 개인정보와 목적",
+      "What the server does not keep": "서버에 남지 않는 것",
+      "How long we keep it, and deletion": "보유 기간과 파기",
+      "Outside services and transfer abroad": "외부 서비스 이용과 국외 이전",
+      "Your rights": "이용자의 권리",
+      "How we keep it safe": "안전성 확보 조치",
+      "Children's personal information": "아동의 개인정보",
+      "Contact": "문의처",
+      "Changes to this policy": "처리방침의 변경"
     }
   }
 }

@@ -113,6 +113,7 @@
 | 3.33 | 2026-11-20 | The live view's sharpness after a reconnection, left for Iteration 5 ([#238]) (2.9). |
 | 3.34 | 2026-11-20 | The Iteration 4 tasks as their issues stand: the owners of Iter4-P7 and Iter4-P11, the name and date of Iter4-P16, and when the prompt templates were dropped (2.9). |
 | 3.35 | 2026-11-21 | One server each for `main` and `dev`, in two versions: a course server, and an AWS server over HTTPS, which the builds use (1.1.1, 1.1.3, 1.2, AD-11, 2.5.2, 2.5.3, 2.6.6, 2.7, 2.8, 2.10). |
+| 3.36 | 2026-11-21 | Server logs and alerts: the AWS servers' logs in CloudWatch, with an alarm on 5xx answers (1.2, AD-20, 2.8). |
 
 </details>
 
@@ -323,6 +324,7 @@ App versions are from `android/gradle/libs.versions.toml`; server versions are t
 | Redis 8, `redis-py` 8.1 | The session store and pub/sub between server processes (AD-18, 2.7) | Host, Server |
 | fakeredis 2.39 with `lupa` | An in-process Redis that runs the store's Lua, for tests and a laptop; development only (2.7) | Server |
 | Docker Compose, nginx 1.30, PostgreSQL 18, certbot | Hosting on the course servers and the AWS servers; nginx switches between the two app copies during a deploy. On the AWS servers, it also serves HTTPS with a certificate that certbot gets from Let's Encrypt (2.8) | Host |
+| AWS CloudWatch Logs and alarms | The AWS servers' logs of the app and nginx, and an email alarm on 5xx answers (AD-20, 2.8) | Host |
 
 ### 1.3 Architectural decisions
 
@@ -347,6 +349,7 @@ App versions are from `android/gradle/libs.versions.toml`; server versions are t
 | AD-17 | **Pinch zoom with a guide-edit mode toggle on both phones** | A pinch is the natural zoom, and one toggle decides: on, gestures edit the guide; off, a pinch zooms. The subject moves the guide (FR-7.2) and zooms too. | A zoom slider; deciding by where the finger lands |
 | AD-18 | **Session state lives in a Redis session store, not in the server process** | Workers share the state, and a new copy takes over during a deploy without losing a waiting room (2.8). The small, short-lived state fits Redis's atomic scripts, expiry, and pub/sub (2.7). Cost: one more service and Lua room transitions; NFR-18's 50 sessions fit in one worker. | One process with in-memory state; routing rooms by code; the relational database |
 | AD-19 | **Crash reports and usage events through Firebase Crashlytics and Analytics, behind one `Telemetry` facade** | Pix already uses Firebase for pushes, so no account or server is added. The phones send over HTTPS from any network, which the course servers cannot receive. One facade with typed events keeps personal data out (NFR-13) and lets tests record what is sent. Release builds only, while the user allows it (FR-10.6). | An endpoint on the Pix server (plain HTTP, campus only, our own storage and dashboards); Sentry (another account and SDK) |
+| AD-20 | **Server logs in CloudWatch Logs, with a CloudWatch alarm on 5xx answers, all in AWS** | The AWS servers already run there, so no account or agent is added. The logs outlive deploys and can be searched without SSH, and the team gets an email when a server answers with errors (2.8, *Server logs and alerts*). | Sentry (another account and SDK); Prometheus and Grafana, ELK, or Loki (a system to run); an uptime check from outside: Route 53 health checks alarm only in `us-east-1`, which the account's organization blocks, and UptimeRobot is another account (not needed for the course) |
 
 ## 2. Design Details
 
@@ -3154,6 +3157,7 @@ erDiagram
 
 - The global limits bound a day's model cost, however many addresses send. The OpenRouter key's spending limit, set in its dashboard, is the last bound. On the course servers, the address is the last `X-Forwarded-For` value, and on the AWS servers the address that connects (*Hosting*).
 - Requests to the AWS servers are encrypted with TLS. Over plain HTTP to a course server or a laptop, a scene photo, a sign-in password, and the tokens travel unencrypted (AD-11). The live view goes phone to phone, encrypted (NFR-14).
+- The AWS servers' logs, which hold the same lines, also go to CloudWatch in the servers' region (*Server logs and alerts*).
 - No URL holds a Pix ID or other personal data, because nginx's error log prints a failed request's whole request line. The lookup is `POST /users/lookup`. nginx and Uvicorn access logs leave out query strings.
 - Password hashes run two at a time per worker. A burst of sign-ins, which needs no account, then queues instead of taking a 64 MiB argon2id buffer per pool thread.
 - Cloud backups are off (`allowBackup="false"`); `data_extraction_rules.xml` keeps the sign-in, `guides/`, and the prompt history out of transfers to a new phone.
@@ -3187,6 +3191,14 @@ erDiagram
 
 - Each field is an event-scoped custom definition in the linked Analytics property: a dimension, or a metric for a count or a time (milliseconds for `ms` and `shutter_ms`). Analytics' reports show only registered fields, from their registration on, so a new field is registered before its release.
 - To see a debug build's events in Firebase's DebugView, build with `-Ppix.telemetry=true` and run `adb shell setprop debug.firebase.analytics.app com.lastpenguin.pix`.
+
+**Server logs and alerts** (AD-20)
+
+- The server writes its log lines to stdout and stderr: Uvicorn's, with its access log (`INFO:`, `ERROR:`), and the server's own, each with its level and logger (`WARNING pix_server.poses.generator: …`), from WARNING up and one INFO line. nginx writes its access log without query strings. What a line may hold: *Privacy*.
+- Docker keeps each container's log on its server, 5 files of 10 MB, which `pix logs` reads. A deploy recreates a copy's container and deletes that log.
+- On the AWS servers, the app's copies and nginx also send their logs to CloudWatch Logs, in one log group per server (`/pix/main`, `/pix/dev`) that keeps 30 days, with one stream per container name. Their driver does not block. `deploy.sh` tries the log group before each deploy, restart, or rollback, and keeps the logs local when that fails. Redis and PostgreSQL log only locally, so turning this on never restarts them.
+- A metric filter on each log group counts nginx's 5xx answers, and 5 or more in 5 minutes raise an alarm, which emails the team through SNS. A server that does not answer at all writes no log, so no alarm sees it.
+- The phones' crash reports and events: *Telemetry*.
 
 **Hosting** (AD-11)
 

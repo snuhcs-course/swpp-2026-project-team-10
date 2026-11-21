@@ -1,0 +1,24 @@
+# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
+# CloudWatch Logs for the AWS servers (server/README.md, Logs in CloudWatch). deploy.sh adds this file to
+# docker-compose.yml when deploy.conf names a log group (CLOUDWATCH_GROUP). The app's copies and nginx send their logs
+# there, and Docker keeps a local copy, which docker logs and pix logs read. Redis and PostgreSQL keep their local log
+# only, so turning this on never restarts them: a restart of Redis would end every room.
+x-cloudwatch: &cloudwatch
+  # Compose replaces the base file's json-file options, since the driver differs.
+  driver: awslogs
+  options:
+    awslogs-region: ${PIX_LOG_REGION:?deploy.sh sets PIX_LOG_REGION}
+    awslogs-group: ${PIX_LOG_GROUP:?deploy.sh sets PIX_LOG_GROUP}
+    # One stream per container name, so a copy's log goes on in the same stream after a deploy recreates it.
+    tag: "{{.Name}}"
+    # If CloudWatch does not answer, log lines are dropped after this buffer fills, instead of blocking the app.
+    mode: non-blocking
+    max-buffer-size: 4m
+
+services:
+  app-blue:
+    logging: *cloudwatch
+  app-green:
+    logging: *cloudwatch
+  nginx:
+    logging: *cloudwatch

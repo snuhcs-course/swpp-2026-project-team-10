@@ -311,6 +311,7 @@ Do this setup once in the AWS console, in the servers' region (`ap-southeast-2`)
 5. **Give the workflow the instance IDs and addresses.** Put them in the workflow's `env`, by branch (`AWS_INSTANCE_ID`, `SERVER_URL`). They are not secrets.
 6. **Disable the timer on each server** with `sudo systemctl disable --now pix-deploy.timer`. Then only the workflow deploys, and its log shows each build. If the timer stays on, deploys still work. But the run often shows only that the commit was already live.
 7. **Set up HTTPS** on each server ([HTTPS](#https)).
+8. **Send the logs to CloudWatch** ([Logs in CloudWatch](#logs-in-cloudwatch)).
 
 To replace the key:
 
@@ -348,6 +349,82 @@ Set it up once on each AWS server, after a deploy of a commit that has these fil
 
 sslip.io is not on the Public Suffix List, so all sslip.io names share Let's Encrypt's limit of 50 new certificates in 7 days. If certbot is refused for that limit, try again later. A renewal of the same name is exempt.
 
+### Logs in CloudWatch
+
+The AWS servers also send the logs of the app's copies and of nginx to [CloudWatch Logs](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/), in the servers' region. So the logs outlive a deploy, which recreates a copy's container and deletes its local log, and you can read and search them without SSH.
+
+- Each server has one log group, `/pix/main` or `/pix/dev`, which keeps 30 days. nginx's access lines hold the phones' addresses, so keep that limit short.
+- Each container writes to a stream named after it (`pix-app-blue-1`, `pix-app-green-1`, `pix-nginx-1`), which goes on after a deploy recreates the container.
+- Docker keeps a local copy, so `pix logs` and `docker logs` still work. Redis and PostgreSQL keep their local log only: a change of their log driver would restart them, and a restart of Redis ends every room.
+- `deploy.sh` adds [`docker-compose.cloudwatch.yml`](deploy/docker-compose.cloudwatch.yml) when `/opt/pix/deploy.conf` sets `CLOUDWATCH_GROUP` and `CLOUDWATCH_REGION`. Before each deploy, restart, or rollback, it checks that the server can make a log stream there, with a container that writes one line to the `deploy-check` stream. When that fails, it warns and keeps the logs on the server for that run. Docker reports a failed upload of a line only in its own journal (`journalctl -u docker`), so the check cannot prove that lines arrive: step 3 does. `deploy.sh status` says where nginx's log goes.
+- An alarm emails you when nginx answers 5 or more requests with a 5xx status in 5 minutes. It cannot see a server that does not answer at all, which writes no log. No check from outside covers that.
+- The server's own lines start with their level and logger, such as `WARNING pix_server.poses.generator: …`. Uvicorn's start with `INFO:` or `ERROR:`.
+
+Set it up once:
+
+1. **Make the log groups and the alarm.** Open CloudShell in the AWS console, in `ap-southeast-2`, and run this with the email addresses that get the alarm. Each address confirms its subscription from the email AWS sends, within three days.
+
+   ```sh
+   export AWS_REGION=ap-southeast-2
+   topic=$(aws sns create-topic --name pix-alerts --query TopicArn --output text)
+   for email in <address 1> <address 2>; do
+     aws sns subscribe --topic-arn "$topic" --protocol email --notification-endpoint "$email"
+   done
+   for env in main dev; do
+     aws logs create-log-group --log-group-name /pix/$env
+     aws logs put-retention-policy --log-group-name /pix/$env --retention-in-days 30
+     aws logs put-metric-filter --log-group-name /pix/$env --filter-name http-5xx \
+       --filter-pattern '[ip, dash, user, time, request = *HTTP*, status = 5*, bytes, referer, agent]' \
+       --metric-transformations metricName=Http5xx,metricNamespace=Pix/$env,metricValue=1,defaultValue=0
+     aws cloudwatch put-metric-alarm --alarm-name pix-$env-5xx --namespace Pix/$env --metric-name Http5xx \
+       --statistic Sum --period 300 --evaluation-periods 1 --threshold 5 \
+       --comparison-operator GreaterThanOrEqualToThreshold --treat-missing-data notBreaching --alarm-actions "$topic"
+   done
+   ```
+
+   To add an address later, run the `topic=` line, which returns the topic that exists, and the `subscribe` line. `aws sns list-subscriptions-by-topic --topic-arn "$topic"` lists the addresses. Every alarm email has a link that unsubscribes its address.
+
+   To check the filter against one of nginx's lines:
+
+   ```sh
+   aws logs test-metric-filter --filter-pattern '[ip, dash, user, time, request = *HTTP*, status = 5*, bytes, referer, agent]' \
+     --log-event-messages '203.0.113.7 - - [21/Nov/2026:10:00:00 +0000] "GET /health HTTP/1.1" 502 157 "-" "curl/8.5"'
+   ```
+
+2. **Let the servers write there.** In *IAM › Roles*, open the role attached to the instances (*The AWS servers*, step 1). Choose *Add permissions › Create inline policy*, paste this JSON with your account ID, and name the policy `pix-cloudwatch-logs`:
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+         "Resource": "arn:aws:logs:ap-southeast-2:<account-id>:log-group:/pix/*"
+       }
+     ]
+   }
+   ```
+
+3. **Turn it on, on each server**, once it runs a commit with these files. Use `/pix/dev` on AWS dev. `restart` recreates nginx, which drops the open sockets for a moment; phones in a session take their place again.
+
+   ```sh
+   echo 'CLOUDWATCH_GROUP=/pix/main' | sudo tee -a /opt/pix/deploy.conf
+   echo 'CLOUDWATCH_REGION=ap-southeast-2' | sudo tee -a /opt/pix/deploy.conf
+   sudo /opt/pix/repo/server/deploy/deploy.sh restart
+   sudo /opt/pix/repo/server/deploy/deploy.sh status    # logs: CloudWatch, log group /pix/main, and this server
+   ```
+
+   Then open *CloudWatch › Log groups › /pix/main* and the `pix-nginx-1` stream: after any request, its line is there, which shows that the server can write to the group.
+
+To read the logs, open *CloudWatch › Log groups › /pix/main*, or search with *Logs Insights*:
+
+```text
+fields @timestamp, @logStream, @message
+| filter @message like /ERROR|WARNING|Traceback/
+| sort @timestamp desc
+```
+
 ### Settings
 
 [`.env.example`](.env.example) lists every setting, and a test keeps it in step with [`config.py`](src/pix_server/config.py). A name with no value, such as `OPENROUTER_API_KEY=`, `PIX_GOOGLE_CLIENT_ID=`, or `PIX_TURN_API_TOKEN=`, needs a value on every server. Every other name is in a comment. Its line shows the server's default, or says what sets the value. Uncomment a name in `/opt/pix/.env` only to give a server another value. Then a default that changes in the code still reaches the server.
@@ -373,13 +450,13 @@ Without the shortcuts, run these commands on the server with `sudo`:
 
 | Command | What it does |
 | --- | --- |
-| `/opt/pix/repo/server/deploy/deploy.sh status` | The branch, the recorded commit, which copy serves, whether HTTPS is on, the open rooms, and the containers. |
+| `/opt/pix/repo/server/deploy/deploy.sh status` | The branch, the recorded commit, which copy serves, whether HTTPS is on, where the logs go, the open rooms, and the containers. |
 | `… deploy.sh deploy [ref]` | Deploys a branch or a commit now. The default is the server's branch. It also deploys a commit that the timer stopped trying. |
 | `… deploy.sh rollback` | Switches back to the image that served before the last deploy, without a wait for rooms. The timer does not deploy the rolled-back code again until the branch changes `server/`. |
 | `… deploy.sh reload` | Has nginx read its configuration and the certificate again, after it checks them. certbot's deploy hook runs it after a renewal ([HTTPS](#https)). |
 | `… deploy.sh restart` | Starts the other copy from the same image, for example after you edit `/opt/pix/.env`. |
 | `journalctl -u pix-deploy -n 50` | What the timer's deploys printed. `/opt/pix/state/last-build.log` has the last build in full. |
-| `docker logs -n 100 pix-app-blue-1` | The server's log. Use `pix-app-green-1` for the other copy, `pix-nginx-1` for the access log, `pix-redis-1` for the session store, and `pix-postgres-1` for the database. Logs rotate at 10 MB, five files each. |
+| `docker logs -n 100 pix-app-blue-1` | The server's log. Use `pix-app-green-1` for the other copy, `pix-nginx-1` for the access log, `pix-redis-1` for the session store, and `pix-postgres-1` for the database. Logs rotate at 10 MB, five files each. On the AWS servers, CloudWatch keeps the app's and nginx's logs too ([Logs in CloudWatch](#logs-in-cloudwatch)). |
 
 A deploy waits at most `MAX_WAIT_SECONDS` (600) for open rooms. To switch without a wait for one run, put `MAX_WAIT_SECONDS=0` in front of a `deploy.sh` command (after `sudo`) or in front of `pix deploy`. To change the limit for every deploy on a server, the timer's included, put `MAX_WAIT_SECONDS=<seconds>` in `/opt/pix/deploy.conf`. The timer's next run uses it. A value in front of a command still wins for that run.
 

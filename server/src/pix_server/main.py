@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
 """ASGI entry point: uv run uvicorn pix_server.main:app --host 0.0.0.0 --port 8000."""
 
 import asyncio
@@ -72,6 +72,14 @@ class HideQuery(logging.Filter):
 
 
 logging.getLogger("uvicorn.access").addFilter(HideQuery())
+
+# Uvicorn sets up only its own loggers, so the server's lines carry their level and logger here, which makes them
+# searchable in the container's log and in CloudWatch (server/README.md, Logs in CloudWatch). They still reach the root
+# logger, where pytest's caplog reads them.
+_log_handler = logging.StreamHandler()
+_log_handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+logging.getLogger("pix_server").addHandler(_log_handler)
+logging.getLogger("pix_server").setLevel(logging.INFO)
 
 
 def warn_about_missing_settings(settings: Settings) -> None:

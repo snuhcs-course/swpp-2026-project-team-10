@@ -9,10 +9,32 @@
 <x-dc>
 <helmet>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&family=Manrope:wght@400;500;600;700;800&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&family=Manrope:wght@400;500;600;700;800&family=DM+Mono:wght@500&family=Roboto:wght@400;600;700&family=Roboto+Mono:wght@400&family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 body{margin:0;background:#1B1D22}
 a{color:#8FA7D6;text-decoration:none}a:hover{color:#AFC1E4}
+.pp-web{font-family:'Roboto','Noto Sans KR',sans-serif;font-size:14px;line-height:1.7;color:#ECECEC;background:#0B0B0D;overflow-wrap:anywhere}
+.pp-web,.pp-web *{box-sizing:border-box;word-break:normal;overflow-wrap:inherit}
+html[lang="ko"] .pp-web,html[lang="ko"] .pp-web *{word-break:keep-all}
+.pp-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:56px;padding:0 20px;border-bottom:1px solid #26272B}
+.pp-logo{display:block;height:28px;width:auto;color:#ECECEC}
+.pp-lang{font-size:13px;white-space:nowrap}
+.pp-lang span{color:#A9ACB2}
+.pp-lang .pp-en,html[lang="ko"] .pp-lang .pp-ko{color:#ECECEC;font-weight:600}
+html[lang="ko"] .pp-lang .pp-en{color:#A9ACB2;font-weight:400}
+.pp-lang span+span::before{content:"|";margin:0 10px;color:#26272B;font-weight:400}
+.pp-main{padding:32px 20px 64px}
+.pp-web h1{margin:0 0 10px;font-size:22px;line-height:1.3;letter-spacing:-0.01em;font-weight:700}
+.pp-meta{display:flex;flex-wrap:wrap;gap:2px 20px;margin:0 0 28px;color:#A9ACB2;font-size:13px}
+.pp-meta div{display:flex;gap:6px}
+.pp-meta dd{margin:0}
+.pp-lead{margin:0 0 32px}
+.pp-web code{padding:1px 5px;border-radius:4px;background:#17181B;font-family:'Roboto Mono',monospace;font-size:0.88em}
+.pp-toc{padding:20px 0;border-top:1px solid #26272B;border-bottom:1px solid #26272B}
+.pp-toc h2{margin:0 0 6px;font-size:14px;line-height:1.7;font-weight:700}
+.pp-toc ol{margin:0;padding:0;list-style:none;color:#A9ACB2;font-size:14px;line-height:2}
+.pp-sec{padding-top:40px}
+.pp-sec h2{margin:0 0 12px;font-size:16px;line-height:1.45;font-weight:700}
 </style>
 </helmet>
 <div style="position: relative; width: 1160px; height: 981px; background: #1B1D22; color: #DDE0E6; font-family: 'IBM Plex Sans', 'Helvetica Neue', system-ui, sans-serif">
@@ -99,18 +121,17 @@ a{color:#8FA7D6;text-decoration:none}a:hover{color:#AFC1E4}
 <div style="position: absolute; left: 640px; top: 96px; width: 168px; height: 364px; box-sizing: border-box; border: 1.5px solid #3A404B; border-radius: 20px; background: #0B0B0D; overflow: hidden">
 <div style="position: absolute; left: 12px; top: 4px; font-size: 8px; font-weight: 600; letter-spacing: 0.08em; color: #9AA1AD; line-height: 10px">SETTINGS, SCROLLED</div>
 <div style="position: absolute; left: 0; top: 0; width: 165px; height: 341.1px; overflow: hidden">
-<div style="position: absolute; box-sizing: border-box; left: 9.2px; top: 18.0px; width: 146.7px; height: 33.3px; background: #1F2024; border-radius: 8.2px"></div>
-<div style="position: absolute; left: 9.2px; top: 62.3px; width: 23.4px; height: 7.3px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 5.96px; font-weight: 700; line-height: 7.33px; color: #B8BBC0; letter-spacing: 0.06em; text-transform: uppercase"><span style="text-align: left; white-space: nowrap">Privacy</span></div>
-<div style="position: absolute; box-sizing: border-box; left: 9.2px; top: 73.3px; width: 146.7px; height: 53.2px; background: #1F2024; border-radius: 8.2px"></div>
-<div style="position: absolute; left: 16.5px; top: 82.5px; width: 69.3px; height: 11.0px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 6.88px; font-weight: 500; line-height: 11.0px; color: #E6E7E9"><span style="text-align: left; white-space: nowrap">AI pose generation</span></div>
-<div data-fit="right" style="position: absolute; left: 117.8px; top: 83.4px; width: 21.6px; height: 9.2px; display: flex; align-items: flex-start; justify-content: flex-end; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 6.42px; font-weight: 500; line-height: 9.17px; color: #B8BBC0"><span style="text-align: right; white-space: nowrap">Agreed</span></div>
-<div style="position: absolute; left: 141.2px; top: 82.5px; width: 11.0px; height: 11.0px; display: flex; align-items: center; justify-content: center"><svg width="11.0px" height="11.0px" viewBox="0 0 24 24" style="display: block; flex: none"><path d="M9,6l6,6l-6,6" fill="none" stroke="#8A8E94" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
-<div style="position: absolute; left: 16.5px; top: 95.3px; width: 132.0px; height: 27.5px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 5.96px; font-weight: 500; line-height: 9.17px; color: #B8BBC0"><span style="text-align: left; white-space: normal">A scene photo goes to the AI service only after you agree. If you withdraw, Pix asks again before the next one.</span></div>
-<div style="position: absolute; box-sizing: border-box; left: 9.2px; top: 130.2px; width: 146.7px; height: 46.2px; background: #1F2024; border-radius: 8.2px"></div>
-<div style="position: absolute; left: 16.5px; top: 134.9px; width: 56.2px; height: 11.0px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 6.88px; font-weight: 500; line-height: 11.0px; color: #E6E7E9"><span style="text-align: left; white-space: nowrap">Share usage data</span></div>
-<div style="position: absolute; left: 16.5px; top: 146.1px; width: 104.5px; height: 24.8px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 5.96px; font-weight: 500; line-height: 8.25px; color: #B8BBC0"><span style="text-align: left; white-space: normal">Crash reports and how Pix runs, so we can fix problems. Never your photos, names, or what you write.</span></div>
-<div style="position: absolute; box-sizing: border-box; left: 126.5px; top: 146.0px; width: 23.8px; height: 14.7px; background: #F2C14E; border-radius: 7.3px"></div>
-<div style="position: absolute; box-sizing: border-box; left: 137.5px; top: 147.8px; width: 11.0px; height: 11.0px; background: #141413; border-radius: 5.5px"></div>
+<div style="position: absolute; box-sizing: border-box; left: 9.2px; top: 49.6px; width: 146.7px; height: 126.8px; background: #1F2024; border-radius: 8.2px"></div>
+<div style="position: absolute; left: 16.5px; top: 58.8px; width: 69.3px; height: 11.0px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 6.88px; font-weight: 500; line-height: 11.0px; color: #E6E7E9"><span style="text-align: left; white-space: nowrap">AI pose generation</span></div>
+<div data-fit="right" style="position: absolute; left: 117.8px; top: 59.7px; width: 21.6px; height: 9.2px; display: flex; align-items: flex-start; justify-content: flex-end; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 6.42px; font-weight: 500; line-height: 9.17px; color: #B8BBC0"><span style="text-align: right; white-space: nowrap">Agreed</span></div>
+<div style="position: absolute; left: 141.2px; top: 58.8px; width: 11.0px; height: 11.0px; display: flex; align-items: center; justify-content: center"><svg width="11.0px" height="11.0px" viewBox="0 0 24 24" style="display: block; flex: none"><path d="M9,6l6,6l-6,6" fill="none" stroke="#8A8E94" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+<div style="position: absolute; left: 16.5px; top: 71.6px; width: 132.0px; height: 27.5px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 5.96px; font-weight: 500; line-height: 9.17px; color: #B8BBC0"><span style="text-align: left; white-space: normal">A scene photo goes to the AI service only after you agree. If you withdraw, Pix asks again before the next one.</span></div>
+<div style="position: absolute; left: 16.5px; top: 105.7px; width: 56.2px; height: 11.0px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 6.88px; font-weight: 500; line-height: 11.0px; color: #E6E7E9"><span style="text-align: left; white-space: nowrap">Share usage data</span></div>
+<div style="position: absolute; left: 16.5px; top: 116.7px; width: 104.5px; height: 27.5px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 5.96px; font-weight: 500; line-height: 9.17px; color: #B8BBC0"><span style="text-align: left; white-space: normal">Crash reports and how Pix runs, so we can fix problems. Never your photos, names, or what you write.</span></div>
+<div style="position: absolute; box-sizing: border-box; left: 126.5px; top: 117.6px; width: 23.8px; height: 14.7px; background: #F2C14E; border-radius: 7.3px"></div>
+<div style="position: absolute; box-sizing: border-box; left: 137.5px; top: 119.4px; width: 11.0px; height: 11.0px; background: #141413; border-radius: 5.5px"></div>
+<div style="position: absolute; left: 16.5px; top: 156.3px; width: 51.6px; height: 11.0px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 6.88px; font-weight: 500; line-height: 11.0px; color: #E6E7E9"><span style="text-align: left; white-space: nowrap">Privacy policy</span></div>
+<div style="position: absolute; left: 141.2px; top: 156.3px; width: 11.0px; height: 11.0px; display: flex; align-items: center; justify-content: center"><svg width="11.0px" height="11.0px" viewBox="0 0 24 24" style="display: block; flex: none"><path d="M9,6l6,6l-6,6" fill="none" stroke="#8A8E94" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
 <div style="position: absolute; left: 9.2px; top: 187.3px; width: 23.4px; height: 7.3px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 5.96px; font-weight: 700; line-height: 7.33px; color: #B8BBC0; letter-spacing: 0.06em; text-transform: uppercase"><span style="text-align: left; white-space: nowrap">Account</span></div>
 <div style="position: absolute; box-sizing: border-box; left: 9.2px; top: 198.3px; width: 146.7px; height: 29.3px; background: #1F2024; border-radius: 8.2px"></div>
 <div style="position: absolute; left: 16.5px; top: 207.5px; width: 42.4px; height: 11.0px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 6.88px; font-weight: 500; line-height: 11.0px; color: #E6E7E9"><span style="text-align: left; white-space: nowrap">Pix account</span></div>
@@ -183,6 +204,49 @@ a{color:#8FA7D6;text-decoration:none}a:hover{color:#AFC1E4}
 <div style="position: absolute; left: 16.5px; top: 344.4px; width: 83.4px; height: 9.2px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 5.96px; font-weight: 500; line-height: 9.17px; color: #B8BBC0"><span style="text-align: left; white-space: nowrap">SIL Open Font License 1.1</span></div>
 <div style="position: absolute; left: 16.5px; top: 360.9px; width: 132.0px; height: 7.3px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 5.96px; font-weight: 600; line-height: 7.33px; color: #E6E7E9"><span style="text-align: left; white-space: nowrap">Manrope</span></div>
 <div style="position: absolute; left: 16.5px; top: 369.1px; width: 83.4px; height: 9.2px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 5.96px; font-weight: 500; line-height: 9.17px; color: #B8BBC0"><span style="text-align: left; white-space: nowrap">SIL Open Font License 1.1</span></div>
+</div>
+<div style="position: absolute; left: 0; top: 341.1px; width: 165px; height: 19.9px; background: #0B0B0D"></div><div style="position: absolute; left: 64.5px; top: 349.6px; width: 36px; height: 3px; border-radius: 1.5px; background: rgba(244,244,242,0.45)"></div>
+</div>
+<svg width="240" height="96" viewBox="0 0 240 96" preserveAspectRatio="none" style="position: absolute; left: 432px; top: 460px; width: 240px; height: 96px; overflow: visible; fill: none; stroke: #7C8494; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled" orient="auto" markerWidth="5" markerHeight="5" refX="3.2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#7C8494" stroke="none" style="fill: context-stroke"></path></marker></defs><path d="M 236 0 L 236 48 L 4 48 L 4 94" marker-end="url(#dc-arrow-head-filled)"></path></svg>
+<div style="position: absolute; left: 448px; top: 484px; width: 212px; text-align: center; font-size: 13px; line-height: 16px; color: #A9AFBA">tap <span data-ui>Privacy policy</span></div>
+<div style="position: absolute; left: 352px; top: 556px; width: 168px; height: 364px; box-sizing: border-box; border: 1.5px solid #3A404B; border-radius: 20px; background: #0B0B0D; overflow: hidden">
+<div style="position: absolute; left: 12px; top: 4px; font-size: 8px; font-weight: 600; letter-spacing: 0.08em; color: #9AA1AD; line-height: 10px">PRIVACY POLICY</div>
+<div style="position: absolute; left: 0; top: 0; width: 165px; height: 341.1px; overflow: hidden">
+<div style="position: absolute; left: 3.7px; top: 21.7px; width: 22.0px; height: 22.0px; display: flex; align-items: center; justify-content: center"><svg width="11.0px" height="11.0px" viewBox="0 0 24 24" style="display: block; flex: none"><path d="M19,12H5M11,6l-6,6l6,6" fill="none" stroke="#F4F4F2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+<div style="position: absolute; left: 27.5px; top: 26.9px; width: 54.7px; height: 11.5px; display: flex; align-items: flex-start; justify-content: flex-start; gap: 0px; font-family: 'Manrope', sans-serif; font-size: 8.25px; font-weight: 700; line-height: 11.46px; color: #F4F4F2"><span style="text-align: left; white-space: nowrap">Privacy policy</span></div>
+<div style="position: absolute; left: 0; top: 43.67px; width: 165px; height: 297.43px; overflow: hidden; background: #0B0B0D">
+<div class="pp-web" style="width: 360px; transform: scale(0.458333); transform-origin: 0 0">
+<div class="pp-bar">
+<svg viewBox="0 -14 533 270" class="pp-logo"><g transform="translate(-34 0)"><path fill="currentColor" d="M146 76.37 L84.72 40.99 A70 70 0 0 1 146 28.35 Z M120 70.6 L58 106.39 L58 96 A70 70 0 0 1 78.42 46.59 Z M102 90.23 L102 188 L60 230 L58 230 L58 115.63 Z M110 115.63 L171.28 151.01 A70 70 0 0 1 110 163.65 Z M136 121.4 L197.28 86.02 A70 70 0 0 1 177.58 145.41 Z M154 101.77 L154 31.01 A70 70 0 0 1 195.58 77.77 Z"></path><path fill="#F2C14E" d="M154 111.01 L128 126.02 L102 111.01 L102 80.99 L128 65.98 L154 80.99 Z"></path></g><g transform="translate(208 26) scale(0.88)"><path fill="currentColor" d="M66.49645390070921 105.98581560283688H44.48226950354609V160.0H0.0V0.0H66.49645390070921Q85.78723404255318 0.0 99.29078014184395 6.808510638297875Q112.79432624113474 13.61702127659575 119.6028368794326 25.64539007092199Q126.41134751773048 37.67375886524823 126.41134751773048 53.33333333333334Q126.41134751773048 67.8581560283688 119.71631205673758 79.77304964539007Q113.02127659574468 91.68794326241135 99.51773049645391 98.83687943262412Q86.01418439716312 105.98581560283688 66.49645390070921 105.98581560283688ZM81.02127659574468 53.33333333333334Q81.02127659574468 35.858156028368796 62.184397163120565 35.858156028368796H44.48226950354609V70.58156028368795H62.184397163120565Q81.02127659574468 70.58156028368795 81.02127659574468 53.33333333333334Z M188.82269503546098 32.68085106382979V160.0H144.3404255319149V32.68085106382979Z M293.67375886524826 160.0 270.7517730496454 128.0 252.59574468085106 160.0H203.80141843971631L246.24113475177305 93.95744680851064L201.98581560283688 32.68085106382979H251.91489361702128L274.83687943262413 64.68085106382979L293.2198581560284 32.68085106382979H342.01418439716315L298.6666666666667 97.58865248226951L343.60283687943263 160.0Z"></path><path fill="#F2C14E" d="M191.16 -21.50 L166.70 -35.62 L142.23 -21.50 L142.23 6.75 L166.70 20.88 L191.16 6.75 Z"></path></g></svg>
+<div class="pp-lang"><span class="pp-ko">한국어</span><span class="pp-en">English</span></div>
+</div>
+<div class="pp-main">
+<h1>Privacy Policy</h1>
+<dl class="pp-meta">
+<div><dt>Effective</dt><dd>November 21, 2026</dd></div>
+<div><dt>Contact</dt><dd>csmking7@gmail.com</dd></div>
+</dl>
+<p class="pp-lead">The Last Penguin team ("the team") runs the Pix app and handles its users' personal information as described below. This is a translation of the Korean policy; if the two differ, the Korean text applies.</p>
+<div class="pp-toc">
+<h2>Contents</h2>
+<ol>
+<li>1. Personal information we handle, and why</li>
+<li>2. What the server does not keep</li>
+<li>3. How long we keep it, and deletion</li>
+<li>4. Outside services and transfer abroad</li>
+<li>5. Your rights</li>
+<li>6. How we keep it safe</li>
+<li>7. Children's personal information</li>
+<li>8. Contact</li>
+<li>9. Changes to this policy</li>
+</ol>
+</div>
+<section class="pp-sec">
+<h2>1. Personal information we handle, and why</h2>
+</section>
+</div>
+</div>
+</div>
 </div>
 <div style="position: absolute; left: 0; top: 341.1px; width: 165px; height: 19.9px; background: #0B0B0D"></div><div style="position: absolute; left: 64.5px; top: 349.6px; width: 36px; height: 3px; border-radius: 1.5px; background: rgba(244,244,242,0.45)"></div>
 </div>

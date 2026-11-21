@@ -12,6 +12,7 @@ dependencies = [
     "fastapi>=0.142.2",
     "google-auth>=2.62.0",
     "httpx2>=2.13.1",
+    "markdown>=3.10",
     "pillow>=12.3.0",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",

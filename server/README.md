@@ -122,6 +122,14 @@ For a `502 UPSTREAM_ERROR`, the server log gives OpenRouter's status code, for e
 
 The account and friend endpoints are in [`src/pix_server/accounts/`](src/pix_server/accounts/). [Design 2.5.3][d253] gives the endpoints, the bodies, the error codes, and the session tokens. [Design 2.8][d28] (*Accounts*) gives the password hashing and the token settings. Most of these endpoints need `Authorization: Bearer <access token>`.
 
+`DELETE /me` deletes the caller's account with its sign-ins, devices, friendships, friend requests, and invitations, and frees its Pix ID ([Design 2.5.3][d253]). The app's *Account* sheet calls it after asking.
+
+## Privacy policy
+
+The privacy policy is [`src/pix_server/privacy/policy.ko.md`](src/pix_server/privacy/policy.ko.md) and [`policy.en.md`](src/pix_server/privacy/policy.en.md). The server renders both when it starts and serves them at `/privacy`, in Korean, the version that applies, and at `/privacy/en`. The store links to `https://swpp26t10.15-134-147-114.sslip.io/privacy`, and the app shows the same page in *Settings › Privacy* and on its sign-up screens. The wiki's *Privacy Policy* pages copy the two files: change all four together, and `tests/test_privacy.py` fails until the copies match.
+
+The page lays the text out itself (`privacy/router.py`): the logo, the language switch, the contents, and one part per numbered section. On a phone, a table scrolls sideways in its own box. Keep the files' shape: the title in bold on the first line, a paragraph and `Term: value` lines (the effective date, the contact) before the sections, and each section as `## n. Name`; the server refuses to start otherwise. The logo is `privacy/pix-logo.svg`, a copy of [`branding/pix-horizontal.svg`](../branding/pix-horizontal.svg). To see a change, run the server and open `http://localhost:8000/privacy`.
+
 ## Invitations and push
 
 The invitation endpoints are in [`src/pix_server/invitations/`](src/pix_server/invitations/). [Design 2.6.6][d266] gives the flow, and [Design 2.5.3][d253] gives the bodies and the errors. The invite link, `http://<host>/i/<id>`, opens a small page whose button passes the invitation to Pix.
@@ -183,7 +191,7 @@ To use a course server, set `pix.serverUrl` in a debug build.
 
 [`deploy/docker-compose.yml`](deploy/docker-compose.yml) runs these services:
 
-- **nginx** on port 80, and on the AWS servers also on port 443 for HTTPS ([HTTPS](#https)). It forwards `/api/v1/`, `/ws`, `/health`, and `/i/` (the invite link's page) to the serving copy. It answers `/version` with the commit that is live, Let's Encrypt's check from `/opt/pix/acme`, and `404` for everything else. So FastAPI's `/docs` and the server's `/internal` routes are not public.
+- **nginx** on port 80, and on the AWS servers also on port 443 for HTTPS ([HTTPS](#https)). It forwards `/api/v1/`, `/ws`, `/health`, `/i/` (the invite link's page), and `/privacy` (the privacy policy) to the serving copy. It answers `/version` with the commit that is live, Let's Encrypt's check from `/opt/pix/acme`, and `404` for everything else. So FastAPI's `/docs` and the server's `/internal` routes are not public.
 - **`app-blue` and `app-green`**, two copies of the server, built from the [`Dockerfile`](Dockerfile). One copy serves, and the other does not run. Each copy runs two workers.
 - **Redis**, which both copies use. Its port is not published, and it writes nothing to disk.
 - **PostgreSQL**, which both copies use. Its port is not published either. Its files are in `/opt/pix/postgres` on the server's own disk, and nothing makes a backup of them yet.
@@ -220,7 +228,7 @@ A failure at any step leaves the serving copy as it was, and the timer does not 
 
 - Keep `deploy.sh` runnable by bash 3.2, so you can try it on macOS with `PIX_HOME` set to a scratch directory. Keep everything in it inside functions, because a deploy checks out another version of the file while it runs.
 - Operators source [`deploy/pix.sh`](deploy/pix.sh) and do not run it ([Operate it](#operate-it)). When a `deploy.sh` command or a container name changes, change it in `pix.sh` too.
-- nginx forwards only `/api/v1/`, `/ws`, `/health`, and `/i/` (the invite link's page). Add a new public route to [`deploy/nginx/nginx.conf`](deploy/nginx/nginx.conf), but never add `/internal/*` to it. `deploy.sh` reads `/internal/stats` inside the container, to wait for open rooms before it switches copies. Its one server block serves both ports, so a route needs nothing more for HTTPS.
+- nginx forwards only `/api/v1/`, `/ws`, `/health`, `/i/` (the invite link's page), and `/privacy` (the privacy policy). Add a new public route to [`deploy/nginx/nginx.conf`](deploy/nginx/nginx.conf), but never add `/internal/*` to it. `deploy.sh` reads `/internal/stats` inside the container, to wait for open rooms before it switches copies. Its one server block serves both ports, so a route needs nothing more for HTTPS.
 - HTTPS is [`docker-compose.https.yml`](deploy/docker-compose.https.yml) and [`deploy/nginx/https/`](deploy/nginx/https/). `deploy.sh` adds the Compose file only on a server with a certificate, so a course server never publishes port 443. Anything else that runs Compose on an AWS server passes both files, or nginx loses port 443.
 - nginx's `pix` log format and the server's `HideQuery` filter omit query strings from the access logs. But nginx's error log prints the whole request line of a failed request. So nothing personal, such as a Pix ID, goes in a path or a query, and the lookup is `POST /users/lookup`.
 - `deploy.sh` makes two secrets once and passes them to Compose. One is PostgreSQL's password (`/opt/pix/db-password`, `PIX_DB_PASSWORD`). PostgreSQL keeps the password that it got when it first created its files, so never generate that file again. The other is the access-token key (`/opt/pix/jwt-secret`, `PIX_JWT_SECRET`).
@@ -311,6 +319,7 @@ Do this setup once in the AWS console, in the servers' region (`ap-southeast-2`)
 5. **Give the workflow the instance IDs and addresses.** Put them in the workflow's `env`, by branch (`AWS_INSTANCE_ID`, `SERVER_URL`). They are not secrets.
 6. **Disable the timer on each server** with `sudo systemctl disable --now pix-deploy.timer`. Then only the workflow deploys, and its log shows each build. If the timer stays on, deploys still work. But the run often shows only that the commit was already live.
 7. **Set up HTTPS** on each server ([HTTPS](#https)).
+8. **Send the logs to CloudWatch** ([Logs in CloudWatch](#logs-in-cloudwatch)).
 
 To replace the key:
 
@@ -348,6 +357,82 @@ Set it up once on each AWS server, after a deploy of a commit that has these fil
 
 sslip.io is not on the Public Suffix List, so all sslip.io names share Let's Encrypt's limit of 50 new certificates in 7 days. If certbot is refused for that limit, try again later. A renewal of the same name is exempt.
 
+### Logs in CloudWatch
+
+The AWS servers also send the logs of the app's copies and of nginx to [CloudWatch Logs](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/), in the servers' region. So the logs outlive a deploy, which recreates a copy's container and deletes its local log, and you can read and search them without SSH.
+
+- Each server has one log group, `/pix/main` or `/pix/dev`, which keeps 30 days. nginx's access lines hold the phones' addresses, so keep that limit short.
+- Each container writes to a stream named after it (`pix-app-blue-1`, `pix-app-green-1`, `pix-nginx-1`), which goes on after a deploy recreates the container.
+- Docker keeps a local copy, so `pix logs` and `docker logs` still work. Redis and PostgreSQL keep their local log only: a change of their log driver would restart them, and a restart of Redis ends every room.
+- `deploy.sh` adds [`docker-compose.cloudwatch.yml`](deploy/docker-compose.cloudwatch.yml) when `/opt/pix/deploy.conf` sets `CLOUDWATCH_GROUP` and `CLOUDWATCH_REGION`. Before each deploy, restart, or rollback, it checks that the server can make a log stream there, with a container that writes one line to the `deploy-check` stream. When that fails, it warns and keeps the logs on the server for that run. Docker reports a failed upload of a line only in its own journal (`journalctl -u docker`), so the check cannot prove that lines arrive: step 3 does. `deploy.sh status` says where nginx's log goes.
+- An alarm emails you when nginx answers 5 or more requests with a 5xx status in 5 minutes. It cannot see a server that does not answer at all, which writes no log. No check from outside covers that.
+- The server's own lines start with their level and logger, such as `WARNING pix_server.poses.generator: …`. Uvicorn's start with `INFO:` or `ERROR:`.
+
+Set it up once:
+
+1. **Make the log groups and the alarm.** Open CloudShell in the AWS console, in `ap-southeast-2`, and run this with the email addresses that get the alarm. Each address confirms its subscription from the email AWS sends, within three days.
+
+   ```sh
+   export AWS_REGION=ap-southeast-2
+   topic=$(aws sns create-topic --name pix-alerts --query TopicArn --output text)
+   for email in <address 1> <address 2>; do
+     aws sns subscribe --topic-arn "$topic" --protocol email --notification-endpoint "$email"
+   done
+   for env in main dev; do
+     aws logs create-log-group --log-group-name /pix/$env
+     aws logs put-retention-policy --log-group-name /pix/$env --retention-in-days 30
+     aws logs put-metric-filter --log-group-name /pix/$env --filter-name http-5xx \
+       --filter-pattern '[ip, dash, user, time, request = *HTTP*, status = 5*, bytes, referer, agent]' \
+       --metric-transformations metricName=Http5xx,metricNamespace=Pix/$env,metricValue=1,defaultValue=0
+     aws cloudwatch put-metric-alarm --alarm-name pix-$env-5xx --namespace Pix/$env --metric-name Http5xx \
+       --statistic Sum --period 300 --evaluation-periods 1 --threshold 5 \
+       --comparison-operator GreaterThanOrEqualToThreshold --treat-missing-data notBreaching --alarm-actions "$topic"
+   done
+   ```
+
+   To add an address later, run the `topic=` line, which returns the topic that exists, and the `subscribe` line. `aws sns list-subscriptions-by-topic --topic-arn "$topic"` lists the addresses. Every alarm email has a link that unsubscribes its address.
+
+   To check the filter against one of nginx's lines:
+
+   ```sh
+   aws logs test-metric-filter --filter-pattern '[ip, dash, user, time, request = *HTTP*, status = 5*, bytes, referer, agent]' \
+     --log-event-messages '203.0.113.7 - - [21/Nov/2026:10:00:00 +0000] "GET /health HTTP/1.1" 502 157 "-" "curl/8.5"'
+   ```
+
+2. **Let the servers write there.** In *IAM › Roles*, open the role attached to the instances (*The AWS servers*, step 1). Choose *Add permissions › Create inline policy*, paste this JSON with your account ID, and name the policy `pix-cloudwatch-logs`:
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+         "Resource": "arn:aws:logs:ap-southeast-2:<account-id>:log-group:/pix/*"
+       }
+     ]
+   }
+   ```
+
+3. **Turn it on, on each server**, once it runs a commit with these files. Use `/pix/dev` on AWS dev. `restart` recreates nginx, which drops the open sockets for a moment; phones in a session take their place again.
+
+   ```sh
+   echo 'CLOUDWATCH_GROUP=/pix/main' | sudo tee -a /opt/pix/deploy.conf
+   echo 'CLOUDWATCH_REGION=ap-southeast-2' | sudo tee -a /opt/pix/deploy.conf
+   sudo /opt/pix/repo/server/deploy/deploy.sh restart
+   sudo /opt/pix/repo/server/deploy/deploy.sh status    # logs: CloudWatch, log group /pix/main, and this server
+   ```
+
+   Then open *CloudWatch › Log groups › /pix/main* and the `pix-nginx-1` stream: after any request, its line is there, which shows that the server can write to the group.
+
+To read the logs, open *CloudWatch › Log groups › /pix/main*, or search with *Logs Insights*:
+
+```text
+fields @timestamp, @logStream, @message
+| filter @message like /ERROR|WARNING|Traceback/
+| sort @timestamp desc
+```
+
 ### Settings
 
 [`.env.example`](.env.example) lists every setting, and a test keeps it in step with [`config.py`](src/pix_server/config.py). A name with no value, such as `OPENROUTER_API_KEY=`, `PIX_GOOGLE_CLIENT_ID=`, or `PIX_TURN_API_TOKEN=`, needs a value on every server. Every other name is in a comment. Its line shows the server's default, or says what sets the value. Uncomment a name in `/opt/pix/.env` only to give a server another value. Then a default that changes in the code still reaches the server.
@@ -373,13 +458,13 @@ Without the shortcuts, run these commands on the server with `sudo`:
 
 | Command | What it does |
 | --- | --- |
-| `/opt/pix/repo/server/deploy/deploy.sh status` | The branch, the recorded commit, which copy serves, whether HTTPS is on, the open rooms, and the containers. |
+| `/opt/pix/repo/server/deploy/deploy.sh status` | The branch, the recorded commit, which copy serves, whether HTTPS is on, where the logs go, the open rooms, and the containers. |
 | `… deploy.sh deploy [ref]` | Deploys a branch or a commit now. The default is the server's branch. It also deploys a commit that the timer stopped trying. |
 | `… deploy.sh rollback` | Switches back to the image that served before the last deploy, without a wait for rooms. The timer does not deploy the rolled-back code again until the branch changes `server/`. |
 | `… deploy.sh reload` | Has nginx read its configuration and the certificate again, after it checks them. certbot's deploy hook runs it after a renewal ([HTTPS](#https)). |
 | `… deploy.sh restart` | Starts the other copy from the same image, for example after you edit `/opt/pix/.env`. |
 | `journalctl -u pix-deploy -n 50` | What the timer's deploys printed. `/opt/pix/state/last-build.log` has the last build in full. |
-| `docker logs -n 100 pix-app-blue-1` | The server's log. Use `pix-app-green-1` for the other copy, `pix-nginx-1` for the access log, `pix-redis-1` for the session store, and `pix-postgres-1` for the database. Logs rotate at 10 MB, five files each. |
+| `docker logs -n 100 pix-app-blue-1` | The server's log. Use `pix-app-green-1` for the other copy, `pix-nginx-1` for the access log, `pix-redis-1` for the session store, and `pix-postgres-1` for the database. Logs rotate at 10 MB, five files each. On the AWS servers, CloudWatch keeps the app's and nginx's logs too ([Logs in CloudWatch](#logs-in-cloudwatch)). |
 
 A deploy waits at most `MAX_WAIT_SECONDS` (600) for open rooms. To switch without a wait for one run, put `MAX_WAIT_SECONDS=0` in front of a `deploy.sh` command (after `sudo`) or in front of `pix deploy`. To change the limit for every deploy on a server, the timer's included, put `MAX_WAIT_SECONDS=<seconds>` in `/opt/pix/deploy.conf`. The timer's next run uses it. A value in front of a command still wins for that run.
 

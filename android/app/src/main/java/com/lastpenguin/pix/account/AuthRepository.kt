@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
 package com.lastpenguin.pix.account
 
 import kotlinx.coroutines.flow.SharedFlow
@@ -59,4 +59,11 @@ interface AuthRepository {
 
     /** Signs this phone out on the server, if it answers, and always on the phone. */
     suspend fun signOut()
+
+    /**
+     * Deletes the account on the server with everything it keeps about it (FR-5.18), then signs this phone out; the
+     * account's other phones sign out at their next request. Fails with OFFLINE or UNAVAILABLE, and the account and
+     * this phone's sign-in stay; with SIGNED_OUT when the server had already ended the sign-in.
+     */
+    suspend fun deleteAccount(): Result<Unit>
 }

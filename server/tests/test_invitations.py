@@ -1,10 +1,11 @@
-# AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
 """Invitations through the REST API and the signaling socket (Design 2.5.3, 2.6.6; R&S FR-6.1–6.4, FR-6.9, FR-6.17).
 
 Partitions:
 - invite: a friend, offline or online; someone who is not a friend, an unknown user, oneself; a friend in a session
   (BUSY, nothing saved); a caller signed out or without a Pix ID; the session store down (nothing saved)
-- open: pending; 59 s, 60 s, and 61 s after it was sent; answered; unknown; without a sign-in
+- open: pending; 59 s, 60 s, and 61 s after it was sent; answered; unknown; without a sign-in; while the
+  photographer's account is deleted (the invitation and its sender read in one statement)
 - incoming: none; one; several, newest first; another user's; answered (accepted, declined, cancelled); 59 s and 60 s
   after it was sent; without a sign-in; an invitation still opens by its id
 - answer: accept, decline, or cancel by the one who may (the friend, the friend, the photographer), or by anyone else;
@@ -15,7 +16,8 @@ Partitions:
   photographer; a cancel frees the photographer's socket
 - the push: to each of the friend's phones, with the data the app needs, at high priority, for the invitation's 60 s;
   not to the photographer; not to a phone whose sign-in expired; a device FCM no longer knows is removed; FCM failing
-  leaves the invitation working
+  leaves the invitation working; not when the photographer's account is deleted before the push runs, nor a friend
+  request's
 - the link: an invitation id gives the page that opens Pix and names nobody; anything else is not found
 """
 
@@ -25,7 +27,12 @@ import time
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+
+from pix_server.accounts import friends as friends_router
+from pix_server.accounts.auth import TokenClaims
+from pix_server.accounts.router import delete_me
+from pix_server.invitations import router as invitations_router
 
 INVITATION_ID = re.compile(r"inv_[0-9A-HJKMNP-TV-Z]{26}")
 
@@ -202,6 +209,38 @@ def test_opening_shows_who_invites_without_a_sign_in_until_it_expires(client, cl
         "status": status,
         "expiresAt": invitation["expiresAt"],
     }
+
+
+def test_opening_while_the_photographer_deletes_the_account_still_answers(client, friends, monkeypatch):
+    """PostgreSQL reads each statement at its own moment, so a deletion that commits after the first read is seen by
+    the next one. The deletion here commits right after the endpoint's first statement."""
+    (_, dongje_user), _ = friends
+    invitation = sent(client, friends)
+    get, execute = AsyncSession.get, AsyncSession.execute
+    armed = [True]
+
+    async def deleted_after(self, call, *args, **kwargs):
+        result = await call(self, *args, **kwargs)
+        if armed:
+            armed.clear()
+            # The next statement starts a new transaction, as under PostgreSQL's READ COMMITTED.
+            await self.commit()
+            async with client.app.state.database() as other:
+                await delete_me(TokenClaims(user_id=dongje_user["id"], session_id="ses_other_phone"), other)
+        return result
+
+    async def patched_get(self, *args, **kwargs):
+        return await deleted_after(self, get, *args, **kwargs)
+
+    async def patched_execute(self, *args, **kwargs):
+        return await deleted_after(self, execute, *args, **kwargs)
+
+    monkeypatch.setattr(AsyncSession, "get", patched_get)
+    monkeypatch.setattr(AsyncSession, "execute", patched_execute)
+    opened = client.get(f"/api/v1/invitations/{invitation['id']}")
+
+    assert opened.status_code == 200, opened.text
+    assert opened.json()["from"] == public(dongje_user)
 
 
 def test_opening_an_unknown_invitation_is_not_found(client):
@@ -475,6 +514,40 @@ def test_the_invitation_is_pushed_to_each_of_the_friends_phones(client, friends,
         assert push["authorization"] == "Bearer test-fcm-access"
         assert push["url"] == "https://fcm.googleapis.com/v1/projects/pix-test/messages:send"
     assert len(fcm_api.token_requests) == 1
+
+
+def deleted_before_the_push(client, monkeypatch, module, user):
+    """The sender's account deleted after the request committed and before its queued push runs."""
+    push = module.push_to_user
+
+    async def after_the_deletion(app, *args, **kwargs):
+        async with app.state.database() as db:
+            await delete_me(TokenClaims(user_id=user["id"], session_id="ses_other_phone"), db)
+        await push(app, *args, **kwargs)
+
+    monkeypatch.setattr(module, "push_to_user", after_the_deletion)
+
+
+def test_no_invitation_is_pushed_once_its_photographer_deleted_the_account(client, friends, fcm_api, monkeypatch):
+    (_, dongje_user), (joonhyung, _) = friends
+    register_device(client, joonhyung, "joonhyung-phone")
+    deleted_before_the_push(client, monkeypatch, invitations_router, dongje_user)
+
+    assert invite(client, friends[0][0], friends[1][1]).status_code == 201
+
+    assert fcm_api.pushes == []
+
+
+def test_no_friend_request_is_pushed_once_its_sender_deleted_the_account(client, sign_up, fcm_api, monkeypatch):
+    sender, sender_user = sign_up("test1", "Test Account 1")
+    receiver, receiver_user = sign_up("test2", "Test Account 2")
+    register_device(client, receiver, "test2-phone")
+    deleted_before_the_push(client, monkeypatch, friends_router, sender_user)
+
+    sent = client.post("/api/v1/friend-requests", headers=sender, json={"userId": receiver_user["id"]})
+    assert sent.status_code == 201, sent.text
+
+    assert fcm_api.pushes == []
 
 
 def test_a_phone_whose_sign_in_expired_gets_no_push(client, clock, friends, fcm_api):

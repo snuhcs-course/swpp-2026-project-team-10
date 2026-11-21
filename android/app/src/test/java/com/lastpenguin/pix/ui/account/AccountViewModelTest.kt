@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.account
 
 import android.content.ContextWrapper
@@ -31,14 +31,16 @@ import org.junit.Before
 import org.junit.Test
 
 /*
- * Partitions for Sign in, Sign up, Pix ID setup, and the Account sheet (FR-5.2, FR-5.3, FR-5.11–5.15, US-6). Log-in:
- * accepted (to Friends), refused (the error stays on the screen), an account without a Pix ID (to Pix ID setup).
- * Google: registered, NOT_REGISTERED (the question), the sheet closed (nothing shown), no Google account on the phone
- * (an error). The question: Yes (sign in, then Google is added; adding fails: the sign-in stands and says so), No (a new
- * account, then Pix ID setup), closed (the Google account is forgotten). Sign-up, Pix ID, name, Add Google, Add a
- * password, Sign out: each answered with its event. A second tap while a call runs does nothing. Check: asked (shown as
- * checking, beside a running sign-up), free, taken, failed (the reason kept), replaced by a newer check before it is
- * answered (only the newer one shows); a form that opens forgets the last check.
+ * Partitions for Sign in, Sign up, Sign up with Google, Pix ID setup, and the Account sheet (FR-5.2, FR-5.3,
+ * FR-5.11–5.15, FR-5.18, FR-5.19, US-6). Log-in: accepted (to Friends), refused (the error stays on the screen), an
+ * account without a Pix ID (to Pix ID setup). Google: registered, NOT_REGISTERED (the question), the sheet closed
+ * (nothing shown), no Google account on the phone (an error). The question: Yes (sign in, then Google is added; adding
+ * fails: the sign-in stands and says so), No (Sign up with Google, where *Sign up* makes the account, then Pix ID
+ * setup; a failed sign-up keeps the Google account for another try), closed (the Google account is forgotten, and
+ * *Sign up* does nothing). Sign-up, Pix ID, name, Add Google, Add a password, Sign out, Delete account: each answered
+ * with its event; a failed deletion keeps the account signed in and shows why. A second tap while a call runs does
+ * nothing. Check: asked (shown as checking, beside a running sign-up), free, taken, failed (the reason kept), replaced
+ * by a newer check before it is answered (only the newer one shows); a form that opens forgets the last check.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AccountViewModelTest {
@@ -158,7 +160,7 @@ class AccountViewModelTest {
         model.continueWithGoogle(activity)
         runCurrent()
 
-        model.answerExistingAccount(hasAccount = true)
+        model.signInToAddGoogle()
         assertTrue(model.uiState.value.linkingGoogle)
         model.logIn("test1", "sunset2026")
         runCurrent()
@@ -174,7 +176,7 @@ class AccountViewModelTest {
         auth.googleResult = GoogleSignIn.NotRegistered
         model.continueWithGoogle(activity)
         runCurrent()
-        model.answerExistingAccount(hasAccount = true)
+        model.signInToAddGoogle()
         val refused = AccountException(AccountError.GOOGLE_ALREADY_ADDED)
         auth.failures["addGoogle"] = refused
 
@@ -189,16 +191,38 @@ class AccountViewModelTest {
     }
 
     @Test
-    fun existingAccount_no_makesAnAccountThenAsksForAPixId() = runTest {
+    fun googleSignUp_makesTheAccountThenAsksForAPixId() = runTest {
         collectEvents()
         auth.googleResult = GoogleSignIn.NotRegistered
         model.continueWithGoogle(activity)
         runCurrent()
+        assertTrue(model.waitingGoogle)
 
-        model.answerExistingAccount(hasAccount = false)
+        model.signUpWithGoogle()
         runCurrent()
 
         assertEquals("googleSignUp:google-token", auth.calls.last())
+        assertEquals(AccountEvent.SignedIn(needsPixId = true), events.last())
+        assertFalse(model.waitingGoogle)
+    }
+
+    @Test
+    fun googleSignUp_failed_keepsTheGoogleAccountForAnotherTry() = runTest {
+        collectEvents()
+        auth.googleResult = GoogleSignIn.NotRegistered
+        model.continueWithGoogle(activity)
+        runCurrent()
+        auth.failures["googleSignUp"] = AccountException(AccountError.OFFLINE)
+
+        model.signUpWithGoogle()
+        runCurrent()
+        assertEquals(AccountError.OFFLINE, (model.uiState.value.error as AccountException).error)
+        assertTrue(model.waitingGoogle)
+
+        auth.failures.clear()
+        model.signUpWithGoogle()
+        runCurrent()
+        assertEquals(listOf("googleSignUp:google-token", "googleSignUp:google-token"), auth.calls.drop(1))
         assertEquals(AccountEvent.SignedIn(needsPixId = true), events.last())
     }
 
@@ -209,10 +233,39 @@ class AccountViewModelTest {
         runCurrent()
 
         model.forgetGoogle()
-        model.answerExistingAccount(hasAccount = false)
+        model.signUpWithGoogle()
         runCurrent()
 
         assertEquals(listOf("google:google-token"), auth.calls)
+        assertFalse(model.waitingGoogle)
+    }
+
+    @Test
+    fun deleteAccount_signsOutWithItsEvent() = runTest {
+        collectEvents()
+        auth.signInAs(auth.account)
+
+        model.deleteAccount()
+        runCurrent()
+
+        assertEquals(listOf("deleteAccount"), auth.calls)
+        assertEquals(listOf(AccountEvent.AccountDeleted), events)
+        assertEquals(AuthState.SignedOut, auth.state.value)
+    }
+
+    @Test
+    fun deleteAccount_failed_keepsTheAccountAndSaysWhy() = runTest {
+        collectEvents()
+        auth.signInAs(auth.account)
+        auth.failures["deleteAccount"] = AccountException(AccountError.OFFLINE)
+
+        model.deleteAccount()
+        runCurrent()
+
+        assertEquals(emptyList<AccountEvent>(), events)
+        assertTrue(auth.state.value is AuthState.SignedIn)
+        assertEquals(AccountError.OFFLINE, (model.uiState.value.error as AccountException).error)
+        assertFalse(model.uiState.value.busy)
     }
 
     @Test

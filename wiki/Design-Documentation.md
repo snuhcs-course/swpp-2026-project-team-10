@@ -113,6 +113,9 @@
 | 3.33 | 2026-11-20 | The live view's sharpness after a reconnection, left for Iteration 5 ([#238]) (2.9). |
 | 3.34 | 2026-11-20 | The Iteration 4 tasks as their issues stand: the owners of Iter4-P7 and Iter4-P11, the name and date of Iter4-P16, and when the prompt templates were dropped (2.9). |
 | 3.35 | 2026-11-21 | One server each for `main` and `dev`, in two versions: a course server, and an AWS server over HTTPS, which the builds use (1.1.1, 1.1.3, 1.2, AD-11, 2.5.2, 2.5.3, 2.6.6, 2.7, 2.8, 2.10). |
+| 3.36 | 2026-11-21 | Server logs and alerts: the AWS servers' logs in CloudWatch, with an alarm on 5xx answers (1.2, AD-20, 2.8). |
+| 4.0 | 2026-11-21 | Iteration 5 plan from the kickoff of 11/21: the task table with owners and due dates (2.9); the open decisions (*Still open*: the cutout, the options on *Generate poses*, pose generation started by the subject, the self-timer, the live view after a reconnection, a deleted account's Pix ID, remote focus next to the guide's gestures). Remote focus is planned, and the remote-control switch is dropped (2.5.1, 2.6.5, 2.9). |
+| 4.1 | 2026-11-21 | What an account keeps and the agreement before it is made, deleting an account, the privacy policy in Pix and at `/privacy`, the screens above the keyboard, and the retention pass (Iter5-P2, [#266]) (*Still open*, 2.1, 2.5.3, 2.6.8, 2.7, 2.8). |
 
 </details>
 
@@ -120,7 +123,16 @@ Audience: the development team. This page describes Pix's design as built throug
 
 **Still open**
 
-None at the close of Iteration 4. The QR connection ([#214]) and light mode ([#212]) were dropped on 11/20 as not needed. The tips' open question (Testing Documentation 3.2) and the work left out of Iteration 4 (2.9) wait for the kickoff of Iteration 5.
+| Decision | Current proposal | Owner | Decide by |
+|----|----|----|----|
+| The cutout as a guide (FR-2.2) | A guide can show the person's cutout from the reference photo, on both phones, drawn with the guide's opacity and never in a photo or the stream. Open: how the user switches between the outline and the cutout, for each guide or in the settings, and what is sent to the subject's phone, the reference copy it already gets or a larger one (AD-6, NFR-13; [#275]). | 한준형 | Iteration 5 |
+| Options on *Generate poses* (FR-4.15) | The screen offers options to choose, so a set starts with nothing typed. Open: what the options are and where they come from (a fixed list, the AI's suggestions, or both), and how they sit next to typing ([#274]). | 박동제 | Iteration 5 |
+| Pose generation started by the subject (FR-6.15) | The subject's *Add a pose guide* offers the situations, and the flow then runs on both phones as today. Open: how the scene photo is taken, since it comes from the photographer's camera: who takes it, and who reviews it ([#276]). | 한준형 | Iteration 5 |
+| The self-timer (FR-1.17) | A countdown over the preview before the photo. Open: the delays, and whether the subject's phone shows the countdown, which needs a message ([#272]). | 박재완 | Iteration 5 |
+| The live view after a reconnection (NFR-6) | Measure the resolution, bitrate, and frame rate before a drop and after the reconnection first. Open: fix it, show a notice while the quality is low, or record it as a limit ([#269]). | 박재완 | Iteration 5 |
+| Remote focus next to the guide's gestures (FR-7.7) | A tap on the video sets the photographer's focus. Open: the tap while guide-edit mode is on, and next to the pinch ([#273]). | 박동제 | Iteration 5 |
+
+The tips' open question (Testing Documentation 3.2) is not planned: the kickoff of 11/21 left it out.
 
 **Contents**
 
@@ -323,6 +335,7 @@ App versions are from `android/gradle/libs.versions.toml`; server versions are t
 | Redis 8, `redis-py` 8.1 | The session store and pub/sub between server processes (AD-18, 2.7) | Host, Server |
 | fakeredis 2.39 with `lupa` | An in-process Redis that runs the store's Lua, for tests and a laptop; development only (2.7) | Server |
 | Docker Compose, nginx 1.30, PostgreSQL 18, certbot | Hosting on the course servers and the AWS servers; nginx switches between the two app copies during a deploy. On the AWS servers, it also serves HTTPS with a certificate that certbot gets from Let's Encrypt (2.8) | Host |
+| AWS CloudWatch Logs and alarms | The AWS servers' logs of the app and nginx, and an email alarm on 5xx answers (AD-20, 2.8) | Host |
 
 ### 1.3 Architectural decisions
 
@@ -347,6 +360,7 @@ App versions are from `android/gradle/libs.versions.toml`; server versions are t
 | AD-17 | **Pinch zoom with a guide-edit mode toggle on both phones** | A pinch is the natural zoom, and one toggle decides: on, gestures edit the guide; off, a pinch zooms. The subject moves the guide (FR-7.2) and zooms too. | A zoom slider; deciding by where the finger lands |
 | AD-18 | **Session state lives in a Redis session store, not in the server process** | Workers share the state, and a new copy takes over during a deploy without losing a waiting room (2.8). The small, short-lived state fits Redis's atomic scripts, expiry, and pub/sub (2.7). Cost: one more service and Lua room transitions; NFR-18's 50 sessions fit in one worker. | One process with in-memory state; routing rooms by code; the relational database |
 | AD-19 | **Crash reports and usage events through Firebase Crashlytics and Analytics, behind one `Telemetry` facade** | Pix already uses Firebase for pushes, so no account or server is added. The phones send over HTTPS from any network, which the course servers cannot receive. One facade with typed events keeps personal data out (NFR-13) and lets tests record what is sent. Release builds only, while the user allows it (FR-10.6). | An endpoint on the Pix server (plain HTTP, campus only, our own storage and dashboards); Sentry (another account and SDK) |
+| AD-20 | **Server logs in CloudWatch Logs, with a CloudWatch alarm on 5xx answers, all in AWS** | The AWS servers already run there, so no account or agent is added. The logs outlive deploys and can be searched without SSH, and the team gets an email when a server answers with errors (2.8, *Server logs and alerts*). | Sentry (another account and SDK); Prometheus and Grafana, ELK, or Loki (a system to run); an uptime check from outside: Route 53 health checks alarm only in `us-east-1`, which the account's organization blocks, and UptimeRobot is another account (not needed for the course) |
 
 ## 2. Design Details
 
@@ -355,7 +369,7 @@ App versions are from `android/gradle/libs.versions.toml`; server versions are t
 ```mermaid
 flowchart TB
   subgraph UI["UI layer: Fragments with XML layouts"]
-    C1["Camera"] --- C2["Add a pose guide with My library · Library · Reference confirm"] --- C3["Generate poses · Generating poses · Pick a pose"] --- C4["Sign in · Sign up · Pix ID setup · Account · Share my camera · Add a friend · Sent requests"] --- C5["Who takes the photo? · Room code · See their camera · Invite sent · Invite not accepted · Invitation"] --- C6["Subject view and its Generate poses · Generating poses · Pick a pose · Your reference · Connection lost"] --- C7["Settings · How to use Pix · About Pix · tutorial tips"]
+    C1["Camera"] --- C2["Add a pose guide with My library · Library · Reference confirm"] --- C3["Generate poses · Generating poses · Pick a pose"] --- C4["Sign in · Sign up · Sign up with Google · Pix ID setup · Account · Share my camera · Add a friend · Sent requests"] --- C5["Who takes the photo? · Room code · See their camera · Invite sent · Invite not accepted · Invitation"] --- C6["Subject view and its Generate poses · Generating poses · Pick a pose · Your reference · Connection lost"] --- C7["Settings · How to use Pix · About Pix · Privacy policy · tutorial tips"]
   end
   subgraph VM["ViewModels: StateFlow of UI state"]
     V1["CameraViewModel"] --- V2["ReferenceViewModel"] --- V3["GenerationViewModel · PoseSaveViewModel"] --- V4["AccountViewModel · FriendsViewModel"] --- V5["SessionViewModel · InvitationViewModel · IncomingInvitationsViewModel"] --- V6["SubjectViewModel · SubjectDescribeViewModel · SubjectGeneratingViewModel · SubjectPickViewModel · SubjectConfirmViewModel"] --- V7["SettingsViewModel"]
@@ -422,13 +436,16 @@ android/app/src/main/java/com/lastpenguin/pix/
 | Any other two screens | `SHARED_AXIS` along x: the next screen comes 30 dp in from the right, the last goes 30 dp left; back reverses it | A deeper step: *Share my camera* → *Add a friend*, the library → *Reference confirm*, *Generate poses* → *Generating poses* → *Pick a pose* |
 | A sheet (*Add a pose guide*, *Who takes the photo?*, *Account*, *Room code*, *Invite sent*) and the screen under it | None: the sheet keeps its own slide | `ScreenNavigator` does not move dialog destinations. A screen a sheet opens moves from the screen under it: Camera → *Reference confirm* fades. |
 
+**Insets and the keyboard (R&S 6.9).** From Android 15, Pix draws behind the system bars, and the window no longer shrinks for the keyboard. So `MainActivity` pads the screens by the bars and, while it is open, by the keyboard. A form's `ScrollView` then shrinks above the keyboard and scrolls the focused field into view.
+
 **Who takes the photo (Iter3-A17, [#188]; R&S 6.7).** The phone that shows a room code or sends an invitation is the photographer. *Shoot together* opens `ShootTogetherSheet`, a dialog over Camera. Each choice replaces it (`popUpTo` inclusive), so Back goes to Camera.
 
 - *I'll take the photo* opens *Share my camera* (`friendsFragment`, `FriendsFragment`): friends to invite, and *Show a code*, signed in or not.
 - *I'll be in the photo* opens *See their camera* (`joinCodeFragment`, `JoinCodeFragment`): received invitations above the code field. The button counts them, so a dismissed invitation can still be accepted within its minute (2.6.6, FR-6.17).
 - A photographer whose subject left still waits in its room (`Waiting`, 2.4), unseen on Camera, and `SessionManager.start` ignores a second session. So *I'll be in the photo* and *Accept* (on *Invitation* and *See their camera*) first end that room (`SessionViewModel.endWaitingRoom` awaits `leave(CANCELLED)`). A session with someone in it, or on its way, still refuses them (FR-6.9).
 - *Room code* has no join field; it says which phone enters the code, and where. The code screens name the other phone's buttons by their own labels (`room_code_path`, `join_hint`, `withColoredPart`), so a renamed button renames them.
-- *Sign in* returns to the screen that opened it (`popBackStack(signInFragment, inclusive)`); *Sign up* closes with it, and *Pix ID setup* replaces it. So *Invitation* and Settings open *Sign in* themselves.
+- *Sign in* returns to the screen that opened it (`popBackStack(signInFragment, inclusive)`). *Sign up* and its agreement page close with it. *Pix ID setup* replaces it, and *Sign up with Google* with it. So *Invitation* and Settings open *Sign in* themselves.
+- *Privacy policy* (`privacyPolicyFragment`, `PrivacyPolicyFragment`) opens through one global action from Settings and the sign-up agreement. It shows the server's `/privacy/ko` or `/privacy/en` page, in the screens' language, in a WebView without JavaScript; a page that cannot load shows the reason and *Try again*.
 - Screens say *friend* only for the Pix friend list; elsewhere they name the role or say *the other person* (R&S 6.9).
 
 #### Module interfaces
@@ -563,6 +580,7 @@ interface AuthRepository {                              // FR-5.1–5.3, FR-5.11
     suspend fun refreshAccount(): Result<Unit>          // GET /me again: another phone may have changed the account
     suspend fun freshAccessToken(): String?             // for a signaling socket, which sends it only when it opens
     suspend fun signOut()                               // on the server if it answers, on the phone always
+    suspend fun deleteAccount(): Result<Unit>           // DELETE /me, then signs out; OFFLINE keeps the sign-in until a retry
 }
 
 interface FriendsRepository {                           // FR-5.4–5.10, FR-5.16; failures are AccountException
@@ -1590,8 +1608,8 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `camera.zoom.hold` | P→S | reliable | `by` | Whose pinch holds the zoom, or null when it is free (FR-7.6) |
 | `camera.exposure.set` | S→P | steps realtime, final reliable | `index`, `final` | The subject's brightness slider (FR-7.3) |
 | `camera.flash.set` | S→P | reliable | `mode` | The subject's flash choice (FR-7.3) |
-| `camera.focus.set` | S→P | reliable | `x`, `y` | The subject's focus point (FR-7.7; Could, Iteration 5) |
-| `control.permission` | P→S | reliable | `allowed` | Whether remote control is allowed (FR-7.5; Could, Iteration 5) |
+| `camera.focus.set` | S→P | reliable | `x`, `y` | The subject's focus point (FR-7.7; Could, Iteration 5, [#273]) |
+| `control.permission` | P→S | reliable | `allowed` | Whether remote control is allowed (FR-7.5, dropped at the kickoff of 11/21; never sent) |
 | `guide.image.begin` / `.chunk` / `.end` | both | reliable | chunks | The guide's mask; S→P for a guide made on the subject's phone |
 | `guide.reference.begin` / `.chunk` / `.end` | both | reliable | chunks | The guide's reference photo, for the other phone's thumbnail (FR-3.9); S→P for a guide made on the subject's phone |
 | `guide.state` | P→S | steps realtime, final reliable | `state`, `final`, `by` | The guide's place, opacity, and visibility |
@@ -2267,6 +2285,7 @@ Base URL `https://<host>/api/v1` on the AWS servers, and `http://<host>/api/v1`,
 | `GET /me`, `PUT /me` (It 2) | auth | The caller's account; set the Pix ID, the display name, or both | `400 PIX_ID_INVALID`, `401 INVALID_CREDENTIALS`, `409 PIX_ID_TAKEN` |
 | `PUT /me/google` (It 2) | auth | Add a Google account (FR-5.12, FR-5.13) | `401 INVALID_TOKEN`, `409 GOOGLE_IN_USE`, `409 GOOGLE_ALREADY_ADDED`, `503 UNAVAILABLE` |
 | `PUT /me/password` (It 2) | auth | Add a password to a Google account (FR-5.14) | `400 PASSWORD_INVALID`, `403 PIX_ID_REQUIRED`, `409 PASSWORD_ALREADY_SET` |
+| `DELETE /me` (It 5) | auth | Delete the account with everything the server keeps about it (FR-5.18); `204` | — |
 | `POST /devices` (It 2) | auth | Register or refresh the FCM token | `401 UNAUTHENTICATED` after sign-out, even with an unexpired token |
 | `POST /users/lookup` (It 2) | auth, Pix ID | Exact-match lookup with the relation to the caller (FR-5.5, FR-5.8) | `404 NOT_FOUND` |
 | `GET /friend-requests` (It 2) | auth, Pix ID | Pending requests, received and sent (FR-5.7) | — |
@@ -2281,6 +2300,7 @@ Outside `/api/v1`:
 
 - `/ws`: the signaling WebSocket (2.5.2).
 - `GET /i/{invitationId}` (It 3): the invite link's page (2.6.6).
+- `GET /privacy`, `GET /privacy/{ko|en}` (It 5): the privacy policy's page, in Korean, the version that applies, or in English (FR-10.7). Each links to the other language; another language is `404`.
 - `GET /health`: `{"status": "ok"}`, or `503` when Redis does not answer within 2 s (2.8, Deployment).
 - `GET /internal/stats`: open sessions and sockets, for `deploy.sh`; nginx does not forward it.
 
@@ -2403,6 +2423,9 @@ Outside `/api/v1`:
 - **`refreshToken`.** 32 random bytes, stored only as a SHA-256 hash in `sessions` (2.7), valid 30 days from its last use. `POST /auth/refresh` `{ "refreshToken": "kq3V9x0Rz8..." }` answers `{ "accessToken", "refreshToken", "expiresIn" }`, and the old token stops working. A spent token that comes back ends the session for every holder. An unknown or expired one also gets `401 INVALID_REFRESH_TOKEN`.
 - **Sign-out.** `DELETE /auth/session` deletes the session and its device row at once. The access token works until it expires, at most 15 minutes later; the app deletes both tokens. A signaling socket stays online after its token expires, since the token is checked only at the upgrade.
 - **Several phones.** Each phone has its own session, so a refresh or sign-out on one never affects another. A change reaches other phones only through the server: *Share my camera* and *Sent requests* read `GET /me` every 10 s while shown (`AuthRepository.refreshAccount`, 2.8 *Push*). `AuthTokens.reload` drops a read that a change on this phone overtook, and does not write an unchanged account.
+- **Deleting the account (FR-5.18).** `DELETE /me` locks the user row, then deletes its invitations, friend requests (sent and received), friendships, devices, spent refresh tokens, sessions, and the user, in one transaction. Its Pix ID and Google account are free for a new account at once. The account's other phones sign out at their next request: their access tokens name a missing user (`401 UNAUTHENTICATED`), and the refresh that follows finds no session (`401 INVALID_REFRESH_TOKEN`). The app deletes this phone's tokens itself.
+- **Deleting again.** `DELETE /me` checks only the access token, so a token whose account is already gone also gets `204`. A phone whose first answer was lost tries again and signs out. User ids are never reused (`new_id`), so such a token cannot name another account.
+- **Racing a deletion.** Every write that saves a row naming a user takes that user's row first: shared with `held_users` (a sign-in, a device, an invitation), or for update with `lock_pair` (a friend request and its answer). `DELETE /me` takes the row for update, so it runs wholly before or after such a write. A deletion first means the write finds the account gone, and answers as for a missing account: a wrong password, `NOT_REGISTERED`, `401`, or `404`. A write first means the deletion deletes what it saved. User rows come before any other row and in id order, so no two transactions wait on each other in a circle. A read that shows a user beside another row reads both in one statement (`GET /invitations/{id}`), since each statement sees the latest commit.
 - **In the app (Iter2-P13).** `BearerTokens` adds the token and answers `401 UNAUTHENTICATED` with one refresh and one retry. `AuthTokens` also refreshes a minute before expiry. It runs one refresh at a time and gives waiting callers its new token, since a spent token ends the session. A refused refresh signs the phone out; an unanswered one keeps the tokens. `PixAuthApi` has its own client, so a refresh never waits behind account or pose calls.
 
 </details>
@@ -2425,7 +2448,7 @@ Outside `/api/v1`:
 - **Verification.** The server checks the signature against Google's published keys, kept as long as Google's `Cache-Control` allows. The audience must be our web client ID (`PIX_GOOGLE_CLIENT_ID`, the server client ID the app passes to Credential Manager), and the issuer Google. Only the Google `sub` is kept (AD-12). Without the client ID or Google's keys, all three answer `503 UNAVAILABLE`.
 - **New account.** It is named after the Google account, up to 30 characters, or "Pix user" without a name. Its Pix ID is `null` until `PUT /me` sets one.
 
-**Signing up with Google (FR-5.13).** The app calls `POST /auth/google` first. On `NOT_REGISTERED` it asks "Do you already have a Pix account?" *Yes:* the person signs in with Pix ID and password, and the app sends the same ID token to `PUT /me/google`. *No:* `POST /auth/google/signup` creates the account, and the Pix ID setup follows. A password account can add Google later the same way (FR-5.12).
+**Signing up with Google (FR-5.13).** The app calls `POST /auth/google` first. On `NOT_REGISTERED` it asks "Do you already have a Pix account?" *Yes:* the person signs in with Pix ID and password, and the app sends the same ID token to `PUT /me/google`. *No:* *Sign up with Google*, the agreement page for the Google account (`SignUpAgreementFragment` with `google`), asks for the consents (FR-5.19); its *Agree and continue* calls `POST /auth/google/signup`, which creates the account, and the Pix ID setup follows. Its Back forgets the Google account, as closing the question does, or the next sign-in with a password would add it. While the account is being made, Back and the policy row wait. Pix ID setup opens from the account (`authState`: signed in, no Pix ID), not from the one-time `SignedIn` event, which is lost when no screen collects it: behind the privacy policy, or with Pix in the background. After a new process, no Google account waits, so the page waits for the kept sign-in to be read before it opens Pix ID setup or goes back. A password account can add Google later the same way (FR-5.12).
 
 **Adding a password (FR-5.14).** `PUT /me/password` `{ "password": "sunset2026" }` answers `200` with `"hasPassword": true`; the Pix ID and password then sign in too. The Pix ID is the login name, so an account without one gets `403 PIX_ID_REQUIRED`. The rules are those of sign-up. An account with a password gets `409 PASSWORD_ALREADY_SET`, since changing a password is not offered. There is no email, so a forgotten password cannot be reset.
 
@@ -2820,8 +2843,8 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - Outside a session, Camera's thumbnail is the newest photo in Pix's album, taken here or received, and a tap opens the whole album in the same viewer, at the newest (`PixAlbumPhotos`, FR-1.6, [#247]). A photo just taken is a page at once, before MediaStore tells of it. The viewer closes when a session starts or ends, so it never turns from one list to the other. The phone's gallery, given one photo through `ACTION_VIEW`, would show that photo alone, in Pix's task. The album is read from MediaStore at the app's start and at each MediaStore change, so a photo deleted in the gallery leaves it. Without a storage permission Pix sees only the photos it saved, so after a reinstall the album is empty until the next.
   - Ending the session drops unconfirmed photos without asking. 3 s later Camera says "Couldn't send 2 photos to Joonhyung". The subject deletes partial files, also at each session start.
   - IT-20 measures the live view while photos go (NFR-6). FR-6.13's notice is unchanged.
-- **Remote focus (Could, FR-7.7).** A tap on the video would send `camera.focus.set` to `setFocusPoint`, with no echo. Planned for Iteration 5 (Iter2-P17; left out of Iteration 4 at its kickoff); only the message exists.
-- **Permission (Could, FR-7.5).** `control.permission` with `allowed: false` would disable the subject's controls and drop its requests. Planned for Iteration 5 (Iter2-P17; left out of Iteration 4 at its kickoff); only the message exists, so remote control is always allowed.
+- **Remote focus (Could, FR-7.7).** A tap on the video would send `camera.focus.set` to `setFocusPoint`, with no echo. Planned for Iteration 5 (Iter5-P9, [#273]), with the brightness beside the focus box (FR-7.3); only the message exists.
+- **Permission (Could, FR-7.5).** `control.permission` with `allowed: false` would disable the subject's controls and drop its requests. Dropped at the kickoff of 11/21: short of time, and judged less important. Only the message exists, so remote control is always allowed.
 - **Ultrawide routing.** `CameraZoomPlan` prefers the primary camera's native sub-1× zoom. A separate rear ultrawide extends the range only when its range reaches the primary's. The controller converts each request to the bound camera's native `setZoomRatio`, and `ZoomState` back, so every ratio is primary-relative.
 - **Zoom without stutter (It 2, Must, NFR-19).**
   - `CameraXController.setZoom` applies only the newest request, once per `Choreographer` frame, and skips a native ratio already asked for. This is a precaution: the S23 Ultra showed no stutter either way.
@@ -2906,9 +2929,11 @@ The settings screen (FR-10.1, R&S 6.10; Iter3-P23, [#123]) opens from a gear on 
 | Guide | Color, thickness, preview |
 | Shoot together | *Show the delay* |
 | General | *Language*, *Notifications* |
-| Privacy | *AI pose generation*, *Share usage data* |
+| Privacy | *AI pose generation*, *Share usage data*, *Privacy policy* |
 | Account | *Pix account* |
 | Help | *How to use Pix*, *Show the tutorial again*, *About Pix* |
+
+Each section's rows share one card, without dividers.
 
 - **Base brightness (FR-1.11, [#182]).** "Every photo starts from it. Tap to focus, then drag up or down to change it until the next tap." The slider runs from −2 to +2 EV in thirds, 0 by default, and shows its value, such as "+1.0". It is saved as `AppSettings.baseBrightness` (DataStore `base_brightness_ev`). Camera returns to it at each tap to focus (2.8, *Camera labels and brightness*). A camera with a smaller range clamps it.
 - **Guide look (FR-3.10).** Five colors: white, the default (FR-2.2); black; yellow; mint; and pink. Three thicknesses: about 1.5, 2, and 3 dp (`GuideThickness` 0.75, 1, 1.5), 2 dp by default. DataStore keeps them (`app_settings`).
@@ -3007,12 +3032,19 @@ erDiagram
 *Figure 10. Database schema. The `invitations` table comes with invitations (Iteration 3).*
 
 - **Users.** A check constraint requires a Google subject, a password hash, or both, so every user can sign in. `pix_id` and `google_sub` are unique; many users may have neither yet.
+- **Deleted users.** Deleting an account deletes every row that names it, in the order of the foreign keys (2.5.3, *Deleting the account*), so no table keeps the ID of a deleted user.
 - **Friends.** `friendships` has one row per pair, `user_a < user_b` (the server orders them), with the pair as its primary key. `friend_requests` has at most one request per pair, in either direction: (`user_a`, `user_b`) is unique. A request is deleted when it is accepted (the friendship is created), declined, or withdrawn, or when either user removes the other.
 - **Opposite requests.** A request in the opposite direction is accepted instead of duplicated, also when both come at once: sending locks both users, so the second finds the first's request and accepts it. The unique pair is the database's own guard.
-- **Sign-in sessions.** Each sign-in on a phone is a `sessions` row with only the hash of its current refresh token (2.5.3, *Session tokens*); access tokens are not stored. A sign-in removes the user's expired sessions; a refresh moves `expires_at` forward. Exchanged refresh tokens go to `spent_refresh_tokens`, so one that comes back ends the session. One spent longer ago than a session lasts is ignored, as it would have expired, and dropped at the next refresh.
+- **Sign-in sessions.** Each sign-in on a phone is a `sessions` row with only the hash of its current refresh token (2.5.3, *Session tokens*); access tokens are not stored. A refresh moves `expires_at` forward. Exchanged refresh tokens go to `spent_refresh_tokens`, so one that comes back ends the session. One spent longer ago than a session lasts is ignored, as it would have expired.
 - **Devices.** A device row belongs to the session that registered it, and `session_id` is unique. `POST /devices` is one upsert on `session_id`, so a rotated FCM token replaces the old one in place, even when two registrations arrive at once. When two sessions register one token at once, the second meets the first's row, rolls back, and moves the token on its retry. Ending the session deletes the row (`ON DELETE CASCADE`).
-- **Push targets.** A session that expired without a sign-out keeps its device row until the user signs in again. The push sender skips such a row: it sends only to devices whose session has not expired. It deletes a row whose token FCM no longer knows (Iter3-P15, [#119]).
-- **Invitations.** A pending invitation past `expires_at` has expired, without a write. Rows are deleted a day after they were created, when a later invitation is sent. `session_id` names a session in the session store, not a row.
+- **Push targets.** A session that expired without a sign-out keeps its device row until the next retention pass (*Retention*). The push sender skips such a row: it sends only to devices whose session has not expired. It deletes a row whose token FCM no longer knows (Iter3-P15, [#119]).
+- **Invitations.** A pending invitation past `expires_at` has expired, without a write. Rows are deleted a day after they were created. `session_id` names a session in the session store, not a row.
+- **Retention.** The privacy policy's periods hold also for an account nobody uses. Each worker deletes, when it starts and then every hour (`retention.py`):
+  - invitations made more than a day ago;
+  - expired sessions, with their devices and spent refresh tokens;
+  - spent refresh tokens older than one session lifetime.
+
+  A pass gives the same result run twice or by two workers at once, so the workers share no lock. A sign-in, a refresh, and a new invitation also delete some of these rows on the way.
 - **Indexes.** Besides the keys and unique columns: `sessions.user_id`, `spent_refresh_tokens.session_id`, `devices.user_id`, `friend_requests.to_user_id`, `friendships.user_b`, and `invitations` on `from_user_id`, `to_user_id`, and `created_at`.
 - **Privacy.** No table stores a Google ID token, a scene photo, a guide, or anything from the live view or a session (NFR-13). Logs never contain tokens, or Pix IDs with request bodies (2.8, Privacy).
 - **Storage.** On every server, PostgreSQL's files are in `/opt/pix/postgres`, a directory on the server's disk mounted into the container, not a Docker volume. They outlive a crash of PostgreSQL (its write-ahead log replays what was committed), a restart of any container, a deploy, a reboot, and `docker compose down -v`. Deleting that directory deletes every account, and nothing backs it up yet.
@@ -3140,6 +3172,9 @@ erDiagram
 
 **Privacy** (NFR-13)
 
+- Before an account is made, the agreement page (`SignUpAgreementFragment`) asks for three required consents, each with its own box: being 14 or older, the collection and use of personal information, and its transfer abroad to AWS (Australia) and Google (United States) (FR-5.19). Each consent to collection or transfer lists the items, the purpose, how long they are kept, and the right to refuse, as Korea's Personal Information Protection Act asks. *Agree and continue* waits for all three. As *Sign up*'s first page, it then opens the form; as *Sign up with Google*, it makes the account. The app keeps no record of the agreement; the account exists only with it.
+- The privacy policy is one text in two languages, `server/src/pix_server/privacy/policy.ko.md` and `policy.en.md`. The server renders both once at start and serves them at `/privacy` (Korean) and `/privacy/en`, the address the store links to; Pix shows the same page (2.1). The wiki's *Privacy Policy* pages copy them, and a test keeps the copies the same.
+- The page lays the text out as a document: the Pix logo and a language switch, the title with the effective date and the contact, the contents, and one part per numbered section. A table keeps its columns' widths and, on a narrow screen, scrolls sideways in its own box. The page has no script and loads nothing from elsewhere, so the app's WebView keeps JavaScript off. The renderer refuses a policy laid out otherwise: sections as `## n. Name`, and `Term: value` lines before them.
 - The server never logs request bodies, images, the image API's response bodies, passwords, or tokens. Nor does it log descriptions, suggested poses, or variations, which describe the person in the photo.
 - A scene photo stays in memory until the response. nginx and the app refuse a request over 1 MiB before reading it, so no upload reaches the disk.
 - Each description and pose also goes, without the photo, to the description filter's decision model, TypeSafe's Jev on OpenRouter (2.6.3). A refusal logs only the question and its probability. Each `POST /poses` scene goes to the same model for the person check, which logs only its probability.
@@ -3154,6 +3189,7 @@ erDiagram
 
 - The global limits bound a day's model cost, however many addresses send. The OpenRouter key's spending limit, set in its dashboard, is the last bound. On the course servers, the address is the last `X-Forwarded-For` value, and on the AWS servers the address that connects (*Hosting*).
 - Requests to the AWS servers are encrypted with TLS. Over plain HTTP to a course server or a laptop, a scene photo, a sign-in password, and the tokens travel unencrypted (AD-11). The live view goes phone to phone, encrypted (NFR-14).
+- The AWS servers' logs, which hold the same lines, also go to CloudWatch in the servers' region (*Server logs and alerts*).
 - No URL holds a Pix ID or other personal data, because nginx's error log prints a failed request's whole request line. The lookup is `POST /users/lookup`. nginx and Uvicorn access logs leave out query strings.
 - Password hashes run two at a time per worker. A burst of sign-ins, which needs no account, then queues instead of taking a 64 MiB argon2id buffer per pool thread.
 - Cloud backups are off (`allowBackup="false"`); `data_extraction_rules.xml` keeps the sign-in, `guides/`, and the prompt history out of transfers to a new phone.
@@ -3188,6 +3224,14 @@ erDiagram
 - Each field is an event-scoped custom definition in the linked Analytics property: a dimension, or a metric for a count or a time (milliseconds for `ms` and `shutter_ms`). Analytics' reports show only registered fields, from their registration on, so a new field is registered before its release.
 - To see a debug build's events in Firebase's DebugView, build with `-Ppix.telemetry=true` and run `adb shell setprop debug.firebase.analytics.app com.lastpenguin.pix`.
 
+**Server logs and alerts** (AD-20)
+
+- The server writes its log lines to stdout and stderr: Uvicorn's, with its access log (`INFO:`, `ERROR:`), and the server's own, each with its level and logger (`WARNING pix_server.poses.generator: …`), from WARNING up and one INFO line. nginx writes its access log without query strings. What a line may hold: *Privacy*.
+- Docker keeps each container's log on its server, 5 files of 10 MB, which `pix logs` reads. A deploy recreates a copy's container and deletes that log.
+- On the AWS servers, the app's copies and nginx also send their logs to CloudWatch Logs, in one log group per server (`/pix/main`, `/pix/dev`) that keeps 30 days, with one stream per container name. Their driver does not block. `deploy.sh` tries the log group before each deploy, restart, or rollback, and keeps the logs local when that fails. Redis and PostgreSQL log only locally, so turning this on never restarts them.
+- A metric filter on each log group counts nginx's 5xx answers, and 5 or more in 5 minutes raise an alarm, which emails the team through SNS. A server that does not answer at all writes no log, so no alarm sees it.
+- The phones' crash reports and events: *Telemetry*.
+
 **Hosting** (AD-11)
 
 | Branch | Course server: campus network, HTTP | AWS server: every network, HTTPS | Builds |
@@ -3199,7 +3243,7 @@ erDiagram
 - The course servers are reachable only through the course's HTTP proxy on port 80, and only from the campus network. They cannot reach each other.
 - The AWS servers serve HTTPS on port 443 with a Let's Encrypt certificate for a hostname that sslip.io resolves to their Elastic IP. certbot renews it through nginx on port 80 (`/.well-known/acme-challenge/`). `deploy.sh` adds `docker-compose.https.yml`, which publishes port 443, once the certificate exists, so the course servers serve port 80 only. On a server with the certificate, it refuses to deploy or roll back to a commit without that file, which would close port 443. nginx passes the scheme on (`X-Forwarded-Proto`), so invite links from the AWS servers start with `https://`.
 - `server/deploy/docker-compose.yml` runs:
-  - `nginx` on port 80, and on 443 on the AWS servers, which forwards `/api/v1`, `/ws`, `/health`, and the invite link's page `/i/<id>`, serves `/version` and Let's Encrypt's check, and answers `404` to the rest, so FastAPI's `/docs` is not public;
+  - `nginx` on port 80, and on 443 on the AWS servers, which forwards `/api/v1`, `/ws`, `/health`, the invite link's page `/i/<id>`, and the privacy policy's `/privacy`, serves `/version` and Let's Encrypt's check, and answers `404` to the rest, so FastAPI's `/docs` is not public;
   - `app-blue` and `app-green`, two copies of the app, each Uvicorn with two workers, set explicitly because the servers report 38 CPUs for our 8 cores;
   - `redis`, which writes nothing to disk;
   - `postgres`, with its files in `/opt/pix/postgres` on the server's disk, not a Docker volume, so no Docker cleanup can delete them.
@@ -3225,6 +3269,7 @@ erDiagram
 
 - The app sends the access token as a bearer header on REST calls and on the signaling upgrade. Everything but friends and invitations works without one (FR-5.1).
 - Sign-up takes a Pix ID, a display name, and a password, or Google. Either account can add the other sign-in (`PUT /me/google`, `PUT /me/password`; 2.5.3). Without email, a lost password cannot be reset.
+- *Account* › *Delete account* deletes the account after asking (`DELETE /me`, FR-5.18); this phone signs out at once and the others at their next request. Guides and photos on the phone stay.
 - Passwords are hashed with argon2id (`argon2-cffi`'s defaults: 3 passes over 64 MiB) on a worker thread, so a hash does not hold up the worker's sockets. Only the hash is stored.
 - Passwords cross HTTPS to the AWS servers, and plain HTTP to a course server (AD-11, NFR-14). Log-in attempts are not limited.
 - Whether a Pix ID exists is not secret: the lookup tells any signed-in user, and `POST /auth/check-pix-id` anyone, for an exact Pix ID only (NFR-15). Neither is limited. A failed log-in answers alike for an unknown Pix ID and a wrong password.
@@ -3241,7 +3286,7 @@ erDiagram
 - The account is read even without a Pix ID, so one chosen on another phone brings the lists at once. Received invitations are read every 5 s (2.6.6).
 - FCM carries data messages only; the app renders each notification (`push/PushNotifications`). An invitation's uses the high-importance *Invitations* channel for the invitation's lifetime. A friend request's uses *Friend requests* and opens *Share my camera* (`pix://friends`).
 - An invitation opened after it left `PENDING` shows "This invitation is no longer available".
-- The server pushes from a background task after its response, so FCM never slows or fails a request. It keeps FCM's access token, from the service account's key, until a minute before it expires.
+- The server pushes from a background task after its response, so FCM never slows or fails a request. The task first reads the row the push tells of, the friend request or the pending invitation, and sends nothing when it is gone, so no push names an account deleted after its request. It keeps FCM's access token, from the service account's key, until a minute before it expires.
 - The server deletes a device row whose token FCM reports unregistered (404). A log line holds FCM's status, never a token.
 
 **Aspect ratio and camera controls**
@@ -3295,7 +3340,7 @@ Owners follow the README's *Team* section. The Iteration 3 table names who built
 
 | Module | Owner | Iteration 1 | Iteration 2 | Provides to |
 |----|----|----|----|----|
-| **App shell, design, and integration** | 한준형 (PM in Iteration 2); 박재완 (PM in Iteration 3); 조성민 (PM in Iteration 4) | Activity, navigation graph, permission flow, `AppContainer` | The design and the shared contracts (Iter2-P3, [#45]); integration (Iter2-P22, [#60]); integration tests (Iter2-P21, [#59]); demo README (Iter2-P23, [#61]); schedule and issues | All screens |
+| **App shell, design, and integration** | 한준형 (PM in Iteration 2); 박재완 (PM in Iteration 3); 조성민 (PM in Iterations 4 and 5) | Activity, navigation graph, permission flow, `AppContainer` | The design and the shared contracts (Iter2-P3, [#45]); integration (Iter2-P22, [#60]); integration tests (Iter2-P21, [#59]); demo README (Iter2-P23, [#61]); schedule and issues | All screens |
 | **Camera** | 박동제 | Preview, capture to MediaStore, zoom, the viewport, `setFrameSink` (한준형, #3) | Tap to focus, brightness, flash, aspect ratios; `CameraController` and `CameraCapabilities` additions (Iter2-P10, [#51]) | Session, remote control |
 | **Reference guide** | 박동제 | Picker, segmentation, cutout, outline, *No person found* | Smooth outlines (Iter2-P7, [#49]); the `anchor` and the thumbnail copy of the reference (Iter2-P11, [#52]). Lines for arms and legs in front of the body are out of scope (2.6.1). | Guide overlay |
 | **Guide overlay and controls** | 박동제 | `GuideRepository`, `GuideGeometry`, overlay gestures, opacity (한준형, #6) | Hide and replace, reference thumbnail, starting position, guide-edit mode on Camera (Iter2-P11, [#52]); saved guides (Iter2-P18, [#58]) | Guide sync, Subject view |
@@ -3309,7 +3354,7 @@ Owners follow the README's *Team* section. The Iteration 3 table names who built
 | **Settings and tutorial** (`SettingsViewModel`, `AppSettings`, `TutorialFragment`) | 조성민 (settings), 한준형 (tutorial) | — | — | All screens |
 | **Telemetry** (`telemetry/`) | 박재완 | — | — | All modules |
 
-The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 passed on the S21 and the S22 in Iteration 3, by eye. Remote focus and the remote-control switch (Iter2-P17, Could) move to Iteration 5, left out of Iteration 4 at its kickoff of 11/7.
+The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 passed on the S21 and the S22 in Iteration 3, by eye. Remote focus and the remote-control switch (Iter2-P17, Could) move to Iteration 5, left out of Iteration 4 at its kickoff of 11/7. Remote focus is planned for Iteration 5 (Iter5-P9, [#273]); the switch was dropped at its kickoff of 11/21.
 
 **Iteration 3 tasks** (from the kickoff of 2026-10-25; the tasks due 10/30 were for the user test of 10/31–11/1):
 
@@ -3390,6 +3435,34 @@ The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 pas
 | The Iteration 4 documents, demo README, and `iteration-4-demo` (Iter4-P20, [#217]) | All | 11/20 | Done | — |
 
 Left out of Iteration 4 at its kickoff, for the UAT and its fixes: the remote-control switch and remote focus (FR-7.5, FR-7.7), and search, situations, and memos in the library (FR-3.11), both for Iteration 5. Dropped on 11/14 after a trial: the prompt templates ([#211]). Dropped on 11/20 as not needed: the QR connection ([#214]) and light mode ([#212]). Also left for Iteration 5: the changes for UAT cycle 2 and the live view's sharpness after a reconnection ([#238]; Testing Documentation 4.4), and the open problems of the user test and the heuristic evaluation (Testing Documentation 4.1, 4.2). Marking the face, the limbs, or the background on the guide (Testing Documentation 4.1) is on hold: ML Kit's pose detection or segmentation may err too much, and a background overlay did not work well; the tips take its place ([#213]).
+
+**Iteration 5 tasks** (from the kickoff of 2026-11-21; Iteration 5 runs 11/22–12/4, with UAT cycle 2 in class on 11/23 and the alpha test on 11/30):
+
+| Task | Owner | Due | Status | Design |
+|----|----|----|----|----|
+| The documents and the issues (Iter5-P1, [#265]) | 조성민 | 11/23 | Open | — |
+| Privacy in the app: what Sign up collects, and deleting an account (Iter5-P2, [#266]) | 박재완 | 11/22 | Open | 2.5.3, 2.7, *Still open* |
+| UAT cycle 2 (Iter5-P3, [#267]) | 조성민 | 11/23 | Open | Testing Documentation 4.3, 4.4 |
+| A guide from an earlier session stays on the subject's phone (Iter5-P4, [#268]) | 박동제 | 11/25 | Open | 2.5.1, 2.6.5 |
+| The live view's sharpness after a reconnection (Iter5-P5, [#269]) | 박재완 | 11/25 | Open | 2.6.7, *Still open* |
+| The library's situations and memos (Iter5-P6, [#270]) | 한준형 | 11/26 | Open | 2.6.2, AD-16 |
+| UI fixes: switches for the grid and the horizon bar, "up to 30 s", and UAT cycle 2's opinions (Iter5-P7, [#271]) | 박재완 | 11/27 | Open | 2.6.2, 2.6.8 |
+| A self-timer for the shutter (Iter5-P8, [#272]) | 박재완 | 11/27 | Open | 2.6.2, *Still open* |
+| Remote focus, with the brightness beside the focus box (Iter5-P9, [#273]) | 박동제 | 11/27 | Open | 2.5.1, 2.6.5, *Still open* |
+| Options to choose on *Generate poses* (Iter5-P10, [#274]) | 박동제 | 11/27 | Open | 2.6.3, *Still open* |
+| The cutout as a guide (Iter5-P11, [#275]) | 한준형 | 11/27 | Open | AD-6, 2.5.1, 2.6.1, 2.6.8, *Still open* |
+| Pose generation started by the subject (Iter5-P12, [#276]) | 한준형 | 11/27 | Open | 2.5.1, 2.6.3, 2.6.5, *Still open* |
+| ONE store: requested by 11/22, registered by 11/29 (Iter5-P13, [#277]) | 조성민 | 11/29 | Open | 2.8 |
+| The beta testing plan (Iter5-P14, [#278]) | 조성민 | 11/29 | Open | Testing Documentation 5 |
+| The alpha test in class (Iter5-P15, [#279]) | 조성민 | 11/30 | Open | Testing Documentation 5 |
+| AI module test: the outline on 100 photos (Iter5-P16, [#280]) | 박재완 | 12/1 | Open | 2.6.1; Testing Documentation 3 |
+| AI module test: the person check's precision and recall (Iter5-P17, [#281]) | 한준형 | 12/1 | Open | 2.6.3; Testing Documentation 3 |
+| Design patterns (Iter5-P18, [#282]) | 조성민 | 12/2 | Open | 3 |
+| Integration tests for the Iteration 5 flows (Iter5-P19, [#283]) | 조성민 | 12/3 | Open | Testing Documentation |
+| Integrate the Iteration 5 features (Iter5-P20, [#284]) | 조성민 | 12/3 | Open | — |
+| The Iteration 5 documents, demo README, and `iteration-5-demo` (Iter5-P21, [#285]) | All | 12/4 | Open | — |
+
+Done before the kickoff, as part of [#277]: release builds on the AWS servers over HTTPS ([#261]) and the privacy policy ([#264]). Dropped at the kickoff of 11/21, short of time and judged less important: the remote-control switch (FR-7.5), the library's search (FR-3.11), a zoom slider, more work on latency, and the UAT's suggestions of group photos, video, and switching roles. Light mode stays dropped. The coverage measures and the mutation run are not planned either (Testing Documentation 2.1.2, 2.1.7).
 
 **Iteration 2 build order** (the schedule of 2026-10-11; the issues' due dates). All was delivered by 10/23, except as noted:
 
@@ -3523,3 +3596,26 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#217]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/217
 [#247]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/247
 [#254]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/254
+[#261]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/261
+[#264]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/264
+[#265]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/265
+[#266]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/266
+[#267]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/267
+[#268]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/268
+[#269]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/269
+[#270]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/270
+[#271]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/271
+[#272]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/272
+[#273]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/273
+[#274]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/274
+[#275]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/275
+[#276]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/276
+[#277]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/277
+[#278]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/278
+[#279]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/279
+[#280]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/280
+[#281]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/281
+[#282]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/282
+[#283]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/283
+[#284]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/284
+[#285]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/285

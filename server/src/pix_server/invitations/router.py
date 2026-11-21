@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
 """Invitations to shoot together (Design Documentation 2.5.3, 2.6.6; R&S FR-6.1–6.4, FR-6.9, FR-6.17).
 
 Inviting a friend opens the session at once, with only the photographer's place: the answer carries that place's
@@ -22,7 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import InstrumentedAttribute
 
-from pix_server.accounts.auth import Database, SignedIn, millis, now_of
+from pix_server.accounts.auth import Database, SignedIn, held_users, millis, now_of
 from pix_server.accounts.friends import Member, are_friends
 from pix_server.accounts.schemas import UserOut
 from pix_server.db.models import Invitation, User, new_id
@@ -132,7 +132,11 @@ async def invite(
     """Invites a friend (FR-6.1) and pushes to the friend's phones after answering. A friend in a session, a waiting
     room included, is BUSY (FR-6.9); anyone but a friend is NOT_FRIENDS, whether or not the user exists (NFR-15)."""
     me = caller.user
-    friend = await db.get(User, body.friendId)
+    # Both rows first (`held_users`), so a deletion of either account runs wholly before or after this invitation.
+    held = await held_users(db, me.id, body.friendId)
+    if me.id not in held:
+        raise ApiError(401, "UNAUTHENTICATED", "Sign in to use this")
+    friend = await db.get(User, body.friendId) if body.friendId in held else None
     if friend is None or not await are_friends(db, me.id, friend.id):
         raise ApiError(403, "NOT_FRIENDS", "You can invite only your friends")
     store: SessionStore = request.app.state.store
@@ -165,7 +169,9 @@ async def invite(
         "fromName": me.display_name,
         "expiresAt": str(millis(expires_at)),
     }
-    background.add_task(push_to_user, request.app, friend.id, push, math.ceil(settings.invitation_ttl_seconds))
+    still_pending = select(Invitation.id).where(Invitation.id == invitation.id, Invitation.status == "PENDING")
+    ttl = math.ceil(settings.invitation_ttl_seconds)
+    background.add_task(push_to_user, request.app, friend.id, push, ttl, about=still_pending)
     return SentInvitation(
         id=invitation.id,
         to=UserOut.of(friend),
@@ -207,11 +213,18 @@ async def incoming_invitations(request: Request, caller: SignedIn, db: Database)
 @router.get("/invitations/{invitation_id}")
 async def open_invitation(invitation_id: str, request: Request, db: Database) -> OpenedInvitation:
     """What the friend's Invitation screen shows, opened from a push or a link (FR-6.4). No sign-in, so a link opens on
-    any phone; it shows only who is inviting."""
-    invitation = await db.get(Invitation, invitation_id)
-    if invitation is None:
+    any phone; it shows only who is inviting. The invitation and its sender are read in one statement: read apart, a
+    deletion of the sender's account (`DELETE /me`) that commits between the two would leave no sender."""
+    found = (
+        await db.execute(
+            select(Invitation, User)
+            .join(User, User.id == Invitation.from_user_id)
+            .where(Invitation.id == invitation_id)
+        )
+    ).first()
+    if found is None:
         raise not_found()
-    sender = await db.get(User, invitation.from_user_id)
+    invitation, sender = found
     return OpenedInvitation(
         id=invitation.id,
         sender=UserOut.of(sender),
@@ -285,7 +298,7 @@ a { display: block; padding: 14px; border-radius: 12px; background: #f2c14e; col
 @pages.get("/i/{invitation_id}", response_class=HTMLResponse)
 async def invite_link(invitation_id: str) -> HTMLResponse:
     """The page an invite link opens (Design 2.6.6): a button that opens the Invitation screen in Pix through its
-    `pix://invite/<id>` scheme, since a verified App Link that opens Pix directly needs HTTPS (AD-11). The page reads
+    `pix://invite/<id>` scheme, since Pix declares no App Links that would open it directly. The page reads
     nothing and names nobody, because a link can travel further than the friend."""
     if not INVITATION_ID.fullmatch(invitation_id):
         raise HTTPException(404)

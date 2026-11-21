@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-03, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
 """ASGI entry point: uv run uvicorn pix_server.main:app --host 0.0.0.0 --port 8000."""
 
 import asyncio
@@ -6,7 +6,7 @@ import logging
 import secrets
 import time
 from collections.abc import AsyncIterator, Callable
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 import httpx2
 from argon2 import PasswordHasher
@@ -45,6 +45,8 @@ from pix_server.poses.person_check import PersonCheck
 from pix_server.poses.router import router as poses_router
 from pix_server.poses.suggester import PoseSuggester
 from pix_server.poses.tips import PoseTipper
+from pix_server.privacy.router import router as privacy_router
+from pix_server.retention import keep_pruning, prune_now
 from pix_server.signaling.registry import SessionRegistry
 from pix_server.signaling.router import router as signaling_router
 from pix_server.store import SessionStore, open_redis
@@ -72,6 +74,14 @@ class HideQuery(logging.Filter):
 
 
 logging.getLogger("uvicorn.access").addFilter(HideQuery())
+
+# Uvicorn sets up only its own loggers, so the server's lines carry their level and logger here, which makes them
+# searchable in the container's log and in CloudWatch (server/README.md, Logs in CloudWatch). They still reach the root
+# logger, where pytest's caplog reads them.
+_log_handler = logging.StreamHandler()
+_log_handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+logging.getLogger("pix_server").addHandler(_log_handler)
+logging.getLogger("pix_server").setLevel(logging.INFO)
 
 
 def warn_about_missing_settings(settings: Settings) -> None:
@@ -144,9 +154,15 @@ def create_app(
                 registry = SessionRegistry(config, store, TurnRelay(config, turn_http).ice_servers)
                 app.state.signaling = registry
                 await registry.start()
+                # What is past its retention period goes before this worker serves, then every hour.
+                await prune_now(app)
+                pruner = asyncio.create_task(keep_pruning(app))
                 try:
                     yield
                 finally:
+                    pruner.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await pruner
                     await registry.stop()
         finally:
             await connection.aclose()
@@ -159,6 +175,7 @@ def create_app(
     app.include_router(friends_router)
     app.include_router(invitations_router)
     app.include_router(invitation_pages)
+    app.include_router(privacy_router)
     app.add_middleware(RequestBodyLimitMiddleware, max_body_size=MAX_REQUEST_BYTES)
     app.add_exception_handler(ApiError, handle_api_error)
     app.add_exception_handler(RequestValidationError, handle_validation_error)

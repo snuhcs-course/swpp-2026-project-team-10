@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
 package com.lastpenguin.pix.core.network
 
 import okhttp3.MultipartBody
@@ -101,6 +101,13 @@ interface PixAccountApi {
 
     @GET("api/v1/me")
     suspend fun me(): AccountDto
+
+    /**
+     * Deletes the account with its sign-ins on every phone, devices, friendships, friend requests, and invitations
+     * (FR-5.18); `204`. Its Pix ID is free again at once.
+     */
+    @DELETE("api/v1/me")
+    suspend fun deleteMe()
 
     /** `409 PIX_ID_TAKEN`, `400 PIX_ID_INVALID`, `401 INVALID_CREDENTIALS` (a password account's wrong password). */
     @PUT("api/v1/me")

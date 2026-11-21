@@ -80,6 +80,10 @@ jobs:
           # The page an invite link opens, for an invitation id only.
           curl -fsS http://127.0.0.1:8080/i/inv_01JB2C3D4E5F6G7H8J9KAMNPQR | grep -F 'intent://invite/inv_01JB2C3D4E5F6G7H8J9KAMNPQR#Intent;scheme=pix;'
           test "$(status http://127.0.0.1:8080/i/not-an-invitation)" = 404
+          # The privacy policy in both languages, which the store and the app link to.
+          curl -fsS http://127.0.0.1:8080/privacy | grep -F '<html lang="ko">'
+          curl -fsS http://127.0.0.1:8080/privacy/en | grep -F '<h1>Privacy Policy</h1>'
+          test "$(status http://127.0.0.1:8080/privacy/fr)" = 404
           # FastAPI's documentation and the app's internal routes are not public.
           test "$(status http://127.0.0.1:8080/docs)" = 404
           test "$(status http://127.0.0.1:8080/openapi.json)" = 404
@@ -133,6 +137,25 @@ jobs:
           echo ci-token > "$RUNNER_TEMP/pix/acme/.well-known/acme-challenge/ci-token"
           test "$(curl -fsS http://127.0.0.1:8080/.well-known/acme-challenge/ci-token)" = ci-token
           test "$(status http://127.0.0.1:8080/.well-known/acme-challenge/other)" = 404
+
+      # The AWS servers' CloudWatch override (server/README.md, Logs in CloudWatch): the app's copies and nginx take the
+      # awslogs driver without the base file's json-file options, and Redis and PostgreSQL keep their local log.
+      - name: Check the CloudWatch override
+        run: |
+          PIX_LOG_GROUP=/pix/ci PIX_LOG_REGION=ap-southeast-2 docker compose -f server/deploy/docker-compose.yml \
+            -f server/deploy/docker-compose.cloudwatch.yml config --format json > "$RUNNER_TEMP/compose.json"
+          python3 - "$RUNNER_TEMP/compose.json" <<'EOF'
+          import json
+          import sys
+
+          services = json.load(open(sys.argv[1]))["services"]
+          for name in ("app-blue", "app-green", "nginx"):
+              logging = services[name]["logging"]
+              assert logging["driver"] == "awslogs", (name, logging)
+              assert set(logging["options"]) == {"awslogs-region", "awslogs-group", "tag", "mode", "max-buffer-size"}, logging
+          for name in ("redis", "postgres"):
+              assert services[name]["logging"]["driver"] == "json-file", (name, services[name]["logging"])
+          EOF
 
       - name: Show the container logs
         if: failure()

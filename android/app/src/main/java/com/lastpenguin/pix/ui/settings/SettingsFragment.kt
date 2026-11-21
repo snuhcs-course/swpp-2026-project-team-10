@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.content.ActivityNotFoundException
@@ -7,9 +7,11 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Toast
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
@@ -85,6 +87,9 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         binding.notificationsRow.root.setOnClickListener { openNotificationSettings() }
         binding.consentRow.settingTitle.setText(R.string.settings_ai_consent)
         binding.consentRow.root.setOnClickListener { confirmWithdrawal() }
+        binding.privacyPolicyRow.settingTitle.setText(R.string.settings_privacy_policy)
+        binding.privacyPolicyRow.settingValue.isVisible = false
+        binding.privacyPolicyRow.root.setOnClickListener { openPrivacyPolicy(R.id.settingsFragment) }
         binding.accountRow.settingTitle.setText(R.string.settings_account)
         binding.accountRow.root.setOnClickListener { openAccount() }
         binding.helpRow.settingTitle.setText(R.string.settings_how_to)
@@ -232,6 +237,11 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         // Only an agreement can be taken back; without one, Pix asks before it sends anything.
         row.settingChevron.isVisible = given
         row.root.isClickable = given
+        // The row's end padding leaves room for the chevron, whose tip is 16 dp from the edge; without it, the value
+        // ends there itself.
+        row.settingValue.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+            marginEnd = if (given) 0 else (8 * resources.displayMetrics.density).roundToInt()
+        }
     }
 
     private fun confirmWithdrawal() {

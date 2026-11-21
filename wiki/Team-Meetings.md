@@ -444,6 +444,115 @@ The tasks due 10/30 are for the user test on 10/31–11/1. The rest continues ne
 
 [↑ Back to the list](#iteration-4)
 
+## Iteration 5
+
+| Date | Meeting | Topics |
+|---|---|---|
+| [2026-11-21 (Sat)](#2026-11-21-sat-iteration-5-kickoff) | Iteration 5 kickoff | Schedule, UAT cycle 2, the alpha prep survey, ONE store, UI changes, new features, bug fixes, testing, documents, tasks |
+
+### 2026-11-21 (Sat): Iteration 5 kickoff
+
+**Attendees:** 박동제, 박재완, 조성민, 한준형
+
+**Agenda**
+1. Schedule
+2. UAT cycle 2
+3. The alpha prep survey
+4. ONE store registration
+5. UI changes
+6. New features
+7. Bug fixes
+8. Testing
+9. Documents and submissions
+10. Tasks
+
+**1. Schedule**
+- Iteration 5 runs 11/22–12/4. 조성민 is PM.
+- 11/22: the alpha prep survey and the ONE store registration request. 11/23: UAT cycle 2 in class. 11/29: the beta testing plan, and the ONE store registration complete. 11/30: the alpha test in class. 12/4: Iteration 5 is due.
+- The ONE store registration completes on 11/29, so the UI is settled and the bugs are fixed in the first week, by 11/28.
+- The beta test is on 12/7–12/11, not on 12/2. The documents that say 12/2 are corrected (R&S, Testing, README).
+
+**2. UAT cycle 2**
+- Cycle 1: all five stories passed, with 140 of 140 marks accepted and a mean satisfaction of 4.93. Of its seven problems, five were fixed in Iteration 4. Two remain: the outline is too simple, and the live view is less sharp after a reconnection ([[Testing Documentation|Testing-Documentation]] 4.4).
+- The sheet changes for cycle 2: every step says what testers A and B each do; the live view (US-10) and remote control (US-12) become one story; the less important edge and negative steps go, since 70 steps were tight for 45 minutes.
+- Open at the meeting: which story fills the freed time, saved guides or joining with a room code without sign-in. The sheet has both: a room code in place of the invitation, and saved guides in the library ([#267]).
+- The PM prepares the phones, the accounts, and the build.
+
+**3. The alpha prep survey**
+- Due on 11/22. The PM shares a draft, and the team checks it.
+
+**4. ONE store registration**
+- The request is due on 11/22 and the registration on 11/29.
+- The screenshots go in with the request, before the UI is settled, so they show the current build.
+- The PM makes the release build and registers Pix ([#277]).
+
+**5. UI changes**
+- A zoom slider (heuristic evaluation): not built.
+- A self-timer (user test): built.
+- A switch to turn off the horizon bar (heuristic evaluation): built, with one for the grid, in the settings.
+- The illustrations stay as they are.
+- Light mode: only if time remains; for now, not built.
+- The caption of *Generating poses* says 30 s, not 60 s.
+- The opinions of UAT cycle 2 are added, and the UI is settled in one pass.
+
+**6. New features**
+- The cutout comes back as a guide. "The outline is too simple" came from three of the six users in the user test, and again from T2 in the UAT. Its UI is the owner's call.
+- Put off twice, decided now:
+  - the remote-control switch (FR-7.5): dropped;
+  - remote focus (FR-7.7): built, with the focus and the brightness set from the subject's view of the camera;
+  - the library (FR-3.11): situations and memos are built, inside the library only; the search is dropped.
+- T2's suggestions in the UAT (group photos, video, switching roles): not built.
+- In a session, the subject can start AI pose generation too.
+- Users often do not know what pose to type, so *Generate poses* offers options to choose next to typing. How is the owner's call.
+
+**7. Bug fixes**
+- An outline that was shared before stays on the screen.
+- Latency: no more work.
+- The live view after a reconnection was not measured in Iteration 4, so it is measured first. It may be unavoidable; a notice when the network is back is an option.
+- Before the alpha test, the server's AI limits and the cost are checked: the daily limit once stopped the heuristic evaluation.
+
+**8. Testing**
+- AI module tests:
+  - the outline, a new test: 100 photos, such as Instagram screenshots, labeled pass or fail by the four of us; the rule for pass and fail written before labeling; kinds mixed on purpose (long hair, thick clothes, several people, from behind, low light); the screenshot's cut and the outline's quality scored apart; the photos kept out of the public repository, with only labels and ids committed;
+  - the person check's precision and recall: Iteration 3's sample was small (none of four far-away people found); the same 100 photos and 50 without a person; recall matters more, since a miss leaves the user without poses;
+  - whether the four candidates differ: not measured again.
+- For each test: the pass mark, whether a miss is fixed or recorded as a limit, and a time limit.
+- The alpha test is on 11/30, and the beta testing plan is due on 11/29.
+
+**9. Documents and submissions**
+- Design 3, *Design Patterns*, with at least two patterns; Testing 5, *Alpha & Beta Testing*.
+- Iteration 5 is submitted on 12/4.
+
+**10. Tasks**
+
+| Owner | Item | Due |
+|---|---|---|
+| 조성민 | PM work: the documents and the issues ([#265]) | 11/23 (Mon) |
+| 박재완 | Privacy in the app: what Sign up collects, and deleting an account ([#266]) | 11/22 (Sun) |
+| 조성민 | UAT cycle 2 ([#267]) | 11/23 (Mon) |
+| 박동제 | A guide from an earlier session stays on the subject's phone ([#268]) | 11/25 (Wed) |
+| 박재완 | The live view's sharpness after a reconnection ([#269]) | 11/25 (Wed) |
+| 한준형 | The library's situations and memos ([#270]) | 11/26 (Thu) |
+| 박재완 | UI fixes ([#271]) | 11/27 (Fri) |
+| 박재완 | A self-timer ([#272]) | 11/27 (Fri) |
+| 박동제 | Remote focus, with the brightness beside the focus box ([#273]) | 11/27 (Fri) |
+| 박동제 | Options to choose on *Generate poses* ([#274]) | 11/27 (Fri) |
+| 한준형 | The cutout as a guide ([#275]) | 11/27 (Fri) |
+| 한준형 | Pose generation started by the subject ([#276]) | 11/27 (Fri) |
+| 조성민 | ONE store registration ([#277]) | 11/29 (Sun) |
+| 조성민 | The beta testing plan ([#278]) | 11/29 (Sun) |
+| 조성민 | The alpha test ([#279]) | 11/30 (Mon) |
+| 박재완 | AI module test: the outline ([#280]) | 12/1 (Tue) |
+| 한준형 | AI module test: the person check ([#281]) | 12/1 (Tue) |
+| 조성민 | Design patterns ([#282]) | 12/2 (Wed) |
+| 조성민 | Integration tests ([#283]) | 12/3 (Thu) |
+| 조성민 | Integration ([#284]) | 12/3 (Thu) |
+| All | The documents and the demo README ([#285]) | 12/4 (Fri) |
+
+The privacy task ([#266]) was added after the meeting, for the ONE store's review.
+
+[↑ Back to the list](#iteration-5)
+
 [#1]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/1
 [#12]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/12
 [#13]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/13
@@ -473,3 +582,24 @@ The tasks due 10/30 are for the user test on 10/31–11/1. The rest continues ne
 [#215]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/215
 [#216]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/216
 [#217]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/217
+[#265]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/265
+[#266]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/266
+[#267]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/267
+[#268]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/268
+[#269]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/269
+[#270]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/270
+[#271]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/271
+[#272]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/272
+[#273]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/273
+[#274]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/274
+[#275]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/275
+[#276]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/276
+[#277]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/277
+[#278]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/278
+[#279]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/279
+[#280]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/280
+[#281]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/281
+[#282]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/282
+[#283]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/283
+[#284]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/284
+[#285]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/285

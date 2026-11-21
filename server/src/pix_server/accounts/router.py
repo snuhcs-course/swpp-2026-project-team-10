@@ -409,16 +409,18 @@ async def register_device(body: DeviceRequest, request: Request, caller: SignedI
     signed in to another account. A session has one device, `session_id` being unique: a rotated token replaces the
     old one in place, in one upsert, so two registrations at once cannot leave two rows."""
     session_id = caller.session_id
+    # Read once: the rollback before a retry expires `caller.user`, which an async session cannot load again by itself.
+    user_id = caller.user.id
     dialect = postgresql if db.get_bind().dialect.name == "postgresql" else sqlite
     values = {
-        "user_id": caller.user.id,
+        "user_id": user_id,
         "fcm_token": body.fcmToken,
         "platform": body.platform,
         "updated_at": now_of(request.app),
     }
     for attempt in range(2):
         # The user's row before any device row, the order every writer and a deletion share (`held_users`).
-        if caller.user.id not in await held_users(db, caller.user.id) or await db.get(AuthSession, session_id) is None:
+        if user_id not in await held_users(db, user_id) or await db.get(AuthSession, session_id) is None:
             # Signed out, with an access token that has not expired yet.
             raise ApiError(401, "UNAUTHENTICATED", "Sign in to use this")
         # The token leaves the session it was registered under, if another.

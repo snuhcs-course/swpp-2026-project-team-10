@@ -1230,6 +1230,6 @@ class KoreanScreensTest {
         val WORD = Regex("[A-Za-z]+")
 
         /** What Korean keeps as it is in English: names, and the letters a Pix ID may use. */
-        val KEPT = listOf("Amazon Web Services", "Pix", "ID", "Google", "AWS", "AI", "a–z")
+        val KEPT = listOf("Amazon Web Services", "Pix", "ID", "IP", "Google", "AWS", "AI", "a–z")
     }
 }

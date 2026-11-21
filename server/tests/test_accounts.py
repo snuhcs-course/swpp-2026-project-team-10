@@ -26,7 +26,8 @@ Partitions:
   anywhere else (a bug, so a 500)
 - slow work holds no database: a sign-in waiting for its password check, and adding Google while Google answers
 - devices: new token, the same token from another account, a rotated token, two registrations at once for one
-  session, one token registered by two sessions at once, sign-out, invalid body
+  session, one token registered by two sessions at once, the retry after another session's registration got in
+  first (the rolled-back caller not read again), sign-out, invalid body
 """
 
 import asyncio
@@ -42,8 +43,9 @@ import jwt
 import pytest
 from argon2 import PasswordHasher
 from sqlalchemy import select
-from sqlalchemy.exc import OperationalError
-from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.sql.dml import Insert
 
 from pix_server.accounts.passwords import Passwords
 from pix_server.config import Settings
@@ -732,6 +734,27 @@ def test_sign_out_forgets_the_phones_device_token(client, sign_up):
     register(client, other_phone, "fcm-2")
     client.delete("/api/v1/auth/session", headers=phone)
     assert devices(client) == [(user["id"], "fcm-2")]
+
+
+def test_a_device_registration_retries_after_another_session_got_in_first(client, sign_up, monkeypatch):
+    """On PostgreSQL another session can register the same token between this one's delete and insert; the insert
+    then fails, the transaction rolls back, and the retry moves the token. The rollback expires every row the session
+    loaded, the caller's user among them, so the retry must not read it again."""
+    headers, user = sign_up("test1", "Test Account 1")
+    execute = AsyncSession.execute
+    raced = []
+
+    async def first_insert_loses(self, statement, *args, **kwargs):
+        if isinstance(statement, Insert) and statement.table.name == "devices" and not raced:
+            raced.append(True)
+            raise IntegrityError(str(statement), {}, Exception("UNIQUE constraint failed: devices.fcm_token"))
+        return await execute(self, statement, *args, **kwargs)
+
+    monkeypatch.setattr(AsyncSession, "execute", first_insert_loses)
+
+    assert register(client, headers, "fcm-1").status_code == 204
+    assert raced == [True]
+    assert devices(client) == [(user["id"], "fcm-1")]
 
 
 def test_signed_out_phone_cannot_register_a_device_with_its_unexpired_access_token(client, sign_up):

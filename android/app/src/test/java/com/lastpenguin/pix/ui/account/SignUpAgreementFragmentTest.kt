@@ -23,6 +23,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -40,8 +41,9 @@ import org.robolectric.annotation.GraphicsMode
  * (the boxes kept); Sign up's first page (Agree and continue opens the form over it and calls nothing; an error from the
  * form does not show here); Sign up with Google (it makes the account from the waiting Google account and opens Pix ID
  * setup in the place of Sign in and this screen; a refused sign-up shows the reason and stays; Back goes to Sign in and
- * forgets the Google account; a new process with no waiting Google account goes straight back); the privacy policy's
- * row, from either.
+ * forgets the Google account; a new process with no waiting Google account goes straight back; while the call runs,
+ * Back and the policy row wait; a sign-up that ends while the page's view is gone, as in the background, still opens
+ * Pix ID setup when it comes back); the privacy policy's row, from either.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -249,6 +251,47 @@ class SignUpAgreementFragmentTest {
 
         assertEquals(R.id.signInFragment, nav.currentDestination?.id)
         assertEquals(emptyList<String>(), modules.auth.calls)
+    }
+
+    @Test
+    fun google_whileTheCallRuns_backAndThePolicyRowWait() {
+        val modules = TestAppContainer()
+        modules.auth.googleSignUpGate = CompletableDeferred()
+        launch(google = true, modules = modules)
+        onScreen { it.allCheck.performClick() }
+        onScreen { it.agreeButton.performClick() }
+        idle()
+
+        onScreen { it.backButton.performClick() }
+        onScreen { it.policyRow.root.performClick() }
+        scenario!!.onFragment { it.requireActivity().onBackPressedDispatcher.onBackPressed() }
+        idle()
+        assertEquals(R.id.signUpAgreementFragment, nav.currentDestination?.id)
+        assertTrue(accountViewModel.waitingGoogle)
+
+        modules.auth.googleSignUpGate!!.complete(Unit)
+        idle()
+        assertEquals(R.id.pixIdSetupFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun google_aSignUpThatEndsWhileTheViewIsGone_stillOpensTheSetupWhenItComesBack() {
+        val modules = TestAppContainer()
+        modules.auth.googleSignUpGate = CompletableDeferred()
+        launch(google = true, modules = modules)
+        onScreen { it.allCheck.performClick() }
+        onScreen { it.agreeButton.performClick() }
+        idle()
+
+        // Its view destroyed, as when the person leaves Pix for a while; nothing collects the ViewModel's event.
+        scenario!!.moveToState(Lifecycle.State.CREATED)
+        modules.auth.googleSignUpGate!!.complete(Unit)
+        idle()
+        scenario!!.moveToState(Lifecycle.State.RESUMED)
+        idle()
+
+        assertEquals("googleSignUp:google-token", modules.auth.calls.last())
+        assertEquals(R.id.pixIdSetupFragment, nav.currentDestination?.id)
     }
 
     @Test

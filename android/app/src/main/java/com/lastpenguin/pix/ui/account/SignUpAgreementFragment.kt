@@ -19,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.lastpenguin.pix.R
+import com.lastpenguin.pix.account.AuthState
 import com.lastpenguin.pix.databinding.FragmentSignUpAgreementBinding
 import com.lastpenguin.pix.databinding.ItemConsentDetailBinding
 import com.lastpenguin.pix.ui.PixViewModels
@@ -30,9 +31,11 @@ import kotlinx.coroutines.launch
  * their details, the privacy policy, and *Agree and continue*. Sign in's *Sign up* opens it as Sign up's first page,
  * and *Agree and continue* opens the form (`SignUpFragment`) over it. "Do you already have a Pix account?" answered
  * *No, make one* opens it as Sign up with Google ([ARG_GOOGLE]): *Agree and continue* makes the account from the
- * waiting Google account and opens Pix ID setup in the place of Sign in and this screen. There, Back returns to Sign in
- * and forgets the Google account, as closing the question does, or a later sign-in with a password would add it, and a
- * new process with no waiting Google account goes back at once. Owner: Accounts (#54).
+ * waiting Google account and opens Pix ID setup in the place of Sign in and this screen, once the account says it has
+ * no Pix ID yet, so a sign-up that ends while the page is away still goes on. There, Back returns to Sign in and
+ * forgets the Google account, as closing the question does, or a later sign-in with a password would add it; while
+ * the account is being made, Back and the privacy policy wait. A new process with no waiting Google account goes back
+ * at once. Owner: Accounts (#54).
  */
 class SignUpAgreementFragment : Fragment(R.layout.fragment_sign_up_agreement) {
 
@@ -41,7 +44,8 @@ class SignUpAgreementFragment : Fragment(R.layout.fragment_sign_up_agreement) {
     private val google: Boolean get() = arguments?.getBoolean(ARG_GOOGLE) == true
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        if (google && !viewModel.waitingGoogle) {
+        // No Google account waits after a new process, or after the sign-up ended: then the account itself says.
+        if (google && !viewModel.waitingGoogle && !needsPixId(viewModel.authState.value)) {
             findNavController().popBackStack()
             return
         }
@@ -60,7 +64,9 @@ class SignUpAgreementFragment : Fragment(R.layout.fragment_sign_up_agreement) {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.uiState.collect(page::render) }
-                launch { viewModel.events.collect(::onEvent) }
+                // From the account, not the ViewModel's event: a sign-up that ended while nothing collected, the
+                // privacy policy on top or Pix in the background, still opens Pix ID setup.
+                launch { viewModel.authState.collect { if (needsPixId(it)) openPixIdSetup() } }
             }
         }
     }
@@ -72,18 +78,20 @@ class SignUpAgreementFragment : Fragment(R.layout.fragment_sign_up_agreement) {
         }
     }
 
-    private fun onEvent(event: AccountEvent) {
-        if (event !is AccountEvent.SignedIn) return
+    /** A Google sign-up's new account, signed in and without its Pix ID yet. */
+    private fun needsPixId(state: AuthState) = state is AuthState.SignedIn && state.account.pixId == null
+
+    private fun openPixIdSetup() {
         val navController = findNavController()
-        if (navController.currentDestination?.id != R.id.signUpAgreementFragment) return
-        if (event.needsPixId) {
+        if (navController.currentDestination?.id == R.id.signUpAgreementFragment) {
             navController.navigate(R.id.action_signUpAgreement_to_pixIdSetup)
-        } else {
-            navController.popBackStack(R.id.signInFragment, true)
         }
     }
 
     private fun leave() {
+        // While the account is being made, the page waits for it, or the person would leave with an account that never
+        // chose its Pix ID.
+        if (google && viewModel.uiState.value.busy) return
         if (google) viewModel.forgetGoogle()
         findNavController().popBackStack()
     }
@@ -158,7 +166,7 @@ class SignUpAgreement(
         }
         binding.policyRow.settingTitle.setText(R.string.sign_up_consent_policy)
         binding.policyRow.settingValue.isVisible = false
-        binding.policyRow.root.setOnClickListener { onPolicy() }
+        binding.policyRow.root.setOnClickListener { if (!busy) onPolicy() }
         binding.agreeButton.setOnClickListener { if (binding.agreeButton.isEnabled) onAgree() }
         render(AccountUiState())
     }

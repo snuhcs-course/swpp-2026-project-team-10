@@ -1,10 +1,11 @@
-# AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
 """Invitations through the REST API and the signaling socket (Design 2.5.3, 2.6.6; R&S FR-6.1–6.4, FR-6.9, FR-6.17).
 
 Partitions:
 - invite: a friend, offline or online; someone who is not a friend, an unknown user, oneself; a friend in a session
   (BUSY, nothing saved); a caller signed out or without a Pix ID; the session store down (nothing saved)
-- open: pending; 59 s, 60 s, and 61 s after it was sent; answered; unknown; without a sign-in
+- open: pending; 59 s, 60 s, and 61 s after it was sent; answered; unknown; without a sign-in; while the
+  photographer's account is deleted (the invitation and its sender read in one statement)
 - incoming: none; one; several, newest first; another user's; answered (accepted, declined, cancelled); 59 s and 60 s
   after it was sent; without a sign-in; an invitation still opens by its id
 - answer: accept, decline, or cancel by the one who may (the friend, the friend, the photographer), or by anyone else;
@@ -25,7 +26,10 @@ import time
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+
+from pix_server.accounts.auth import TokenClaims
+from pix_server.accounts.router import delete_me
 
 INVITATION_ID = re.compile(r"inv_[0-9A-HJKMNP-TV-Z]{26}")
 
@@ -202,6 +206,38 @@ def test_opening_shows_who_invites_without_a_sign_in_until_it_expires(client, cl
         "status": status,
         "expiresAt": invitation["expiresAt"],
     }
+
+
+def test_opening_while_the_photographer_deletes_the_account_still_answers(client, friends, monkeypatch):
+    """PostgreSQL reads each statement at its own moment, so a deletion that commits after the first read is seen by
+    the next one. The deletion here commits right after the endpoint's first statement."""
+    (_, dongje_user), _ = friends
+    invitation = sent(client, friends)
+    get, execute = AsyncSession.get, AsyncSession.execute
+    armed = [True]
+
+    async def deleted_after(self, call, *args, **kwargs):
+        result = await call(self, *args, **kwargs)
+        if armed:
+            armed.clear()
+            # The next statement starts a new transaction, as under PostgreSQL's READ COMMITTED.
+            await self.commit()
+            async with client.app.state.database() as other:
+                await delete_me(TokenClaims(user_id=dongje_user["id"], session_id="ses_other_phone"), other)
+        return result
+
+    async def patched_get(self, *args, **kwargs):
+        return await deleted_after(self, get, *args, **kwargs)
+
+    async def patched_execute(self, *args, **kwargs):
+        return await deleted_after(self, execute, *args, **kwargs)
+
+    monkeypatch.setattr(AsyncSession, "get", patched_get)
+    monkeypatch.setattr(AsyncSession, "execute", patched_execute)
+    opened = client.get(f"/api/v1/invitations/{invitation['id']}")
+
+    assert opened.status_code == 200, opened.text
+    assert opened.json()["from"] == public(dongje_user)
 
 
 def test_opening_an_unknown_invitation_is_not_found(client):

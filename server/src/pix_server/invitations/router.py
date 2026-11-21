@@ -211,11 +211,18 @@ async def incoming_invitations(request: Request, caller: SignedIn, db: Database)
 @router.get("/invitations/{invitation_id}")
 async def open_invitation(invitation_id: str, request: Request, db: Database) -> OpenedInvitation:
     """What the friend's Invitation screen shows, opened from a push or a link (FR-6.4). No sign-in, so a link opens on
-    any phone; it shows only who is inviting."""
-    invitation = await db.get(Invitation, invitation_id)
-    if invitation is None:
+    any phone; it shows only who is inviting. The invitation and its sender are read in one statement: read apart, a
+    deletion of the sender's account (`DELETE /me`) that commits between the two would leave no sender."""
+    found = (
+        await db.execute(
+            select(Invitation, User)
+            .join(User, User.id == Invitation.from_user_id)
+            .where(Invitation.id == invitation_id)
+        )
+    ).first()
+    if found is None:
         raise not_found()
-    sender = await db.get(User, invitation.from_user_id)
+    invitation, sender = found
     return OpenedInvitation(
         id=invitation.id,
         sender=UserOut.of(sender),

@@ -272,6 +272,9 @@ class FakeAuthRepository(state: AuthState = AuthState.SignedOut) : AuthRepositor
     val takenPixIds = mutableSetOf("test1")
     var checkGate: CompletableDeferred<Unit>? = null
 
+    /** When set, holds a sign-up with Google until it completes, as a slow server does. */
+    var googleSignUpGate: CompletableDeferred<Unit>? = null
+
     fun signInAs(account: Account) {
         this.account = account
         _state.value = AuthState.SignedIn(account)
@@ -309,8 +312,10 @@ class FakeAuthRepository(state: AuthState = AuthState.SignedOut) : AuthRepositor
         return Result.success(result)
     }
 
-    override suspend fun signUpWithGoogle(idToken: String) =
-        answer("googleSignUp:$idToken") { it.copy(pixId = null, hasPassword = false, hasGoogle = true) }
+    override suspend fun signUpWithGoogle(idToken: String): Result<Account> {
+        googleSignUpGate?.await()
+        return answer("googleSignUp:$idToken") { it.copy(pixId = null, hasPassword = false, hasGoogle = true) }
+    }
 
     override suspend fun addGoogle(idToken: String) = answer("addGoogle:$idToken") { it.copy(hasGoogle = true) }
 

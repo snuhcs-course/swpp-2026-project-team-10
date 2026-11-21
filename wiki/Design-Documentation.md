@@ -114,7 +114,7 @@
 | 3.34 | 2026-11-20 | The Iteration 4 tasks as their issues stand: the owners of Iter4-P7 and Iter4-P11, the name and date of Iter4-P16, and when the prompt templates were dropped (2.9). |
 | 3.35 | 2026-11-21 | One server each for `main` and `dev`, in two versions: a course server, and an AWS server over HTTPS, which the builds use (1.1.1, 1.1.3, 1.2, AD-11, 2.5.2, 2.5.3, 2.6.6, 2.7, 2.8, 2.10). |
 | 3.36 | 2026-11-21 | Server logs and alerts: the AWS servers' logs in CloudWatch, with an alarm on 5xx answers (1.2, AD-20, 2.8). |
-| 3.37 | 2026-11-21 | What an account keeps and the agreement before it is made, deleting an account, the privacy policy in Pix and at `/privacy`, and the screens above the keyboard (Iter5-P2, [#266]) (2.1, 2.5.3, 2.7, 2.8). |
+| 3.37 | 2026-11-21 | What an account keeps and the agreement before it is made, deleting an account, the privacy policy in Pix and at `/privacy`, and the screens above the keyboard (Iter5-P2, [#266]) (2.1, 2.5.3, 2.6.8, 2.7, 2.8). |
 
 </details>
 
@@ -2436,7 +2436,7 @@ Outside `/api/v1`:
 - **Verification.** The server checks the signature against Google's published keys, kept as long as Google's `Cache-Control` allows. The audience must be our web client ID (`PIX_GOOGLE_CLIENT_ID`, the server client ID the app passes to Credential Manager), and the issuer Google. Only the Google `sub` is kept (AD-12). Without the client ID or Google's keys, all three answer `503 UNAVAILABLE`.
 - **New account.** It is named after the Google account, up to 30 characters, or "Pix user" without a name. Its Pix ID is `null` until `PUT /me` sets one.
 
-**Signing up with Google (FR-5.13).** The app calls `POST /auth/google` first. On `NOT_REGISTERED` it asks "Do you already have a Pix account?" *Yes:* the person signs in with Pix ID and password, and the app sends the same ID token to `PUT /me/google`. *No:* *Sign up with Google*, the agreement page for the Google account (`SignUpAgreementFragment` with `google`), says what the account keeps (FR-5.18); its *Agree* calls `POST /auth/google/signup`, which creates the account, and the Pix ID setup follows. Its Back forgets the Google account, as closing the question does, or the next sign-in with a password would add it. A password account can add Google later the same way (FR-5.12).
+**Signing up with Google (FR-5.13).** The app calls `POST /auth/google` first. On `NOT_REGISTERED` it asks "Do you already have a Pix account?" *Yes:* the person signs in with Pix ID and password, and the app sends the same ID token to `PUT /me/google`. *No:* *Sign up with Google*, the agreement page for the Google account (`SignUpAgreementFragment` with `google`), asks for the consents (FR-5.18); its *Agree and continue* calls `POST /auth/google/signup`, which creates the account, and the Pix ID setup follows. Its Back forgets the Google account, as closing the question does, or the next sign-in with a password would add it. A password account can add Google later the same way (FR-5.12).
 
 **Adding a password (FR-5.14).** `PUT /me/password` `{ "password": "sunset2026" }` answers `200` with `"hasPassword": true`; the Pix ID and password then sign in too. The Pix ID is the login name, so an account without one gets `403 PIX_ID_REQUIRED`. The rules are those of sign-up. An account with a password gets `409 PASSWORD_ALREADY_SET`, since changing a password is not offered. There is no email, so a forgotten password cannot be reset.
 
@@ -2917,9 +2917,11 @@ The settings screen (FR-10.1, R&S 6.10; Iter3-P23, [#123]) opens from a gear on 
 | Guide | Color, thickness, preview |
 | Shoot together | *Show the delay* |
 | General | *Language*, *Notifications* |
-| Privacy | *AI pose generation*, *Share usage data* |
+| Privacy | *AI pose generation*, *Share usage data*, *Privacy policy* |
 | Account | *Pix account* |
 | Help | *How to use Pix*, *Show the tutorial again*, *About Pix* |
+
+Each section's rows share one card, without dividers.
 
 - **Base brightness (FR-1.11, [#182]).** "Every photo starts from it. Tap to focus, then drag up or down to change it until the next tap." The slider runs from −2 to +2 EV in thirds, 0 by default, and shows its value, such as "+1.0". It is saved as `AppSettings.baseBrightness` (DataStore `base_brightness_ev`). Camera returns to it at each tap to focus (2.8, *Camera labels and brightness*). A camera with a smaller range clamps it.
 - **Guide look (FR-3.10).** Five colors: white, the default (FR-2.2); black; yellow; mint; and pink. Three thicknesses: about 1.5, 2, and 3 dp (`GuideThickness` 0.75, 1, 1.5), 2 dp by default. DataStore keeps them (`app_settings`).
@@ -3152,9 +3154,9 @@ erDiagram
 
 **Privacy** (NFR-13)
 
-- Before an account is made, the agreement page (`SignUpAgreementFragment`) says what it keeps, why, for how long, and who receives it, and links to the privacy policy. Its *Agree* confirms that the person is 14 or older and agrees (FR-5.18). As *Sign up*'s first page, it then opens the form; as *Sign up with Google*, it makes the account. The app keeps no record of the agreement; the account exists only with it.
+- Before an account is made, the agreement page (`SignUpAgreementFragment`) asks for three required consents, each with its own box: being 14 or older, the collection and use of personal information, and its transfer abroad to AWS (Australia) and Google (United States) (FR-5.18). Each consent to collection or transfer lists the items, the purpose, how long they are kept, and the right to refuse, as Korea's Personal Information Protection Act asks. *Agree and continue* waits for all three. As *Sign up*'s first page, it then opens the form; as *Sign up with Google*, it makes the account. The app keeps no record of the agreement; the account exists only with it.
 - The privacy policy is one text in two languages, `server/src/pix_server/privacy/policy.ko.md` and `policy.en.md`. The server renders both once at start and serves them at `/privacy` (Korean) and `/privacy/en`, the address the store links to; Pix shows the same page (2.1). The wiki's *Privacy Policy* pages copy them, and a test keeps the copies the same.
-- The page lays the text out as a document: the Pix logo and a language switch, the title with the effective date and the contact, the contents, and one part per numbered section. On a narrow screen, each table row becomes labeled lines. The page has no script and loads nothing from elsewhere, so the app's WebView keeps JavaScript off. The renderer refuses a policy laid out otherwise: sections as `## n. Name`, and `Term: value` lines before them.
+- The page lays the text out as a document: the Pix logo and a language switch, the title with the effective date and the contact, the contents, and one part per numbered section. On a narrow screen, a table of up to three columns stays a table; a wider one shows each row as its first cell over the others, two to a line, each under its column's name. The page has no script and loads nothing from elsewhere, so the app's WebView keeps JavaScript off. The renderer refuses a policy laid out otherwise: sections as `## n. Name`, and `Term: value` lines before them.
 - The server never logs request bodies, images, the image API's response bodies, passwords, or tokens. Nor does it log descriptions, suggested poses, or variations, which describe the person in the photo.
 - A scene photo stays in memory until the response. nginx and the app refuse a request over 1 MiB before reading it, so no upload reaches the disk.
 - Each description and pose also goes, without the photo, to the description filter's decision model, TypeSafe's Jev on OpenRouter (2.6.3). A refusal logs only the question and its probability. Each `POST /poses` scene goes to the same model for the person check, which logs only its probability.

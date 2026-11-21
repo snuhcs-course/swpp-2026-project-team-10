@@ -4,9 +4,10 @@ and `/privacy/en` in English. The app shows the same pages in Settings and on it
 to `/privacy`, so the policy has one text: `policy.ko.md` and `policy.en.md` here, which the wiki's *Privacy Policy*
 pages copy (`tests/test_privacy.py`).
 
-A page lays the text out as a document: the Pix logo (`pix-logo.svg`, a copy of `branding/pix-horizontal.svg`) and the
-language switch, the title with the opening paragraph, the effective date and the contact, the contents, and one part
-per numbered section. On a narrow screen each table row becomes a block of labeled lines. The page needs no JavaScript,
+A page lays the text out as a plain document: the Pix logo (`pix-logo.svg`, a copy of `branding/pix-horizontal.svg`)
+and the language switch, the title with the effective date and the contact, the opening paragraph, the contents, and
+one part per numbered section, set in the text's own colors with thin rules. On a narrow screen a table stays a table,
+except one wider than three columns, whose rows become blocks of labeled cells two to a line. The page needs no JavaScript,
 which the app's WebView keeps off, and loads nothing from elsewhere.
 
 Both pages are rendered once, when the module is imported, so a file that cannot be read, or a policy laid out in
@@ -34,100 +35,84 @@ PAGE = Template("""<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>$title</title>
+<title>$title | Pix</title>
 <link rel="alternate" hreflang="ko" href="/privacy">
 <link rel="alternate" hreflang="en" href="/privacy/en">
 <style>
-:root { color-scheme: light dark; --ground: #f4f4f2; --surface: #ffffff; --head: #f8f8f7; --line: #e2e3e6;
-  --text: #16171a; --muted: #4f535b; --faint: #6b6f77; --accent: #f2c14e; --on-accent: #16171a;
-  --accent-soft: rgba(242, 193, 78, 0.18); --link: #855500; }
+:root { color-scheme: light dark; --ground: #ffffff; --text: #1b1c1f; --muted: #5c6068; --faint: #80848b;
+  --line: #e4e5e8; --code: #f4f4f5; }
 @media (prefers-color-scheme: dark) {
-  :root { --ground: #0b0b0d; --surface: #16171a; --head: #1c1d21; --line: rgba(255, 255, 255, 0.12);
-    --text: #f4f4f2; --muted: #b8bbc0; --faint: #8a8e94; --accent-soft: rgba(242, 193, 78, 0.16); --link: #f2c14e; }
+  :root { --ground: #0b0b0d; --text: #ececec; --muted: #a9acb2; --faint: #84888f; --line: #26272b; --code: #17181b; }
 }
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
-body { margin: 0; background: var(--ground); color: var(--text); font-size: 16px; line-height: 1.65;
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--ground); color: var(--text); font-size: 16px; line-height: 1.7;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   overflow-wrap: anywhere; }
 html[lang="ko"] body { word-break: keep-all; }
-a { color: var(--link); text-underline-offset: 3px; }
-.bar { background: var(--surface); border-bottom: 1px solid var(--line); }
-.bar-in, main, .foot-in { max-width: 760px; margin: 0 auto; padding-left: 20px; padding-right: 20px; }
-.bar-in { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 60px; }
-.logo { display: block; height: 26px; width: auto; color: var(--text); }
-.lang { display: flex; padding: 3px; border: 1px solid var(--line); border-radius: 999px; font-size: 14px;
-  line-height: 1.4; white-space: nowrap; }
-.lang a, .lang span { padding: 5px 12px; border-radius: 999px; text-decoration: none; }
-.lang a { color: var(--muted); }
-.lang span { background: var(--accent); color: var(--on-accent); font-weight: 600; }
-main { padding-top: 40px; padding-bottom: 56px; }
-.hero h1 { margin: 0 0 14px; font-size: 32px; line-height: 1.25; letter-spacing: -0.015em; }
-.lead { margin: 0 0 22px; color: var(--muted); font-size: 17px; }
-.meta { display: flex; flex-wrap: wrap; gap: 6px 28px; margin: 0; padding-top: 16px; border-top: 1px solid var(--line);
-  font-size: 14px; }
-.meta div { display: flex; gap: 10px; }
-.meta dt { color: var(--faint); }
-.meta dd { margin: 0; font-weight: 600; }
-.toc { margin: 36px 0 4px; padding: 18px 20px 14px; background: var(--surface); border: 1px solid var(--line);
-  border-radius: 16px; }
-.toc h2 { margin: 0 0 6px; color: var(--faint); font-size: 13px; font-weight: 600; letter-spacing: 0.06em;
-  text-transform: uppercase; }
-.toc ol { margin: 0; padding: 0; list-style: none; }
-.toc a { display: flex; align-items: baseline; gap: 12px; padding: 7px 0; color: var(--text); text-decoration: none; }
-.toc a:hover { color: var(--link); }
-.num { display: inline-block; flex: none; min-width: 26px; padding: 2px 6px; border-radius: 8px; background:
-  var(--accent-soft); color: var(--link); font-size: 13px; font-weight: 700; line-height: 1.6; text-align: center;
-  font-variant-numeric: tabular-nums; }
-section { padding-top: 40px; scroll-margin-top: 8px; }
-section h2 { display: flex; align-items: baseline; gap: 12px; margin: 0 0 14px; font-size: 21px; line-height: 1.4;
-  letter-spacing: -0.01em; }
-section h2 .num { position: relative; top: -2px; background: var(--accent); color: var(--on-accent); }
+a { color: inherit; text-underline-offset: 3px; }
+.top { border-bottom: 1px solid var(--line); }
+.top-in, main, .foot-in { max-width: 720px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
+.top-in { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; }
+.logo { display: block; height: 28px; width: auto; color: var(--text); }
+.lang { font-size: 14px; white-space: nowrap; }
+.lang a { color: var(--muted); text-decoration: none; }
+.lang a:hover { text-decoration: underline; }
+.lang span { font-weight: 600; }
+.lang > * + *::before { content: "|"; margin: 0 10px; color: var(--line); font-weight: 400; }
+main { padding-top: 48px; padding-bottom: 64px; }
+h1 { margin: 0 0 10px; font-size: 28px; line-height: 1.3; letter-spacing: -0.01em; }
+.meta { display: flex; flex-wrap: wrap; gap: 2px 20px; margin: 0 0 28px; color: var(--muted); font-size: 14px; }
+.meta div { display: flex; gap: 6px; }
+.meta dd { margin: 0; }
+.lead { margin: 0 0 32px; }
+.toc { padding: 20px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.toc h2 { margin: 0 0 6px; font-size: 15px; }
+.toc ol { margin: 0; padding: 0; list-style: none; color: var(--muted); font-size: 15px; line-height: 2; }
+.toc a { text-decoration: none; }
+.toc a:hover { color: var(--text); text-decoration: underline; }
+section { padding-top: 40px; }
+section h2 { margin: 0 0 12px; font-size: 19px; line-height: 1.45; }
 section p, section ul { margin: 0 0 14px; }
-section ul { padding-left: 22px; }
-section li { margin: 7px 0; padding-left: 2px; }
-section li::marker { color: var(--faint); }
-strong { font-weight: 650; }
-code { padding: 1px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--head);
+section ul { padding-left: 20px; }
+section li { margin: 6px 0; }
+code { padding: 1px 5px; border-radius: 4px; background: var(--code);
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.88em; }
-.table { margin: 16px 0 20px; overflow: hidden; background: var(--surface); border: 1px solid var(--line);
-  border-radius: 14px; }
-table { width: 100%; border-collapse: collapse; font-size: 14.5px; line-height: 1.55; }
-th { padding: 10px 14px; background: var(--head); border-bottom: 1px solid var(--line); color: var(--muted);
-  font-size: 12.5px; font-weight: 600; letter-spacing: 0.02em; text-align: left; }
-td { padding: 12px 14px; border-top: 1px solid var(--line); vertical-align: top; }
-tbody tr:first-child td { border-top: 0; }
-td:first-child { font-weight: 600; }
+.table { margin: 16px 0 20px; }
+table { width: 100%; border-collapse: collapse; font-size: 14.5px; line-height: 1.6; }
+th { padding: 0 16px 10px 0; border-bottom: 1px solid var(--text); font-size: 13.5px; font-weight: 600;
+  text-align: left; vertical-align: bottom; }
+td { padding: 12px 16px 12px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th:last-child, td:last-child { padding-right: 0; }
 footer { border-top: 1px solid var(--line); color: var(--faint); font-size: 13px; }
-.foot-in { padding-top: 20px; padding-bottom: 28px; }
+.foot-in { padding-top: 20px; padding-bottom: 32px; }
 @media (max-width: 640px) {
-  .bar-in, main, .foot-in { padding-left: 16px; padding-right: 16px; }
-  main { padding-top: 30px; }
-  .hero h1 { font-size: 27px; }
-  .lead { font-size: 16px; }
-  .toc { padding: 16px 16px 12px; }
-  section h2 { font-size: 19px; }
-  .table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-  .table table, .table tbody, .table tr, .table td { display: block; }
-  .table tr { padding: 14px 16px; border-top: 1px solid var(--line); }
-  .table tbody tr:first-child { border-top: 0; }
-  .table td { padding: 0; border: 0; }
-  .table td + td { margin-top: 8px; }
-  .table td:first-child { font-size: 15.5px; }
-  .table td + td::before { content: attr(data-label); display: block; color: var(--faint); font-size: 12.5px;
-    font-weight: 600; letter-spacing: 0.02em; }
+  .top-in, main, .foot-in { padding-left: 20px; padding-right: 20px; }
+  main { padding-top: 32px; }
+  h1 { font-size: 24px; }
+  section h2 { font-size: 18px; }
+  table { font-size: 13.5px; line-height: 1.55; }
+  th { padding: 0 10px 8px 0; font-size: 12.5px; }
+  td { padding: 10px 10px 10px 0; }
+  .wide thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .wide table, .wide tbody { display: block; }
+  .wide table { border-top: 1px solid var(--text); }
+  .wide tr { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; padding: 12px 0;
+    border-bottom: 1px solid var(--line); }
+  .wide td { display: block; padding: 0; border: 0; }
+  .wide td:first-child { grid-column: 1 / -1; font-weight: 600; }
+  .wide td + td::before { content: attr(data-label); display: block; color: var(--faint); font-size: 12.5px; }
 }
 @media print {
   .lang, .toc { display: none; }
-  .bar, .table { background: none; }
 }
 </style>
 </head>
 <body>
-<div class="bar"><div class="bar-in">
+<header class="top"><div class="top-in">
 $logo
 <nav class="lang" aria-label="$language_nav">$switch</nav>
-</div></div>
+</div></header>
 <main>
 $content
 </main>
@@ -154,12 +139,16 @@ LANGUAGES = {
 
 SECTION_HEADING = re.compile(r"(\d+)\.\s+(.+)")
 
+# The most columns a table keeps as a table on a phone. A wider one (the outside services) shows each row as its first
+# cell over a two-column grid of the others, each under its column's name.
+MAX_PHONE_COLUMNS = 3
+
 
 class PolicyLayout(Treeprocessor):
     """Puts the policy's Markdown in the page's parts: what comes before the first section becomes the title block
-    (the paragraph as its lead, the list as the effective date and the contact), each `## n. Name` starts a section
-    with its number apart, the contents link to them, and every table cell carries its column's name, which a narrow
-    screen shows as the line's label. The roles keep the tables tables for a screen reader when CSS lays them out as
+    (the title, the list as the effective date and the contact, then the paragraph), each `## n. Name` starts a
+    section, the contents link to them, and every table cell carries its column's name, which a narrow screen shows as
+    the cell's label in a wide table. The roles keep the tables tables for a screen reader when CSS lays them out as
     blocks."""
 
     def __init__(self, md: markdown.Markdown, title: str, contents: str) -> None:
@@ -171,8 +160,9 @@ class PolicyLayout(Treeprocessor):
         blocks = list(root)
         for block in blocks:
             root.remove(block)
-        hero = ET.SubElement(root, "header", {"class": "hero"})
+        hero = ET.SubElement(root, "div", {"class": "hero"})
         ET.SubElement(hero, "h1").text = self.title
+        leads: list[ET.Element] = []
         toc = ET.SubElement(root, "nav", {"class": "toc", "aria-labelledby": "contents"})
         ET.SubElement(toc, "h2", {"id": "contents"}).text = self.contents
         toc_list = ET.SubElement(toc, "ol")
@@ -181,14 +171,19 @@ class PolicyLayout(Treeprocessor):
             if block.tag == "h2":
                 section = self.section(root, toc_list, "".join(block.itertext()).strip())
             elif section is None:
-                hero.append(meta(block) if block.tag == "ul" else lead(block))
+                if block.tag == "ul":
+                    hero.append(meta(block))
+                else:
+                    leads.append(lead(block))
             elif block.tag == "table":
                 labeled(block)
-                ET.SubElement(section, "div", {"class": "table"}).append(block)
+                wide = len(list(block.iter("th"))) > MAX_PHONE_COLUMNS
+                ET.SubElement(section, "div", {"class": "table wide" if wide else "table"}).append(block)
             else:
                 section.append(block)
         if section is None:
             raise ValueError("The privacy policy has no numbered sections")
+        hero.extend(leads)
 
     @staticmethod
     def section(root: ET.Element, toc_list: ET.Element, heading_text: str) -> ET.Element:
@@ -197,12 +192,8 @@ class PolicyLayout(Treeprocessor):
             raise ValueError(f"A section's heading must start with its number: {heading_text!r}")
         number, name = match.groups()
         section = ET.SubElement(root, "section", {"id": f"s{number}", "aria-labelledby": f"s{number}-title"})
-        heading = ET.SubElement(section, "h2", {"id": f"s{number}-title"})
-        ET.SubElement(heading, "span", {"class": "num"}).text = number
-        heading[-1].tail = name
-        link = ET.SubElement(ET.SubElement(toc_list, "li"), "a", {"href": f"#s{number}"})
-        ET.SubElement(link, "span", {"class": "num"}).text = number
-        link[-1].tail = name
+        ET.SubElement(section, "h2", {"id": f"s{number}-title"}).text = heading_text
+        ET.SubElement(ET.SubElement(toc_list, "li"), "a", {"href": f"#s{number}"}).text = heading_text
         return section
 
 

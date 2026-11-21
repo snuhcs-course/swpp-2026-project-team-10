@@ -7,9 +7,11 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Toast
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
@@ -235,6 +237,11 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         // Only an agreement can be taken back; without one, Pix asks before it sends anything.
         row.settingChevron.isVisible = given
         row.root.isClickable = given
+        // The row's end padding leaves room for the chevron, whose tip is 16 dp from the edge; without it, the value
+        // ends there itself.
+        row.settingValue.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+            marginEnd = if (given) 0 else (8 * resources.displayMetrics.density).roundToInt()
+        }
     }
 
     private fun confirmWithdrawal() {

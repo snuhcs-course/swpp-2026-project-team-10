@@ -2,7 +2,10 @@
 package com.lastpenguin.pix.ui.account
 
 import android.view.View
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.core.os.bundleOf
+import androidx.core.view.isVisible
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragmentInContainer
@@ -30,11 +33,14 @@ import org.robolectric.annotation.GraphicsMode
 
 /*
  * The sign-up agreement on the real Fragment (R&S 6.4; FR-5.13, FR-5.18), opened from Sign in as the app opens it, over
- * Share my camera and Sign in. Partitions: Sign up's first page (the notice names the password; Agree opens the form
- * over it and calls nothing; an error from the form does not show here); Sign up with Google (the notice names the
- * Google account; Agree makes the account from the waiting Google account and opens Pix ID setup in the place of Sign
- * in and this screen; a refused sign-up shows the reason and stays; Back goes to Sign in and forgets the Google account;
- * a new process with no waiting Google account goes straight back); the privacy policy's link, from either.
+ * Share my camera and Sign in. Partitions: the consents (none, some, all three given by hand, all through Agree to all,
+ * one taken back; Agree and continue waits for all three, and Agree to all follows them); the details (hidden at first,
+ * shown and hidden by their chevron, the password or the Google account among what is collected); a recreated screen
+ * (the boxes kept); Sign up's first page (Agree and continue opens the form over it and calls nothing; an error from the
+ * form does not show here); Sign up with Google (it makes the account from the waiting Google account and opens Pix ID
+ * setup in the place of Sign in and this screen; a refused sign-up shows the reason and stays; Back goes to Sign in and
+ * forgets the Google account; a new process with no waiting Google account goes straight back); the privacy policy's
+ * row, from either.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -85,12 +91,86 @@ class SignUpAgreementFragmentTest {
         return result!!
     }
 
+    private fun details(details: LinearLayout): List<String> =
+        (0 until details.childCount).map { details.getChildAt(it) }.mapNotNull { line ->
+            line.findViewById<TextView>(R.id.detailValue)?.text?.toString()
+        }
+
     @Test
-    fun signUp_namesThePassword_andAgreeOpensTheFormOverIt() {
+    fun agreeAndContinue_waitsForAllThreeConsents_andAgreeToAllFollowsThem() {
+        launch(google = false)
+        assertFalse(onScreen { it.agreeButton.isEnabled })
+
+        onScreen { it.ageCheck.performClick() }
+        onScreen { it.collectionCheck.performClick() }
+        assertFalse(onScreen { it.agreeButton.isEnabled || it.allCheck.isChecked })
+        onScreen { it.transferCheck.performClick() }
+        assertTrue(onScreen { it.agreeButton.isEnabled && it.allCheck.isChecked })
+
+        onScreen { it.collectionCheck.performClick() }
+        assertFalse(onScreen { it.agreeButton.isEnabled || it.allCheck.isChecked })
+
+        onScreen { it.allCheck.performClick() }
+        assertTrue(onScreen { it.ageCheck.isChecked && it.collectionCheck.isChecked && it.transferCheck.isChecked })
+        assertTrue(onScreen { it.agreeButton.isEnabled })
+        onScreen { it.allCheck.performClick() }
+        assertFalse(onScreen { it.ageCheck.isChecked || it.collectionCheck.isChecked || it.transferCheck.isChecked })
+        assertFalse(onScreen { it.agreeButton.isEnabled })
+    }
+
+    @Test
+    fun theDetails_showUnderTheirChevron_andNameThePassword() {
+        launch(google = false)
+        assertFalse(onScreen { it.collectionDetails.isVisible || it.transferDetails.isVisible })
+        assertTrue(onScreen { it.ageCheck.text.startsWith(string(R.string.sign_up_consent_required)) })
+
+        onScreen { it.collectionToggle.performClick() }
+        assertTrue(onScreen { it.collectionDetails.isVisible })
+        assertEquals(
+            string(R.string.sign_up_consent_details_hide, string(R.string.sign_up_consent_collection)),
+            onScreen { it.collectionToggle.contentDescription.toString() },
+        )
+        assertEquals(
+            listOf(
+                R.string.sign_up_consent_items_password,
+                R.string.sign_up_consent_purpose,
+                R.string.sign_up_consent_period,
+            ).map {
+                string(it)
+            },
+            onScreen { details(it.collectionDetails) },
+        )
+        onScreen { it.transferToggle.performClick() }
+        assertEquals(5, onScreen { details(it.transferDetails).size })
+
+        onScreen { it.collectionToggle.performClick() }
+        assertFalse(onScreen { it.collectionDetails.isVisible })
+    }
+
+    @Test
+    fun aRecreatedScreen_keepsTheBoxes() {
+        launch(google = false)
+        onScreen { it.ageCheck.performClick() }
+        onScreen { it.transferCheck.performClick() }
+
+        scenario!!.recreate()
+        idle()
+
+        assertEquals(
+            listOf(true, false, true, false),
+            onScreen {
+                listOf(it.ageCheck, it.collectionCheck, it.transferCheck, it.allCheck).map { box -> box.isChecked }
+            },
+        )
+        assertFalse(onScreen { it.agreeButton.isEnabled })
+    }
+
+    @Test
+    fun signUp_agreeAndContinue_opensTheFormOverIt() {
         val modules = launch(google = false)
         assertEquals(string(R.string.sign_up_title), onScreen { it.titleText.text.toString() })
-        assertEquals(string(R.string.sign_up_notice_what_password), onScreen { it.whatText.text.toString() })
 
+        onScreen { it.allCheck.performClick() }
         onScreen { it.agreeButton.performClick() }
         idle()
 
@@ -109,16 +189,17 @@ class SignUpAgreementFragmentTest {
         idle()
 
         assertFalse(onScreen { it.errorText.visibility == View.VISIBLE })
-        assertTrue(onScreen { it.agreeButton.isEnabled })
     }
 
     @Test
-    fun google_agree_makesTheAccountAndGoesToTheSetup() {
+    fun google_agreeAndContinue_makesTheAccountAndGoesToTheSetup() {
         val modules = launch(google = true)
         assertEquals(string(R.string.google_sign_up_title), onScreen { it.titleText.text.toString() })
-        assertEquals(string(R.string.sign_up_notice_what_google), onScreen { it.whatText.text.toString() })
+        onScreen { it.collectionToggle.performClick() }
+        assertEquals(string(R.string.sign_up_consent_items_google), onScreen { details(it.collectionDetails).first() })
         assertEquals(listOf("google:google-token"), modules.auth.calls)
 
+        onScreen { it.allCheck.performClick() }
         onScreen { it.agreeButton.performClick() }
         idle()
 
@@ -133,6 +214,7 @@ class SignUpAgreementFragmentTest {
         modules.auth.failures["googleSignUp"] = AccountException(AccountError.OFFLINE)
         launch(google = true, modules = modules)
 
+        onScreen { it.allCheck.performClick() }
         onScreen { it.agreeButton.performClick() }
         idle()
 
@@ -161,11 +243,11 @@ class SignUpAgreementFragmentTest {
     }
 
     @Test
-    fun thePolicyLink_opensThePrivacyPolicy_fromEither() {
+    fun thePolicyRow_opensThePrivacyPolicy_fromEither() {
         for (google in listOf(false, true)) {
             launch(google)
 
-            onScreen { it.policyButton.performClick() }
+            onScreen { it.policyRow.root.performClick() }
             idle()
 
             assertEquals(R.id.privacyPolicyFragment, nav.currentDestination?.id)

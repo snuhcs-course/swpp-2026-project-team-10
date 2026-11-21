@@ -136,7 +136,8 @@ import org.robolectric.shadows.ShadowDialog
  * Generate poses; Generating poses with a candidate ready; Pick a pose, alone, with a pose saved by its ♥, and in a
  * session; Couldn't create poses,
  * failed, refused, and without a person; Who takes the photo?; Share my camera signed out, and with a friend, a request,
- * and a sent request; Sent requests; Add a friend; Sign in; the sign-up agreement; Sign up; Sign up with Google;
+ * and a sent request; Sent requests; Add a friend; Sign in; the sign-up agreement, with its details; Sign up; Sign up
+ * with Google;
  * Pix ID setup; Account, with
  * "Delete your Pix account?"; the room code; See their
  * camera; Session not found; Subject view, with the photographer's tip closed and open,
@@ -659,6 +660,17 @@ class KoreanScreensTest {
     @Test
     fun signUpAgreement_isInKorean() {
         accountScreen<SignUpAgreementFragment>(R.id.signUpAgreementFragment, signedIn = false)
+        assertKorean(screen())
+    }
+
+    @Test
+    fun signUpAgreement_withItsDetails_isInKorean() {
+        accountScreen<SignUpAgreementFragment>(R.id.signUpAgreementFragment, signedIn = false)
+        scenario!!.onFragment {
+            it.requireView().findViewById<View>(R.id.collectionToggle).performClick()
+            it.requireView().findViewById<View>(R.id.transferToggle).performClick()
+        }
+        idle()
         assertKorean(screen())
     }
 
@@ -1218,6 +1230,6 @@ class KoreanScreensTest {
         val WORD = Regex("[A-Za-z]+")
 
         /** What Korean keeps as it is in English: names, and the letters a Pix ID may use. */
-        val KEPT = listOf("Pix", "ID", "Google", "AWS", "AI", "a–z")
+        val KEPT = listOf("Amazon Web Services", "Pix", "ID", "Google", "AWS", "AI", "a–z")
     }
 }

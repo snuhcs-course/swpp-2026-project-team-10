@@ -1,8 +1,8 @@
 *The privacy policy of Pix for its users, in Korean ([[English|Privacy-Policy-–-English]]). Pix shows it in Settings › Privacy and on its sign-up screens, and the server at `/privacy`. This page copies `server/src/pix_server/privacy/policy.ko.md`, and a test keeps the two the same.*
 
-**Pix 개인정보 처리방침**
+**개인정보 처리방침**
 
-Last Penguin 팀(이하 "팀")은 Pix 앱(`com.lastpenguin.pix`)을 운영하며, 이용자의 개인정보를 아래와 같이 처리합니다.
+Last Penguin 팀(이하 "팀")은 Pix 앱을 운영하며, 이용자의 개인정보를 아래와 같이 처리합니다.
 
 - 시행일: 2026년 11월 21일
 - 문의: csmking7@gmail.com
@@ -87,4 +87,4 @@ Pix는 만 14세 미만 아동의 가입을 받지 않습니다. 회원가입 �
 
 ## 9. 처리방침의 변경
 
-이 방침은 앱의 설정 › 개인정보 › 개인정보 처리방침과 Pix 서버의 `/privacy` 페이지에서 볼 수 있습니다. 방침이 바뀌면 바뀐 내용과 시행일을 이곳에 올립니다.
+이 방침은 앱의 설정 › 개인정보 › 개인정보 처리방침에서 볼 수 있습니다. 방침이 바뀌면 바뀐 내용과 시행일을 이곳에 올립니다.

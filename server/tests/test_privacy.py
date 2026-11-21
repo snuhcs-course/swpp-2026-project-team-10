@@ -4,7 +4,8 @@
 Partitions:
 - language: none (Korean, the one that applies); `ko`; `en`; another one (404)
 - what a page holds: the policy's title as its heading, its tables, the language switch with its own language marked;
-  the contents linking to every numbered section; each table cell labeled with its column; the logo inline; nothing
+  the contents linking to every numbered section; each table cell labeled with its column, and a table of more than
+  three columns marked to show as blocks on a phone; the logo inline; nothing
   loaded from elsewhere and no script; no sign-in
 - a policy laid out another way (a section without its number, a line before the sections that is not "Term: value"):
   refused when the pages are made
@@ -35,7 +36,8 @@ def page(client, path):
 def test_privacy_without_a_language_is_the_korean_policy(client):
     text = page(client, "/privacy")
     assert '<html lang="ko">' in text
-    assert "<h1>Pix 개인정보 처리방침</h1>" in text
+    assert "<h1>개인정보 처리방침</h1>" in text
+    assert "<title>개인정보 처리방침 | Pix</title>" in text
     assert text.count("<table>") == 3
     assert '<span aria-current="page">한국어</span><a href="/privacy/en" hreflang="en" lang="en">English</a>' in text
     assert page(client, "/privacy/ko") == text
@@ -44,7 +46,7 @@ def test_privacy_without_a_language_is_the_korean_policy(client):
 def test_privacy_in_english(client):
     text = page(client, "/privacy/en")
     assert '<html lang="en">' in text
-    assert "<h1>Pix Privacy Policy</h1>" in text
+    assert "<h1>Privacy Policy</h1>" in text
     assert text.count("<table>") == 3
     assert '<a href="/privacy" hreflang="ko" lang="ko">한국어</a><span aria-current="page">English</span>' in text
 
@@ -55,7 +57,9 @@ def test_a_page_has_contents_labeled_tables_and_the_logo_and_loads_nothing_else(
     sections = re.findall(r'<section aria-labelledby="s(\d+)-title" id="s\1">', text)
     assert sections == [str(n) for n in range(1, 10)]
     for number in sections:
-        assert f'<a href="#s{number}"><span class="num">{number}</span>' in text
+        assert f'<a href="#s{number}">{number}. ' in text
+        assert f'<h2 id="s{number}-title">{number}. ' in text
+    assert text.count('<div class="table">') == 2 and text.count('<div class="table wide">') == 1
     cells = re.findall(r"<td( [^>]*)?>", text)
     assert cells and all('data-label="' in (attributes or "") for attributes in cells)
     assert (
@@ -86,7 +90,7 @@ def test_privacy_needs_no_sign_in(client):
 )
 def test_a_policy_laid_out_another_way_is_refused(policy, problem):
     with pytest.raises(ValueError, match=problem):
-        markdown.markdown(policy, extensions=["tables", PolicyLayoutExtension("Pix Privacy Policy", "Contents")])
+        markdown.markdown(policy, extensions=["tables", PolicyLayoutExtension("Privacy Policy", "Contents")])
 
 
 def test_the_logo_is_the_brandings():

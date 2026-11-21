@@ -1,6 +1,6 @@
-**Pix Privacy Policy**
+**Privacy Policy**
 
-The Last Penguin team ("the team") runs the Pix app (`com.lastpenguin.pix`) and handles its users' personal information as described below. This is a translation of the Korean policy; if the two differ, the Korean text applies.
+The Last Penguin team ("the team") runs the Pix app and handles its users' personal information as described below. This is a translation of the Korean policy; if the two differ, the Korean text applies.
 
 - Effective: November 21, 2026
 - Contact: csmking7@gmail.com
@@ -85,4 +85,4 @@ Pix does not accept sign-ups from children under 14. The sign-up screen asks you
 
 ## 9. Changes to this policy
 
-This policy is in the app under Settings › Privacy › Privacy policy, and on the Pix server's `/privacy` page. When it changes, the changes and their effective date are posted here.
+This policy is in the app under Settings › Privacy › Privacy policy. When it changes, the changes and their effective date are posted here.

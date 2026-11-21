@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One line of a consent's details on the sign-up agreement (FR-5.18): its label in a column of its own, then the
+     value, so the two never read as one text. SignUpAgreement fills it. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingVertical="5dp">
+
+    <TextView
+        android:id="@+id/detailLabel"
+        android:layout_width="72dp"
+        android:layout_height="wrap_content"
+        android:textAppearance="@style/TextAppearance.Pix.Label"
+        android:textColor="@color/pix_text_faint"
+        tools:text="@string/sign_up_consent_label_items" />
+
+    <TextView
+        android:id="@+id/detailValue"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+        android:textColor="@color/pix_text_soft"
+        tools:text="@string/sign_up_consent_purpose" />
+</LinearLayout>

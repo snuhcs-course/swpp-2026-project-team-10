@@ -316,13 +316,14 @@
                 android:text="@string/settings_section_privacy"
                 android:textAppearance="@style/TextAppearance.Pix.Overline" />
 
+            <!-- Privacy (FR-10.6, FR-10.7, FR-4.2) in one card, as General: the AI agreement, usage data, and the privacy
+                 policy, without dividers. -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_list_card"
                 android:orientation="vertical"
-                android:paddingTop="4dp"
-                android:paddingBottom="14dp">
+                android:paddingVertical="4dp">
 
                 <include
                     android:id="@+id/consentRow"
@@ -336,60 +337,51 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="-12dp"
                     android:paddingHorizontal="16dp"
+                    android:paddingBottom="6dp"
                     android:text="@string/settings_consent_body"
                     android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
-            </LinearLayout>
 
-            <!-- Crash reports and usage data (FR-10.6, Design 2.8, Telemetry), a card of its own like the latency row. -->
-            <LinearLayout
-                android:id="@+id/usageRow"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/bg_list_card"
-                android:gravity="center_vertical"
-                android:minHeight="56dp"
-                android:paddingVertical="12dp"
-                android:paddingStart="16dp"
-                android:paddingEnd="12dp">
-
+                <!-- Crash reports and usage data (FR-10.6, Design 2.8, Telemetry); a tap on the row turns the switch. -->
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:id="@+id/usageRow"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
+                    android:background="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:minHeight="56dp"
+                    android:paddingVertical="12dp"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="12dp">
 
-                    <TextView
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/settings_usage"
+                            android:textAppearance="@style/TextAppearance.Pix.BodyLarge" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/settings_usage_body"
+                            android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/usageSwitch"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/settings_usage"
-                        android:textAppearance="@style/TextAppearance.Pix.BodyLarge" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="@string/settings_usage_body"
-                        android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+                        android:layout_marginStart="12dp"
+                        android:contentDescription="@string/settings_usage" />
                 </LinearLayout>
 
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/usageSwitch"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:contentDescription="@string/settings_usage" />
-            </LinearLayout>
-
-            <!-- The privacy policy (FR-10.7), the server's page shown in Pix. -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/bg_list_card"
-                android:orientation="vertical"
-                android:paddingVertical="4dp">
-
+                <!-- The privacy policy (FR-10.7), the server's page shown in Pix. -->
                 <include
                     android:id="@+id/privacyPolicyRow"
                     layout="@layout/item_setting_row" />

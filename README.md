@@ -115,7 +115,7 @@ The full design is in the [Design Documentation](https://github.com/snuhcs-cours
 |---|---|
 | Android app | Kotlin 2.2, XML Views with ViewBinding, Navigation, ViewModel, and coroutines · CameraX 1.6 · ML Kit Subject Segmentation, Pose Detection, and Face Detection · WebRTC (`io.github.webrtc-sdk:android` 137) · OkHttp 4.12 and Retrofit 2.11 with kotlinx.serialization · Jetpack DataStore · Credential Manager with Google ID · Firebase Cloud Messaging, Crashlytics, and Analytics |
 | Server | Python 3.11 · FastAPI and Uvicorn (WebSocket signaling and REST API) · SQLAlchemy 2 with asyncpg and Alembic on PostgreSQL 18 · Redis (session store) · PyJWT and argon2 · google-auth (Google sign-in and FCM) · pydantic-settings · httpx2 · Pillow · Docker and nginx with blue-green deploys |
-| Services | Cloudflare Realtime (TURN relay) · Firebase Cloud Messaging, Crashlytics, and Analytics · OpenRouter · AWS EC2 (the AWS servers) · Let's Encrypt (their certificates) |
+| Services | Cloudflare Realtime (TURN relay) · Firebase Cloud Messaging, Crashlytics, and Analytics · OpenRouter · AWS EC2 and CloudWatch Logs (the AWS servers and their logs) · Let's Encrypt (their certificates) |
 | AI | Through OpenRouter: GPT Image 2.5 Flare at low quality for the candidates · Gemini 3.1 Flash Lite for the suggestions and the tips · Jev 1.14 (`typesafe/jev-1.14`) for the description filter and the person check. The AI module test uses Claude Opus 5.5 as its judge. |
 | Tests and CI | JUnit 4, Robolectric 4.17, and FragmentScenario with JaCoCo · pytest with pytest-cov, fakeredis, and SQLite · Spotless with ktlint · Ruff · GitHub Actions (lint, tests, the server image, the AWS deploy, the wiki) |
 

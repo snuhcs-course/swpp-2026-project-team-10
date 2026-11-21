@@ -113,6 +113,7 @@
 | 3.33 | 2026-11-20 | The live view's sharpness after a reconnection, left for Iteration 5 ([#238]) (2.9). |
 | 3.34 | 2026-11-20 | The Iteration 4 tasks as their issues stand: the owners of Iter4-P7 and Iter4-P11, the name and date of Iter4-P16, and when the prompt templates were dropped (2.9). |
 | 3.35 | 2026-11-21 | One server each for `main` and `dev`, in two versions: a course server, and an AWS server over HTTPS, which the builds use (1.1.1, 1.1.3, 1.2, AD-11, 2.5.2, 2.5.3, 2.6.6, 2.7, 2.8, 2.10). |
+| 3.36 | 2026-11-21 | The AWS servers' logs in CloudWatch, with an alarm on 5xx responses (1.2, 2.8). |
 
 </details>
 
@@ -323,6 +324,7 @@ App versions are from `android/gradle/libs.versions.toml`; server versions are t
 | Redis 8, `redis-py` 8.1 | The session store and pub/sub between server processes (AD-18, 2.7) | Host, Server |
 | fakeredis 2.39 with `lupa` | An in-process Redis that runs the store's Lua, for tests and a laptop; development only (2.7) | Server |
 | Docker Compose, nginx 1.30, PostgreSQL 18, certbot | Hosting on the course servers and the AWS servers; nginx switches between the two app copies during a deploy. On the AWS servers, it also serves HTTPS with a certificate that certbot gets from Let's Encrypt (2.8) | Host |
+| AWS CloudWatch Logs | The AWS servers' logs of the app and nginx, and an email alarm on 5xx responses (2.8) | Host |
 
 ### 1.3 Architectural decisions
 
@@ -3154,6 +3156,7 @@ erDiagram
 
 - The global limits bound a day's model cost, however many addresses send. The OpenRouter key's spending limit, set in its dashboard, is the last bound. On the course servers, the address is the last `X-Forwarded-For` value, and on the AWS servers the address that connects (*Hosting*).
 - Requests to the AWS servers are encrypted with TLS. Over plain HTTP to a course server or a laptop, a scene photo, a sign-in password, and the tokens travel unencrypted (AD-11). The live view goes phone to phone, encrypted (NFR-14).
+- The AWS servers' logs, which hold the same lines, also go to CloudWatch in the servers' region (*Hosting*).
 - No URL holds a Pix ID or other personal data, because nginx's error log prints a failed request's whole request line. The lookup is `POST /users/lookup`. nginx and Uvicorn access logs leave out query strings.
 - Password hashes run two at a time per worker. A burst of sign-ins, which needs no account, then queues instead of taking a 64 MiB argon2id buffer per pool thread.
 - Cloud backups are off (`allowBackup="false"`); `data_extraction_rules.xml` keeps the sign-in, `guides/`, and the prompt history out of transfers to a new phone.
@@ -3198,6 +3201,7 @@ erDiagram
 - Each branch's server runs in two versions with the same Compose setup, each with its own database and session store. The builds use the AWS versions, which stay on and answer from every network, cellular data included. A debug build reaches a course server through `pix.serverUrl`.
 - The course servers are reachable only through the course's HTTP proxy on port 80, and only from the campus network. They cannot reach each other.
 - The AWS servers serve HTTPS on port 443 with a Let's Encrypt certificate for a hostname that sslip.io resolves to their Elastic IP. certbot renews it through nginx on port 80 (`/.well-known/acme-challenge/`). `deploy.sh` adds `docker-compose.https.yml`, which publishes port 443, once the certificate exists, so the course servers serve port 80 only. On a server with the certificate, it refuses to deploy or roll back to a commit without that file, which would close port 443. nginx passes the scheme on (`X-Forwarded-Proto`), so invite links from the AWS servers start with `https://`.
+- On the AWS servers, the app's copies and nginx also log to CloudWatch Logs, in one log group per server that keeps 30 days, and Docker keeps a local copy. An alarm emails the team when nginx answers 5 or more requests with a 5xx status in 5 minutes. Redis and PostgreSQL log only locally, so turning this on never restarts them.
 - `server/deploy/docker-compose.yml` runs:
   - `nginx` on port 80, and on 443 on the AWS servers, which forwards `/api/v1`, `/ws`, `/health`, and the invite link's page `/i/<id>`, serves `/version` and Let's Encrypt's check, and answers `404` to the rest, so FastAPI's `/docs` is not public;
   - `app-blue` and `app-green`, two copies of the app, each Uvicorn with two workers, set explicitly because the servers report 38 CPUs for our 8 cores;

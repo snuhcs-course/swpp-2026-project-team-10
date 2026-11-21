@@ -119,6 +119,7 @@
 | 3.36 | 2026-11-20 | What Iteration 4 built for each UAT problem, and the live view after a reconnection left open; T2's final sheet: every step accepted and scored, the outline comment, and the overall comment (4.4, 6). |
 | 3.37 | 2026-11-20 | The owners of Iter4-P7 and Iter4-P11 as their issues stand, and what the tips say in place of marking the guide (1.1, 4.1). |
 | 3.38 | 2026-11-21 | `server-image` also checks HTTPS as on the AWS servers (1.2). |
+| 3.39 | 2026-11-21 | `server-image` also checks the CloudWatch override (1.2). |
 
 </details>
 
@@ -236,7 +237,7 @@ The CI jobs:
 - `android-test`: `./gradlew :app:testDebugUnitTest`, all JVM and Robolectric tests.
 - `server-lint`: Ruff lint and format.
 - `server-test`: `uv run pytest` on fakeredis and a SQLite file, then on real Redis and PostgreSQL.
-- `server-image` also runs: it builds the server's Docker image (the build runs the server tests), starts it with nginx, Redis, and PostgreSQL, and checks the routes, a sign-up, an access log without the Pix ID, and eight rooms through nginx. *Added in Iteration 5:* HTTPS on port 443 with a certificate made for the run, as on the AWS servers (`/health`, `/version`, a WSS upgrade, `/docs` still 404), and Let's Encrypt's check over port 80.
+- `server-image` also runs: it builds the server's Docker image (the build runs the server tests), starts it with nginx, Redis, and PostgreSQL, and checks the routes, a sign-up, an access log without the Pix ID, and eight rooms through nginx. *Added in Iteration 5:* HTTPS on port 443 with a certificate made for the run, as on the AWS servers (`/health`, `/version`, a WSS upgrade, `/docs` still 404), and Let's Encrypt's check over port 80, and the CloudWatch override's log settings for each service.
 
 Passing CI is necessary, not sufficient. The reviewer also checks the tests (1.3) and, when UI or camera code changed, the PR's *How to verify* steps on a phone.
 

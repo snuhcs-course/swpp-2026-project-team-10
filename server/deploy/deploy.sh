@@ -10,7 +10,8 @@
 #   deploy.sh reload         have nginx read its configuration and the certificate again; certbot's hook runs this
 #   deploy.sh status         show what is running
 #
-# Settings come from /opt/pix/deploy.conf: BRANCH, and optionally HTTP_PORT, MAX_WAIT_SECONDS (600), and PROJECT.
+# Settings come from /opt/pix/deploy.conf: BRANCH, and optionally HTTP_PORT, MAX_WAIT_SECONDS (600), PROJECT, and on
+# an AWS server CLOUDWATCH_GROUP and CLOUDWATCH_REGION, which send the logs to CloudWatch (README, Logs in CloudWatch).
 # MAX_WAIT_SECONDS given for one command, as in `sudo MAX_WAIT_SECONDS=0 deploy.sh deploy`, wins over the file.
 #
 # Two copies of the app, blue and green, sit behind nginx and share their rooms through Redis and their accounts
@@ -141,6 +142,22 @@ drops_https() {
     [ -f "$CERTIFICATE" ] && ! git -C "$REPO" cat-file -e "$1:server/deploy/docker-compose.https.yml" 2> /dev/null
 }
 
+# Where nginx's log goes, from the running container rather than deploy.conf: a new setting takes effect only once the
+# containers are recreated. The app's copies follow at their next start.
+logs_state() {
+    local nginx group format
+    format='{{if eq .HostConfig.LogConfig.Type "awslogs"}}{{index .HostConfig.LogConfig.Config "awslogs-group"}}{{end}}'
+    nginx=$(compose ps -q nginx 2> /dev/null || true)
+    group=$(docker inspect -f "$format" "$nginx" 2> /dev/null || true)
+    if [ -n "$nginx" ] && [ -n "$group" ]; then
+        echo "CloudWatch, log group $group, and this server"
+    elif cloudwatch_on; then
+        echo "this server only: deploy.conf names $CLOUDWATCH_GROUP, which deploy.sh restart applies"
+    else
+        echo "this server only"
+    fi
+}
+
 # What nginx serves, from the running container's published ports rather than the files: a certificate made after
 # nginx started takes effect only once nginx is recreated.
 https_state() {
@@ -157,12 +174,34 @@ https_state() {
     fi
 }
 
+# CloudWatch where deploy.conf names a log group, if the checked-out commit has the file for it.
+cloudwatch_on() {
+    [ -n "$CLOUDWATCH_GROUP" ] && [ -f "$REPO/server/deploy/docker-compose.cloudwatch.yml" ]
+}
+
+# Tries the log group with a container that only starts: it fails when the server's role cannot write there or
+# CloudWatch does not answer. Then the logs stay on this server for this run. The containers themselves would still
+# start, since their driver does not block, but every line they write would be lost.
+check_cloudwatch() {
+    local image output
+    cloudwatch_on || return 0
+    image=$(sed -n 's/^ *image: *\(nginx:[^ ]*\) *$/\1/p' "$REPO/server/deploy/docker-compose.yml")
+    if ! output=$(docker run --rm --log-driver awslogs --log-opt awslogs-region="$CLOUDWATCH_REGION" \
+        --log-opt awslogs-group="$CLOUDWATCH_GROUP" --log-opt awslogs-stream=deploy-check "$image" true 2>&1); then
+        log "WARNING: cannot write to the CloudWatch log group $CLOUDWATCH_GROUP, so the logs stay on this server:"
+        log "  $(printf '%s\n' "$output" | head -n 1)"
+        CLOUDWATCH_GROUP=""
+    fi
+}
+
 compose() {
     local files=(-f "$REPO/server/deploy/docker-compose.yml")
     if https_on; then files+=(-f "$REPO/server/deploy/docker-compose.https.yml"); fi
+    if cloudwatch_on; then files+=(-f "$REPO/server/deploy/docker-compose.cloudwatch.yml"); fi
     PIX_BLUE_TAG=$(short "${BLUE_COMMIT:-none}") PIX_GREEN_TAG=$(short "${GREEN_COMMIT:-none}") \
         PIX_ENV_FILE=$ENV_FILE PIX_STATE_DIR=$STATE_DIR PIX_POSTGRES_DIR=$POSTGRES_DIR PIX_HTTP_PORT=$HTTP_PORT \
-        PIX_ACME_DIR=$ACME_DIR PIX_DB_PASSWORD=$(secret "$DB_PASSWORD_FILE") PIX_JWT_SECRET=$(secret "$JWT_SECRET_FILE") \
+        PIX_ACME_DIR=$ACME_DIR PIX_LOG_GROUP=$CLOUDWATCH_GROUP PIX_LOG_REGION=$CLOUDWATCH_REGION \
+        PIX_DB_PASSWORD=$(secret "$DB_PASSWORD_FILE") PIX_JWT_SECRET=$(secret "$JWT_SECRET_FILE") \
         docker compose -p "$PROJECT" "${files[@]}" "$@"
 }
 
@@ -442,6 +481,7 @@ command_status() {
     echo "standby:       app-$idle, built from $(short "$(commit_of "$idle")")"
     echo "through nginx: app-$(served_copy)"
     echo "https:         $(https_state)"
+    echo "logs:          $(logs_state)"
     echo "open rooms:    ${rooms:-unknown}"
     if [ -n "$FAILED_TREE" ]; then echo "not retried:   server/ tree $(short "$FAILED_TREE") failed or was rolled back"; fi
     check_env > /dev/null
@@ -470,6 +510,11 @@ main() {
     HTTP_PORT=${HTTP_PORT:-80}
     MAX_WAIT_SECONDS=${wait_for_this_run:-${MAX_WAIT_SECONDS:-600}}
     PROJECT=${PROJECT:-pix}
+    CLOUDWATCH_GROUP=${CLOUDWATCH_GROUP:-}
+    CLOUDWATCH_REGION=${CLOUDWATCH_REGION:-}
+    if [ -n "$CLOUDWATCH_GROUP" ] && [ -z "$CLOUDWATCH_REGION" ]; then
+        die "deploy.conf sets CLOUDWATCH_GROUP without CLOUDWATCH_REGION"
+    fi
     case "$MAX_WAIT_SECONDS" in
         "" | *[!0-9]*) die "MAX_WAIT_SECONDS must be a whole number of seconds, not '$MAX_WAIT_SECONDS'" ;;
     esac
@@ -489,6 +534,8 @@ main() {
             die "another deploy is running"
         fi
     fi
+
+    if [ "$command" != status ] && [ "$command" != reload ]; then check_cloudwatch; fi
 
     case "$command" in
         auto) command_auto ;;

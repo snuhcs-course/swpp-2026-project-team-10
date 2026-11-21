@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-15, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
 """Access and refresh tokens, and the request dependencies built on them (Design Documentation AD-12, 2.8).
 
 A sign-in gives the phone two tokens. The access token is a JWT signed with HS256 and `PIX_JWT_SECRET` that names the
@@ -17,6 +17,7 @@ from typing import Annotated
 
 import jwt
 from fastapi import Depends, FastAPI, Request, WebSocket
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pix_server.db.models import User
@@ -101,11 +102,34 @@ async def database(request: Request) -> AsyncIterator[AsyncSession]:
 Database = Annotated[AsyncSession, Depends(database)]
 
 
-async def caller(request: Request, db: Database) -> Caller:
+async def held_users(db: AsyncSession, *user_ids: str) -> set[str]:
+    """Holds these users' rows, shared, until the transaction ends, and returns the ids still there. Every write that
+    saves a row naming a user takes it first: a deletion (`DELETE /me`), which takes the row for update, then runs
+    wholly before the write, which finds the user gone, or wholly after it, and deletes what it saved. Taken before
+    any other row and in the ids' order, so writers and a deletion never wait on each other in a circle. SQLite runs
+    one transaction at a time anyway (`db.engine.open_database`)."""
+    held = await db.execute(
+        select(User.id).where(User.id.in_(sorted(set(user_ids)))).order_by(User.id).with_for_update(read=True)
+    )
+    return set(held.scalars())
+
+
+async def token_claims(request: Request) -> TokenClaims:
+    """The claims of the caller's access token, whether or not its account still exists."""
     token = bearer_token(request.headers.get("authorization"))
     tokens: Tokens = request.app.state.tokens
     claims = tokens.read(token) if token is not None else None
-    user = await db.get(User, claims.user_id) if claims is not None else None
+    if claims is None:
+        raise ApiError(401, "UNAUTHENTICATED", "Sign in to use this")
+    return claims
+
+
+# Only `DELETE /me` takes a token without its account, so that deleting an account already gone succeeds.
+Claims = Annotated[TokenClaims, Depends(token_claims)]
+
+
+async def caller(claims: Claims, db: Database) -> Caller:
+    user = await db.get(User, claims.user_id)
     if user is None:
         raise ApiError(401, "UNAUTHENTICATED", "Sign in to use this")
     return Caller(user=user, session_id=claims.session_id)

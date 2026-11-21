@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
 package com.lastpenguin.pix.account
 
 import com.lastpenguin.pix.core.network.GoogleTokenBody
@@ -23,7 +23,9 @@ import org.junit.Test
  * Google: a registered account, NOT_REGISTERED (404, no sign-in), a new account without a Pix ID. Account changes:
  * addGoogle GOOGLE_IN_USE, setPixId (the account changes, the tokens stay), the display name trimmed. The account read
  * again: answered (a Pix ID chosen on another phone shows), no answer (OFFLINE, the account kept). Any call without an
- * answer: OFFLINE. Sign-out: answered, and without an answer (the phone signs out either way).
+ * answer: OFFLINE. Sign-out: answered, and without an answer (the phone signs out either way). Deleting the account
+ * (FR-5.18): answered (the phone signs out and forgets the sign-in), and without an answer (OFFLINE; the sign-in
+ * stays, and trying again, which the server answers with 204 even if the first one deleted it, signs out).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemoteAuthRepositoryTest {
@@ -222,5 +224,33 @@ class RemoteAuthRepositoryTest {
         repository.signOut()
 
         assertEquals(AuthState.SignedOut, repository.state.value)
+    }
+
+    @Test
+    fun deleteAccount_deletesItOnTheServerAndSignsOutThePhone() = runTest {
+        val repository = repository()
+        repository.logIn("test1", "sunset2026")
+
+        assertTrue(repository.deleteAccount().isSuccess)
+
+        assertEquals(listOf("deleteMe"), accountApi.calls)
+        assertEquals(AuthState.SignedOut, repository.state.value)
+        assertNull(store.stored)
+    }
+
+    @Test
+    fun deleteAccount_withoutAnAnswer_isOffline_andATryAgainSignsOut() = runTest {
+        val repository = repository()
+        repository.logIn("test1", "sunset2026")
+        accountApi.failure = IOException("offline")
+
+        assertEquals(AccountError.OFFLINE, repository.deleteAccount().error())
+        assertTrue(repository.state.value is AuthState.SignedIn)
+
+        // The server may have deleted it before the answer was lost; it answers 204 again either way.
+        accountApi.failure = null
+        assertTrue(repository.deleteAccount().isSuccess)
+        assertEquals(AuthState.SignedOut, repository.state.value)
+        assertNull(store.stored)
     }
 }

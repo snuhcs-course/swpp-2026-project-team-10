@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.view.View
@@ -67,8 +67,12 @@ class SignInWayBackTest {
     }
 
     @Test
-    fun signUp_closesWithSignIn_backToSettings() {
-        launch<SignUpFragment>(R.id.action_settings_to_signIn, R.id.action_signIn_to_signUp)
+    fun signUp_closesWithItsAgreementAndSignIn_backToSettings() {
+        launch<SignUpFragment>(
+            R.id.action_settings_to_signIn,
+            R.id.action_signIn_to_signUp,
+            R.id.action_signUpAgreement_to_signUp,
+        )
 
         accountViewModel.signUp("test9", "Test Account 9", "secret12")
         idle()

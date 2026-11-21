@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix
 
 import android.content.Intent
@@ -34,10 +34,12 @@ class MainActivity : AppCompatActivity() {
         val binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Android 15+ draws behind the system bars; keep the screens inside them.
+        // Android 15+ draws behind the system bars and no longer shrinks the window for the keyboard: keep the screens
+        // inside the bars and above an open keyboard. A form's ScrollView then shrinks with it and scrolls its focused
+        // field into view, and a short phone can scroll to every field.
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            val room = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
+            view.setPadding(room.left, room.top, room.right, room.bottom)
             insets
         }
 

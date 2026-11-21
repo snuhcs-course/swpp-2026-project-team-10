@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-22, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
 """Sign-up, sign-in, the caller's own account, and device tokens (Design Documentation 2.5.3, R&S F5).
 
 A user signs up with a Pix ID and a password, or with Google; either kind of account can add the other way to sign
@@ -14,12 +14,31 @@ from sqlalchemy import delete, or_, select, update
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.exc import IntegrityError
 
-from pix_server.accounts.auth import Caller, Database, SignedIn, Tokens, hash_token, new_refresh_token, now_of
+from pix_server.accounts.auth import (
+    Caller,
+    Claims,
+    Database,
+    SignedIn,
+    Tokens,
+    hash_token,
+    held_users,
+    new_refresh_token,
+    now_of,
+)
 from pix_server.accounts.google import GoogleAccount, GoogleUnavailable, GoogleVerifier, InvalidGoogleToken
 from pix_server.accounts.passwords import Passwords
 from pix_server.accounts.rules import DISPLAY_NAME_MAX, normalize_pix_id, password_problem, pix_id_problem
 from pix_server.accounts.schemas import AccountOut, AuthOut, DisplayName, TokensOut
-from pix_server.db.models import AuthSession, Device, SpentRefreshToken, User, new_id
+from pix_server.db.models import (
+    AuthSession,
+    Device,
+    FriendRequest,
+    Friendship,
+    Invitation,
+    SpentRefreshToken,
+    User,
+    new_id,
+)
 from pix_server.errors import ApiError
 
 router = APIRouter(prefix="/api/v1")
@@ -84,9 +103,13 @@ async def locked_user(db: Database, caller: Caller) -> User:
     row holds: the Pix ID and the password are checked against each other, and a Google account is added only if
     none is. On PostgreSQL the second of two at once waits and sees the first's result; SQLite already runs
     transactions one at a time."""
-    return await db.scalar(
+    user = await db.scalar(
         select(User).where(User.id == caller.user.id).with_for_update().execution_options(populate_existing=True)
     )
+    if user is None:
+        # Deleted (`DELETE /me`) after the request read it.
+        raise ApiError(401, "UNAUTHENTICATED", "Sign in to use this")
+    return user
 
 
 def check_pix_id(pix_id: str) -> None:
@@ -106,9 +129,12 @@ def issue(request: Request, user_id: str, session_id: str, refresh_token: str) -
     )
 
 
-async def signed_in(request: Request, db: Database, user: User) -> AuthOut:
+async def signed_in(request: Request, db: Database, user: User, gone: ApiError | None = None) -> AuthOut:
     """Starts a session for this phone, saves it with whatever the sign-in changed, and answers with its tokens.
-    The user's expired sessions are removed on the way."""
+    The user's expired sessions are removed on the way. The user's row is held first (`held_users`): an account
+    deleted while the sign-in waited, for the password check or Google's, answers [gone], and no session is saved."""
+    if user.id not in await held_users(db, user.id):
+        raise gone or ApiError(401, "UNAUTHENTICATED", "Sign in to use this")
     now = now_of(request.app)
     await db.execute(delete(AuthSession).where(AuthSession.user_id == user.id, AuthSession.expires_at <= now))
     refresh_token = new_refresh_token()
@@ -123,6 +149,14 @@ async def signed_in(request: Request, db: Database, user: User) -> AuthOut:
     await db.commit()
     tokens = issue(request, user.id, session.id, refresh_token)
     return AuthOut(**tokens.model_dump(), user=AccountOut.mine(user))
+
+
+def invalid_credentials() -> ApiError:
+    return ApiError(401, "INVALID_CREDENTIALS", "The Pix ID or the password is wrong")
+
+
+def not_registered() -> ApiError:
+    return ApiError(404, "NOT_REGISTERED", "No Pix account uses this Google account")
 
 
 def invalid_refresh_token() -> ApiError:
@@ -187,8 +221,8 @@ async def log_in(body: LogInRequest, request: Request, db: Database) -> AuthOut:
     # One answer for an unknown Pix ID and a wrong password. Whether a Pix ID exists is not secret (the lookup and
     # `check-pix-id` tell it), but a failed log-in does not say which of the two was wrong.
     if not await passwords.verify(stored, body.password):
-        raise ApiError(401, "INVALID_CREDENTIALS", "The Pix ID or the password is wrong")
-    return await signed_in(request, db, user)
+        raise invalid_credentials()
+    return await signed_in(request, db, user, gone=invalid_credentials())
 
 
 @router.post("/auth/google")
@@ -198,8 +232,8 @@ async def sign_in_with_google(body: GoogleRequest, request: Request, db: Databas
     account = await google_account(request, body.idToken)
     user = await db.scalar(select(User).where(User.google_sub == account.subject))
     if user is None:
-        raise ApiError(404, "NOT_REGISTERED", "No Pix account uses this Google account")
-    return await signed_in(request, db, user)
+        raise not_registered()
+    return await signed_in(request, db, user, gone=not_registered())
 
 
 @router.post("/auth/google/signup", status_code=201)
@@ -298,6 +332,38 @@ async def update_me(body: AccountUpdate, request: Request, caller: SignedIn, db:
     return AccountOut.mine(user)
 
 
+@router.delete("/me", status_code=204)
+async def delete_me(claims: Claims, db: Database) -> None:
+    """Deletes the caller's account with everything the server keeps about it (FR-5.18): its sign-ins on every phone,
+    their spent refresh tokens and devices, its friendships, the friend requests it sent or received, and its
+    invitations. Its Pix ID and its Google account are free for a new account at once. The account's other phones
+    sign out at their next request: their access tokens name a user who no longer exists, and their refresh tokens
+    are gone. A session the phones already hold goes on, since the video goes phone to phone.
+
+    The caller's row is locked first, so a friend request or an answer to one that runs at the same moment waits and
+    then finds the account gone (`friends.lock_pair`). The rows go in the order of their foreign keys.
+
+    An access token whose account is already gone answers the same 204: a phone whose first answer was lost tries
+    again with the same token, and learns that the account it asked to delete is deleted. User ids are never used
+    again (`new_id`), so the token cannot name another account."""
+    user = await db.scalar(select(User).where(User.id == claims.user_id).with_for_update())
+    if user is None:
+        return
+    sessions = select(AuthSession.id).where(AuthSession.user_id == user.id)
+    await db.execute(
+        delete(Invitation).where(or_(Invitation.from_user_id == user.id, Invitation.to_user_id == user.id))
+    )
+    await db.execute(
+        delete(FriendRequest).where(or_(FriendRequest.from_user_id == user.id, FriendRequest.to_user_id == user.id))
+    )
+    await db.execute(delete(Friendship).where(or_(Friendship.user_a == user.id, Friendship.user_b == user.id)))
+    await db.execute(delete(Device).where(Device.user_id == user.id))
+    await db.execute(delete(SpentRefreshToken).where(SpentRefreshToken.session_id.in_(sessions)))
+    await db.execute(delete(AuthSession).where(AuthSession.user_id == user.id))
+    await db.execute(delete(User).where(User.id == user.id))
+    await db.commit()
+
+
 @router.put("/me/google")
 async def add_google(body: GoogleRequest, request: Request, caller: SignedIn, db: Database) -> AccountOut:
     """Lets the account sign in with this Google account too. Adding the same one again changes nothing. The
@@ -343,15 +409,18 @@ async def register_device(body: DeviceRequest, request: Request, caller: SignedI
     signed in to another account. A session has one device, `session_id` being unique: a rotated token replaces the
     old one in place, in one upsert, so two registrations at once cannot leave two rows."""
     session_id = caller.session_id
+    # Read once: the rollback before a retry expires `caller.user`, which an async session cannot load again by itself.
+    user_id = caller.user.id
     dialect = postgresql if db.get_bind().dialect.name == "postgresql" else sqlite
     values = {
-        "user_id": caller.user.id,
+        "user_id": user_id,
         "fcm_token": body.fcmToken,
         "platform": body.platform,
         "updated_at": now_of(request.app),
     }
     for attempt in range(2):
-        if await db.get(AuthSession, session_id) is None:
+        # The user's row before any device row, the order every writer and a deletion share (`held_users`).
+        if user_id not in await held_users(db, user_id) or await db.get(AuthSession, session_id) is None:
             # Signed out, with an access token that has not expired yet.
             raise ApiError(401, "UNAUTHENTICATED", "Sign in to use this")
         # The token leaves the session it was registered under, if another.

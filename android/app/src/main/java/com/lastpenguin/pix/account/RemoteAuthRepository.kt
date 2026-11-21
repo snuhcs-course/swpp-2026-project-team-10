@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-28, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
 package com.lastpenguin.pix.account
 
 import com.lastpenguin.pix.core.network.GoogleTokenBody
@@ -74,6 +74,11 @@ class RemoteAuthRepository(
     override suspend fun signOut() {
         // Without an answer the server's session lasts until its refresh token expires; the phone forgets it anyway.
         if (tokens.state.value is AuthState.SignedIn) accountCall { accountApi.signOut() }
+        tokens.clear()
+    }
+
+    override suspend fun deleteAccount() = accountCall {
+        accountApi.deleteMe()
         tokens.clear()
     }
 

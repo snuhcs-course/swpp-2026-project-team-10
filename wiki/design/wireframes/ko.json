@@ -80,7 +80,25 @@
       "ML Kit Terms of Service",
       "Google APIs Terms of Service",
       "Android Software Development Kit License",
-      "SIL Open Font License 1.1"
-    ]
+      "SIL Open Font License 1.1",
+      "English",
+      "csmking7@gmail.com"
+    ],
+    "texts": {
+      "The Last Penguin team (\"the team\") runs the Pix app and handles its users' personal information as described below. This is a translation of the Korean policy; if the two differ, the Korean text applies.": "Last Penguin 팀(이하 \"팀\")은 Pix 앱을 운영하며, 이용자의 개인정보를 아래와 같이 처리합니다.",
+      "Effective": "시행일",
+      "November 21, 2026": "2026년 11월 21일",
+      "Contact": "문의",
+      "Contents": "목차",
+      "1. Personal information we handle, and why": "1. 처리하는 개인정보와 목적",
+      "2. What the server does not keep": "2. 서버에 남지 않는 것",
+      "3. How long we keep it, and deletion": "3. 보유 기간과 파기",
+      "4. Outside services and transfer abroad": "4. 외부 서비스 이용과 국외 이전",
+      "5. Your rights": "5. 이용자의 권리",
+      "6. How we keep it safe": "6. 안전성 확보 조치",
+      "7. Children's personal information": "7. 아동의 개인정보",
+      "8. Contact": "8. 문의처",
+      "9. Changes to this policy": "9. 처리방침의 변경"
+    }
   }
 }

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.content.Context
@@ -58,12 +58,16 @@ sealed interface AccountEvent {
     data object PasswordAdded : AccountEvent
 
     data object SignedOut : AccountEvent
+
+    /** The account is gone from the server, and this phone is signed out (FR-5.18). */
+    data object AccountDeleted : AccountEvent
 }
 
 /**
- * Sign in, Sign up, Pix ID setup, and the Account sheet (R&S 6.4, 6.8; FR-5.2, FR-5.3, FR-5.11–5.14). Shared by those
- * screens (activity scope), because the Google account of "Do you already have a Pix account?" waits here while the
- * person signs in. One call at a time. Owner: Accounts (#54).
+ * Sign in, Sign up, Sign up with Google, Pix ID setup, and the Account sheet (R&S 6.4; FR-5.2, FR-5.3, FR-5.11–5.14,
+ * FR-5.18, FR-5.19). Shared by those screens (activity scope), because the Google account of "Do you already have a Pix
+ * account?" waits here while the person signs in, or taps *Agree* on Sign up with Google. One call at a time. Owner:
+ * Accounts (#54).
  */
 class AccountViewModel(private val auth: AuthRepository, private val google: GoogleIdTokens) : ViewModel() {
 
@@ -105,16 +109,25 @@ class AccountViewModel(private val auth: AuthRepository, private val google: Goo
         }
     }
 
-    /** The answer to "Do you already have a Pix account?": sign in to add Google to it, or make a new account. */
-    fun answerExistingAccount(hasAccount: Boolean) {
+    /** Whether a Google account waits for *Yes, sign in* or for Sign up with Google; a new process has none. */
+    val waitingGoogle: Boolean get() = pendingGoogleToken != null
+
+    /** *Yes, sign in* to "Do you already have a Pix account?": signing in then adds the waiting Google account. */
+    fun signInToAddGoogle() {
+        if (pendingGoogleToken == null) return
+        _uiState.update { it.copy(linkingGoogle = true, error = null) }
+    }
+
+    /**
+     * *Agree* on Sign up with Google, once the person read what the account keeps (FR-5.13, FR-5.19): the waiting
+     * Google account makes a new Pix account, which chooses its Pix ID next. The Google account keeps waiting until the
+     * account is made, so *Agree* can be tried again after a failure.
+     */
+    fun signUpWithGoogle() {
         val token = pendingGoogleToken ?: return
-        if (hasAccount) {
-            _uiState.update { it.copy(linkingGoogle = true, error = null) }
-            return
-        }
         call {
-            pendingGoogleToken = null
             val account = auth.signUpWithGoogle(token).getOrThrow()
+            pendingGoogleToken = null
             _events.emit(AccountEvent.SignedIn(needsPixId = account.pixId == null))
         }
     }
@@ -176,6 +189,12 @@ class AccountViewModel(private val auth: AuthRepository, private val google: Goo
     fun signOut() = call {
         auth.signOut()
         _events.emit(AccountEvent.SignedOut)
+    }
+
+    /** *Delete account* on Account, after asking (FR-5.18). A failure keeps the account and the sign-in. */
+    fun deleteAccount() = call {
+        auth.deleteAccount().getOrThrow()
+        _events.emit(AccountEvent.AccountDeleted)
     }
 
     /** A screen opens without the failure another one showed. */

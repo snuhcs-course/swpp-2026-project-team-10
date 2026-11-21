@@ -1,10 +1,11 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.content.Intent
 import android.provider.Settings
 import android.view.MotionEvent
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.isVisible
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -38,14 +39,16 @@ import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowToast
 
 /*
- * Settings on the real screen (FR-10.1–10.4, FR-10.6, FR-3.10, FR-4.2), with the settings in memory behind the ViewModel.
+ * Settings on the real screen (FR-10.1–10.4, FR-10.6, FR-10.7, FR-3.10, FR-4.2), with the settings in memory behind the
+ * ViewModel.
  * Partitions: the defaults (white, normal, the indicator off, the phone's language, an agreement given, usage data
  * shared, signed out); usage data turned off from its switch and on from its row, and its switch while the stored
  * answer loads (disabled, saving nothing, also when its restored state changes it) and once it arrives off;
  * the base brightness at 0 EV, slid to +1 EV and saved, and shown as kept; each color and thickness chosen; the indicator turned on from its switch and off from its row; a language chosen and
- * the dialog cancelled; the agreement withdrawn, the row without one, and the row while the stored answer loads; the
+ * the dialog cancelled; the agreement withdrawn, the row without one (its value 16 dp from the edge, with no chevron),
+ * and the row while the stored answer loads; the
  * account signed in and signed out (Sign in; Friends until #188);
- * notifications, How to use Pix, and About Pix opened; *Show the tutorial again*, which makes every screen's tips due
+ * notifications, How to use Pix, About Pix, and the privacy policy opened; *Show the tutorial again*, which makes every screen's tips due
  * again and says so. The agreement's text right under its row's title, as the indicator's under its own (#204), with the
  * row still 56 dp tall.
  */
@@ -286,13 +289,18 @@ class SettingsFragmentTest {
     }
 
     @Test
-    fun withoutAnAgreement_theRowOnlySaysSo() {
+    fun withoutAnAgreement_theRowOnlySaysSo_endingWhereTheChevronsTipWould() {
         val modules = TestAppContainer().apply { consent.given = false }
         launch(modules)
 
         onScreen { binding ->
             assertEquals(string(R.string.settings_consent_not_given), binding.consentRow.settingValue.text.toString())
             assertFalse(binding.consentRow.root.isClickable)
+            assertFalse(binding.consentRow.settingChevron.isVisible)
+            // 16 dp from the card's edge, where the other rows' chevrons end (ChevronTest), not the row's 8 dp.
+            val value = binding.consentRow.settingValue
+            val density = value.resources.displayMetrics.density
+            assertEquals(16f, (binding.consentRow.root.width - value.right) / density, 0.5f)
         }
     }
 
@@ -339,6 +347,22 @@ class SettingsFragmentTest {
         nav.popBackStack()
         onScreen { it.aboutRow.root.performClick() }
         assertEquals(R.id.aboutFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun privacyPolicy_opensFromThePrivacySection() {
+        launch()
+
+        onScreen { binding ->
+            assertEquals(
+                string(R.string.settings_privacy_policy),
+                binding.privacyPolicyRow.settingTitle.text.toString(),
+            )
+            assertFalse(binding.privacyPolicyRow.settingValue.isShown)
+            binding.privacyPolicyRow.root.performClick()
+        }
+
+        assertEquals(R.id.privacyPolicyFragment, nav.currentDestination?.id)
     }
 
     @Test

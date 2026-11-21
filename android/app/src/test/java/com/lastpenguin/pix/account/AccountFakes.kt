@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.account
 
 import android.content.Context
@@ -138,6 +138,8 @@ class FakeAccountApi : PixAccountApi {
 
     override suspend fun signOut() = call("signOut")
 
+    override suspend fun deleteMe() = call("deleteMe")
+
     override suspend fun me(): AccountDto = me.also { call("me") }
 
     override suspend fun updateMe(body: UpdateMeBody): AccountDto {
@@ -270,9 +272,17 @@ class FakeAuthRepository(state: AuthState = AuthState.SignedOut) : AuthRepositor
     val takenPixIds = mutableSetOf("test1")
     var checkGate: CompletableDeferred<Unit>? = null
 
+    /** When set, holds a sign-up with Google until it completes, as a slow server does. */
+    var googleSignUpGate: CompletableDeferred<Unit>? = null
+
     fun signInAs(account: Account) {
         this.account = account
         _state.value = AuthState.SignedIn(account)
+    }
+
+    /** The kept sign-in's state, as reading it at a start sets it: [AuthState.Loading] first, then what it found. */
+    fun load(state: AuthState) {
+        _state.value = state
     }
 
     fun expire() {
@@ -307,8 +317,10 @@ class FakeAuthRepository(state: AuthState = AuthState.SignedOut) : AuthRepositor
         return Result.success(result)
     }
 
-    override suspend fun signUpWithGoogle(idToken: String) =
-        answer("googleSignUp:$idToken") { it.copy(pixId = null, hasPassword = false, hasGoogle = true) }
+    override suspend fun signUpWithGoogle(idToken: String): Result<Account> {
+        googleSignUpGate?.await()
+        return answer("googleSignUp:$idToken") { it.copy(pixId = null, hasPassword = false, hasGoogle = true) }
+    }
 
     override suspend fun addGoogle(idToken: String) = answer("addGoogle:$idToken") { it.copy(hasGoogle = true) }
 
@@ -338,6 +350,13 @@ class FakeAuthRepository(state: AuthState = AuthState.SignedOut) : AuthRepositor
     override suspend fun signOut() {
         calls += "signOut"
         _state.value = AuthState.SignedOut
+    }
+
+    override suspend fun deleteAccount(): Result<Unit> {
+        calls += "deleteAccount"
+        (failures["deleteAccount"] ?: failure)?.let { return Result.failure(it) }
+        _state.value = AuthState.SignedOut
+        return Result.success(Unit)
     }
 }
 

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui
 
 import android.animation.AnimatorInflater
@@ -346,7 +346,9 @@ class ScreenTransitionsTest {
             R.id.sentRequestsFragment to Kind.SCREEN,
             R.id.signInFragment to Kind.SCREEN,
             R.id.signUpFragment to Kind.SCREEN,
+            R.id.signUpAgreementFragment to Kind.SCREEN,
             R.id.pixIdSetupFragment to Kind.SCREEN,
+            R.id.privacyPolicyFragment to Kind.SCREEN,
             R.id.accountSheet to Kind.SHEET,
             R.id.shootTogetherSheet to Kind.SHEET,
             R.id.roomCodeSheet to Kind.SHEET,

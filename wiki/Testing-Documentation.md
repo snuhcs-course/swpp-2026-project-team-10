@@ -121,6 +121,7 @@
 | 3.38 | 2026-11-21 | `server-image` also checks HTTPS as on the AWS servers (1.2). |
 | 3.39 | 2026-11-21 | `server-image` also checks the CloudWatch override (1.2). |
 | 4.0 | 2026-11-21 | The Iteration 5 plan from the kickoff of 11/21: the owners of its tests (1.1); UAT cycle 2, the alpha test, and the beta test on 12/7–12/11, not 12/2 (1.2, 4.3, 5); two new AI module tests, the outline and the person check (3.1); the coverage measures, the property-testing library, and the mutation run not planned (2.1.2, 2.1.6, 2.1.7, 2.2.1); and the open items of 3.2, 4.1, 4.2, and 4.4 pointed at their issues or marked as not planned. |
+| 4.1 | 2026-11-21 | What an account keeps, deleting an account, the privacy policy, and fields above the keyboard (Iter5-P2, [#266]): their tests, `server-image`'s policy pages, and IT-40 (1.1, 1.2, 2.1.5, Appendix A). |
 
 </details>
 
@@ -206,7 +207,7 @@ One member writes and maintains each component's tests, following the module own
 | One phone zooms at a time (Iter4-A3) | Managers, ViewModels, Views, the session protocol | `session/` (`ZoomHoldTest`, `RemoteZoomHoldTest`, `RtcSessionManagerTest`, `MessageCodecTest`, `ChannelRouterTest`, `RemoteControlMessagesTest`), `ui/camera/` (`CameraZoomHoldTest`, `CameraFragmentInteractionTest`), `ui/session/` (`SubjectZoomHoldTest`, `SubjectFragmentRenderTest`) | 조성민 |
 | *Add a pose guide*'s tiles as buttons and the picker kept open (Iter4-A6) | Views, ViewModels | `ui/guide/` (`AddGuideSheetTest`), `ui/settings/` (`TutorialLayoutTest`, `TutorialFragmentTest`), `ui/generation/` (`GenerationViewModelTest`) | 박재완 |
 | Crash reports and usage data (Iter4-A8) | Managers, ViewModels, Views | `telemetry/` (`TelemetryEventTest`, `GatedTelemetryTest`); the tests of each class that sends an event; `settings/`, `ui/settings/` (`SettingsFragmentTest`) | 박재완 |
-| Privacy in the app: Sign up's notice and deleting an account (Iter5-P2) | Server module, ViewModels, Views | `test_accounts.py`, `account/`, `ui/` | 박재완 |
+| What an account keeps, deleting an account, and the privacy policy (Iter5-P2, [#266]) | Repositories, ViewModels, Views; server modules | `account/` (`RemoteAuthRepositoryTest`), `ui/account/` (`SignUpAgreementFragmentTest`, `SignInFragmentTest`, `SignInWayBackTest`, `AccountSheetTest`, `AccountViewModelTest`), `ui/settings/` (`PrivacyPolicyFragmentTest`, `SettingsFragmentTest`), `ui/` (`KoreanScreensTest`, `ScreenTransitionsTest`), `MainActivityTest` (the keyboard), `test_account_deletion.py`, `test_retention.py`, `test_privacy.py` | 박재완 |
 | The stale guide, remote focus, and the options on *Generate poses* (Iter5-P4, P9, P10) | Managers, ViewModels, Views, the session protocol | `session/`, `ui/session/`, `generation/`, `ui/generation/` | 박동제 |
 | The live view after a reconnection, the UI fixes, and the self-timer (Iter5-P5, P7, P8) | Platform, ViewModels, Views | `session/`, `settings/`, `ui/camera/`, `ui/settings/` | 박재완 |
 | The library's situations and memos, the cutout, and pose generation started by the subject (Iter5-P6, P11, P12) | Managers, ViewModels, Views, the session protocol | `guide/`, `ui/guide/`, `session/`, `ui/session/`, `generation/` | 한준형 |
@@ -244,7 +245,7 @@ The CI jobs:
 - `android-test`: `./gradlew :app:testDebugUnitTest`, all JVM and Robolectric tests.
 - `server-lint`: Ruff lint and format.
 - `server-test`: `uv run pytest` on fakeredis and a SQLite file, then on real Redis and PostgreSQL.
-- `server-image` also runs: it builds the server's Docker image (the build runs the server tests), starts it with nginx, Redis, and PostgreSQL, and checks the routes, a sign-up, an access log without the Pix ID, and eight rooms through nginx. *Added in Iteration 5:* HTTPS on port 443 with a certificate made for the run, as on the AWS servers (`/health`, `/version`, a WSS upgrade, `/docs` still 404), and Let's Encrypt's check over port 80, and the CloudWatch override's log settings for each service.
+- `server-image` also runs: it builds the server's Docker image (the build runs the server tests), starts it with nginx, Redis, and PostgreSQL, and checks the routes, a sign-up, an access log without the Pix ID, and eight rooms through nginx. *Added in Iteration 5:* HTTPS on port 443 with a certificate made for the run, as on the AWS servers (`/health`, `/version`, a WSS upgrade, `/docs` still 404), and Let's Encrypt's check over port 80, and the CloudWatch override's log settings for each service. The privacy policy's pages in both languages, and `404` for another.
 
 Passing CI is necessary, not sufficient. The reviewer also checks the tests (1.3) and, when UI or camera code changed, the PR's *How to verify* steps on a phone.
 
@@ -465,6 +466,7 @@ The codec and message tests use the JSON examples of Design 2.5 verbatim, so a f
 | IT-37 | Landscape photos and landscape poses (Iter4-P9) | The S22 as the photographer, a second phone as the subject; AWS server, same Wi-Fi | A photo opens in the gallery as the phone was held, on both phones, and a selfie mirrored as its preview. A scene photo taken sideways shows as framed and gives four landscape candidates, whole on the pose screens; the chosen guide lies on the person in the preview held sideways, on both phones within 3 % of the frame width. | FR-1.5, FR-1.14, FR-4.3, FR-6.14, NFR-8, NFR-17, R&S 6.3, 6.9 · Iteration 4 | [steps](#it-37-procedure) |
 | IT-38 | The controls that turn (Iter4-P10) | The S22 as the photographer, a second phone as the subject; AWS server, same Wi-Fi | The icons, the ratio, the zoom readout, and the bottom row's labels turn upright together, smoothly, at a quarter past the dead band, on both screens, and the tutorial's rings stay on them; *Shoot together*'s label, the shutter, the preview, and every control's place stay; with Remove animations they snap. Held sideways, the photo viewer is a landscape screen. | FR-1.15, NFR-16, NFR-17, R&S 6.2, 6.6, 6.9 · Iteration 4 | [steps](#it-38-procedure) |
 | IT-39 | Crash reports and usage data (Iter4-A8) | One phone with a debug build made with `-Ppix.telemetry=true`, AWS server; a second phone as the subject for the session step; the Firebase console's DebugView | Each flow's event shows in DebugView with its fields, and none holds a description, a name, or a code. With *Share usage data* off, nothing more shows, also after a restart. A plain debug build sends nothing. | FR-10.6, NFR-13 · Iteration 4 | [steps](#it-39-procedure) |
+| IT-40 | What an account keeps, deleting it, and the privacy policy (Iter5-P2) | Two debug-build phones against the AWS dev server, signed in as friends on the second; Wi-Fi | *Sign up* and *Sign up with Google* ask for three consents and make no account until all three are given. A field stays above the keyboard. The privacy policy opens from them and from Settings, in the screens' language. *Delete account* asks, then the Pix ID no longer signs in, the friend's list no longer shows it, and a phone still signed in to it signs out at its next request. | FR-5.18, FR-5.19, FR-10.7, NFR-13 · Iteration 5 | [steps](#it-40-procedure) |
 
 #### 2.1.6 Test design techniques and where they apply
 
@@ -1915,6 +1917,32 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 - Steps 5 and 7: no event shows in DebugView.
 - Step 6: the photo's `photo_taken` shows again.
 
+### IT-40 procedure
+
+**Flow:** What an account keeps, deleting it, and the privacy policy (Iter5-P2, [#266]; FR-5.18, FR-5.19, FR-10.7, NFR-13, R&S 6.4, 6.10 · Iteration 5). **Devices and network:** two phones with a debug build, against the AWS dev server, on Wi-Fi. Phone B is signed in as `test2`. A Google account that no Pix account uses is on phone A.
+
+**Steps**
+
+1. On phone A, open *Shoot together › I'll take the photo › Sign in to add friends › Sign up*.
+2. Open both consents' details, then tap *Read the full privacy policy*, then Back. Check the three boxes one by one, uncheck one, then tap *Agree to all* and *Agree and continue*. Fill in a Pix ID such as `test9`, a name, and a password, typing the password last, and tap *Sign up*.
+3. Send `test2` a friend request, and accept it on phone B.
+4. On phone A, sign in to `test9` a second time with an emulator or a third phone (phone C), and leave it on *Share my camera*.
+5. On phone A, open *Settings › Privacy › Privacy policy*, then switch Pix's language to 한국어 and open it again.
+6. On phone A, open *Settings › Pix account › Delete account*. Tap *Cancel*; then tap *Delete account* again and confirm.
+7. On phone B, wait 10 s on *Share my camera*. On phone C, pull to *Share my camera* again or wait 10 s.
+8. On phone A, sign in with `test9` and its password.
+9. On phone A, *Continue with Google*, then *No, make one*. Tap *Agree to all*, then *Agree and continue*. Choose a Pix ID.
+
+**Expected result**
+
+- Step 1: the agreement page shows three required consents and *Agree to all* before any field to fill in; *Agree and continue* is disabled.
+- Step 2: each consent's details show their items, purpose, and retention beside their labels. *Agree and continue* turns on only with all three boxes checked, and *Agree to all* follows the boxes. While the keyboard is open, the field being typed in shows above it, and the form scrolls to every field.
+- Steps 2 and 5: the policy opens in English, then in Korean, with its tables, and Back returns to the screen that opened it.
+- Step 6: *Cancel* keeps the account. Confirming shows "Account deleted", and the account sheet closes, signed out.
+- Step 7: phone B lists no `test9` among its friends. Phone C shows "You were signed out. Sign in again to see your friends."
+- Step 8: "The Pix ID or the password is wrong."
+- Step 9: no account exists until *Agree and continue*; then *Pix ID setup* opens, and the new account signs in.
+
 ## Appendix B. Run records
 
 One record per run that 2.2 and the Test Log (6) report, oldest first. Each gives the setup, what ran, the results with their evidence, and the deviations.
@@ -2446,6 +2474,7 @@ Observations: every Iteration 4 step held, and no defect was found.
 [#247]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/247
 [#254]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/254
 [#256]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/256
+[#266]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/266
 [#267]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/267
 [#269]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/269
 [#271]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/271

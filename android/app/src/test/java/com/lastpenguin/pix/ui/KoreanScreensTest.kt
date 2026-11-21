@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.Manifest
@@ -8,6 +8,9 @@ import android.net.Uri
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebView
 import android.widget.TextView
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.os.bundleOf
@@ -23,6 +26,7 @@ import com.lastpenguin.pix.R
 import com.lastpenguin.pix.account.Account
 import com.lastpenguin.pix.account.Friend
 import com.lastpenguin.pix.account.FriendRequest
+import com.lastpenguin.pix.account.GoogleSignIn
 import com.lastpenguin.pix.account.InvitationStatus
 import com.lastpenguin.pix.account.OpenedInvitation
 import com.lastpenguin.pix.account.PixUser
@@ -67,11 +71,13 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.tipsOver
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.account.AccountSheet
+import com.lastpenguin.pix.ui.account.AccountViewModel
 import com.lastpenguin.pix.ui.account.AddFriendFragment
 import com.lastpenguin.pix.ui.account.FriendsFragment
 import com.lastpenguin.pix.ui.account.PixIdSetupFragment
 import com.lastpenguin.pix.ui.account.SentRequestsFragment
 import com.lastpenguin.pix.ui.account.SignInFragment
+import com.lastpenguin.pix.ui.account.SignUpAgreementFragment
 import com.lastpenguin.pix.ui.account.SignUpFragment
 import com.lastpenguin.pix.ui.camera.CameraFragment
 import com.lastpenguin.pix.ui.generation.DescribePoseFragment
@@ -100,6 +106,7 @@ import com.lastpenguin.pix.ui.session.SubjectGeneratingFragment
 import com.lastpenguin.pix.ui.session.SubjectPickPoseFragment
 import com.lastpenguin.pix.ui.settings.AboutFragment
 import com.lastpenguin.pix.ui.settings.HelpFragment
+import com.lastpenguin.pix.ui.settings.PrivacyPolicyFragment
 import com.lastpenguin.pix.ui.settings.SettingsFragment
 import com.lastpenguin.pix.ui.settings.TutorialFragment
 import java.time.Duration
@@ -129,12 +136,15 @@ import org.robolectric.shadows.ShadowDialog
  * Generate poses; Generating poses with a candidate ready; Pick a pose, alone, with a pose saved by its ♥, and in a
  * session; Couldn't create poses,
  * failed, refused, and without a person; Who takes the photo?; Share my camera signed out, and with a friend, a request,
- * and a sent request; Sent requests; Add a friend; Sign in; Sign up; Pix ID setup; Account; the room code; See their
+ * and a sent request; Sent requests; Add a friend; Sign in; the sign-up agreement, with its details; Sign up; Sign up
+ * with Google;
+ * Pix ID setup; Account, with
+ * "Delete your Pix account?"; the room code; See their
  * camera; Session not found; Subject view, with the photographer's tip closed and open,
  * and while the photographer picks a pose, with a guide to save, and with the session's photos open in the viewer,
  * readable or not (Iter4-A2); the subject's Pick a pose; Connection lost; Camera in a session with its photos open in the
  * viewer (Iter4-A2), and with the delay shown; Camera with Pix's album open in the viewer; Settings, signed in; How
- * to use Pix; About Pix. On each, no visible text, hint, or content
+ * to use Pix; About Pix; the privacy policy, failed to load. On each, no visible text, hint, or content
  * description has an English word but what Korean keeps (KEPT) and the test's own data (names, Pix IDs, the server's
  * pose texts), and no text is cut off: none is ellipsized, has lines dropped, or is taller than its view, except a name
  * in a view that ellipsizes on purpose, and no line breaks inside a word. The text styles' font aliases: Pretendard in
@@ -648,6 +658,38 @@ class KoreanScreensTest {
     }
 
     @Test
+    fun signUpAgreement_isInKorean() {
+        accountScreen<SignUpAgreementFragment>(R.id.signUpAgreementFragment, signedIn = false)
+        assertKorean(screen())
+    }
+
+    @Test
+    fun signUpAgreement_withItsDetails_isInKorean() {
+        accountScreen<SignUpAgreementFragment>(R.id.signUpAgreementFragment, signedIn = false)
+        scenario!!.onFragment {
+            it.requireView().findViewById<View>(R.id.collectionToggle).performClick()
+            it.requireView().findViewById<View>(R.id.transferToggle).performClick()
+        }
+        idle()
+        assertKorean(screen())
+    }
+
+    @Test
+    fun googleSignUp_isInKorean() {
+        val modules = TestAppContainer()
+        modules.auth.googleResult = GoogleSignIn.NotRegistered
+        modules.install()
+        // The screen needs the waiting Google account before its view is made.
+        scenario = launchPrepared<SignUpAgreementFragment>(
+            R.id.signUpAgreementFragment,
+            bundleOf(SignUpAgreementFragment.ARG_GOOGLE to true),
+        ) { activity ->
+            activity.viewModel<AccountViewModel>().continueWithGoogle(activity)
+        }.first
+        assertKorean(screen())
+    }
+
+    @Test
     fun pixIdSetup_isInKorean() {
         accountScreen<PixIdSetupFragment>(R.id.pixIdSetupFragment)
         assertKorean(screen())
@@ -660,6 +702,10 @@ class KoreanScreensTest {
         modules.install()
         scenario = launchFragment<AccountSheet>(themeResId = R.style.Theme_Pix)
         assertKorean(screen(), *people)
+
+        screen().findViewById<View>(R.id.deleteAccountButton).performClick()
+        idle()
+        assertKorean(checkNotNull(ShadowDialog.getLatestDialog().window).decorView)
     }
 
     // ---- Sessions ----------------------------------------------------------------------
@@ -1059,6 +1105,32 @@ class KoreanScreensTest {
         assertKorean(screen(), *names.toTypedArray())
     }
 
+    @Test
+    fun privacyPolicy_failedToLoad_isInKorean() {
+        TestAppContainer().install()
+        scenario = launchFragmentInContainer<PrivacyPolicyFragment>(themeResId = R.style.Theme_Pix)
+        val web = screen().findViewById<WebView>(R.id.policyWeb)
+        val request = object : WebResourceRequest {
+            override fun getUrl(): Uri = Uri.parse(shadowOf(web).lastLoadedUrl)
+
+            override fun isForMainFrame() = true
+
+            override fun isRedirect() = false
+
+            override fun hasGesture() = false
+
+            override fun getMethod() = "GET"
+
+            override fun getRequestHeaders() = emptyMap<String, String>()
+        }
+        shadowOf(web).webViewClient.onReceivedHttpError(
+            web,
+            request,
+            WebResourceResponse("text/html", "utf-8", 503, "Error", emptyMap(), null),
+        )
+        assertKorean(screen())
+    }
+
     // ---- Fonts ------------------------------------------------------------------------------
 
     /** How wide [text] is in [font], so two fonts can be told apart by what they draw. */
@@ -1158,6 +1230,6 @@ class KoreanScreensTest {
         val WORD = Regex("[A-Za-z]+")
 
         /** What Korean keeps as it is in English: names, and the letters a Pix ID may use. */
-        val KEPT = listOf("Pix", "ID", "Google", "AI", "a–z")
+        val KEPT = listOf("Amazon Web Services", "Pix", "ID", "IP", "Google", "AWS", "AI", "a–z")
     }
 }

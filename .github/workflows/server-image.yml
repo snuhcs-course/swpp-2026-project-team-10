@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
 name: server-image
 
 on:
@@ -39,7 +39,7 @@ jobs:
       # runs docker compose needs them, so they go to $GITHUB_ENV; an export would last only for this step.
       - name: Prepare what deploy.sh would write
         run: |
-          mkdir -p "$RUNNER_TEMP/pix/state" "$RUNNER_TEMP/pix/secrets"
+          mkdir -p "$RUNNER_TEMP/pix/state" "$RUNNER_TEMP/pix/secrets" "$RUNNER_TEMP/pix/acme"
           printf 'set $pix_app "app-blue:8000";\nset $pix_copy "blue";\n' > "$RUNNER_TEMP/pix/state/active.conf"
           echo "$GITHUB_SHA" > "$RUNNER_TEMP/pix/state/version"
           touch "$RUNNER_TEMP/pix/.env"
@@ -50,6 +50,9 @@ jobs:
             echo "PIX_STATE_DIR=$RUNNER_TEMP/pix/state"
             echo "PIX_SECRETS_DIR=$RUNNER_TEMP/pix/secrets"
             echo "PIX_POSTGRES_DIR=$RUNNER_TEMP/pix/postgres"
+            echo "PIX_ACME_DIR=$RUNNER_TEMP/pix/acme"
+            echo "PIX_LETSENCRYPT_DIR=$RUNNER_TEMP/pix/letsencrypt"
+            echo "PIX_HTTPS_PORT=8443"
             echo "PIX_DB_PASSWORD=ci-password"
             echo "PIX_JWT_SECRET=ci-jwt-secret-that-is-long-enough-for-hs256"
           } >> "$GITHUB_ENV"
@@ -107,6 +110,29 @@ jobs:
 
           asyncio.run(main())
           EOF
+
+      # An AWS server's HTTPS, with a certificate made for this run where certbot keeps the real one (server/README.md,
+      # HTTPS). Compose recreates nginx with port 443 and the certificate.
+      - name: Serve HTTPS as on an AWS server
+        run: |
+          status() { curl -s -o /dev/null -m 5 -w '%{http_code}' "$@" || true; }
+          live=$RUNNER_TEMP/pix/letsencrypt/live/pix
+          mkdir -p "$live"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=localhost -addext subjectAltName=DNS:localhost \
+            -keyout "$live/privkey.pem" -out "$live/fullchain.pem" 2> /dev/null
+          docker compose -f server/deploy/docker-compose.yml -f server/deploy/docker-compose.https.yml up -d --wait nginx
+          set -x
+          https() { curl --cacert "$live/fullchain.pem" "$@"; }
+          test "$(https -fsS https://localhost:8443/health)" = '{"status":"ok"}'
+          test "$(https -fsS https://localhost:8443/version)" = "$GITHUB_SHA"
+          test "$(status --cacert "$live/fullchain.pem" -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' https://localhost:8443/ws)" = 101
+          test "$(status --cacert "$live/fullchain.pem" https://localhost:8443/docs)" = 404
+          # Port 80 still serves the app, and Let's Encrypt's check: a file certbot wrote, and 404 for any other.
+          test "$(curl -fsS http://127.0.0.1:8080/health)" = '{"status":"ok"}'
+          mkdir -p "$RUNNER_TEMP/pix/acme/.well-known/acme-challenge"
+          echo ci-token > "$RUNNER_TEMP/pix/acme/.well-known/acme-challenge/ci-token"
+          test "$(curl -fsS http://127.0.0.1:8080/.well-known/acme-challenge/ci-token)" = ci-token
+          test "$(status http://127.0.0.1:8080/.well-known/acme-challenge/other)" = 404
 
       - name: Show the container logs
         if: failure()

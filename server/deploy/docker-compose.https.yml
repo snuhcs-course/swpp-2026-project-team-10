@@ -1,0 +1,12 @@
+# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
+# HTTPS for the AWS servers (server/README.md, HTTPS). deploy.sh adds this file to docker-compose.yml once the
+# server has a certificate in /etc/letsencrypt/live/pix; the course servers have none and serve plain HTTP only.
+services:
+  nginx:
+    ports:
+      - "${PIX_HTTPS_PORT:-443}:443"
+    volumes:
+      # Directories, not single files, as in docker-compose.yml. The certificate's files in live/ link into
+      # archive/, so the whole folder is mounted. A renewal reloads nginx (certbot's deploy hook).
+      - ./nginx/https:/etc/nginx/https:ro
+      - ${PIX_LETSENCRYPT_DIR:-/etc/letsencrypt}:/etc/letsencrypt:ro

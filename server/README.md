@@ -45,7 +45,7 @@ To connect a debug build to the laptop, set `pix.serverUrl` (`android/README.md`
 - From a phone on the same Wi-Fi, use `http://<laptop-IP>:8000/`. The Wi-Fi must allow device-to-device traffic, and the laptop must accept inbound TCP on port 8000.
 - From an emulator, use `http://10.0.2.2:8000/`.
 
-Without a TURN key, each phone gets Cloudflare's STUN server only, which is enough on one Wi-Fi ([Design 2.6.7][d267]). Across networks, give the server the TURN key ([Setup](#setup)), or use the AWS server. Debug builds use the AWS server by default.
+Without a TURN key, each phone gets Cloudflare's STUN server only, which is enough on one Wi-Fi ([Design 2.6.7][d267]). Across networks, give the server the TURN key ([Setup](#setup)), or use the AWS dev server. Debug builds use it by default.
 
 Uvicorn's WebSocket ping and pong find dead connections. The protocol needs no heartbeat message of its own.
 
@@ -172,17 +172,18 @@ Every worker brings the schema to the newest revision at start, before it takes 
 
 ## Deploy
 
-The server runs on the two course servers and on an AWS server ([Design 2.8][d28], *Hosting* and *Deployment*). Each course server is reachable only through the course's HTTP proxy on port 80, and only from the campus network. So the course servers have no HTTPS or WSS, and they cannot reach each other. The AWS server stays on permanently and answers from every network, cellular data included.
+Pix has one server for `main` and one for `dev`. Each runs in two versions with the same setup: on a course server and on AWS ([Design 2.8][d28], *Hosting* and *Deployment*). Each course server is reachable only through the course's HTTP proxy on port 80, and only from the campus network. So the course servers have no HTTPS or WSS, and they cannot reach each other. The AWS servers stay on permanently, answer from every network, cellular data included, and serve HTTPS ([HTTPS](#https)). So the app's builds use the AWS servers.
 
-| Server | Address | Branch | Use |
+| Branch | Course server | AWS server (`ap-southeast-2`) | Builds |
 | --- | --- | --- | --- |
-| A (`ssh swpp-a`) | `http://swpp26t10.147-46-242-169.sslip.io` | `main` | Production. Release builds of the app use it. |
-| B (`ssh swpp-b`) | `http://swpp26t10.147-46-242-174.sslip.io` | `dev` | Staging. To use it, set `pix.serverUrl` in a debug build. |
-| AWS (`ap-southeast-2`) | `http://3.105.185.251` | `dev` | Debug builds use it by default. Every network reaches it, cellular data included. |
+| `main` | Server A (`ssh swpp-a`), `http://swpp26t10.147-46-242-169.sslip.io` | AWS main, `https://swpp26t10.15-134-147-114.sslip.io` | Release builds use AWS main. |
+| `dev` | Server B (`ssh swpp-b`), `http://swpp26t10.147-46-242-174.sslip.io` | AWS dev, `https://swpp26t10.3-105-185-251.sslip.io` | Debug builds use AWS dev by default. |
+
+To use a course server, set `pix.serverUrl` in a debug build.
 
 [`deploy/docker-compose.yml`](deploy/docker-compose.yml) runs these services:
 
-- **nginx** on port 80. It forwards `/api/v1/`, `/ws`, `/health`, and `/i/` (the invite link's page) to the serving copy. It answers `/version` with the commit that is live, and `404` for everything else. So FastAPI's `/docs` and the server's `/internal` routes are not public.
+- **nginx** on port 80, and on the AWS servers also on port 443 for HTTPS ([HTTPS](#https)). It forwards `/api/v1/`, `/ws`, `/health`, and `/i/` (the invite link's page) to the serving copy. It answers `/version` with the commit that is live, Let's Encrypt's check from `/opt/pix/acme`, and `404` for everything else. So FastAPI's `/docs` and the server's `/internal` routes are not public.
 - **`app-blue` and `app-green`**, two copies of the server, built from the [`Dockerfile`](Dockerfile). One copy serves, and the other does not run. Each copy runs two workers.
 - **Redis**, which both copies use. Its port is not published, and it writes nothing to disk.
 - **PostgreSQL**, which both copies use. Its port is not published either. Its files are in `/opt/pix/postgres` on the server's own disk, and nothing makes a backup of them yet.
@@ -191,7 +192,7 @@ The server runs on the two course servers and on an AWS server ([Design 2.8][d28
 
 ### How a deploy happens
 
-GitHub cannot push to the course servers. SSH goes through a campus-only relay with personal keys. A self-hosted runner needs repository admin rights, and GitHub advises against one on a public repository. So each course server pulls. GitHub deploys the AWS server instead ([The AWS server](#the-aws-server)).
+GitHub cannot push to the course servers. SSH goes through a campus-only relay with personal keys. A self-hosted runner needs repository admin rights, and GitHub advises against one on a public repository. So each course server pulls. GitHub deploys the AWS servers instead ([The AWS servers](#the-aws-servers)).
 
 On a course server, a systemd timer runs [`deploy/deploy.sh auto`](deploy/deploy.sh) every minute as root. The script does these steps:
 
@@ -219,7 +220,8 @@ A failure at any step leaves the serving copy as it was, and the timer does not 
 
 - Keep `deploy.sh` runnable by bash 3.2, so you can try it on macOS with `PIX_HOME` set to a scratch directory. Keep everything in it inside functions, because a deploy checks out another version of the file while it runs.
 - Operators source [`deploy/pix.sh`](deploy/pix.sh) and do not run it ([Operate it](#operate-it)). When a `deploy.sh` command or a container name changes, change it in `pix.sh` too.
-- nginx forwards only `/api/v1/`, `/ws`, `/health`, and `/i/` (the invite link's page). Add a new public route to [`deploy/nginx/nginx.conf`](deploy/nginx/nginx.conf), but never add `/internal/*` to it. `deploy.sh` reads `/internal/stats` inside the container, to wait for open rooms before it switches copies.
+- nginx forwards only `/api/v1/`, `/ws`, `/health`, and `/i/` (the invite link's page). Add a new public route to [`deploy/nginx/nginx.conf`](deploy/nginx/nginx.conf), but never add `/internal/*` to it. `deploy.sh` reads `/internal/stats` inside the container, to wait for open rooms before it switches copies. Its one server block serves both ports, so a route needs nothing more for HTTPS.
+- HTTPS is [`docker-compose.https.yml`](deploy/docker-compose.https.yml) and [`deploy/nginx/https/`](deploy/nginx/https/). `deploy.sh` adds the Compose file only on a server with a certificate, so a course server never publishes port 443. Anything else that runs Compose on an AWS server passes both files, or nginx loses port 443.
 - nginx's `pix` log format and the server's `HideQuery` filter omit query strings from the access logs. But nginx's error log prints the whole request line of a failed request. So nothing personal, such as a Pix ID, goes in a path or a query, and the lookup is `POST /users/lookup`.
 - `deploy.sh` makes two secrets once and passes them to Compose. One is PostgreSQL's password (`/opt/pix/db-password`, `PIX_DB_PASSWORD`). PostgreSQL keeps the password that it got when it first created its files, so never generate that file again. The other is the access-token key (`/opt/pix/jwt-secret`, `PIX_JWT_SECRET`).
 - PostgreSQL's files are bind-mounted from `/opt/pix/postgres` (`PIX_POSTGRES_DIR`), not kept in a Docker volume. So `down -v` and volume prunes cannot delete accounts. Never delete that directory. Anything that runs this Compose file sets `PIX_DB_PASSWORD`, `PIX_JWT_SECRET`, and `PIX_POSTGRES_DIR`, the [server-image](../.github/workflows/server-image.yml) workflow included.
@@ -231,10 +233,10 @@ The server needs git, curl, and Docker with the Compose and Buildx plugins (`sud
 
 ```sh
 sudo git clone https://github.com/snuhcs-course/swpp-2026-project-team-10.git /opt/pix/repo
-sudo /opt/pix/repo/server/deploy/setup.sh dev        # "main" on Server A
+sudo /opt/pix/repo/server/deploy/setup.sh dev        # the server's branch: main or dev
 sudoedit /opt/pix/.env                               # fill in the names left empty
 sudo /opt/pix/repo/server/deploy/deploy.sh deploy    # the first deploy, by hand
-sudo systemctl enable --now pix-deploy.timer         # then automatic deploys
+sudo systemctl enable --now pix-deploy.timer         # automatic deploys, on a course server only
 ```
 
 [`setup.sh`](deploy/setup.sh) installs no packages and creates no users. It does these steps:
@@ -246,22 +248,29 @@ sudo systemctl enable --now pix-deploy.timer         # then automatic deploys
 
 The API keys and tokens are only in `/opt/pix/.env`. The other secrets are the two files that `deploy.sh` makes and the FCM key file. `/opt/pix/state/` holds what `deploy.sh` writes. To try a branch before you merge it, give it to the first deploy: `deploy.sh deploy feat/2-deploy`.
 
-### The AWS server
+### The AWS servers
 
-The AWS server stays on permanently. Its setup is the same as a course server's, with `setup.sh dev`, but without the timer. GitHub can reach it, so the [server-deploy-aws](../.github/workflows/server-deploy-aws.yml) workflow deploys it after each push to `dev`:
+Two AWS servers stay on permanently, one for each branch:
 
-1. The workflow has AWS Systems Manager run the `PixDeploy` document on the server.
+| Server | Instance | Elastic IP | Branch |
+| --- | --- | --- | --- |
+| AWS main | `i-0fc0336d74f394646` | `15.134.147.114` | `main` |
+| AWS dev | `i-07f7e5dd7cc4cc9cc` | `3.105.185.251` | `dev` |
+
+Each one's setup is the same as a course server's, with `setup.sh main` or `setup.sh dev`, but without the timer. GitHub can reach them, so the [server-deploy-aws](../.github/workflows/server-deploy-aws.yml) workflow deploys a branch's server after each push to `main` or `dev`:
+
+1. The workflow has AWS Systems Manager run the `PixDeploy` document on the branch's server.
 2. `PixDeploy` waits for any deploy that already runs there, and then runs `deploy.sh deploy`.
 3. The workflow shows in the run what `deploy.sh` printed.
 4. The workflow checks `/version` at the public address.
 
-A failed deploy shows as a red mark on the commit. *Re-run jobs*, or *Run workflow* on `dev`, tries again, even for a `server/` tree that failed before.
+A failed deploy shows as a red mark on the commit. *Re-run jobs*, or *Run workflow* on `main` or `dev`, tries again, even for a `server/` tree that failed before.
 
-The workflow signs in with the access key of an IAM user. That user may run only `PixDeploy`, and only on this one instance. So a leaked key can do no more than deploy `dev` again. The key is a secret of the repository's `aws` environment, which only `dev` may use. The security group needs only port 80 open, plus SSH for operators.
+The workflow signs in with the access key of an IAM user. That user may run only `PixDeploy`, and only on these two instances. `deploy.sh deploy` takes the branch from the server's own `deploy.conf`, so a leaked key can do no more than deploy each server's branch again. The key is a secret of the repository's `aws` environment, which only `main` and `dev` may use. The security group needs ports 80 and 443 open, plus SSH for operators.
 
-Do this setup once in the AWS console, in the server's region (`ap-southeast-2`):
+Do this setup once in the AWS console, in the servers' region (`ap-southeast-2`):
 
-1. **Let Systems Manager reach the server.** Create an IAM role for EC2 with the managed policy `AmazonSSMManagedInstanceCore`. Attach the role to the instance (*EC2 › Instances › Actions › Security › Modify IAM role*). Ubuntu and Amazon Linux images include the SSM agent. Within a few minutes, the instance shows as online in *Systems Manager › Fleet Manager*. If it does not, on Ubuntu, run `sudo snap restart amazon-ssm-agent`.
+1. **Let Systems Manager reach each server.** Create an IAM role for EC2 with the managed policy `AmazonSSMManagedInstanceCore`. Attach the role to each instance (*EC2 › Instances › Actions › Security › Modify IAM role*). Ubuntu and Amazon Linux images include the SSM agent. Within a few minutes, the instance shows as online in *Systems Manager › Fleet Manager*. If it does not, on Ubuntu, run `sudo snap restart amazon-ssm-agent`.
 2. **Create the `PixDeploy` document** with this content. Use *Systems Manager › Documents › Create document › Command or Session*, type *Command*, format YAML. When a change to `deploy.sh` touches its command or its lock, change the document too:
 
    ```yaml
@@ -277,7 +286,7 @@ Do this setup once in the AWS console, in the server's region (`ap-southeast-2`)
            - /opt/pix/repo/server/deploy/deploy.sh deploy
    ```
 
-3. **Create the IAM user that the workflow signs in as**, `pix-github-deploy`, without console access. Give it this inline policy. The policy lets the user run `PixDeploy` on that one instance and read the output:
+3. **Create the IAM user that the workflow signs in as**, `pix-github-deploy`, without console access. Give it this inline policy. The policy lets the user run `PixDeploy` on the two instances and read the output:
 
    ```json
    {
@@ -287,7 +296,8 @@ Do this setup once in the AWS console, in the server's region (`ap-southeast-2`)
          "Effect": "Allow",
          "Action": "ssm:SendCommand",
          "Resource": [
-           "arn:aws:ec2:ap-southeast-2:<account-id>:instance/<instance-id>",
+           "arn:aws:ec2:ap-southeast-2:<account-id>:instance/<main-instance-id>",
+           "arn:aws:ec2:ap-southeast-2:<account-id>:instance/<dev-instance-id>",
            "arn:aws:ssm:ap-southeast-2:<account-id>:document/PixDeploy"
          ]
        },
@@ -297,9 +307,10 @@ Do this setup once in the AWS console, in the server's region (`ap-southeast-2`)
    ```
 
    Then create an access key for the user (*Security credentials › Create access key*, for an application running outside AWS).
-4. **Store the key in GitHub.** This step needs a repository admin. In *Settings › Environments*, create the environment `aws`. Limit its deployment branches to `dev`. Add the secrets `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Then delete every other copy of the key.
-5. **Give the workflow the instance ID.** Put it in the workflow's `env` (`AWS_INSTANCE_ID`). It is not a secret.
-6. **Disable the timer on the server** with `sudo systemctl disable --now pix-deploy.timer`. Then only the workflow deploys, and its log shows each build. If the timer stays on, deploys still work. But the run often shows only that the commit was already live.
+4. **Store the key in GitHub.** This step needs a repository admin. In *Settings › Environments*, create the environment `aws`. Limit its deployment branches to `main` and `dev`. Add the secrets `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Then delete every other copy of the key.
+5. **Give the workflow the instance IDs and addresses.** Put them in the workflow's `env`, by branch (`AWS_INSTANCE_ID`, `SERVER_URL`). They are not secrets.
+6. **Disable the timer on each server** with `sudo systemctl disable --now pix-deploy.timer`. Then only the workflow deploys, and its log shows each build. If the timer stays on, deploys still work. But the run often shows only that the commit was already live.
+7. **Set up HTTPS** on each server ([HTTPS](#https)).
 
 To replace the key:
 
@@ -307,7 +318,35 @@ To replace the key:
 2. Update the two secrets.
 3. Delete the old key.
 
-If you delete the AWS instance, also delete the IAM user.
+If you delete an AWS instance, also remove it from the IAM user's policy. Delete the IAM user with the last instance.
+
+### HTTPS
+
+The AWS servers serve HTTPS on port 443 with a certificate from [Let's Encrypt](https://letsencrypt.org/). The certificate names a hostname that [sslip.io](https://sslip.io/) resolves to the server's Elastic IP: `swpp26t10.15-134-147-114.sslip.io` resolves to `15.134.147.114`. Port 80 stays open, because Let's Encrypt checks the hostname over it.
+
+- Every server's nginx serves Let's Encrypt's check, `/.well-known/acme-challenge/`, from `/opt/pix/acme`. The folder is empty on the course servers.
+- Once `/etc/letsencrypt/live/pix/fullchain.pem` exists, `deploy.sh` adds [`docker-compose.https.yml`](deploy/docker-compose.https.yml) to each Compose command. That file publishes port 443 and mounts [`nginx/https/`](deploy/nginx/https/) and `/etc/letsencrypt`, so nginx also listens on 443 with the certificate. `deploy.sh status` shows `https: on` once the running nginx publishes port 443.
+- On a server with the certificate, `deploy.sh` refuses to deploy or roll back to a commit without `docker-compose.https.yml`, which would close port 443. The commit that serves keeps serving.
+- certbot's systemd timer renews the certificate before it expires. Its deploy hook, `deploy.sh reload`, then has nginx read the certificate again.
+- nginx tells the app that a request came over HTTPS (`X-Forwarded-Proto`), so the app's invite links start with `https://`.
+
+Set it up once on each AWS server, after a deploy of a commit that has these files:
+
+1. In the security group, allow inbound TCP on port 443 from anywhere.
+2. On the server, set `host` to the server's own hostname, then run the rest:
+
+   ```sh
+   host=swpp26t10.15-134-147-114.sslip.io   # AWS main; swpp26t10.3-105-185-251.sslip.io on AWS dev
+   sudo apt install -y certbot
+   sudo certbot certonly --webroot -w /opt/pix/acme --cert-name pix -d "$host" \
+     --deploy-hook '/opt/pix/repo/server/deploy/deploy.sh reload' --register-unsafely-without-email --agree-tos
+   sudo /opt/pix/repo/server/deploy/deploy.sh restart
+   ```
+
+   `restart` recreates nginx with port 443. To try the certbot line first against Let's Encrypt's test service, add `--dry-run`.
+3. Check it from your computer: `curl https://<hostname>/health` answers `{"status":"ok"}`. On the server, `sudo certbot renew --dry-run` checks the renewal.
+
+sslip.io is not on the Public Suffix List, so all sslip.io names share Let's Encrypt's limit of 50 new certificates in 7 days. If certbot is refused for that limit, try again later. A renewal of the same name is exempt.
 
 ### Settings
 
@@ -334,9 +373,10 @@ Without the shortcuts, run these commands on the server with `sudo`:
 
 | Command | What it does |
 | --- | --- |
-| `/opt/pix/repo/server/deploy/deploy.sh status` | The branch, the recorded commit, which copy serves, the open rooms, and the containers. |
+| `/opt/pix/repo/server/deploy/deploy.sh status` | The branch, the recorded commit, which copy serves, whether HTTPS is on, the open rooms, and the containers. |
 | `… deploy.sh deploy [ref]` | Deploys a branch or a commit now. The default is the server's branch. It also deploys a commit that the timer stopped trying. |
 | `… deploy.sh rollback` | Switches back to the image that served before the last deploy, without a wait for rooms. The timer does not deploy the rolled-back code again until the branch changes `server/`. |
+| `… deploy.sh reload` | Has nginx read its configuration and the certificate again, after it checks them. certbot's deploy hook runs it after a renewal ([HTTPS](#https)). |
 | `… deploy.sh restart` | Starts the other copy from the same image, for example after you edit `/opt/pix/.env`. |
 | `journalctl -u pix-deploy -n 50` | What the timer's deploys printed. `/opt/pix/state/last-build.log` has the last build in full. |
 | `docker logs -n 100 pix-app-blue-1` | The server's log. Use `pix-app-green-1` for the other copy, `pix-nginx-1` for the access log, `pix-redis-1` for the session store, and `pix-postgres-1` for the database. Logs rotate at 10 MB, five files each. |

@@ -1,5 +1,6 @@
-# AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
-# The Pix server on the course server. deploy.sh drives this file and supplies the variables
+# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
+# The Pix server on a course server or an AWS server. deploy.sh drives this file and supplies the variables, and on
+# a server with a certificate adds docker-compose.https.yml.
 # On the server, use deploy.sh instead of calling docker compose by hand.
 name: pix
 
@@ -87,11 +88,13 @@ services:
     image: nginx:1.30-alpine
     command: ["nginx", "-c", "/etc/nginx/conf/nginx.conf", "-g", "daemon off;"]
     ports:
-      # The course's proxy reaches only port 80, and only on 0.0.0.0.
+      # The course's proxy reaches only port 80, and only on 0.0.0.0. docker-compose.https.yml adds 443.
       - "${PIX_HTTP_PORT:-80}:80"
     volumes:
       # Directories, not single files: a bind-mounted file keeps its old content after git or deploy.sh replaces it.
       - ./nginx:/etc/nginx/conf:ro
       - ${PIX_STATE_DIR:-/opt/pix/state}:/etc/nginx/pix:ro
+      # Where certbot writes Let's Encrypt's check (nginx.conf); empty on the course servers.
+      - ${PIX_ACME_DIR:-/opt/pix/acme}:/var/www/acme:ro
     restart: unless-stopped
     logging: *logging

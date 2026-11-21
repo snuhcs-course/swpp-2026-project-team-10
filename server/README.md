@@ -312,6 +312,7 @@ Do this setup once in the AWS console, in the servers' region (`ap-southeast-2`)
 6. **Disable the timer on each server** with `sudo systemctl disable --now pix-deploy.timer`. Then only the workflow deploys, and its log shows each build. If the timer stays on, deploys still work. But the run often shows only that the commit was already live.
 7. **Set up HTTPS** on each server ([HTTPS](#https)).
 8. **Send the logs to CloudWatch** ([Logs in CloudWatch](#logs-in-cloudwatch)).
+9. **Check each server from outside** ([Uptime checks](#uptime-checks)).
 
 To replace the key:
 
@@ -422,6 +423,38 @@ fields @timestamp, @logStream, @message
 | filter @message like /ERROR|WARNING|Traceback/
 | sort @timestamp desc
 ```
+
+### Uptime checks
+
+A Route 53 health check requests each AWS server's `https://<host>/health` every 30 seconds, from several places in the world. `/health` answers 200 only when the app reaches Redis. So a check fails when the instance, nginx, the app, or Redis is down, or HTTPS does not answer. After 3 minutes of failures, a CloudWatch alarm emails the team, and it emails again when the server is back. The 5xx alarm of [Logs in CloudWatch](#logs-in-cloudwatch) cannot see a server that does not answer at all, because such a server writes no log.
+
+- A health check needs no domain or hosted zone of our own; it requests the sslip.io hostname.
+- Each check costs $1 a month, for HTTPS. The alarms and the emails are within the free tier.
+- Route 53 publishes the checks' results only in `us-east-1`, and an alarm emails only a topic in its own region. So these alarms and their own `pix-alerts` topic are in `us-east-1`, apart from the log alarms in `ap-southeast-2`. Each address confirms this topic too.
+- A check does not verify the certificate. certbot renews it 30 days before it expires, and each deploy's workflow checks it with `curl`.
+
+Set them up once in CloudShell, with the same email addresses, then confirm the subscriptions:
+
+```sh
+export AWS_REGION=us-east-1
+topic=$(aws sns create-topic --name pix-alerts --query TopicArn --output text)
+for email in <address 1> <address 2>; do
+  aws sns subscribe --topic-arn "$topic" --protocol email --notification-endpoint "$email"
+done
+for server in main:swpp26t10.15-134-147-114.sslip.io dev:swpp26t10.3-105-185-251.sslip.io; do
+  name=${server%%:*} host=${server#*:}
+  id=$(aws route53 create-health-check --caller-reference "pix-$name-$(date +%s)" \
+    --health-check-config "Type=HTTPS,FullyQualifiedDomainName=$host,Port=443,ResourcePath=/health,RequestInterval=30,FailureThreshold=3,EnableSNI=true" \
+    --query HealthCheck.Id --output text)
+  aws route53 change-tags-for-resource --resource-type healthcheck --resource-id "$id" --add-tags Key=Name,Value=pix-$name
+  aws cloudwatch put-metric-alarm --alarm-name "pix-$name-down" --namespace AWS/Route53 --metric-name HealthCheckStatus \
+    --dimensions Name=HealthCheckId,Value="$id" --statistic Minimum --period 60 --evaluation-periods 3 \
+    --threshold 1 --comparison-operator LessThanThreshold --treat-missing-data breaching \
+    --alarm-actions "$topic" --ok-actions "$topic"
+done
+```
+
+*Route 53 › Health checks* shows both checks healthy within a minute or two.
 
 ### Settings
 

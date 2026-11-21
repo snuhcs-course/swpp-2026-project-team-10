@@ -44,8 +44,10 @@ class SignUpAgreementFragment : Fragment(R.layout.fragment_sign_up_agreement) {
     private val google: Boolean get() = arguments?.getBoolean(ARG_GOOGLE) == true
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        // No Google account waits after a new process, or after the sign-up ended: then the account itself says.
-        if (google && !viewModel.waitingGoogle && !needsPixId(viewModel.authState.value)) {
+        // No Google account waits after a new process, or after the sign-up ended: then the account itself says, once
+        // the kept sign-in is read (the collector below decides while it still loads).
+        val kept = viewModel.authState.value
+        if (google && !viewModel.waitingGoogle && kept !is AuthState.Loading && !needsPixId(kept)) {
             findNavController().popBackStack()
             return
         }
@@ -66,7 +68,16 @@ class SignUpAgreementFragment : Fragment(R.layout.fragment_sign_up_agreement) {
                 launch { viewModel.uiState.collect(page::render) }
                 // From the account, not the ViewModel's event: a sign-up that ended while nothing collected, the
                 // privacy policy on top or Pix in the background, still opens Pix ID setup.
-                launch { viewModel.authState.collect { if (needsPixId(it)) openPixIdSetup() } }
+                launch {
+                    viewModel.authState.collect { state ->
+                        when {
+                            needsPixId(state) -> openPixIdSetup()
+
+                            // A new process read its kept sign-in, and no account waits for its Pix ID.
+                            state !is AuthState.Loading && !viewModel.waitingGoogle -> goBack()
+                        }
+                    }
+                }
             }
         }
     }
@@ -80,6 +91,11 @@ class SignUpAgreementFragment : Fragment(R.layout.fragment_sign_up_agreement) {
 
     /** A Google sign-up's new account, signed in and without its Pix ID yet. */
     private fun needsPixId(state: AuthState) = state is AuthState.SignedIn && state.account.pixId == null
+
+    private fun goBack() {
+        val navController = findNavController()
+        if (navController.currentDestination?.id == R.id.signUpAgreementFragment) navController.popBackStack()
+    }
 
     private fun openPixIdSetup() {
         val navController = findNavController()

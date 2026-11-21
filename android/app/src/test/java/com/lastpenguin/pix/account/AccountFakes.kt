@@ -280,6 +280,11 @@ class FakeAuthRepository(state: AuthState = AuthState.SignedOut) : AuthRepositor
         _state.value = AuthState.SignedIn(account)
     }
 
+    /** The kept sign-in's state, as reading it at a start sets it: [AuthState.Loading] first, then what it found. */
+    fun load(state: AuthState) {
+        _state.value = state
+    }
+
     fun expire() {
         _state.value = AuthState.SignedOut
         _expired.tryEmit(Unit)

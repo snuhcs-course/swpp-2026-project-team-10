@@ -17,6 +17,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.account.AccountError
 import com.lastpenguin.pix.account.AccountException
+import com.lastpenguin.pix.account.AuthState
 import com.lastpenguin.pix.account.GoogleSignIn
 import com.lastpenguin.pix.databinding.FragmentSignUpAgreementBinding
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
@@ -43,7 +44,8 @@ import org.robolectric.annotation.GraphicsMode
  * setup in the place of Sign in and this screen; a refused sign-up shows the reason and stays; Back goes to Sign in and
  * forgets the Google account; a new process with no waiting Google account goes straight back; while the call runs,
  * Back and the policy row wait; a sign-up that ends while the page's view is gone, as in the background, still opens
- * Pix ID setup when it comes back); the privacy policy's row, from either.
+ * Pix ID setup when it comes back; a new process, whose kept sign-in is still being read, waits for it, then opens
+ * Pix ID setup for an account without one or goes back for none); the privacy policy's row, from either.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -292,6 +294,33 @@ class SignUpAgreementFragmentTest {
 
         assertEquals("googleSignUp:google-token", modules.auth.calls.last())
         assertEquals(R.id.pixIdSetupFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun google_inANewProcess_waitsForTheKeptSignIn_thenFinishesTheAccount() {
+        // The sign-up finished and Pix was killed before Pix ID setup opened: nothing waits, and the sign-in is read.
+        val modules = TestAppContainer()
+        modules.auth.load(AuthState.Loading)
+        launch(google = true, modules = modules, waiting = false)
+        assertEquals(R.id.signUpAgreementFragment, nav.currentDestination?.id)
+
+        modules.auth.signInAs(modules.auth.account.copy(pixId = null, hasPassword = false, hasGoogle = true))
+        idle()
+
+        assertEquals(R.id.pixIdSetupFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun google_inANewProcess_withNoAccount_goesBackOnceTheKeptSignInIsRead() {
+        val modules = TestAppContainer()
+        modules.auth.load(AuthState.Loading)
+        launch(google = true, modules = modules, waiting = false)
+        assertEquals(R.id.signUpAgreementFragment, nav.currentDestination?.id)
+
+        modules.auth.load(AuthState.SignedOut)
+        idle()
+
+        assertEquals(R.id.signInFragment, nav.currentDestination?.id)
     }
 
     @Test

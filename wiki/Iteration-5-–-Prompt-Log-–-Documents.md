@@ -1,6 +1,6 @@
 Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-Iteration-5]]
 
-## Iteration 5 kickoff: the issues and the documents ([#265])
+## Iteration 5 kickoff: the issues and the documents ([#265], [#286])
 
 - [Sungmin, 11-21] "Now I'm the PM for Iteration 5 and I want to sort out the issues. […] This is what we talked about at today's kickoff meeting. Can you organize it in detail? If something is unclear or you don't understand it, you can ask me. Iteration 5 is 11/22 to 12/4, so with that in mind, first think concretely about how you will draft the issues."
 - [Sungmin, 11-21] "1. Only the wording changes. 2. It means the subject can press the AI generation buttons (automatic, upper body, full body, landmark, and so on) while sharing; no situation is restricted. 3. Right. But whoever takes it should first read the code and find out in what situation it happens. 4. The cutout has to show on the subject's phone too. 5. I'm doing all of those. But what does design patterns mean? 6. Do we really have to do this? Can't we skip it?"
@@ -11,3 +11,4 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 - [Sungmin, 11-21] "OK, commit and open the PR."
 
 [#265]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/265
+[#286]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/286

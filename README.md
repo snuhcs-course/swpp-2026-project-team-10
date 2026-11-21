@@ -95,8 +95,8 @@ Known limitations of the Iteration 4 build ([Testing Documentation 3.2](https://
 ### Next: Iteration 5
 
 - Cycle 2 of the user acceptance test (UAT) on 11/23, with the changes from cycle 1 ([Testing Documentation 4.4](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Testing-Documentation#44-uat-results-in-class-iteration-4))
-- In-class testing on 11/30 and a test with real users on 12/2
-- The remote-control switch, remote focus, and search in the library
+- The alpha test in class on 11/30, and the beta test with real users on 12/7–12/11
+- Remote focus, and situations and memos in the library
 
 ## How it works
 

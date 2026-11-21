@@ -5,6 +5,7 @@
 - [[Testing Documentation|Testing-Documentation]]
 - [[Team Meetings|Team-Meetings]]
 - [[Daily Standup Meeting Log|Daily-Standup-Meeting-Log]]
+- [[Privacy Policy|Privacy-Policy]]
 - [[AI Collaboration Report – Iteration 1|AI-Collaboration-Report-–-Iteration-1]]
   <ul>
   <li><a href="/snuhcs-course/swpp-2026-project-team-10/wiki/Iteration-1-–-CLAUDE-md-History">CLAUDE.md History</a></li>

@@ -22,7 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import InstrumentedAttribute
 
-from pix_server.accounts.auth import Database, SignedIn, millis, now_of
+from pix_server.accounts.auth import Database, SignedIn, held_users, millis, now_of
 from pix_server.accounts.friends import Member, are_friends
 from pix_server.accounts.schemas import UserOut
 from pix_server.db.models import Invitation, User, new_id
@@ -132,7 +132,11 @@ async def invite(
     """Invites a friend (FR-6.1) and pushes to the friend's phones after answering. A friend in a session, a waiting
     room included, is BUSY (FR-6.9); anyone but a friend is NOT_FRIENDS, whether or not the user exists (NFR-15)."""
     me = caller.user
-    friend = await db.get(User, body.friendId)
+    # Both rows first (`held_users`), so a deletion of either account runs wholly before or after this invitation.
+    held = await held_users(db, me.id, body.friendId)
+    if me.id not in held:
+        raise ApiError(401, "UNAUTHENTICATED", "Sign in to use this")
+    friend = await db.get(User, body.friendId) if body.friendId in held else None
     if friend is None or not await are_friends(db, me.id, friend.id):
         raise ApiError(403, "NOT_FRIENDS", "You can invite only your friends")
     store: SessionStore = request.app.state.store

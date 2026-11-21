@@ -332,6 +332,8 @@
     <string name="sign_up_consent_transfer_recipients">Amazon Web Services(호주), Google(미국)</string>
     <string name="sign_up_consent_transfer_items">계정 정보, 친구와 초대 기록, 푸시 알림 토큰(AWS) · 푸시 알림 토큰과 알림 내용(Google)</string>
     <string name="sign_up_consent_transfer_purpose">Pix 서버 운영(AWS), 알림 전송(Google)</string>
+    <string name="sign_up_consent_transfer_items_google">계정 정보, 친구와 초대 기록, 푸시 알림 토큰(AWS) · Google 계정 식별자, 푸시 알림 토큰과 알림 내용(Google)</string>
+    <string name="sign_up_consent_transfer_purpose_google">Pix 서버 운영(AWS), 로그인과 알림 전송(Google)</string>
     <string name="sign_up_consent_transfer_when">가입할 때와 앱을 쓰는 동안, 암호화된 연결로 전송</string>
     <string name="sign_up_consent_transfer_period">계정을 삭제할 때까지(AWS), Google의 보관 정책에 따름(Google)</string>
     <string name="sign_up_consent_policy">개인정보 처리방침 전체 보기</string>

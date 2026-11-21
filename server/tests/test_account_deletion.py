@@ -10,12 +10,16 @@ Partitions:
   a friend's list, requests, and invitations; the friendships of other accounts, untouched
 - a friend request that read the account just before it was deleted and takes the pair lock after: the other user
   gone (not found), the caller gone (signed out), never a row naming a missing user
+- any other write for an account deleted meanwhile: the rows it holds leave the deleted one out; a sign-in whose
+  password check ends after the deletion answers as for a wrong password and saves no session
 """
 
 import pytest
 from sqlalchemy import or_, select
 
+from pix_server.accounts.auth import TokenClaims, held_users
 from pix_server.accounts.friends import lock_pair
+from pix_server.accounts.router import delete_me
 from pix_server.db.models import AuthSession, Device, FriendRequest, Friendship, Invitation, SpentRefreshToken, User
 from pix_server.errors import ApiError
 
@@ -220,3 +224,34 @@ def test_the_pair_lock_finds_an_account_deleted_meanwhile(client, sign_up):
 
     assert client.portal.call(lock, me["id"], other["id"]) is False
     assert client.portal.call(lock, other["id"], me["id"]) == (401, "UNAUTHENTICATED")
+
+
+def test_held_users_leave_out_an_account_deleted_meanwhile(client, sign_up):
+    _, me = sign_up("test1", "Test Account 1")
+    other_headers, other = sign_up("test2", "Test Account 2")
+    assert delete_account(client, other_headers).status_code == 204
+
+    async def held(*user_ids):
+        async with client.app.state.database() as db:
+            return await held_users(db, *user_ids)
+
+    assert client.portal.call(held, me["id"], other["id"]) == {me["id"]}
+
+
+def test_a_sign_in_whose_password_check_ends_after_the_deletion_saves_no_session(client, sign_up, monkeypatch):
+    """The check waits for a hash slot outside any transaction; another phone deletes the account meanwhile."""
+    _, me = sign_up("test1", "Test Account 1")
+    passwords = client.app.state.passwords
+    check = passwords.verify
+
+    async def check_while_deleted(stored, password):
+        right = await check(stored, password)
+        async with client.app.state.database() as db:
+            await delete_me(TokenClaims(user_id=me["id"], session_id="ses_other_phone"), db)
+        return right
+
+    monkeypatch.setattr(passwords, "verify", check_while_deleted)
+    response = client.post("/api/v1/auth/login", json={"pixId": "test1", "password": PASSWORD})
+
+    assert_error(response, 401, "INVALID_CREDENTIALS")
+    assert rows_of(client, me["id"])["sessions"] == []

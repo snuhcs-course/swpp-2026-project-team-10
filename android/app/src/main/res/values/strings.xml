@@ -352,6 +352,8 @@
     <string name="sign_up_consent_transfer_recipients">Amazon Web Services (Australia), Google (United States)</string>
     <string name="sign_up_consent_transfer_items">Account information, friends and invitations, push tokens (AWS); push tokens and alerts\' contents (Google)</string>
     <string name="sign_up_consent_transfer_purpose">Running Pix\'s server (AWS), delivering alerts (Google)</string>
+    <string name="sign_up_consent_transfer_items_google">Account information, friends and invitations, push tokens (AWS); your Google account\'s ID, push tokens, and alerts\' contents (Google)</string>
+    <string name="sign_up_consent_transfer_purpose_google">Running Pix\'s server (AWS), signing in and delivering alerts (Google)</string>
     <string name="sign_up_consent_transfer_when">When you sign up and while you use Pix, over an encrypted connection</string>
     <string name="sign_up_consent_transfer_period">Until you delete the account (AWS); as Google\'s own policy sets (Google)</string>
     <string name="sign_up_consent_policy">Read the full privacy policy</string>

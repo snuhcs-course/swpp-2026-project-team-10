@@ -95,12 +95,13 @@ class SignUpAgreementFragment : Fragment(R.layout.fragment_sign_up_agreement) {
 }
 
 /**
- * The agreement page's views: the header for Sign up or Sign up with Google ([google]), and the three
- * required consents (14 or older, collection and use, transfer abroad), each with its own box. *Agree to all* checks or
- * clears the three, and follows them. The last two show their details, a label in its own column beside each value,
- * under their chevrons; what is collected names the Google account in place of the password. *Agree and continue* waits
- * for all three and for a call already running. The boxes keep their state through a recreated screen. Apart from the
- * fragment, so it can be tested on the real layout.
+ * The agreement page's views: the header for Sign up or Sign up with Google ([google]), and the three required
+ * consents (14 or older, collection and use, transfer abroad), each with its own box. *Agree to all* checks or clears
+ * the three, and follows them. The last two show their details, a label in its own column beside each value, under
+ * their chevrons; on Sign up with Google they name the Google account in place of the password, and Google's part in
+ * the sign-in among what goes abroad, as the privacy policy does. *Agree and continue* waits for all three and for a
+ * call already running. The boxes keep their state through a recreated screen. Apart from the fragment, so it can be
+ * tested on the real layout.
  */
 class SignUpAgreement(
     private val binding: FragmentSignUpAgreementBinding,
@@ -128,11 +129,16 @@ class SignUpAgreement(
             R.string.sign_up_consent_label_purpose to R.string.sign_up_consent_purpose,
             R.string.sign_up_consent_label_period to R.string.sign_up_consent_period,
         )
+        // Google takes part in a Google sign-in too, as the privacy policy says.
+        val sent =
+            if (google) R.string.sign_up_consent_transfer_items_google else R.string.sign_up_consent_transfer_items
+        val sentFor =
+            if (google) R.string.sign_up_consent_transfer_purpose_google else R.string.sign_up_consent_transfer_purpose
         details(
             binding.transferDetails,
             R.string.sign_up_consent_label_recipients to R.string.sign_up_consent_transfer_recipients,
-            R.string.sign_up_consent_label_items to R.string.sign_up_consent_transfer_items,
-            R.string.sign_up_consent_label_purpose to R.string.sign_up_consent_transfer_purpose,
+            R.string.sign_up_consent_label_items to sent,
+            R.string.sign_up_consent_label_purpose to sentFor,
             R.string.sign_up_consent_label_when to R.string.sign_up_consent_transfer_when,
             R.string.sign_up_consent_label_period to R.string.sign_up_consent_transfer_period,
         )

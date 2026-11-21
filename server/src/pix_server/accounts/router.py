@@ -21,6 +21,7 @@ from pix_server.accounts.auth import (
     SignedIn,
     Tokens,
     hash_token,
+    held_users,
     new_refresh_token,
     now_of,
 )
@@ -102,9 +103,13 @@ async def locked_user(db: Database, caller: Caller) -> User:
     row holds: the Pix ID and the password are checked against each other, and a Google account is added only if
     none is. On PostgreSQL the second of two at once waits and sees the first's result; SQLite already runs
     transactions one at a time."""
-    return await db.scalar(
+    user = await db.scalar(
         select(User).where(User.id == caller.user.id).with_for_update().execution_options(populate_existing=True)
     )
+    if user is None:
+        # Deleted (`DELETE /me`) after the request read it.
+        raise ApiError(401, "UNAUTHENTICATED", "Sign in to use this")
+    return user
 
 
 def check_pix_id(pix_id: str) -> None:
@@ -124,9 +129,12 @@ def issue(request: Request, user_id: str, session_id: str, refresh_token: str) -
     )
 
 
-async def signed_in(request: Request, db: Database, user: User) -> AuthOut:
+async def signed_in(request: Request, db: Database, user: User, gone: ApiError | None = None) -> AuthOut:
     """Starts a session for this phone, saves it with whatever the sign-in changed, and answers with its tokens.
-    The user's expired sessions are removed on the way."""
+    The user's expired sessions are removed on the way. The user's row is held first (`held_users`): an account
+    deleted while the sign-in waited, for the password check or Google's, answers [gone], and no session is saved."""
+    if user.id not in await held_users(db, user.id):
+        raise gone or ApiError(401, "UNAUTHENTICATED", "Sign in to use this")
     now = now_of(request.app)
     await db.execute(delete(AuthSession).where(AuthSession.user_id == user.id, AuthSession.expires_at <= now))
     refresh_token = new_refresh_token()
@@ -141,6 +149,14 @@ async def signed_in(request: Request, db: Database, user: User) -> AuthOut:
     await db.commit()
     tokens = issue(request, user.id, session.id, refresh_token)
     return AuthOut(**tokens.model_dump(), user=AccountOut.mine(user))
+
+
+def invalid_credentials() -> ApiError:
+    return ApiError(401, "INVALID_CREDENTIALS", "The Pix ID or the password is wrong")
+
+
+def not_registered() -> ApiError:
+    return ApiError(404, "NOT_REGISTERED", "No Pix account uses this Google account")
 
 
 def invalid_refresh_token() -> ApiError:
@@ -205,8 +221,8 @@ async def log_in(body: LogInRequest, request: Request, db: Database) -> AuthOut:
     # One answer for an unknown Pix ID and a wrong password. Whether a Pix ID exists is not secret (the lookup and
     # `check-pix-id` tell it), but a failed log-in does not say which of the two was wrong.
     if not await passwords.verify(stored, body.password):
-        raise ApiError(401, "INVALID_CREDENTIALS", "The Pix ID or the password is wrong")
-    return await signed_in(request, db, user)
+        raise invalid_credentials()
+    return await signed_in(request, db, user, gone=invalid_credentials())
 
 
 @router.post("/auth/google")
@@ -216,8 +232,8 @@ async def sign_in_with_google(body: GoogleRequest, request: Request, db: Databas
     account = await google_account(request, body.idToken)
     user = await db.scalar(select(User).where(User.google_sub == account.subject))
     if user is None:
-        raise ApiError(404, "NOT_REGISTERED", "No Pix account uses this Google account")
-    return await signed_in(request, db, user)
+        raise not_registered()
+    return await signed_in(request, db, user, gone=not_registered())
 
 
 @router.post("/auth/google/signup", status_code=201)
@@ -401,7 +417,8 @@ async def register_device(body: DeviceRequest, request: Request, caller: SignedI
         "updated_at": now_of(request.app),
     }
     for attempt in range(2):
-        if await db.get(AuthSession, session_id) is None:
+        # The user's row before any device row, the order every writer and a deletion share (`held_users`).
+        if caller.user.id not in await held_users(db, caller.user.id) or await db.get(AuthSession, session_id) is None:
             # Signed out, with an access token that has not expired yet.
             raise ApiError(401, "UNAUTHENTICATED", "Sign in to use this")
         # The token leaves the session it was registered under, if another.

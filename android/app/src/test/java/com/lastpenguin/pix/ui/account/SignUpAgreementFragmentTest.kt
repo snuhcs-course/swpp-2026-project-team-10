@@ -35,7 +35,8 @@ import org.robolectric.annotation.GraphicsMode
  * The sign-up agreement on the real Fragment (R&S 6.4; FR-5.13, FR-5.19), opened from Sign in as the app opens it, over
  * Share my camera and Sign in. Partitions: the consents (none, some, all three given by hand, all through Agree to all,
  * one taken back; Agree and continue waits for all three, and Agree to all follows them); the details (hidden at first,
- * shown and hidden by their chevron, the password or the Google account among what is collected); a recreated screen
+ * shown and hidden by their chevron, the password or the Google account among what is collected, Google's sign-in
+ * among what goes abroad only on Sign up with Google); a recreated screen
  * (the boxes kept); Sign up's first page (Agree and continue opens the form over it and calls nothing; an error from the
  * form does not show here); Sign up with Google (it makes the account from the waiting Google account and opens Pix ID
  * setup in the place of Sign in and this screen; a refused sign-up shows the reason and stays; Back goes to Sign in and
@@ -142,6 +143,7 @@ class SignUpAgreementFragmentTest {
         )
         onScreen { it.transferToggle.performClick() }
         assertEquals(5, onScreen { details(it.transferDetails).size })
+        assertEquals(string(R.string.sign_up_consent_transfer_items), onScreen { details(it.transferDetails)[1] })
 
         onScreen { it.collectionToggle.performClick() }
         assertFalse(onScreen { it.collectionDetails.isVisible })
@@ -196,7 +198,14 @@ class SignUpAgreementFragmentTest {
         val modules = launch(google = true)
         assertEquals(string(R.string.google_sign_up_title), onScreen { it.titleText.text.toString() })
         onScreen { it.collectionToggle.performClick() }
+        onScreen { it.transferToggle.performClick() }
         assertEquals(string(R.string.sign_up_consent_items_google), onScreen { details(it.collectionDetails).first() })
+        // Google signs the person in too, as the privacy policy says.
+        assertEquals(
+            listOf(R.string.sign_up_consent_transfer_items_google, R.string.sign_up_consent_transfer_purpose_google)
+                .map { string(it) },
+            onScreen { details(it.transferDetails).subList(1, 3) },
+        )
         assertEquals(listOf("google:google-token"), modules.auth.calls)
 
         onScreen { it.allCheck.performClick() }

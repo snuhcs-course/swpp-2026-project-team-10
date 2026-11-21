@@ -17,6 +17,7 @@ from typing import Annotated
 
 import jwt
 from fastapi import Depends, FastAPI, Request, WebSocket
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pix_server.db.models import User
@@ -99,6 +100,18 @@ async def database(request: Request) -> AsyncIterator[AsyncSession]:
 
 
 Database = Annotated[AsyncSession, Depends(database)]
+
+
+async def held_users(db: AsyncSession, *user_ids: str) -> set[str]:
+    """Holds these users' rows, shared, until the transaction ends, and returns the ids still there. Every write that
+    saves a row naming a user takes it first: a deletion (`DELETE /me`), which takes the row for update, then runs
+    wholly before the write, which finds the user gone, or wholly after it, and deletes what it saved. Taken before
+    any other row and in the ids' order, so writers and a deletion never wait on each other in a circle. SQLite runs
+    one transaction at a time anyway (`db.engine.open_database`)."""
+    held = await db.execute(
+        select(User.id).where(User.id.in_(sorted(set(user_ids)))).order_by(User.id).with_for_update(read=True)
+    )
+    return set(held.scalars())
 
 
 async def token_claims(request: Request) -> TokenClaims:

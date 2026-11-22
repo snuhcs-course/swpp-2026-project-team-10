@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-22, reviewed by Jaewan Park
 """The privacy policy as public web pages (R&S FR-10.7, Design 2.5.3): `/privacy` in Korean, the policy's own language,
 and `/privacy/en` in English. The app shows the same pages in Settings and on its sign-up agreement, and the store links
 to `/privacy`, so the policy has one text: `policy.ko.md` and `policy.en.md` here, which the wiki's *Privacy Policy*
@@ -58,8 +58,8 @@ a { color: inherit; text-underline-offset: 3px; }
 .lang { font-size: 13px; white-space: nowrap; }
 .lang a { color: var(--muted); text-decoration: none; }
 .lang a:hover { text-decoration: underline; }
-.lang span { font-weight: 600; }
-.lang > * + *::before { content: "|"; margin: 0 10px; color: var(--line); font-weight: 400; }
+.lang [aria-current] { font-weight: 600; }
+.lang .sep { margin: 0 10px; color: var(--line); }
 main { padding-top: 48px; padding-bottom: 64px; }
 h1 { margin: 0 0 10px; font-size: 25px; line-height: 1.3; letter-spacing: -0.01em; }
 .meta { display: flex; flex-wrap: wrap; gap: 2px 20px; margin: 0 0 28px; color: var(--muted); font-size: 13px; }
@@ -229,14 +229,15 @@ def policy_text(language: str) -> str:
 
 
 def language_switch(language: str) -> str:
-    """Both languages in the same order on each page, the page's own one marked as the current."""
+    """Both languages in the same order on each page, the page's own one marked as the current. The bar between them
+    is an element of its own, outside either link, so a link's hover underline stops at its name."""
     links = []
     for code, other in LANGUAGES.items():
         if code == language:
             links.append(f'<span aria-current="page">{other.name}</span>')
         else:
             links.append(f'<a href="{other.href}" hreflang="{code}" lang="{code}">{other.name}</a>')
-    return "".join(links)
+    return '<span class="sep" aria-hidden="true">|</span>'.join(links)
 
 
 def render(language: str) -> str:

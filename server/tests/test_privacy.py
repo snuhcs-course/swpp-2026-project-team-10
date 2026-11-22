@@ -1,9 +1,10 @@
-# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-22, reviewed by Jaewan Park
 """The privacy policy's public pages (R&S FR-10.7, Design 2.5.3).
 
 Partitions:
 - language: none (Korean, the one that applies); `ko`; `en`; another one (404)
-- what a page holds: the policy's title as its heading, its tables, the language switch with its own language marked;
+- what a page holds: the policy's title as its heading, its tables, the language switch with its own language marked
+  and the bar between the two outside either link;
   the contents linking to every numbered section; every table in a box of its own, which scrolls sideways on a
   phone; the logo inline; nothing
   loaded from elsewhere and no script; no sign-in
@@ -39,7 +40,11 @@ def test_privacy_without_a_language_is_the_korean_policy(client):
     assert "<h1>개인정보 처리방침</h1>" in text
     assert "<title>개인정보 처리방침 | Pix</title>" in text
     assert text.count("<table>") == 3
-    assert '<span aria-current="page">한국어</span><a href="/privacy/en" hreflang="en" lang="en">English</a>' in text
+    # The bar between the two stands outside the link, so a link's hover underline stops at its name.
+    assert (
+        '<span aria-current="page">한국어</span><span class="sep" aria-hidden="true">|</span><a href="/privacy/en" hreflang="en" lang="en">English</a>'
+        in text
+    )
     assert page(client, "/privacy/ko") == text
 
 
@@ -48,7 +53,10 @@ def test_privacy_in_english(client):
     assert '<html lang="en">' in text
     assert "<h1>Privacy Policy</h1>" in text
     assert text.count("<table>") == 3
-    assert '<a href="/privacy" hreflang="ko" lang="ko">한국어</a><span aria-current="page">English</span>' in text
+    assert (
+        '<a href="/privacy" hreflang="ko" lang="ko">한국어</a><span class="sep" aria-hidden="true">|</span><span aria-current="page">English</span>'
+        in text
+    )
 
 
 @pytest.mark.parametrize("path", ["/privacy", "/privacy/en"])

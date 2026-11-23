@@ -116,6 +116,7 @@
 | 3.36 | 2026-11-21 | Server logs and alerts: the AWS servers' logs in CloudWatch, with an alarm on 5xx answers (1.2, AD-20, 2.8). |
 | 4.0 | 2026-11-21 | Iteration 5 plan from the kickoff of 11/21: the task table with owners and due dates (2.9); the open decisions (*Still open*: the cutout, the options on *Generate poses*, pose generation started by the subject, the self-timer, the live view after a reconnection, a deleted account's Pix ID, remote focus next to the guide's gestures). Remote focus is planned, and the remote-control switch is dropped (2.5.1, 2.6.5, 2.9). |
 | 4.1 | 2026-11-21 | What an account keeps and the agreement before it is made, deleting an account, the privacy policy in Pix and at `/privacy`, the screens above the keyboard, and the retention pass (Iter5-P2, [#266]) (*Still open*, 2.1, 2.5.3, 2.6.8, 2.7, 2.8). |
+| 4.2 | 2026-11-23 | The subject's guide after a session: gone from Subject view at the session's end, held for the next `hello`, and what the photographer counts on after a `guide.clear` or a drop (Iter5-P4, [#268]) (2.1, 2.2, 2.5.1, 2.6.7). |
 
 </details>
 
@@ -411,7 +412,7 @@ android/app/src/main/java/com/lastpenguin/pix/
 ├─ telemetry/   Telemetry (the facade), TelemetryEvent, GatedTelemetry (ReportedError), FirebaseTelemetry
 ├─ session/     SessionModels*, SessionManager*, RtcSessionManager, SignalingClient, OkHttpSignalingClient,
 │               PeerConnectionClient, WebRtcPeerConnectionClient, WebRtcRuntime, CameraFrameSource, RemoteVideo,
-│               GuideImageCodec, GuideSyncer, GuideReference (GuideReferenceCodec, MirrorReference),
+│               GuideImageCodec, GuideSyncer, HeldGuide, GuideReference (GuideReferenceCodec, MirrorReference),
 │               PoseSyncer (PoseShare, MirrorPoseSet), PoseCandidates (PoseCandidateCodec),
 │               ConfirmSyncer (ConfirmShare, MirrorConfirm), DescriptionSyncer (DescriptionShare, MirrorDescription),
 │               PhotoSyncer (PhotoShare, PhotoReader), TipSyncer, RemoteControlHandler, MobileDataNotice
@@ -863,7 +864,7 @@ classDiagram
   class GuideSyncer {
     +adopted SharedFlow~String~
     +offerFailed Flow~String~
-    +startAsSender(scope)
+    +startAsSender(scope, resumed)
     +startAsReceiver(scope)
     +attribute(role)
     +offer(guide)
@@ -871,6 +872,12 @@ classDiagram
   class MirrorReference {
     +reference StateFlow~GuideReference~
     +set(reference)
+  }
+  class HeldGuide {
+    +guide ReferenceGuide
+    +reference GuideReference
+    +guideId String
+    +referenceId String
   }
   class PoseShare {
     <<interface>>
@@ -1009,6 +1016,7 @@ classDiagram
   GuideSyncer --> SessionManager
   GuideSyncer --> GuideRepository
   GuideSyncer --> MirrorReference : subject writes the reference photo
+  GuideSyncer --> HeldGuide : subject keeps the image for hello
   RemoteControlHandler --> SessionManager
   RemoteControlHandler --> CameraController
   RemoteControlHandler --> GuideRepository
@@ -1636,8 +1644,8 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 
 | Transfer | Ids | Format and size | The receiver refuses | The subject keeps it |
 |----|----|----|----|----|
-| `guide.image.*` | `guideId` | `mask-png`: the smoothed mask as an 8-bit gray PNG, ≤ 720 px tall, a few KB | A PNG over 1280 px wide or 720 px tall, read from its header before inflating | As the guide; S→P, the photographer adopts it |
-| `guide.reference.*` | `guideId` | `jpeg`, quality 85, long side ≤ 512 px | A photo over 512 px | In memory (`MirrorReference`) until another guide or `guide.clear`; *Save guide* stores it with the guide; S→P, the photographer adopts it with its guide |
+| `guide.image.*` | `guideId` | `mask-png`: the smoothed mask as an 8-bit gray PNG, ≤ 720 px tall, a few KB | A PNG over 1280 px wide or 720 px tall, read from its header before inflating | As the guide, and past the session in `HeldGuide`; S→P, the photographer adopts it |
+| `guide.reference.*` | `guideId` | `jpeg`, quality 85, long side ≤ 512 px | A photo over 512 px | In memory until another guide or `guide.clear`: in `MirrorReference` while its session runs, and past it in `HeldGuide`; *Save guide* stores it with the guide; S→P, the photographer adopts it with its guide |
 | `pose.candidate.*` | `setId`, `poseId` | `jpeg`, quality 85, else 70 or 55 to fit 1 MiB; long side ≤ 1024 px | Over 1024 px or 1 MiB, at `begin` | In memory, with its set; the ♥ on *Pick a pose* can save it (FR-4.14) |
 | `pose.scene.*` | `descriptionId` | As a candidate | As a candidate | In memory, with its description; never saved |
 | `guide.confirm.image.*` | `confirmId`, `guideId` | `mask-png`, as `guide.image.*` | Over 1280 px wide or 720 px tall, at `begin`; an outline its copy is not `READY` with | In memory, on *Your reference* only; never saved |
@@ -1654,7 +1662,7 @@ The subject never draws a reference photo, candidate, scene photo, or outline as
          "haveGuideId": null, "haveReferenceId": null } }
 ```
 
-Both phones send it once both channels are open. `name` is the device name from the system settings, or the model, at most 40 characters; it is not the Pix display name. Only the subject sets `haveGuideId` and `haveReferenceId`: the guide image and the reference photo it already holds, which the photographer then skips.
+Both phones send it once both channels are open. `name` is the device name from the system settings, or the model, at most 40 characters; it is not the Pix display name. Only the subject sets `haveGuideId` and `haveReferenceId`: the guide image and the reference photo it already holds, which the photographer then skips. The subject holds them past a session, in memory (`HeldGuide`), until another guide's image replaces them or a `guide.clear` drops them ([#268]).
 
 </details>
 
@@ -1685,7 +1693,8 @@ Sent when the session connects and at each change. For example, `hasFlash` is fa
 
 Only the smoothed mask travels, never the reference's pixels (AD-6, AD-15). `MaskPng` writes and reads it losslessly on both phones. `aspect` is the mask's width / height. `anchor` is the mask's box in its reference photo, in fractions, right and bottom exclusive (`ReferenceGuide.anchor`); `source` is `GALLERY` or `GENERATED`. Each goes only when the guide has it.
 
-- **P→S.** Skipped when `hello` reported the same `haveGuideId`. The `guide.state` after every image places the guide, also for a subject that joins late (2.6.2). The subject keeps `anchor` and `source` for *Save guide*.
+- **P→S.** Skipped when `hello` reported the same `haveGuideId` and no `guide.clear` followed. After a drop in the same session the photographer counts the images it has sent instead, because `hello` is not sent again (2.6.7, [#268]). The `guide.state` after every image places the guide, also for a subject that joins late (2.6.2). The subject keeps `anchor` and `source` for *Save guide*.
+- **The session's end.** The subject empties what Subject view draws, the mirror and `MirrorReference`, and holds the image and its reference photo for the next `hello`. The next session draws nothing until a `guide.state` names the held guide, which then needs no image ([#268]).
 - **S→P.** The photographer adopts the guide, under the same `guideId`, in place of its own, starting at `anchor` (FR-3.1). It answers with `guide.state` `by: SUBJECT` and no image (2.6.5, *Guide from the subject*). An anchor that is not finite, lies outside 0..1, or has no area starts the guide centered; a missing `source` means `GALLERY`. The guide's reference photo comes just before its image (`guide.reference.*`), and the photographer adopts the guide with it, for its thumbnail (FR-3.9). A refused image leaves the photographer's guide as it was. Without a `guide.state` that names the guide within 5 s, the subject shows the photographer's guide again.
 
 </details>
@@ -1721,7 +1730,7 @@ The receiver traces the outline from the mask with the sender's `OutlineExtracto
          "width": 384, "height": 512, "bytes": 41210, "chunks": 5 } }
 ```
 
-- **P→S.** Sent once per guide, after the guide's image and `guide.state`, so the subject draws the guide first. Skipped for a guide without a reference photo, and when `hello` reported the same `haveReferenceId`. The subject shows it only with its guide (FR-3.9, AD-6).
+- **P→S.** Sent once per guide, after the guide's image and `guide.state`, so the subject draws the guide first. Skipped for a guide without a reference photo, and when the subject holds it, by the image's rule with `haveReferenceId`. The subject shows it only with its guide (FR-3.9, AD-6).
 - **S→P.** Sent just before the image of a guide made on the subject's phone, since a guide does not change once set. The photographer keeps it only for the image that follows with the same `guideId`, and never sends it back. A guide without a reference photo sends none, and its guide has no thumbnail.
 
 </details>
@@ -1746,6 +1755,8 @@ The receiver traces the outline from the mask with the sender's `OutlineExtracto
 ```json
 { "v": 3, "t": "guide.clear", "seq": 413, "ts": 1759212351002, "b": {} }
 ```
+
+The subject drops the image and the reference photo it holds, so the photographer sends the next guide in full ([#268]).
 
 </details>
 
@@ -2907,7 +2918,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - The photographer sends an ICE-restart offer (`restartIce`) when its place is back and at every `peer.rejoined`, even on a working link. A restart waits for the last offer's answer, or 2 s. An answer with no offer pending is dropped.
   - Candidates wait for their description, and the photographer holds the subject's candidates until the new answer applies. Signals go only over a socket that holds the place.
   - The connection, both channels, the video track, and the reliable queue stay. `Reconnecting` ends when ICE connects with both channels open.
-  - The photographer then resends `camera.capabilities`, `camera.state`, the guide image unless `hello` named it, the final `guide.state`, and the open shared steps (2.5.1).
+  - The photographer then resends `camera.capabilities`, `camera.state`, the guide image unless the subject holds it (2.5.1, `guide.image.*`), the final `guide.state`, and the open shared steps (2.5.1).
   - A dropped socket reopens after 1 s, doubling to 30 s. While reconnecting it reopens every second, outside the doubling.
 - **Give up.** After 10 s the photographer says "&lt;name&gt; disconnected". It returns to `Waiting`, or ends an invitation's session. The subject shows *Connection lost*.
   - *Reconnect* (`SessionEntry.Rejoin`) sends `session.join` with `rejoin: false`, the token, and the first credentials. It works while the photographer holds the session, up to 60 s after its last socket. Without a token it joins the code again. In an invitation's session it says the session has ended.

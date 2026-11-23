@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-23, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -199,6 +199,9 @@ class SessionViewModel(
     private var role: Role? = null
     private var peerName: String? = null
     private var streaming = false
+
+    /** The link dropped and the session goes on: the next Connected resumes it, with the `hello` it began with. */
+    private var afterDrop = false
     private var connectedJob: Job? = null
     private var receiverJob: Job? = null
     private var photoJob: Job? = null
@@ -424,6 +427,9 @@ class SessionViewModel(
         // camera's state, the guide and its tip, Generate poses, the pose set, and the Reference confirm again, whatever
         // a drop lost (Design 2.6.7).
         val liveNow = connected?.role == Role.PHOTOGRAPHER
+        // Read for this Connected only: any other state between ends the session, and the next one has its own hello.
+        val resumed = afterDrop && connected != null
+        afterDrop = reconnecting
         if (liveNow && connectedJob == null) {
             connectedJob = viewModelScope.launch {
                 coroutineScope {
@@ -453,7 +459,7 @@ class SessionViewModel(
                             _notices.tryEmit(SessionNotice.RemoteGuide(name))
                         }
                     }
-                    guideSyncer.startAsSender(this)
+                    guideSyncer.startAsSender(this, resumed)
                     poseSyncer?.startAsSender(this)
                     confirmSyncer?.startAsSender(this)
                     descriptionSyncer?.startAsSender(this)

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-23, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -116,8 +116,8 @@ class GuideReference(val guideId: String, val photo: Bitmap)
 
 /**
  * The subject's copy of the photographer's reference photo (FR-3.9), in memory only beside the mirror's guide.
- * [GuideSyncer] writes it, and drops it when another guide arrives or the guide is cleared; Subject view shows it
- * while it belongs to the mirror's guide.
+ * [GuideSyncer] writes it, and drops it when another guide arrives, the guide is cleared, or the session ends;
+ * Subject view shows it while it belongs to the mirror's guide. [HeldGuide] keeps the photo past the session.
  */
 class MirrorReference {
     private val _reference = MutableStateFlow<GuideReference?>(null)

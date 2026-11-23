@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-23, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -64,6 +64,7 @@ import com.lastpenguin.pix.session.ContentPhotoReader
 import com.lastpenguin.pix.session.DataStoreMobileDataNotice
 import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.GuideSyncer
+import com.lastpenguin.pix.session.HeldGuide
 import com.lastpenguin.pix.session.JpegGuideReferenceCodec
 import com.lastpenguin.pix.session.JpegPoseCandidateCodec
 import com.lastpenguin.pix.session.MaskGuideImageCodec
@@ -193,6 +194,8 @@ class AppContainer(
                 InMemoryGuideRepository { cameraController.state.value.aspect.frameAspect }
             val mirrorGuideRepository: GuideRepository = InMemoryGuideRepository { NARROWEST_FRAME_ASPECT }
             val mirrorReference = MirrorReference()
+            // What the subject holds past a session, for `hello`: not the mirror, which is emptied at its end (#268).
+            val heldGuide = HeldGuide()
 
             /** Work that outlives every screen: loading the sign-in, presence, reading the saved guides. */
             val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -263,8 +266,8 @@ class AppContainer(
                 router = ChannelRouter(),
                 serverUrl = BuildConfig.SERVER_URL,
                 identity = SessionIdentity.of(appContext, BuildConfig.VERSION_NAME),
-                haveGuideId = { mirrorGuideRepository.guide.value?.id },
-                haveReferenceId = { mirrorReference.reference.value?.guideId },
+                haveGuideId = { heldGuide.guideId },
+                haveReferenceId = { heldGuide.referenceId },
             )
             val guideSyncer = GuideSyncer(
                 rtcSessionManager,
@@ -273,6 +276,7 @@ class AppContainer(
                 MaskGuideImageCodec(),
                 JpegGuideReferenceCodec(),
                 mirrorReference,
+                held = heldGuide,
             )
             val referenceGuideMaker: ReferenceGuideMaker =
                 MlKitReferenceGuideMaker(appContext, SubjectSegmenter(appContext), OutlineExtractor())

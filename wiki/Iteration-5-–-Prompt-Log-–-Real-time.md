@@ -1,0 +1,9 @@
+Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-Iteration-5]]
+
+## A guide from an earlier session on the subject's phone ([#268])
+
+- [Dongje, 11-23] "Issue #268: a guide from an earlier session stays on the subject's phone. Find the cause, and put the way to fix it into tasks for my review." (The agent read the sync code. The subject's copy of the guide was the one shared copy kept past a session, on purpose, so that `hello` names it and the image is not sent again; Subject view drew that same copy. Scratch tests on the real `GuideSyncer` showed three cases: the old guide while the next session connects, a saved guide that `hello` named and that is never sent after the first `guide.clear`, and a guide changed during a drop.)
+- [Dongje, 11-23] "The phone is connected too, so update the app from dev and test if you need to." (Reproduced with an emulator as the photographer and the S22 as the subject. A screen recording showed the earlier session's outline and reference photo under "Connecting…", and the photographer's log showed a saved guide's state sent without its image. The S22 carried another computer's build, which the agent did not replace. It put up two ways: hold the image apart from what is drawn, or drop everything at the session's end.)
+- [Dongje, 11-23] "Go with A, and put case 3 in this PR too. No more reproducing on real phones: only the fix and the tests in the code." (Built test-first: ten tests failed, then `HeldGuide`, the mirror emptied at the session's end, the reset at every clear, and the sender resumed after a drop. A cancelled encode had to take back what the sender counted as sent, which the plan had missed. Design 2.5.1 and 2.6.7, the Testing plan, and two steps on IT-14.)
+
+[#268]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/268

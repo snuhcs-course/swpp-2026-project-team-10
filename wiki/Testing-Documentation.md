@@ -122,6 +122,7 @@
 | 3.39 | 2026-11-21 | `server-image` also checks the CloudWatch override (1.2). |
 | 4.0 | 2026-11-21 | The Iteration 5 plan from the kickoff of 11/21: the owners of its tests (1.1); UAT cycle 2, the alpha test, and the beta test on 12/7–12/11, not 12/2 (1.2, 4.3, 5); two new AI module tests, the outline and the person check (3.1); the coverage measures, the property-testing library, and the mutation run not planned (2.1.2, 2.1.6, 2.1.7, 2.2.1); and the open items of 3.2, 4.1, 4.2, and 4.4 pointed at their issues or marked as not planned. |
 | 4.1 | 2026-11-21 | What an account keeps, deleting an account, the privacy policy, and fields above the keyboard (Iter5-P2, [#266]): their tests, `server-image`'s policy pages, and IT-40 (1.1, 1.2, 2.1.5, Appendix A). |
+| 4.2 | 2026-11-23 | A guide from an earlier session on the subject's phone (Iter5-P4, [#268]): its owner and tests, and two steps on IT-14 (1.1, 2.1.5, Appendix A). |
 
 </details>
 
@@ -208,7 +209,8 @@ One member writes and maintains each component's tests, following the module own
 | *Add a pose guide*'s tiles as buttons and the picker kept open (Iter4-A6) | Views, ViewModels | `ui/guide/` (`AddGuideSheetTest`), `ui/settings/` (`TutorialLayoutTest`, `TutorialFragmentTest`), `ui/generation/` (`GenerationViewModelTest`) | 박재완 |
 | Crash reports and usage data (Iter4-A8) | Managers, ViewModels, Views | `telemetry/` (`TelemetryEventTest`, `GatedTelemetryTest`); the tests of each class that sends an event; `settings/`, `ui/settings/` (`SettingsFragmentTest`) | 박재완 |
 | What an account keeps, deleting an account, and the privacy policy (Iter5-P2, [#266]) | Repositories, ViewModels, Views; server modules | `account/` (`RemoteAuthRepositoryTest`), `ui/account/` (`SignUpAgreementFragmentTest`, `SignInFragmentTest`, `SignInWayBackTest`, `AccountSheetTest`, `AccountViewModelTest`), `ui/settings/` (`PrivacyPolicyFragmentTest`, `SettingsFragmentTest`), `ui/` (`KoreanScreensTest`, `ScreenTransitionsTest`), `MainActivityTest` (the keyboard), `test_account_deletion.py`, `test_retention.py`, `test_privacy.py` | 박재완 |
-| The stale guide, remote focus, and the options on *Generate poses* (Iter5-P4, P9, P10) | Managers, ViewModels, Views, the session protocol | `session/`, `ui/session/`, `generation/`, `ui/generation/` | 박동제 |
+| A guide from an earlier session on the subject's phone (Iter5-P4, [#268]) | Managers, ViewModels | `session/` (`GuideSyncerTest`, `GuideFromSubjectTest`), `ui/session/` (`SessionViewModelTest`) | 박동제 |
+| Remote focus and the options on *Generate poses* (Iter5-P9, P10) | Managers, ViewModels, Views, the session protocol | `session/`, `ui/session/`, `generation/`, `ui/generation/` | 박동제 |
 | The live view after a reconnection, the UI fixes, and the self-timer (Iter5-P5, P7, P8) | Platform, ViewModels, Views | `session/`, `settings/`, `ui/camera/`, `ui/settings/` | 박재완 |
 | The library's situations and memos, the cutout, and pose generation started by the subject (Iter5-P6, P11, P12) | Managers, ViewModels, Views, the session protocol | `guide/`, `ui/guide/`, `session/`, `ui/session/`, `generation/` | 한준형 |
 | AI module tests: the outline and the person check (Iter5-P16, P17) | The phone's segmentation and person check; the server's person check | 3.1, 3.2 | 박재완 (the outline), 한준형 (the person check) |
@@ -440,7 +442,7 @@ The codec and message tests use the JSON examples of Design 2.5 verbatim, so a f
 | IT-11 | Sign-in and friends | Two phones, Server B; Wi-Fi and cellular | Each sees the other *Online* within 10 s. *Check* says available, then taken. A withdrawn request disappears within 10 s. Google sign-in opens the password account. | US-6, US-7, US-8, FR-5.12, FR-5.13, FR-5.15, FR-5.16 | [steps](#it-11-procedure) |
 | IT-12 | Room-code session across networks (Iter3-P13) | Two phones, AWS server with TURN; different Wi-Fi, Wi-Fi + cellular, cellular + cellular; one Wi-Fi with `-Ppix.relayOnly=true` | Live view within 10 s in every pair; `relay` where no direct path exists. Of 10 sessions per pair, ≥ 90 % connect (NFR-10); delay ≤ 0.8 s over relay or cellular (NFR-5). | FR-6.5, FR-6.13, NFR-5, NFR-10 | [steps](#it-12-procedure) |
 | IT-13 | Korean | S21, S22, and S23 Ultra in Korean | Every screen in Korean and Pretendard, nothing cut off, overlapping, or broken inside a word. English when Japanese is the phone's only language. Korean pose tips have no numbers or units. | FR-10.2 · Iteration 3 | [steps](#it-13-procedure) |
-| IT-14 | Reference thumbnail on Subject view (Iter3-A1). *Added in Iter4-A4 ([#237]): hiding it at the side, on two phones.* | Emulator photographer, S22 subject; Mac server; same Wi-Fi | The subject's thumbnail shows the reference within 3 s, follows hiding, replacing, and removing, and returns after a rejoin without a resend. *Added in Iter4-A4:* a drag or a flick hides it at the side on that phone alone, a tap on its strip shows it, and the system's Back swipe from the strip moves it. | FR-3.9, NFR-13 | [steps](#it-14-procedure) |
+| IT-14 | Reference thumbnail on Subject view (Iter3-A1). *Added in Iter4-A4 ([#237]): hiding it at the side, on two phones.* *Added in Iter5-P4 ([#268]): the guide of an earlier session.* | Emulator photographer, S22 subject; Mac server; same Wi-Fi | The subject's thumbnail shows the reference within 3 s, follows hiding, replacing, and removing, and returns after a rejoin without a resend. *Added in Iter4-A4:* a drag or a flick hides it at the side on that phone alone, a tap on its strip shows it, and the system's Back swipe from the strip moves it. *Added in Iter5-P4 ([#268]):* a session that follows shows no guide or thumbnail of the earlier one while it connects, and a saved guide opened after it shows on both phones. | FR-3.9, NFR-13 | [steps](#it-14-procedure) |
 | IT-15 | Guide from the subject's phone (Iter3-P9). *Added in Iter4-A1 ([#234]): its reference thumbnail on the photographer's Camera.* | Two phones, AWS server, same Wi-Fi | The subject's guide shows at the same place on both phones within 0.3 s, with no resend after a rejoin. Of two at once, the later at the photographer wins. *Added in Iter4-A1:* the photographer's Camera shows the guide's reference thumbnail within 3 s, and it goes with the guide. | US-16, FR-6.15, FR-6.16, NFR-7 | [steps](#it-15-procedure) |
 | IT-16 | Network switch during a session (Iter3-P14). *Added in Iter4-A5 ([#238]): the photographer's notice that the subject dropped or left.* | As IT-4; the subject on Wi-Fi with mobile data on | No crash. The session comes back over cellular within 10 s, or shows *Connection lost* and *Reconnect* works. *Added:* the photographer's notice stays until the subject is back, or 10 s. | NFR-11, FR-6.10, FR-6.11 · Iteration 3 | [steps](#it-16-procedure) |
 | IT-17 | *Generate poses*, *Pick a pose*, and *Reference confirm* on both phones; *Save guide* on Subject view (Iter3-P16) | Two phones, AWS server; same Wi-Fi, then the subject on cellular | On Wi-Fi the subject's *Generate poses* follows within 2 s, *Pick a pose* within 3 s, *Your reference* within 2 s; typed text within 1 s. Both phones end with one choice. *Added in Iter4-P16 ([#213]):* the photographer's tip opens on Subject view at a tap. | US-16, FR-6.15, FR-6.16, NFR-7; US-15, FR-4.10 | [steps](#it-17-procedure) |
@@ -1354,6 +1356,8 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 4. The subject leaves and joins again.
 5. *Added in Iter4-A4 ([#237]), on two phones, since an emulator shows no system back gesture:* on each phone, drag the small thumbnail past the nearer side and let go, then tap its strip. Flick it toward the side, then drag the strip back in. Enlarge it, hide it, and tap the strip. From the strip at the left side, swipe inward as for the system's Back.
 6. *Added in Iter4-A4:* with the thumbnail hidden on both phones, the photographer uses another guide. Then turn *Remove animations* on and repeat step 5.
+7. *Added in Iter5-P4 ([#268]):* the photographer opens a saved guide, ends the session, and removes the guide. It shows a new code, and the subject joins with it.
+8. *Added in Iter5-P4:* in that session the photographer opens the same saved guide.
 
 **Expected result**
 
@@ -1363,6 +1367,8 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 - After the join, the reference comes back without being sent again when the subject still has it.
 - *Added in Iter4-A4:* the thumbnail follows the finger, fades as it leaves, and leaves a see-through strip at that side. A tap or a drag back shows it in its corner. Hidden while enlarged, it leaves the small strip and comes back small. The swipe from the strip moves the thumbnail and does not go back.
 - *Added in Iter4-A4:* hiding on one phone changes nothing on the other. Another guide's thumbnail shows on both. Each change glides in about 0.2 s, and with *Remove animations* it is there at once.
+- *Added in Iter5-P4:* while the subject's phone says "Connecting…" in step 7, Subject view shows no outline, no thumbnail, and no *Save guide*.
+- *Added in Iter5-P4:* in step 8 the guide shows on both phones. The photographer's log has `guide.sent image <id>` after its `guide.sent clear`, not only `guide.sent state <id>`.
 
 ### IT-15 procedure
 
@@ -2476,6 +2482,7 @@ Observations: every Iteration 4 step held, and no defect was found.
 [#256]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/256
 [#266]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/266
 [#267]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/267
+[#268]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/268
 [#269]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/269
 [#271]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/271
 [#272]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/272

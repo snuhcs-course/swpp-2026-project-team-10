@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-23, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.guide.GuideSource
@@ -33,7 +33,7 @@ import org.junit.Test
  * Subject, the offered guide (state-based): drawn at once at its anchor and sent with anchor and source, after its
  * reference photo when it has one; kept when a
  * state names it, while the photographer's own messages wait; dropped after the deadline, which draws the
- * photographer's guide and state again and reports it, also the guide a reconnecting subject's mirror kept; still
+ * photographer's guide and state again and reports it, also the guide a reconnecting subject held from before; still
  * adopted after a clear that came first; an answer after the deadline still finds its image; an offer while not
  * connected sends nothing and is reported; a reference of the photographer's earlier guide that arrives after the
  * answer leaves the offered guide's own thumbnail.
@@ -50,6 +50,7 @@ class GuideFromSubjectTest {
     private val codec = FakeGuideImageCodec()
     private val references = FakeGuideReferenceCodec()
     private val mirrorReference = MirrorReference()
+    private val held = HeldGuide()
 
     private val box = NormalizedRect(0.3f, 0.2f, 0.7f, 0.9f)
 
@@ -62,6 +63,7 @@ class GuideFromSubjectTest {
             references,
             mirrorReference,
             StandardTestDispatcher(testScheduler),
+            held,
         )
 
     private fun connectedAs(role: Role, haveGuideId: String? = null) {
@@ -430,10 +432,10 @@ class GuideFromSubjectTest {
     }
 
     @Test
-    fun `after a reconnect an offer no state names draws the guide the mirror kept`() = runTest {
+    fun `after a reconnect an offer no state names draws the guide held from before`() = runTest {
         // From before the reconnect: hello names this guide, so only its state comes again.
-        mirror.setGuide(fakeGuide("p1"))
-        mirrorReference.set(GuideReference("p1", fakeBitmap()))
+        held.guide = fakeGuide("p1")
+        held.reference = GuideReference("p1", fakeBitmap())
         connectedAs(Role.SUBJECT, haveGuideId = "p1")
         val syncer = syncer()
         syncer.startAsReceiver(backgroundScope)

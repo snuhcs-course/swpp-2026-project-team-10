@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-17, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-23, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.net.Uri
@@ -85,6 +85,9 @@ import org.junit.runner.RunWith
  * (#188): ended for the subject's way in; Idle (nothing to end); a session with someone in it or on its way (kept).
  * The guide's tip (#213, Design 2.5.1): the photographer sends it once connected and again after a reconnect, not while
  * waiting alone; the subject keeps it from Connecting on, through a reconnect, until the session ends.
+ * The guide (#268, Design 2.5.1, 2.6.7): after a reconnect the photographer sends one changed while the link was down,
+ * whatever the session's first `hello` named; in another session it goes by that session's `hello`; the subject's
+ * copy stays through a reconnect and goes when the session ends.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 // Robolectric for ProcessLifecycleOwner, which the ViewModel observes for the background limit.
@@ -242,6 +245,97 @@ class SessionViewModelTest {
         session.setState(SessionState.Ended(EndReason.PEER_LEFT))
         runCurrent()
         assertNull(tips.mirror.value)
+    }
+
+    private val guides = InMemoryGuideRepository()
+    private val mirror = InMemoryGuideRepository()
+
+    /** A ViewModel whose guide syncer sends [guides] and draws on [mirror] (#268). */
+    private fun withGuides(): SessionViewModel {
+        val syncer =
+            GuideSyncer(session, guides, mirror, codec, FakeGuideReferenceCodec(), MirrorReference(), dispatcher)
+        val guideModel = SessionViewModel(
+            session,
+            camera,
+            syncer,
+            RemoteControlHandler(session, camera, InMemoryGuideRepository()),
+            mobileData,
+            invitations,
+        )
+        store.put("guides", guideModel)
+        return guideModel
+    }
+
+    private fun imagesSent() = session.sent.filterIsInstance<SessionMessage.GuideImageBegin>().map { it.guideId }
+
+    @Test
+    fun theGuide_changedWhileTheLinkWasDown_goesToTheSubjectOnceItIsBack() = runTest(dispatcher) {
+        withGuides().startRoom()
+        guides.setGuide(fakeGuide("g1"))
+        // The subject joined holding g1, so the image is not sent.
+        val live = SessionState.Connected("s1", PeerInfo("Joonhyung", haveGuideId = "g1"), Role.PHOTOGRAPHER)
+        session.setState(live)
+        runCurrent()
+        assertEquals(emptyList<String>(), imagesSent())
+        guides.setGuide(fakeGuide("g2"))
+        runCurrent()
+        assertEquals(listOf("g2"), imagesSent())
+
+        session.setState(SessionState.Reconnecting("s1", 0L))
+        runCurrent()
+        guides.setGuide(fakeGuide("g1"))
+        runCurrent()
+        session.setState(live)
+        runCurrent()
+
+        // The hello still names g1, but the subject has held g2 since.
+        assertEquals(listOf("g2", "g1"), imagesSent())
+        session.setState(SessionState.Ended(EndReason.LEFT))
+        runCurrent()
+    }
+
+    @Test
+    fun theGuide_inAnotherSessionAfterADrop_goesByThatSessionsHello() = runTest(dispatcher) {
+        withGuides().startRoom()
+        guides.setGuide(fakeGuide("g1"))
+        session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        runCurrent()
+        assertEquals(listOf("g1"), imagesSent())
+
+        // The link is lost for good, and someone else joins the room: their hello names nothing.
+        session.setState(SessionState.Reconnecting("s1", 0L))
+        runCurrent()
+        session.setState(SessionState.Waiting(CODE))
+        runCurrent()
+        session.setState(SessionState.Connected("s2", PeerInfo("Seongmin"), Role.PHOTOGRAPHER))
+        runCurrent()
+
+        assertEquals(listOf("g1", "g1"), imagesSent())
+        session.setState(SessionState.Ended(EndReason.LEFT))
+        runCurrent()
+    }
+
+    @Test
+    fun theSubject_keepsThePhotographersGuideThroughAReconnect_andDropsItWhenTheSessionEnds() = runTest(dispatcher) {
+        withGuides().joinRoom(CODE)
+        session.setState(SessionState.Connecting("s1"))
+        runCurrent()
+        val image = codec.encode(fakeGuide("g1"))
+        session.deliver(image.begin())
+        for (index in image.chunks.indices) session.deliver(image.chunk(index))
+        session.deliver(image.end())
+        runCurrent()
+        assertEquals("g1", mirror.guide.value?.id)
+
+        connected()
+        runCurrent()
+        session.setState(SessionState.Reconnecting("s1", 0L))
+        runCurrent()
+        assertEquals("g1", mirror.guide.value?.id)
+
+        session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        runCurrent()
+        assertNull(mirror.guide.value)
     }
 
     @Test

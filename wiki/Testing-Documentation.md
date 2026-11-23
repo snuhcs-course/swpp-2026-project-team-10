@@ -123,6 +123,7 @@
 | 4.0 | 2026-11-21 | The Iteration 5 plan from the kickoff of 11/21: the owners of its tests (1.1); UAT cycle 2, the alpha test, and the beta test on 12/7–12/11, not 12/2 (1.2, 4.3, 5); two new AI module tests, the outline and the person check (3.1); the coverage measures, the property-testing library, and the mutation run not planned (2.1.2, 2.1.6, 2.1.7, 2.2.1); and the open items of 3.2, 4.1, 4.2, and 4.4 pointed at their issues or marked as not planned. |
 | 4.1 | 2026-11-21 | What an account keeps, deleting an account, the privacy policy, and fields above the keyboard (Iter5-P2, [#266]): their tests, `server-image`'s policy pages, and IT-40 (1.1, 1.2, 2.1.5, Appendix A). |
 | 4.2 | 2026-11-23 | A guide from an earlier session on the subject's phone (Iter5-P4, [#268]): its owner and tests, and two steps on IT-14 (1.1, 2.1.5, Appendix A). |
+| 4.3 | 2026-11-23 | UAT cycle 2 of 11/23 (Iter5-P3, [#267]): the run, each story's result, the problems found and what follows, and the Test Log row (4.4, 6). |
 
 </details>
 
@@ -1083,6 +1084,45 @@ UAT cycle 1, held in class on 11/16. Two students of other teams ran the five st
 - US-10 and US-12 become one story, since they share a session and most of their steps. A story not tested yet takes the freed place: saved guides, or a session by room code without signing in.
 - Fewer steps, to fit the 45 minutes: the less important edge and negative steps go, such as one of the two waits in airplane mode (5 s and 15 s).
 
+#### UAT cycle 2 (In-Class, Iteration 5)
+
+UAT cycle 2, held in class on 11/23 (Iter5-P3, [#267]). A student of another team and a TA ran the five stories of the cycle 2 sheet (4.3) as testers A and B.
+
+**Run.** One session of about 40 minutes on 11/23, with a debug build of `ebc0175` against the AWS dev server. The testers were one of Team 8 and a TA: T1 held phone A (a Galaxy S25 Ultra, in place of the sheet's Galaxy S23), and T2 phone B (a Galaxy S22). They followed the sheet's 51 steps and marked each step accepted or rejected, with a satisfaction from 1 to 5 and comments. The filled sheets are kept outside the repository.
+
+| Story | Result | Date | Tester | Deviations |
+|---|---|---|---|---|
+| US-13 · Join with a room code | Pass: 7 of 7 steps accepted by both | 11/23 | T1, T2 | — |
+| US-10, US-12 · Live view and remote control | Pass: 15 of 15 steps accepted by both | 11/23 | T1, T2 | Step 13: airplane mode left Wi-Fi on, so the tester turned Wi-Fi off by hand |
+| US-2 · Pose guide from a gallery photo | Pass: 10 of 10 steps accepted by both | 11/23 | T1, T2 | — |
+| US-4 · AI pose suggestions | Pass: 12 of 12 steps accepted by both | 11/23 | T1, T2 | — |
+| FR-3.8, FR-3.11 · Saved guides in *My library* | Pass: 7 of 7 steps accepted by both | 11/23 | T1, T2 | — |
+
+**Summary.**
+
+- All five stories pass. Both testers accepted every step: 102 of 102 marks.
+- T1 scored 50 steps at 5 and one at 4, a mean of 4.98. T2 scored 45 steps at 4 and six at 3, a mean of 3.88.
+- T2's six 3s: the role after connecting, the time to reconnect, *Choose another photo*, *Use* on *Reference confirm*, the scene photo's confirm step, and the ♥. T1's 4 is the zoom notice.
+- T1's overall comment: the work looks technically hard, and it is well finished.
+- T2's overall comment: the functions work, but the UI needs work. Go through fewer screens, check what a wrong tap keeps or loses, and look at Impeccable, a design skill for AI coding agents.
+- The 51 steps took about 40 minutes; cycle 1's 70 steps hardly fit in 45.
+
+**Problems found and what follows.** The testers' comments in the sheet, lowest satisfaction first, then T2's overall comment.
+
+| Problem | Story · step · tester · satisfaction | What follows |
+|---|---|---|
+| After connecting, it is hard to tell which mode the phone is in | US-13 · 7 · T2 · 3 | *Iteration 5:* each phone says whose camera it shows, beside the red light and in a notice when the live view starts, and *Leave* is red like *End session* (Iter5-P7, [#271]) |
+| Reconnecting gives up after 10 s: make it longer, or add a button to try again | US-10, US-12 · 14 · T2 · 3 | *Iteration 5:* 30 s (Iter5-A2, [#293]). No button: *Connection lost* already has *Reconnect* (FR-6.11) |
+| *Choose another photo* should be a main button at the bottom | US-2 · 3 · T2 · 3 | *Iteration 5:* the button goes, and Back returns to *Add a pose guide*, still open (Iter5-A3, [#294]) |
+| *Use* on *Reference confirm* looks unneeded: the guide could show at once | US-2 · 5 · T2 · 3 | The step stays, since a screenshot's cut must be seen. *Iteration 5:* every photo shrinks to its thumbnail while its outline is drawn (Iter5-A4, [#295]) |
+| The scene photo's confirm step looks unneeded | US-4 · 6 · T2 · 3 | *Iteration 5:* the step goes. The photo shrinks into *Generate poses*, where a tap shows it large; without a person, the camera stays and says so (Iter5-A5, [#296]) |
+| A wrong tap loses a pose: keep every pose and guide as history, with favorites chosen from them | US-4 · 10 · T2 · 3 | *Iteration 5:* a history of every candidate and guide with no limit, a *Favorites* tab, selecting several, and a ⋮ menu in the library (Iter5-A6, [#297]) |
+| The zoom notice shows only after the fingers lift | US-10, US-12 · 2 · T1 · 4 | *Iteration 5:* the notice shows while the subject pinches (Iter5-A1, [#292]) |
+| The guide-edit button is not clear | US-10, US-12 · 7 · T2 · 4 | *Iteration 5:* one person icon, lit while the guide can be edited (Iter5-P7, [#271]) |
+| "Saved the photo" comes late, with nothing shown meanwhile | US-10, US-12 · 11 · T2 · 4 | *Iteration 5:* Subject view shows that the photo is saving (Iter5-P7, [#271]) |
+| Airplane mode did not turn Wi-Fi off | US-10, US-12 · 13 · T1 · 5 | No change to Pix: the comment is about the sheet's step |
+| The UI needs work: fewer screens to go through, and what a wrong tap keeps or loses | T2's overall comment | The rows above for [#294], [#296], and [#297]. *Iteration 5:* Impeccable is checked on Pix's screens and applied (Iter5-A7, [#298]) |
+
 ---
 
 ## 5. Alpha & Beta Testing
@@ -1112,6 +1152,7 @@ One row per recorded run, newest first, so the history of the numbers shows at a
 
 | Date | Iteration | What ran | Commit | Outcome | Section |
 |---|---|---|---|---|---|
+| 2026-11-23 | 5 | UAT cycle 2 in class: a tester of another team and a TA, the five stories in 51 steps | `ebc0175` | All five stories pass: 102 of 102 marks accepted. Satisfaction 3, all from the TA, on the role after connecting, the time to reconnect, *Choose another photo*, the two confirm steps, and the ♥; follow-ups in 4.4 | 4.4 |
 | 2026-11-20 | 4 | AI module tests: the tips of one run, 50 of them checked by the four of us | `78287b5` | Tips pass: 46 of 50 (92.0 %) by most of us; 한준형 failed 12 of the 14 guide-outline sentences; 22 of 50 tips ask for no change | 3.2; [record](#run-2026-11-20-tips-check) |
 | 2026-11-20 | 4 | Integration scripts on the phones (IT-6, 7, 10, 14–18, 20–24, 26, 35–38), from 11/19 | `44de211`, `752b7c3` | 18 of 18 pass; the other scripts gained no step and were not rerun. Times by eye, not measured; NFR-1 1.15 s and the shutter 0.26 s from [#208] | 2.2.2, 2.2.3; [record](#run-2026-11-20-integration-scripts) |
 | 2026-11-20 | 4 | Unit, Robolectric, screen, and adapter tests; server; coverage | `752b7c3` | 2,108 + 881 tests, 0 failed; app 88.3 % (94.7 / 97.9 / 94.5 / 49.9); server 98.4 % | 2.2.1; [record](#run-2026-11-20-unit-tests-and-coverage) |
@@ -2492,3 +2533,10 @@ Observations: every Iteration 4 step held, and no defect was found.
 [#279]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/279
 [#280]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/280
 [#281]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/281
+[#292]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/292
+[#293]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/293
+[#294]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/294
+[#295]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/295
+[#296]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/296
+[#297]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/297
+[#298]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/298

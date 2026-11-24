@@ -30,6 +30,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,7 +44,7 @@ import org.robolectric.shadows.ShadowToast
  * memory behind the ViewModel.
  * Partitions: the defaults (white, normal, the grid and the horizon bar on, the indicator off, the phone's language, an
  * agreement given, usage data shared, signed out); the grid and the horizon bar each turned off from its switch and on
- * from its row (#271), and shown off as kept; usage data turned off from its switch and on from its row, and its switch while the stored
+ * from its row (#271), shown off as kept, and in one card with the base brightness, as every section's rows; usage data turned off from its switch and on from its row, and its switch while the stored
  * answer loads (disabled, saving nothing, also when its restored state changes it) and once it arrives off;
  * the base brightness at 0 EV, slid to +1 EV and saved, and shown as kept; each color and thickness chosen; the indicator turned on from its switch and off from its row; a language chosen and
  * the dialog cancelled; the agreement withdrawn, the row without one (its value 16 dp from the edge, with no chevron),
@@ -203,6 +204,17 @@ class SettingsFragmentTest {
         onScreen {
             assertTrue(it.gridSwitch.isChecked)
             assertTrue(it.levelSwitch.isChecked)
+        }
+    }
+
+    @Test
+    fun theCameraSection_isOneCard_withTheBrightnessAndBothSwitches() {
+        launch()
+
+        onScreen { binding ->
+            assertSame(binding.cameraCard, binding.baseBrightnessRow.parent)
+            assertSame(binding.cameraCard, binding.gridRow.parent)
+            assertSame(binding.cameraCard, binding.levelRow.parent)
         }
     }
 

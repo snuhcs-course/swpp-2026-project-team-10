@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+# AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 """Render the drawings in wiki/design/ to the images the wiki pages show.
 
 Each drawing has one image in wiki/images/, named after it:
@@ -27,7 +27,8 @@ Korean from `values-ko`; a quantity string's English forms ("1 invite", "2 invit
 rest, such as the screens the app does not have yet, is in ko.json under the flow's name, which also keeps the names and
 Pix IDs of the flow's people as they are. A screen's text with a Latin letter that neither gives, or an entry the flow
 no longer uses, stops the render, so ko.json changes with the drawing; render the flows again after a Korean string
-changes. Anything as wide as its content in the app (a chip, a button, a line of text its parent centers, or a row of
+changes. A text without a Latin letter stays as it is, unless ko.json has it too: a field's count of characters, such as
+"26/100", which is another number for the Korean text. Anything as wide as its content in the app (a chip, a button, a line of text its parent centers, or a row of
 them) is drawn as one element marked `data-fit` (left, center, or right: the side its parent keeps it at), and in Korean
 it takes its content's width from that side. A dialog is one box whose content flows, centered on the screen, with its
 buttons in a row that wraps (`flex-flow: row-reverse wrap`): as in the app, they stand side by side when they fit and
@@ -246,7 +247,8 @@ def korean_page(source: Path) -> str:
     missing = []
     for i in sorted(set(screens) | set(quoted)):
         text = html.unescape(parts[i])
-        if not LATIN.search(text):
+        # A text without a Latin letter stays, unless ko.json gives it another: a count that differs with the language.
+        if not LATIN.search(text) and clean(text).casefold() not in korean.entries:
             continue
         translated = korean(text)
         if translated is None:

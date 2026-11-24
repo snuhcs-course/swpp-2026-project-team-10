@@ -306,9 +306,14 @@ class SubjectViewModel(
             // is here too. Outside a gesture it is also the value to show.
             session.peerCamera.collect { camera ->
                 _uiState.update {
+                    val aspect = camera?.aspect ?: AspectRatio.R4_3
+                    val mirrored = (camera?.facing ?: CameraFacing.BACK) == CameraFacing.BACK
                     it.copy(
-                        aspect = camera?.aspect ?: AspectRatio.R4_3,
-                        mirrored = (camera?.facing ?: CameraFacing.BACK) == CameraFacing.BACK,
+                        aspect = aspect,
+                        mirrored = mirrored,
+                        // The bar stands beside a point of the frame it was tapped in: another ratio or camera moves
+                        // or turns the image under it, so it goes (FR-7.3).
+                        brightnessOpen = it.brightnessOpen && aspect == it.aspect && mirrored == it.mirrored,
                         zoom = camera?.zoom?.let { zoom -> shownZoom(zoom, by = null, shown = it.zoom) } ?: it.zoom,
                         exposure = camera?.exposure?.takeUnless { exposureSender.adjusting } ?: it.exposure,
                         flash = camera?.flash ?: it.flash,
@@ -362,8 +367,9 @@ class SubjectViewModel(
                     return@collect
                 }
                 if (message !is SessionMessage.CameraStateUpdate) return@collect
-                // The subject's state after a tap to focus is its answer, with the brightness the camera went back to.
-                if (message.by == Role.SUBJECT) endBaseWait()
+                // The tap's answer, with the brightness the camera went back to. No other echo of this phone's is
+                // taken for it: one of an earlier pinch or drag may still be on its way, with the old brightness.
+                if (message.focused) endBaseWait()
                 // While a pinch or the bar is moving its own steps rule the display; the echo wins once it ends.
                 _uiState.update {
                     it.copy(

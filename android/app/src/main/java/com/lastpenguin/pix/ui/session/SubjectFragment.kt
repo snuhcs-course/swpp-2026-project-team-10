@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
+import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.annotation.ColorRes
@@ -207,6 +208,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             onZoom = viewModel::onZoomGesture,
         )
         setupZoomAccessibility(binding.zoomReadout)
+        setupFocusAccessibility(binding)
         // The icons turn with this phone, held as the subject holds it, and so do the zoom readout and Guide and Pick a
         // pose with their labels (FR-1.15); the other texts and the layout stay.
         viewModel.watchPhoneTurn(viewLifecycleOwner)
@@ -1036,11 +1038,18 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         override fun onMove(up: Float) {
             val bar = view?.let(FragmentSubjectBinding::bind)?.exposureBar ?: return
             if (waiting) {
-                if (viewModel.uiState.value.baseAwaited) return
+                val ui = viewModel.uiState.value
+                // The bar went meanwhile, as at the photographer's own focus: this drag moves nothing any more.
+                if (!ui.brightnessOpen) {
+                    waiting = false
+                    return
+                }
+                if (ui.baseAwaited) return
                 waiting = false
                 from = up
                 bar.startDrag()
             }
+            // Nothing while the bar is not dragged.
             bar.dragTo(up - from)
         }
 
@@ -1054,6 +1063,32 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private fun videoFrame(binding: FragmentSubjectBinding, ui: SubjectUiState): ViewfinderFrame {
         val area = binding.videoContainer
         return fitViewfinderFrame(area.width.toFloat(), area.height.toFloat(), ui.aspect.frameAspect)
+    }
+
+    /**
+     * TalkBack has no tap at a place on the video, and the brightness button is gone (#273): its action on the video
+     * asks for the focus at the image's middle, which brings the bar, and moves its focus onto the bar, which stays up
+     * while it has it.
+     */
+    private fun setupFocusAccessibility(binding: FragmentSubjectBinding) {
+        ViewCompat.replaceAccessibilityAction(
+            binding.liveView,
+            AccessibilityActionCompat.ACTION_CLICK,
+            getString(R.string.focus_and_brightness_action),
+        ) { _, _ ->
+            val frame = videoFrame(binding, viewModel.uiState.value)
+            if (!onVideoTap(frame.centerX, frame.centerY)) return@replaceAccessibilityAction false
+            val bar = binding.exposureBar
+            // Once the bar shows. Without a screen reader the focus does not move, and the bar keeps its own time.
+            bar.post {
+                if (!bar.isShown) return@post
+                bar.performAccessibilityAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
+                if (!bar.isAccessibilityFocused) {
+                    bar.performAccessibilityAction(AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS, null)
+                }
+            }
+            true
+        }
     }
 
     private fun setupZoomAccessibility(readout: View) {

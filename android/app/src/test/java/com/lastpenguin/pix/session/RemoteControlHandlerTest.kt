@@ -24,7 +24,8 @@ import org.junit.Test
  * partition: a camera that focuses on a point / one with a brightness range only (no focus action); the brightness away
  * from the base (set again, and its state echoed as the subject's) / at the base already, or no range at all
  * (answered at once, nothing set); a point inside the frame, at its edges (0 and 1), just outside, and no number; a camera that is not ready; a
- * drag's request still outstanding, which keeps its own answer. The photographer's own focus (`camera.focus`): told
+ * drag's request still outstanding, which keeps its own answer; the tap's answer marked as such, and no other echo
+ * of the subject's (a brightness set after the tap). The photographer's own focus (`camera.focus`): told
  * to the subject while the session runs, and to no one before it starts or after it stops.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -589,7 +590,7 @@ class RemoteControlHandlerTest {
             assertEquals(listOf(2), focusCamera.exposureRequests)
             // The tap's answer: the state with the base, as the subject's, and no brightness notice.
             assertEquals(
-                SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 2),
+                SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 2, focused = true),
                 echoes().single(),
             )
             assertEquals(listOf<RemoteAction>(RemoteAction.Focus(0.62f, 0.4f)), actions)
@@ -610,7 +611,10 @@ class RemoteControlHandlerTest {
         assertEquals(listOf(0f to 1f), focusCamera.focusPoints)
         // The camera will not report a brightness it already has, and the subject's bar waits for where it starts.
         assertTrue(focusCamera.exposureRequests.isEmpty())
-        assertEquals(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true), echoes().single())
+        assertEquals(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, focused = true),
+            echoes().single(),
+        )
         assertEquals(listOf<RemoteAction>(RemoteAction.Focus(0f, 1f)), actions)
         focusHandler.stop()
     }
@@ -653,7 +657,10 @@ class RemoteControlHandlerTest {
 
         assertTrue(camera.focusPoints.isEmpty())
         assertEquals(listOf(0), camera.exposureRequests)
-        assertEquals(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true), echoes().single())
+        assertEquals(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, focused = true),
+            echoes().single(),
+        )
         assertTrue(actions.isEmpty())
         handler.stop()
     }
@@ -673,9 +680,30 @@ class RemoteControlHandlerTest {
 
         assertEquals(listOf(0.5f to 0.5f), plain.focusPoints)
         assertTrue(plain.exposureRequests.isEmpty())
-        assertEquals(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true), echoes().single())
+        assertEquals(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, focused = true),
+            echoes().single(),
+        )
         assertEquals(listOf<RemoteAction>(RemoteAction.Focus(0.5f, 0.5f)), actions)
         plainHandler.stop()
+    }
+
+    @Test
+    fun `only the tap's answer is marked as it, not the subject's later echoes`() = runTest {
+        focusCamera.state.value = focusCamera.state.value.copy(exposure = 3)
+        focusHandler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        focusHandler.handle(SessionMessage.FocusSet(0.5f, 0.5f))
+        runCurrent()
+        focusHandler.handle(SessionMessage.ExposureSet(2, final = true))
+        runCurrent()
+
+        assertEquals(listOf(true, false), echoes().map { it.focused })
+        assertEquals(listOf(Role.SUBJECT, Role.SUBJECT), echoes().map { it.by })
+        focusHandler.stop()
     }
 
     @Test

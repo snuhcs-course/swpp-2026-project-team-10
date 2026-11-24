@@ -72,8 +72,8 @@ sealed interface RemoteAction {
  * photographer's preview shows it. It does what a tap on Camera does (FR-1.4): the camera focuses and meters there
  * when it can focus on a point, and the brightness goes back to the photographer's base ([baseBrightness], FR-1.11).
  * The point has no echo, since focus has no lasting state. The tap is answered with the `camera.state` that carries
- * the base, as the subject's, so the subject's bar knows where a drag starts from: at once when the camera has the
- * base already, and otherwise when the camera reports it. It makes no brightness notice. A point outside the frame is
+ * the base, as the subject's and marked `focused`, so the subject's bar knows where a drag starts from and takes no
+ * other echo for it: at once when the camera has the base already, and otherwise when the camera reports it. It makes no brightness notice. A point outside the frame is
  * dropped, and so is a tap while the camera is not ready, as on Camera. The photographer's own tap goes the other
  * way as `camera.focus` ([focusedHere]), so the subject's phone shows the focus box too.
  *
@@ -380,7 +380,7 @@ class RemoteControlHandler(
         if (base == null || (pendingExposure == null && camera.state.value.exposure == base)) {
             // No brightness to set, or already there with nothing outstanding, so the camera will not emit again:
             // answered now.
-            send(camera.zoom.value, Role.SUBJECT, final = true)
+            send(camera.zoom.value, Role.SUBJECT, final = true, focused = true)
         } else {
             // A drag's request still outstanding is left alone: its answer or its late application still tells the
             // subject where the camera is.
@@ -474,7 +474,12 @@ class RemoteControlHandler(
         val baseRequest = pendingBase?.takeIf { it.value == exposure && now - it.at <= PENDING_MS }
         if (baseRequest != null) pendingBase = null
         val bySubject = exposureRequest != null || flashRequest != null || baseRequest != null
-        send(camera.zoom.value, if (bySubject) Role.SUBJECT else Role.PHOTOGRAPHER, exposureRequest?.final ?: true)
+        send(
+            camera.zoom.value,
+            if (bySubject) Role.SUBJECT else Role.PHOTOGRAPHER,
+            exposureRequest?.final ?: true,
+            focused = baseRequest != null,
+        )
     }
 
     private fun confirm(action: RemoteAction, mark: String, detail: String) {
@@ -482,7 +487,8 @@ class RemoteControlHandler(
         Timings.mark(mark, detail)
     }
 
-    private fun send(zoom: Float, by: Role, final: Boolean) {
+    /** [focused]: this state answers the subject's tap to focus (`camera.focus.set`). */
+    private fun send(zoom: Float, by: Role, final: Boolean, focused: Boolean = false) {
         val applied = camera.state.value
         session.send(
             SessionMessage.CameraStateUpdate(
@@ -493,6 +499,7 @@ class RemoteControlHandler(
                 flash = applied.flash,
                 aspect = applied.aspect,
                 facing = camera.facing.value,
+                focused = focused,
             ),
         )
     }

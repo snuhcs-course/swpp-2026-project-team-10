@@ -464,6 +464,7 @@
     <string name="subject_title_placeholder">Photographer\'s camera</string>
     <string name="leave">Leave</string>
     <string name="leave_session_title">Leave the session?</string>
+    <string name="focus_and_brightness_action">Focus and set the brightness</string>
     <string name="subject_video_description">Pinch the video to zoom the photographer\'s camera, or tap it to focus</string>
     <string name="peer_ended_session">%1$s ended the session</string>
     <!-- The same, when the session ended before the photographer's name arrived. -->

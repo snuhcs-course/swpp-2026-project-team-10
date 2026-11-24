@@ -446,7 +446,9 @@ sealed interface SessionMessage {
      * The camera values actually applied, and who changed them. Iteration 2 adds [exposure], [flash], and [aspect],
      * so the subject always has the whole camera state and fits its video, grid, and guide to [aspect] (AD-10).
      * [facing] is the camera in use (#201): the subject shows the rear camera's video as a mirror. An older phone
-     * sends none, which means the rear camera.
+     * sends none, which means the rear camera. [focused] marks the state that answers the subject's
+     * `camera.focus.set` (#273): its [exposure] is the brightness that tap left, which the subject's bar starts from.
+     * No other state of the subject's is that answer, so a zoom's or a brightness's echo cannot be taken for it.
      */
     @Serializable
     @SerialName("camera.state")
@@ -458,6 +460,7 @@ sealed interface SessionMessage {
         val flash: FlashMode = FlashMode.OFF,
         val aspect: AspectRatio = AspectRatio.R4_3,
         val facing: CameraFacing = CameraFacing.BACK,
+        val focused: Boolean = false,
     ) : SessionMessage
 
     @Serializable

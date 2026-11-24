@@ -435,6 +435,7 @@
     <string name="subject_title_placeholder">상대 카메라</string>
     <string name="leave">나가기</string>
     <string name="leave_session_title">카메라 공유에서 나갈까요?</string>
+    <string name="focus_and_brightness_action">초점을 맞추고 밝기 조절</string>
     <string name="subject_video_description">화면을 두 손가락으로 벌리거나 오므려 상대 카메라를 확대·축소하고, 눌러서 초점을 맞출 수 있어요</string>
     <string name="peer_ended_session">%1$s님이 카메라 공유를 끝냈어요</string>
     <string name="peer_ended_session_unnamed">상대가 카메라 공유를 끝냈어요</string>

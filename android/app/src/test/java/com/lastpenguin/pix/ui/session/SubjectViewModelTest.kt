@@ -1,6 +1,7 @@
 // AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
+import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.FlashMode
@@ -59,9 +60,10 @@ import org.junit.Test
  * turned back) / the front camera (x as seen); a point inside the frame, just outside it, and no number; before the
  * session is connected, in guide-edit mode (which also takes the bar down), and after a drop; a camera with point
  * focus, with a brightness range only, and with neither; the tap's answer awaited, answered by the subject's state and
- * not by the photographer's own, timed out (1 ms before 400 ms / after it), and ended by a drop. The photographer's
+ * not by the photographer's own or another echo of this phone's, timed out (1 ms before 400 ms / after it), and ended by a drop. The photographer's
  * own focus (`camera.focus`): shown where this phone has that point, on the rear camera's mirror and on the front
- * camera, and a point outside the frame dropped.
+ * camera, and a point outside the frame dropped. The bar when the photographer's frame changes: another ratio and
+ * another camera take it down, a state of the same frame does not.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SubjectViewModelTest {
@@ -700,16 +702,52 @@ class SubjectViewModelTest {
         viewModel.onFocusTap(0.5f, 0.5f)
         assertTrue(viewModel.uiState.value.baseAwaited)
 
-        // The photographer's own change is not the answer.
+        // The photographer's own change is not the answer, nor is the echo of this phone's earlier pinch.
         session.deliver(SessionMessage.CameraStateUpdate(2f, Role.PHOTOGRAPHER, final = true, exposure = 3))
+        session.deliver(SessionMessage.CameraStateUpdate(2f, Role.SUBJECT, final = true, exposure = 3))
         runCurrent()
         assertTrue(viewModel.uiState.value.baseAwaited)
 
-        session.deliver(SessionMessage.CameraStateUpdate(2f, Role.SUBJECT, final = true, exposure = 0))
+        session.deliver(
+            SessionMessage.CameraStateUpdate(2f, Role.SUBJECT, final = true, exposure = 0, focused = true),
+        )
         runCurrent()
         assertFalse(viewModel.uiState.value.baseAwaited)
         assertEquals(0, viewModel.uiState.value.exposure)
     }
+
+    @Test
+    fun `the bar goes when the photographer's frame changes, since it stood beside a point of the old one`() =
+        runTest(dispatcher) {
+            connectWithFocus()
+            runCurrent()
+            viewModel.onFocusTap(0.5f, 0.5f)
+            viewModel.setBrightnessOpen(true)
+
+            // The same frame: only the brightness changed.
+            session.deliver(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, exposure = 2))
+            runCurrent()
+            assertTrue(viewModel.uiState.value.brightnessOpen)
+
+            session.deliver(
+                SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, aspect = AspectRatio.R16_9),
+            )
+            runCurrent()
+            assertFalse(viewModel.uiState.value.brightnessOpen)
+
+            viewModel.setBrightnessOpen(true)
+            session.deliver(
+                SessionMessage.CameraStateUpdate(
+                    1f,
+                    Role.PHOTOGRAPHER,
+                    final = true,
+                    aspect = AspectRatio.R16_9,
+                    facing = CameraFacing.FRONT,
+                ),
+            )
+            runCurrent()
+            assertFalse(viewModel.uiState.value.brightnessOpen)
+        }
 
     @Test
     fun `a tap that gets no answer stops waiting after a moment, and at once when the link drops`() =

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-09, reviewed by Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.content.Context
@@ -15,6 +15,7 @@ import com.lastpenguin.pix.camera.frameAspect
 /**
  * Viewfinder-only composition aids. Never consumes gestures or enters captured/streamed frames. The lines are thin so
  * that they do not compete with the photo, and each has a dark outline so it still shows on a bright scene (Design 2.8).
+ * Settings turns the grid and the horizon bar off apart ([showGrid], [showLevel]); 1:1's dim stays without either.
  */
 class CameraCompositionView @JvmOverloads constructor(
     context: Context,
@@ -61,6 +62,24 @@ class CameraCompositionView @JvmOverloads constructor(
             invalidate()
         }
 
+    /** The 3×3 grid (FR-1.9), as Settings says; on by default. */
+    var showGrid: Boolean = true
+        set(value) {
+            if (field == value) return
+            field = value
+            updateDescription()
+            invalidate()
+        }
+
+    /** The horizon bar (FR-1.10), as Settings says; on by default. Off, a level set is kept but not drawn. */
+    var showLevel: Boolean = true
+        set(value) {
+            if (field == value) return
+            field = value
+            updateDescription()
+            invalidate()
+        }
+
     init {
         // A non-clickable sibling lets touches reach PreviewView (or the editable guide) below it.
         isClickable = false
@@ -77,13 +96,11 @@ class CameraCompositionView @JvmOverloads constructor(
     }
 
     private fun updateDescription() {
-        contentDescription = context.getString(
-            when (level?.isLevel) {
-                true -> R.string.camera_level_aligned
-                false -> R.string.camera_level_tilted
-                null -> R.string.camera_grid_description
-            },
-        )
+        contentDescription = when (level?.isLevel?.takeIf { showLevel }) {
+            true -> context.getString(R.string.camera_level_aligned)
+            false -> context.getString(R.string.camera_level_tilted)
+            null -> if (showGrid) context.getString(R.string.camera_grid_description) else null
+        }
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -97,7 +114,13 @@ class CameraCompositionView @JvmOverloads constructor(
         if (dimOutside) dimOutsideFrame(canvas, width.toFloat(), height.toFloat(), frame, outsideDim)
         val clipped = canvas.save()
         canvas.clipRect(frame.left, frame.top, frame.right, frame.bottom)
-        // Two lines in each direction create nine identically sized cells inside the image only.
+        if (showGrid) drawGrid(canvas)
+        level?.takeIf { showLevel }?.let { drawLevel(canvas, it) }
+        canvas.restoreToCount(clipped)
+    }
+
+    /** Two lines in each direction create nine identically sized cells inside the image only. */
+    private fun drawGrid(canvas: Canvas) {
         for (division in 1..2) {
             val x = frame.left + frame.width * division / 3f
             val y = frame.top + frame.height * division / 3f
@@ -106,8 +129,6 @@ class CameraCompositionView @JvmOverloads constructor(
             canvas.drawLine(frame.left, y, frame.right, y, gridOutline)
             canvas.drawLine(frame.left, y, frame.right, y, grid)
         }
-        level?.let { drawLevel(canvas, it) }
-        canvas.restoreToCount(clipped)
     }
 
     private fun drawLevel(canvas: Canvas, value: CameraLevel) {

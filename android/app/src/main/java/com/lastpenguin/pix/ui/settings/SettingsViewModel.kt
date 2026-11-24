@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import androidx.lifecycle.ViewModel
@@ -21,8 +21,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * The settings screen's choices (FR-10.1), shared by the activity: the camera screens read the guide's look and the
- * latency indicator from here, so a change applies the moment they show again. The AI consent is
+ * The settings screen's choices (FR-10.1), shared by the activity: the camera screens read the guide's look, the grid,
+ * the horizon bar, and the latency indicator from here, so a change applies the moment they show again. The AI consent is
  * `GenerationViewModel`'s, which asks for it.
  * Owner: Settings (#123).
  */
@@ -38,6 +38,12 @@ class SettingsViewModel(
 
     /** The Camera screen's base brightness in EV (FR-1.11), which its tap to focus goes back to. */
     val baseBrightness: StateFlow<Float> = settings.baseBrightness
+
+    /** Whether Camera and Subject view draw the 3×3 grid (FR-1.9). */
+    val showGrid: StateFlow<Boolean> = settings.showGrid
+
+    /** Whether Camera draws the horizon bar (FR-1.10). */
+    val showLevel: StateFlow<Boolean> = settings.showLevel
 
     /** Whether release builds send crash reports and usage data (FR-10.6); null until the stored answer is read. */
     val shareUsage: StateFlow<Boolean?> = settings.shareUsage
@@ -59,6 +65,14 @@ class SettingsViewModel(
 
     fun setBaseBrightness(ev: Float) {
         viewModelScope.launch { settings.setBaseBrightness(ev) }
+    }
+
+    fun setShowGrid(show: Boolean) {
+        viewModelScope.launch { settings.setShowGrid(show) }
+    }
+
+    fun setShowLevel(show: Boolean) {
+        viewModelScope.launch { settings.setShowLevel(show) }
     }
 
     fun setShareUsage(share: Boolean) {

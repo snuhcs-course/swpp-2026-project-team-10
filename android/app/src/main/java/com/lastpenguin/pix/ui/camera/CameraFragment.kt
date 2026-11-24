@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -50,9 +50,7 @@ import androidx.core.widget.TextViewCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
-import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
@@ -424,7 +422,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                                 )
                     }
                 }
-                // The photographer's side of a session: the live light, End session, and "left" notices (FR-6.8, FR-6.10).
+                // The photographer's side of a session: the live light, End session, and "left" notices (FR-6.8, FR-6.10);
+                // who watches the camera is a notice too (#271).
                 // While the link reconnects the light is off, and the session can still be ended (Design 2.6.7).
                 launch {
                     sessionViewModel.state.collect { state ->
@@ -479,6 +478,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                             )
 
                             is SessionNotice.RemoteGuide -> getString(R.string.remote_guide_notice, notice.name)
+
+                            is SessionNotice.Watching -> getString(R.string.peer_watching_notice, notice.name)
                         }
                         if (notice is SessionNotice.PeerGone) {
                             peerGoneNotice = showNotice(controls, text, CameraViewModel.PEER_GONE_NOTICE_MS)
@@ -850,23 +851,36 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.pinchModeLabel.translationY = controls.zoomRow.translationY
     }
 
+    /**
+     * The grid and the horizon bar, each as Settings says (FR-1.9, FR-1.10). The bar's sensor runs only while the
+     * screen is resumed and the bar is on.
+     */
     private fun setupCompositionLevel(overlay: CameraCompositionView) {
         // This is a view-scoped sensor adapter, like ScaleGestureDetector, not shared camera state.
         val monitor = CameraLevelMonitor(requireContext())
-        viewLifecycleOwner.lifecycle.addObserver(object : DefaultLifecycleObserver {
-            override fun onResume(owner: LifecycleOwner) {
-                monitor.start(overlay::setLevel)
+        val owner = viewLifecycleOwner
+        owner.lifecycleScope.launch {
+            owner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                settingsViewModel.showGrid.collect { overlay.showGrid = it }
             }
+        }
+        owner.lifecycleScope.launch {
+            owner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                try {
+                    settingsViewModel.showLevel.collect { show ->
+                        overlay.showLevel = show
+                        if (show) monitor.start(overlay::setLevel) else stopLevel(monitor, overlay)
+                    }
+                } finally {
+                    stopLevel(monitor, overlay)
+                }
+            }
+        }
+    }
 
-            override fun onPause(owner: LifecycleOwner) {
-                monitor.stop()
-                overlay.setLevel(null)
-            }
-
-            override fun onDestroy(owner: LifecycleOwner) {
-                monitor.stop()
-            }
-        })
+    private fun stopLevel(monitor: CameraLevelMonitor, overlay: CameraCompositionView) {
+        monitor.stop()
+        overlay.setLevel(null)
     }
 
     /** Back of the scene photo step (R&S 6.3, FR-4.1, #199); the step has no other button since #296. */
@@ -947,9 +961,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.editGuideButton.isVisible = state.guide != null
         // Checkable, so TalkBack reads the mode as on or off; the ViewModel decides the state after a tap.
         controls.editGuideButton.isChecked = state.guideEditing
-        controls.editGuideButton.showGuideEditing(state.guideEditing)
         controls.editGuideButton.isEnabled = guideEditable && state.guideState.visible
         controls.guideOverlay.editable = state.guideEditing
+        controls.guideOverlay.filled = state.guideEditing
         // Computed once per render: while the scene photo is framed the guide is hidden, so the pinch zooms whatever
         // the mode says, and while the photo taken is held there is no zoom. Flipping it off and on again in one render
         // would end a pinch in progress, which the detector cannot restart in the same touch stream.

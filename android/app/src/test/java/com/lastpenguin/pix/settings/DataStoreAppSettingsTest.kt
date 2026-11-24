@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park
 package com.lastpenguin.pix.settings
 
 import android.content.Context
@@ -29,8 +29,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /*
- * The settings kept across runs (FR-10.1, Design 2.8): the defaults before any choice (usage data shared, FR-10.6),
- * then each choice in the flows and read back by a new instance, as after a restart; and a store that cannot be read,
+ * The settings kept across runs (FR-10.1, Design 2.8): the defaults before any choice (usage data shared, FR-10.6; the
+ * grid and the horizon bar on, FR-1.9, FR-1.10), then each choice in the flows and read back by a new instance, as after
+ * a restart; and a store that cannot be read,
  * whose usage choice stays unread instead of taking the default (FR-10.6) while the other settings take theirs. One test, because the DataStore behind the context extension lives
  * for the process.
  */
@@ -42,6 +43,8 @@ class DataStoreAppSettingsTest {
         val settings = DataStoreAppSettings(ApplicationProvider.getApplicationContext<Context>(), scope)
         assertEquals(GuideLook(GuideColor.WHITE, GuideThickness.NORMAL), settings.guideLook.value)
         assertFalse(settings.showLatency.value)
+        assertTrue(settings.showGrid.value)
+        assertTrue(settings.showLevel.value)
         assertEquals(
             emptySet<TutorialScreen>(),
             withTimeout(TIMEOUT_MS) {
@@ -53,6 +56,8 @@ class DataStoreAppSettingsTest {
         settings.setGuideColor(GuideColor.BLACK)
         settings.setGuideThickness(GuideThickness.THICK)
         settings.setShowLatency(true)
+        settings.setShowGrid(false)
+        settings.setShowLevel(false)
         settings.setShareUsage(false)
         // Each screen's tips on their own: the second keeps the first.
         settings.setTutorialSeen(setOf(TutorialScreen.CAMERA))
@@ -61,12 +66,17 @@ class DataStoreAppSettingsTest {
         val chosen = GuideLook(GuideColor.BLACK, GuideThickness.THICK)
         assertEquals(chosen, withTimeout(TIMEOUT_MS) { settings.guideLook.first { it == chosen } })
         assertTrue(withTimeout(TIMEOUT_MS) { settings.showLatency.first { it } })
+        assertFalse(withTimeout(TIMEOUT_MS) { settings.showGrid.first { !it } })
+        assertFalse(withTimeout(TIMEOUT_MS) { settings.showLevel.first { !it } })
         assertEquals(seen, withTimeout(TIMEOUT_MS) { settings.tutorialSeen.first { it == seen } })
         assertEquals(false, withTimeout(TIMEOUT_MS) { settings.shareUsage.first { it == false } })
 
         val restarted = DataStoreAppSettings(ApplicationProvider.getApplicationContext<Context>(), scope)
         assertEquals(chosen, withTimeout(TIMEOUT_MS) { restarted.guideLook.first { it == chosen } })
         assertTrue(withTimeout(TIMEOUT_MS) { restarted.showLatency.first { it } })
+        // Both switches stay off after a restart (#271).
+        assertFalse(withTimeout(TIMEOUT_MS) { restarted.showGrid.first { !it } })
+        assertFalse(withTimeout(TIMEOUT_MS) { restarted.showLevel.first { !it } })
         assertEquals(seen, withTimeout(TIMEOUT_MS) { restarted.tutorialSeen.first { it == seen } })
         // Off from the first read: a phone whose user turned it off never sends in between (FR-10.6).
         assertEquals(false, withTimeout(TIMEOUT_MS) { restarted.shareUsage.filterNotNull().first() })
@@ -103,6 +113,8 @@ class DataStoreAppSettingsTest {
         assertNull(settings.shareUsage.value)
         assertEquals(emptySet<TutorialScreen>(), settings.tutorialSeen.value)
         assertFalse(settings.showLatency.value)
+        assertTrue(settings.showGrid.value)
+        assertTrue(settings.showLevel.value)
     }
 
     private companion object {

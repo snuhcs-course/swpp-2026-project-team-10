@@ -122,6 +122,8 @@
     <string name="zoom_held_label">%1$s is zooming</string>
     <string name="remote_guide_move_notice">%1$s moved the guide</string>
     <string name="remote_guide_notice">%1$s set a pose guide</string>
+    <!-- For 3 s on Camera as a subject connects (#271). -->
+    <string name="peer_watching_notice">%1$s is watching your camera</string>
     <string name="remote_brightness_notice">%1$s set brightness to %2$s</string>
     <string name="remote_flash_on_notice">%1$s turned the flash on</string>
     <string name="remote_flash_off_notice">%1$s turned the flash off</string>
@@ -461,6 +463,9 @@
     <!-- Flow 5: Subject view, Connection lost -->
     <string name="subject_title">%1$s\'s camera</string>
     <string name="subject_title_placeholder">Photographer\'s camera</string>
+    <!-- Under the camera's name in the slot where Camera's shutter is (#271): the video is live, or a photo is coming. -->
+    <string name="subject_live">Live</string>
+    <string name="subject_receiving_photo">Receiving photo…</string>
     <string name="leave">Leave</string>
     <string name="leave_session_title">Leave the session?</string>
     <string name="subject_video_description">Pinch the video to zoom the photographer\'s camera</string>
@@ -511,6 +516,10 @@
     <string name="settings_section_camera">Camera</string>
     <string name="settings_base_brightness">Base brightness</string>
     <string name="settings_base_brightness_body">Every photo starts from it. Tap to focus, then drag up or down to change it until the next tap.</string>
+    <string name="settings_grid">Grid</string>
+    <string name="settings_grid_body">Lines that divide the image into thirds.</string>
+    <string name="settings_level">Horizon bar</string>
+    <string name="settings_level_body">A bar in the middle that turns yellow when the phone is level.</string>
     <string name="settings_section_guide">Guide</string>
     <string name="settings_guide_color">Color</string>
     <string name="settings_guide_thickness">Thickness</string>

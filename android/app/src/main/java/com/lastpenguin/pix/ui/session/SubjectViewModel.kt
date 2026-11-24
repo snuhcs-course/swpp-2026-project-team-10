@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -147,6 +147,8 @@ data class SubjectUiState(
     val photos: List<Uri> = emptyList(),
     /** The viewer of [photos] is open over the video (FR-6.14). */
     val photosOpen: Boolean = false,
+    /** A photo of the photographer's is on its way here, from their shutter until it is saved (FR-6.14, #271). */
+    val receivingPhoto: Boolean = false,
 ) {
     /** The thumbnail's photo, none until the session's first. */
     val lastPhoto: Uri?
@@ -186,6 +188,8 @@ class SubjectViewModel(
     private val sessionPhotos: Flow<List<Uri>?> = flowOf(null),
     /** Deletes a photo from the viewer, from the album and the session's photos (`AppContainer.photoDeleter`). */
     private val deleter: PhotoDeleter = PhotoDeleter { false },
+    /** Whether a photo of the photographer's is on its way here (`PhotoSyncer.receiving`, #271). */
+    private val receivingPhoto: Flow<Boolean> = flowOf(false),
     /** How this phone is held, which its own controls' icons turn with; nothing is sent (FR-1.15). */
     private val phoneTurns: PhoneTurns = PhoneTurns.Fixed(),
 ) : ViewModel() {
@@ -258,6 +262,9 @@ class SubjectViewModel(
     }
 
     init {
+        viewModelScope.launch {
+            receivingPhoto.collect { receiving -> _uiState.update { it.copy(receivingPhoto = receiving) } }
+        }
         viewModelScope.launch {
             sessionPhotos.collect { photos ->
                 // The viewer goes with the session's photos, which end with it.

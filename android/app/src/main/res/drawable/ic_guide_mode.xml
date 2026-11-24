@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The guide-edit toggle while a pinch moves the guide (E2, #204): a standing person's outline, as the pose guide is. -->
+<!-- The guide-edit toggle (#271), lit while a pinch moves the guide: a standing person's outline, as the pose guide is. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"

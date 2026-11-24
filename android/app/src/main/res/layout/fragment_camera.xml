@@ -716,8 +716,8 @@
                     tools:visibility="visible" />
             </FrameLayout>
 
-            <!-- Shown while a guide is on the camera (AD-17); checked while drags and pinches edit the guide. Its icon names
-                 the mode: a person's outline while editing, a camera while a pinch zooms (showGuideEditing, #204). -->
+            <!-- Shown while a guide is on the camera (AD-17); checked while drags and pinches edit the guide. One person's
+                 outline, lit in the guide's color while checked (#271). -->
             <com.lastpenguin.pix.ui.camera.TurningButton
                 android:id="@+id/editGuideButton"
                 style="@style/Widget.Pix.Button.Icon"
@@ -727,7 +727,7 @@
                 android:contentDescription="@string/edit_guide"
                 android:visibility="gone"
                 app:backgroundTint="@color/edit_guide_background"
-                app:icon="@drawable/ic_camera"
+                app:icon="@drawable/ic_guide_mode"
                 app:iconTint="@color/edit_guide_icon"
                 tools:visibility="visible" />
         </LinearLayout>

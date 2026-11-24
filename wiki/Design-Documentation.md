@@ -119,6 +119,7 @@
 | 4.2 | 2026-11-23 | The subject's guide after a session: gone from Subject view at the session's end, held for the next `hello`, and what the photographer counts on after a `guide.clear` or a drop (Iter5-P4, [#268]) (2.1, 2.2, 2.5.1, 2.6.7). |
 | 4.3 | 2026-11-24 | *Generate poses* (Iter5-P10, [#274]): the field that says Auto, the situations' options as chips that only write into the field, what shows when, *Back to Auto*, one label for the button, and the scene photo large (*Still open*, 2.1, 2.4, 2.6.3, 2.6.5, 2.9). |
 | 4.4 | 2026-11-24 | The scene photo goes straight to *Generate poses* (Iter5-A5, [#296]): `CHECKING` in place of the review, the photo held on Camera and shrinking into its thumbnail, no person said on the camera, Back that shoots again, and a flow of four steps (2.2, 2.4, 2.6.2, 2.6.3, 2.6.5). |
+| 4.5 | 2026-11-24 | Remote focus as built (Iter5-P9, [#273]): `camera.focus.set` handled and answered with `camera.state`, the base brightness at a remote tap, the focus box and the brightness bar on Subject view (`FocusBrightness`), no tap in guide-edit mode, the notice that does not repeat, `camera.focus` for the photographer's own focus, and the tutorial's tip on the video (2.2, 2.5.1, 2.6.5, 2.6.8, 2.8, 2.9). |
 
 </details>
 
@@ -132,7 +133,6 @@ Audience: the development team. This page describes Pix's design as built throug
 | Pose generation started by the subject (FR-6.15) | The subject's *Add a pose guide* offers the situations, and the flow then runs on both phones as today. Open: how the scene photo is taken, since it comes from the photographer's camera: who takes it, and who reviews it ([#276]). | 한준형 | Iteration 5 |
 | The self-timer (FR-1.17) | A countdown over the preview before the photo. Open: the delays, and whether the subject's phone shows the countdown, which needs a message ([#272]). | 박재완 | Iteration 5 |
 | The live view after a reconnection (NFR-6) | Measure the resolution, bitrate, and frame rate before a drop and after the reconnection first. Open: fix it, show a notice while the quality is low, or record it as a limit ([#269]). | 박재완 | Iteration 5 |
-| Remote focus next to the guide's gestures (FR-7.7) | A tap on the video sets the photographer's focus. Open: the tap while guide-edit mode is on, and next to the pinch ([#273]). | 박동제 | Iteration 5 |
 
 The tips' open question (Testing Documentation 3.2) is not planned: the kickoff of 11/21 left it out.
 
@@ -473,7 +473,7 @@ interface CameraController {
                                                       // a front camera that fails gives the rear one back
     fun setZoom(ratio: Float, final: Boolean = true)  // clamped to [minZoom, maxZoom]; pinch and remote; newest value once
                                                       // per display frame; final = false holds the lens (2.6.5)
-    fun setFocusPoint(x: Float, y: Float)             // frame coordinates 0..1 (FR-1.4); also remote focus (Could)
+    fun setFocusPoint(x: Float, y: Float)             // frame coordinates 0..1 (FR-1.4); also remote focus (FR-7.7)
     fun setExposure(index: Int)                       // within capabilities.exposureRange (FR-1.11)
     fun setFlash(mode: FlashMode)                     // ignored without capabilities.hasFlash (FR-1.12)
     fun setTorch(on: Boolean)                         // the scene photo's light (FR-4.1); kept across rebinds; none on a
@@ -825,6 +825,7 @@ classDiagram
   class SessionViewModel {
     +state StateFlow~SessionState~
     +transitions SharedFlow~SessionState~
+    +remoteFocus SharedFlow~RemoteFocus~
     +startRoom()
     +invite(friend)
     +cancelInvite()
@@ -964,6 +965,7 @@ classDiagram
     +start(scope)
     +stop()
     +handle(message)
+    +focusedHere(x, y)
   }
   class ZoomHold {
     +holder StateFlow~Role~
@@ -978,6 +980,8 @@ classDiagram
     +onGuideGesture(dx, dy, scale, final)
     +setGuideEditing(on)
     +onExposureGesture(index, final)
+    +onFocusTap(x, y) Boolean
+    +photographerFocus SharedFlow~RemoteFocus~
     +setBrightnessOpen(open)
     +onFlashTap()
     +setReferenceExpanded(expanded)
@@ -1617,9 +1621,10 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `camera.state` | P→S | steps realtime, final reliable | `zoom`, `exposure`, `flash`, `aspect`, `facing`, `by`, `final` | The applied camera values, and who changed them |
 | `camera.zoom.set` | S→P | steps realtime, final reliable | `ratio`, `final`, `cancel` | The subject's pinch or readout tap (FR-7.1), or the cancel of a pinch held back (FR-7.6) |
 | `camera.zoom.hold` | P→S | reliable | `by` | Whose pinch holds the zoom, or null when it is free (FR-7.6) |
-| `camera.exposure.set` | S→P | steps realtime, final reliable | `index`, `final` | The subject's brightness slider (FR-7.3) |
+| `camera.exposure.set` | S→P | steps realtime, final reliable | `index`, `final` | The subject's brightness bar (FR-7.3) |
 | `camera.flash.set` | S→P | reliable | `mode` | The subject's flash choice (FR-7.3) |
-| `camera.focus.set` | S→P | reliable | `x`, `y` | The subject's focus point (FR-7.7; Could, Iteration 5, [#273]) |
+| `camera.focus.set` | S→P | reliable | `x`, `y` | The subject's tap to focus, in the photographer's frame (FR-7.7, [#273]); answered with `camera.state` |
+| `camera.focus` | P→S | reliable | `x`, `y` | Where the photographer's own tap focused, in the photographer's frame (FR-7.7, [#273]); not kept |
 | `control.permission` | P→S | reliable | `allowed` | Whether remote control is allowed (FR-7.5, dropped at the kickoff of 11/21; never sent) |
 | `guide.image.begin` / `.chunk` / `.end` | both | reliable | chunks | The guide's mask; S→P for a guide made on the subject's phone |
 | `guide.reference.begin` / `.chunk` / `.end` | both | reliable | chunks | The guide's reference photo, for the other phone's thumbnail (FR-3.9); S→P for a guide made on the subject's phone |
@@ -1824,7 +1829,7 @@ A tap on the readout (a quick step, 2.6.2) and its *Zoom in* / *Zoom out* access
   "b": { "zoom": 2.0, "exposure": 3, "flash": "AUTO", "aspect": "R16_9", "by": "SUBJECT", "final": true } }
 ```
 
-Each zoom the camera reports applied goes at once as a step, and once more as final 100 ms after the last one. A change of exposure, flash, or ratio goes at once as final; a step of the subject's slider is echoed as a step. Every message holds the whole applied state, from the first one after `hello`; a missing `exposure`, `flash`, or `aspect` means 0, `OFF`, or `R4_3`. `by` is `SUBJECT` when the change answers the subject's request. The subject keeps the last message as `SessionManager.peerCamera` and fits its video area to `aspect` (AD-10). It logs `zoom.echo`, with the exposure and flash, for each final one with `by: SUBJECT` (NFR-7).
+Each zoom the camera reports applied goes at once as a step, and once more as final 100 ms after the last one. A change of exposure, flash, or ratio goes at once as final; a step of the subject's bar is echoed as a step. Every message holds the whole applied state, from the first one after `hello`; a missing `exposure`, `flash`, or `aspect` means 0, `OFF`, or `R4_3`. `by` is `SUBJECT` when the change answers the subject's request. The subject keeps the last message as `SessionManager.peerCamera` and fits its video area to `aspect` (AD-10). It logs `zoom.echo`, with the exposure and flash, for each final one with `by: SUBJECT` (NFR-7).
 
 </details>
 
@@ -1851,13 +1856,24 @@ When `hasFlash` is false, the photographer answers with the unchanged state.
 </details>
 
 <details>
-<summary><code>camera.focus.set</code> · reliable · S→P · Could</summary>
+<summary><code>camera.focus.set</code> · reliable · S→P</summary>
 
 ```json
 { "v": 3, "t": "camera.focus.set", "seq": 1, "ts": 1759212355000, "b": { "x": 0.62, "y": 0.4 } }
 ```
 
-Planned (FR-7.7, Could): a tap on the live video, in frame coordinates; the photographer calls `setFocusPoint`, with no echo. The type is in `SessionMessage`, but no phone sends or handles it yet.
+The subject's tap on the live video (FR-7.7): `x` and `y` are fractions of the photographer's frame, 0 to 1, as the photographer's preview shows it. The subject's video of the rear camera is a mirror, so the subject sends 1 − x of what it sees; the front camera's video is mirrored on both phones. The photographer calls `setFocusPoint` and sets its base brightness again (2.6.5). The point has no echo, since focus has no lasting state. The answer is the `camera.state` with that brightness, `by: SUBJECT`. A point outside 0 to 1 is dropped.
+
+</details>
+
+<details>
+<summary><code>camera.focus</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "camera.focus", "seq": 7, "ts": 1759212355000, "b": { "x": 0.38, "y": 0.4 } }
+```
+
+Where the photographer's own tap on Camera focused (FR-7.7, [#273]), in the same coordinates as `camera.focus.set`. The subject shows the focus box there, at 1 − x on the rear camera's mirror. It is sent only for a point the camera took, and never for the subject's own tap, whose box the subject shows itself. Nothing is kept: a subject that connects later gets none. An older subject ignores the type, as any unknown one.
 
 </details>
 
@@ -2813,10 +2829,10 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - Each change of the holder goes to the subject as `camera.zoom.hold`, and again when the session connects. The subject's session keeps it, so a screen that opens late knows it. Subject view then sends nothing, ends a pinch that is running with a cancel (`camera.zoom.set` with `cancel`), which changes no zoom, and its readout follows the echo.
   - The phone held back says who is zooming in its toggle label (2.8).
 - **Unanswered requests.** `RemoteControlHandler` gives a final zoom, brightness, or flash request 500 ms, and longer while the camera is `STARTING`. It then confirms a request the camera holds, or answers with the current state, `by: PHOTOGRAPHER`, so the control snaps back. A request applied within 5 s still counts as the subject's.
-- **Brightness and flash (It 2, FR-7.3).** Subject view's brightness button opens a slider over the exposure range from `camera.capabilities`. It stays a slider, since the subject sets no focus for Camera's bar (2.8, [#182]). The flash button is in the top bar. Each control hides when the camera lacks it.
-  - The slider sends `camera.exposure.set` like zoom. The flash button sends `camera.flash.set` and shows the tapped mode until the echo.
+- **Brightness and flash (It 2, FR-7.3).** Subject view sets the brightness with Camera's bar, over the exposure range from `camera.capabilities`. The bar comes up beside the focus box at a tap on the video (remote focus below, 2.8). Until Iteration 4 it was a slider opened from a button ([#182], [#273]). The flash button is in the top bar. Each control hides when the camera lacks it.
+  - The bar sends `camera.exposure.set` like zoom. The flash button sends `camera.flash.set` and shows the tapped mode until the echo.
   - The photographer clamps and calls `setExposure` or `setFlash`. It answers a request the camera cannot take with the unchanged `camera.state`.
-  - Each exposure, flash, or ratio change, from either phone, goes out as `camera.state`, `by: SUBJECT` when it matches the subject's request. A slider step is echoed as a step. Camera's own controls call the same methods (FR-1.11, FR-1.12).
+  - Each exposure, flash, or ratio change, from either phone, goes out as `camera.state`, `by: SUBJECT` when it matches the subject's request. A step of the bar is echoed as a step. Camera's own controls call the same methods (FR-1.11, FR-1.12).
 - **Guide moves (It 2, FR-7.2).** Subject view shows the guide-edit toggle and its label while a guide is on the video, off by default (2.6.2, 2.8).
   - With it on, drags and pinches move the guide locally, clamped by `GuideGeometry` for the photographer's frame. `guide.move` sends the guide's id, center, and height: steps at most every 50 ms, the final value at once.
   - `RemoteControlHandler` drops a move for a missing, hidden, or replaced guide. Otherwise the photographer's `GuideRepository` clamps and applies it, and `GuideSyncer` echoes `guide.state` with `by: SUBJECT`.
@@ -2871,7 +2887,14 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - Outside a session, Camera's thumbnail is the newest photo in Pix's album, taken here or received, and a tap opens the whole album in the same viewer, at the newest (`PixAlbumPhotos`, FR-1.6, [#247]). A photo just taken is a page at once, before MediaStore tells of it. The viewer closes when a session starts or ends, so it never turns from one list to the other. The phone's gallery, given one photo through `ACTION_VIEW`, would show that photo alone, in Pix's task. The album is read from MediaStore at the app's start and at each MediaStore change, so a photo deleted in the gallery leaves it. Without a storage permission Pix sees only the photos it saved, so after a reinstall the album is empty until the next.
   - Ending the session drops unconfirmed photos without asking. 3 s later Camera says "Couldn't send 2 photos to Joonhyung". The subject deletes partial files, also at each session start.
   - IT-20 measures the live view while photos go (NFR-6). FR-6.13's notice is unchanged.
-- **Remote focus (Could, FR-7.7).** A tap on the video would send `camera.focus.set` to `setFocusPoint`, with no echo. Planned for Iteration 5 (Iter5-P9, [#273]), with the brightness beside the focus box (FR-7.3); only the message exists.
+- **Remote focus (It 5, FR-7.7, [#273]).** A tap on Subject view's video does what a tap on Camera does (FR-1.4), on the photographer's camera.
+  - `PinchZoomController` owns the video's touches and reports the tap and a one-finger drag up or down, as on Camera. In guide-edit mode it is off, so a tap does not focus: the touch is the guide's. A tap outside the image does nothing.
+  - `SubjectViewModel.onFocusTap` sends `camera.focus.set` with the point in the photographer's frame (2.5.1). It needs a camera that focuses on a point or has a brightness range (`camera.capabilities`).
+  - `RemoteControlHandler` calls `setFocusPoint` on a camera that takes a point, and sets the base brightness from Settings again (`CameraCapabilities.baseExposureIndex`, the rule Camera's own tap uses). A camera that is not `READY` drops the tap.
+  - Every tap is answered with a `camera.state`, `by: SUBJECT`: at once when the camera has the base already, and otherwise when the camera reports it. It makes no brightness notice.
+  - Subject view shows the focus box at the tap and the brightness bar beside it (`FocusBrightness`, 2.8). A drag that starts with the bar down taps first. It then waits for the tap's answer, at most 400 ms (`SubjectUiState.baseAwaited`), so the bar starts from the photographer's base, which this phone does not know otherwise.
+  - The photographer's Camera shows the focus box alone where the subject tapped (`SessionViewModel.remoteFocus`). A brightness bar it has up goes, unless a finger is on it. The notice "Joonhyung set the focus" shows for 1.5 s, and no tap in the 2 s after it makes another (`FOCUS_NOTICE_MS`, `FOCUS_NOTICE_QUIET_MS`), so taps in a row do not repeat it. Another session's first tap is said again.
+  - The photographer's own tap goes the other way. `CameraViewModel.onFocusTap` tells `RemoteControlHandler.focusedHere`, which sends `camera.focus` while a session runs. Subject view shows the focus box alone at that place (`SubjectViewModel.photographerFocus`), with no notice, as the photographer's other changes have none there. A bar it has up goes, unless a finger is on it.
 - **Permission (Could, FR-7.5).** `control.permission` with `allowed: false` would disable the subject's controls and drop its requests. Dropped at the kickoff of 11/21: short of time, and judged less important. Only the message exists, so remote control is always allowed.
 - **Ultrawide routing.** `CameraZoomPlan` prefers the primary camera's native sub-1× zoom. A separate rear ultrawide extends the range only when its range reaches the primary's. The controller converts each request to the bound camera's native `setZoomRatio`, and `ZoomState` back, so every ratio is primary-relative.
 - **Zoom without stutter (It 2, Must, NFR-19).**
@@ -2980,6 +3003,7 @@ Each section's rows share one card, without dividers.
   - `TutorialFragment` is a see-through dialog among the screen's child fragments, so the camera and the video keep running, a sheet stays open, and the screen can still navigate.
   - Tips fade in over 200 ms (`Motion.FADE_MS`, Iter3-A14). A tap anywhere and Back mark them seen, pass touches through at once, and fade them out.
   - `CoachMarkLayout` dims the screen and cuts a dashed ring around each control in `TUTORIAL_TIPS`. Each caption is TalkBack text with a dashed arrow, placed to avoid the other captions and rings.
+  - Subject view's tip for the focus and the brightness has no control to ring. It rings a touch point on the video, a third of the way down (`pointOn`), as the guide's tip does on the guide ([#273]).
   - There is no *Got it* button: the whole layer closes the tips on a tap ([#204]). The line "Tap anywhere to close" sits at the bottom's middle, on the navigation bar's edge, on every screen and in either language. The captions keep clear of it.
   - A ring hugs what its control draws, not its touch area (`drawnOnScreen`, [#204]): a button's shape inside its insets; without a shape, its icon in a 36 dp circle, or its text with 8 dp of room. So *Generate poses*' action gets a ring around its text, and Save and ✕ get rings that do not overlap. A ring is around the box its control is drawn in, through its own and its parents' turns and moves, so it stays on a control that turns with the phone (`boundsOnScreen`, [#207]). A ring covers only the part of its control that the scrolling views around it and the window show (`shownOnScreen`, [#210]); a control scrolled out of view, or less than half shown, as on *Add a pose guide* on a short screen, gets none.
   - *Add a pose guide* rings the situations, then the whole *Choose from the gallery* and *My library* rows ([#210], [#243]). Each row's caption sits on its ring's top edge at the right, half over the row, with no arrow (`TutorialTip.onEdge`). The ring stops on both sides of it, as an outlined field's border does at its label. My library's row is the sheet's last, with the closing line under it, so its caption sits on the seam where the gallery's ring meets its own, and both rings stop around it (`seamRing`). A caption keeps to one line, shrinking to 50 % at most; with no room even then, it goes beside the row only where nothing is in the way, or the tip is left out. The two rows touch, so their rings each give up half of what they share and keep 6 dp apart; each gives up as much on its other side, so it stays centered on its row.
@@ -3343,11 +3367,11 @@ erDiagram
 - Up without a tap point, as after the screen is made again, the bar stands at the middle of the image's right edge, clear of the horizon bar.
 - A drag on the bar, or one finger's drag up or down anywhere on the preview (`PinchZoomController.VerticalDrag`), moves the sun from where it was, up brighter. It changes the brightness by 1 EV for each 150 dp of the finger's way, whatever the camera's range and step (`ExposureBarView.DP_PER_EV`), so a swipe changes it by about 1 EV and a camera's usual ±2 EV takes a long drag each way, as with an iPhone's sun. Before, the bar's 114 dp of travel spanned the whole range, so a short swipe went most of the way ([#207]). The bar spans the camera's whole range, so the sun moves less than the finger. Each step applies at once, and the last again on release.
 - A drag that starts with the bar down first focuses there, as a tap, and starts from the base. A sideways move or a second finger is no brightness drag; guide-edit mode keeps the preview's drags.
-- Every photo starts from the base brightness in Settings, like iPhone's exposure adjustment (2.6.8). `CameraViewModel` applies `AppSettings.baseBrightness` as the nearest exposure index in the camera's range (`ExposureScale.indexOf`).
+- Every photo starts from the base brightness in Settings, like iPhone's exposure adjustment (2.6.8). `CameraViewModel` applies `AppSettings.baseBrightness` as the nearest exposure index in the camera's range (`CameraCapabilities.baseExposureIndex`), and so does a tap from the subject's phone (2.6.5).
 - It applies it when the range is first known, when the range or step changes (another camera), and when the setting changes. Each tap to focus drops a drag's change and sets the base again; the setting stays.
-- TalkBack reads the bar as a slider with scroll actions. The bar fades after 3 s without a touch (`CameraFragment.BRIGHTNESS_IDLE_MS`). It stays while dragged or in TalkBack's focus; the idle time restarts when the focus leaves.
-- The focus box (`bg_focus_ring`) is a 64 dp square of a 1 dp accent line, with a short tick at the middle of each side. Subject view keeps its brightness button and horizontal slider (2.6.5).
-- Beside the bar, the box stays as long as the bar does, and the two fade out together in 200 ms, whatever closes the bar (`focusRingWithBar`). On a camera without brightness, the box fades by itself after about a second. Before, it went after a second while the bar stayed and still changed the brightness ([#207]).
+- TalkBack reads the bar as a slider with scroll actions. The bar fades after 3 s without a touch (`FocusBrightness.IDLE_MS`). It stays while dragged or in TalkBack's focus; the idle time restarts when the focus leaves.
+- The focus box (`bg_focus_ring`) is a 64 dp square of a 1 dp accent line, with a short tick at the middle of each side. Subject view has the same box and bar for the photographer's camera, in place of its brightness button and slider (2.6.5, [#273]). `FocusBrightness` places and times both on either screen.
+- Beside the bar, the box stays as long as the bar does, and the two fade out together in 200 ms, whatever closes the bar (`FocusBrightness`). On a camera without brightness, the box fades by itself after about a second. Before, it went after a second while the bar stayed and still changed the brightness ([#207]).
 
 **Language** (FR-10.2)
 
@@ -3382,7 +3406,7 @@ Owners follow the README's *Team* section. The Iteration 3 table names who built
 | **Settings and tutorial** (`SettingsViewModel`, `AppSettings`, `TutorialFragment`) | 조성민 (settings), 한준형 (tutorial) | — | — | All screens |
 | **Telemetry** (`telemetry/`) | 박재완 | — | — | All modules |
 
-The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 passed on the S21 and the S22 in Iteration 3, by eye. Remote focus and the remote-control switch (Iter2-P17, Could) move to Iteration 5, left out of Iteration 4 at its kickoff of 11/7. Remote focus is planned for Iteration 5 (Iter5-P9, [#273]); the switch was dropped at its kickoff of 11/21.
+The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 passed on the S21 and the S22 in Iteration 3, by eye. Remote focus and the remote-control switch (Iter2-P17, Could) move to Iteration 5, left out of Iteration 4 at its kickoff of 11/7. Remote focus was built in Iteration 5 (Iter5-P9, [#273]); the switch was dropped at its kickoff of 11/21.
 
 **Iteration 3 tasks** (from the kickoff of 2026-10-25; the tasks due 10/30 were for the user test of 10/31–11/1):
 
@@ -3476,7 +3500,7 @@ Left out of Iteration 4 at its kickoff, for the UAT and its fixes: the remote-co
 | The library's situations and memos (Iter5-P6, [#270]) | 한준형 | 11/26 | Open | 2.6.2, AD-16 |
 | UI fixes: switches for the grid and the horizon bar, "up to 30 s", and UAT cycle 2's opinions (Iter5-P7, [#271]) | 박재완 | 11/27 | Open | 2.6.2, 2.6.8 |
 | A self-timer for the shutter (Iter5-P8, [#272]) | 박재완 | 11/27 | Open | 2.6.2, *Still open* |
-| Remote focus, with the brightness beside the focus box (Iter5-P9, [#273]) | 박동제 | 11/27 | Open | 2.5.1, 2.6.5, *Still open* |
+| Remote focus, with the brightness beside the focus box (Iter5-P9, [#273]) | 박동제 | 11/27 | Open | 2.5.1, 2.6.5, 2.6.8, 2.8 |
 | Options to choose on *Generate poses* (Iter5-P10, [#274]) | 박동제 | 11/27 | Open | 2.6.3, 2.6.5 |
 | The cutout as a guide (Iter5-P11, [#275]) | 한준형 | 11/27 | Open | AD-6, 2.5.1, 2.6.1, 2.6.8, *Still open* |
 | Pose generation started by the subject (Iter5-P12, [#276]) | 한준형 | 11/27 | Open | 2.5.1, 2.6.3, 2.6.5, *Still open* |

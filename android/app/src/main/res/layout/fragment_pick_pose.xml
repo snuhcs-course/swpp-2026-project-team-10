@@ -41,7 +41,7 @@
             android:text="@string/select_pose" />
     </LinearLayout>
 
-    <!-- Where this screen is in the pose flow (R&S 6.3, #210): Pick a pose, 5 of 5. Across the screen, past this
+    <!-- Where this screen is in the pose flow (R&S 6.3, #210): Pick a pose, 4 of 4. Across the screen, past this
          layout's padding. -->
     <com.lastpenguin.pix.ui.FlowProgressView
         android:id="@+id/flowProgress"
@@ -49,7 +49,7 @@
         android:layout_height="@dimen/flow_progress_height"
         android:layout_marginStart="-20dp"
         android:layout_marginEnd="-20dp"
-        app:flowStep="5" />
+        app:flowStep="4" />
 
     <!--
         The candidates one at a time, as large as the screen allows; a swipe shows the next. The pose on screen is the

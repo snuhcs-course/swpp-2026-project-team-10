@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An option of Generate poses (FR-4.15): the accent's soft tint while its words are in the description. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/pix_accent_soft" android:state_checked="true" />
+    <item android:color="@color/pix_surface_2" />
+</selector>

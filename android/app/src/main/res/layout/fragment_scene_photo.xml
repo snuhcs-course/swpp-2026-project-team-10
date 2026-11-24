@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The scene photo of Generate poses, large (FR-4.15): the whole photo over the screen, with Back at the top left, as
+     the photo viewer has it. The background is the view's, so it can clear as the photo is dragged away. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/camera_bar"
+    android:fitsSystemWindows="true">
+
+    <com.lastpenguin.pix.ui.camera.ZoomablePhotoView
+        android:id="@+id/scenePhotoLarge"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@string/scene_photo_description" />
+
+    <ImageButton
+        android:id="@+id/scenePhotoBack"
+        style="@style/Widget.Pix.Header.Back"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="8dp"
+        android:contentDescription="@string/back" />
+</FrameLayout>

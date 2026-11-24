@@ -38,18 +38,18 @@
                 android:text="@string/describe_title"
                 android:textAppearance="@style/TextAppearance.Pix.Header" />
 
-            <!-- The one button (Iter3-A13): Suggest with an empty field, Generate with a description (FR-4.4, FR-4.8,
-                 US-5, #199). DescriptionForm sets its label as the field changes. Named in full, so it is a MaterialButton
-                 under any activity, which the tutorial's ring around its text needs (#204). -->
+            <!-- The one button (Iter3-A13, #199): suggested poses for an empty field, which says Auto, else poses of
+                 the description (FR-4.4, FR-4.8, FR-4.15, US-5). Named in full, so it is a MaterialButton under any
+                 activity, which the tutorial's ring around its text needs (#204). -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/generateButton"
                 style="@style/Widget.Pix.Button.Header"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/suggest_poses" />
+                android:text="@string/generate_from_description" />
         </LinearLayout>
 
-        <!-- Where this screen is in the pose flow (R&S 6.3, #210): Generate poses, 3 of 5. Across the screen, past this
+        <!-- Where this screen is in the pose flow (R&S 6.3, #210): Generate poses, 2 of 4. Across the screen, past this
              layout's padding. -->
         <com.lastpenguin.pix.ui.FlowProgressView
             android:id="@+id/flowProgress"
@@ -57,7 +57,7 @@
             android:layout_height="@dimen/flow_progress_height"
             android:layout_marginStart="-20dp"
             android:layout_marginEnd="-20dp"
-            app:flowStep="3" />
+            app:flowStep="2" />
 
         <!-- The scene photo the poses are made from. -->
         <LinearLayout
@@ -68,15 +68,38 @@
             android:gravity="center_vertical"
             android:padding="12dp">
 
-            <!-- 72 dp high and as wide as the photo's shape (showScene): 54 dp for 3:4, 9:16 narrower, 1:1 square. -->
-            <com.google.android.material.imageview.ShapeableImageView
-                android:id="@+id/sceneImage"
-                android:layout_width="54dp"
-                android:layout_height="72dp"
-                android:background="@color/pix_surface_2"
+            <!-- A tap shows the photo large (FR-4.15, ScenePhotoFragment), which the badge on its corner says. At least
+                 48 dp wide for the tap, also around a 9:16 photo. -->
+            <FrameLayout
+                android:id="@+id/scenePhotoButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:contentDescription="@string/scene_photo_description"
-                android:scaleType="centerCrop"
-                app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.SmallThumbnail" />
+                android:foreground="?attr/selectableItemBackgroundBorderless"
+                android:minWidth="48dp">
+
+                <!-- 72 dp high and as wide as the photo's shape (showScene): 54 dp for 3:4, 9:16 narrower, 1:1 square. -->
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/sceneImage"
+                    android:layout_width="54dp"
+                    android:layout_height="72dp"
+                    android:layout_gravity="center"
+                    android:background="@color/pix_surface_2"
+                    android:importantForAccessibility="no"
+                    android:scaleType="centerCrop"
+                    app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.SmallThumbnail" />
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="bottom|end"
+                    android:layout_margin="3dp"
+                    android:background="@drawable/bg_photo_badge"
+                    android:importantForAccessibility="no"
+                    android:padding="4dp"
+                    android:src="@drawable/ic_enlarge_small"
+                    app:tint="@color/pix_text" />
+            </FrameLayout>
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -91,14 +114,8 @@
                     android:textAppearance="@style/TextAppearance.Pix.Action.Small"
                     android:textColor="@color/pix_text" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="@string/generating_scene_caption"
-                    android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
-
-                <!-- The situation the photo was taken for (FR-4.8), which a new photo changes; gone on the subject's phone. -->
+                <!-- The situation the photo was taken for (FR-4.8), which a new photo changes; none for Auto, which the
+                     field says already (FR-4.15), nor from an older photographer. -->
                 <TextView
                     android:id="@+id/situationTag"
                     android:layout_width="wrap_content"
@@ -125,63 +142,80 @@
             android:textAppearance="@style/TextAppearance.Pix.Action.Small"
             android:textColor="@color/pix_text" />
 
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp">
-
-            <!-- Korean or English; input stops at 100 characters (FR-4.8). It wraps, and Done closes the keyboard. The
-                 hint is its accessibility label, so the label above does not point at it (lint LabelFor). Its end
-                 leaves room for the clear button. -->
-            <EditText
-                android:id="@+id/descriptionInput"
-                style="@style/Widget.Pix.TextField"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="@string/describe_hint"
-                android:imeOptions="actionDone"
-                android:importantForAutofill="no"
-                android:inputType="textCapSentences"
-                android:maxLength="100"
-                android:paddingEnd="48dp" />
-
-            <!-- ✕ empties the field while it holds text and is not waiting (Iter3-A13), so the one button asks for
-                 suggested poses again; on the first line, in a 48 dp touch area. -->
-            <ImageButton
-                android:id="@+id/clearDescriptionButton"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_gravity="end|top"
-                android:layout_marginTop="2dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/clear_description"
-                android:padding="15dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_close"
-                android:visibility="gone"
-                app:tint="@color/pix_text_muted"
-                tools:visibility="visible" />
-        </FrameLayout>
-
-        <!-- The counter stays at the end, under the field's right edge, with or without the message. -->
-        <LinearLayout
+        <!-- Korean or English; input stops at 100 characters (FR-4.8). It wraps, and Done closes the keyboard. Empty and
+             left alone it says Auto, with what Auto does (FR-4.15): DescriptionForm sets that as its hint, in lines as
+             high as the text's, and the example once it is tapped; it also keeps the field three lines high, which
+             Auto's hint takes, so nothing under it moves when a text replaces the hint. The hint is its accessibility
+             label, so the label above does not point at it (lint LabelFor). Nothing stands in it but its text. -->
+        <EditText
+            android:id="@+id/descriptionInput"
+            style="@style/Widget.Pix.TextField"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:gravity="end">
+            android:gravity="top|start"
+            android:hint="@string/describe_hint"
+            android:imeOptions="actionDone"
+            android:importantForAutofill="no"
+            android:inputType="textCapSentences"
+            android:lineHeight="@dimen/description_line_height"
+            android:maxLength="100" />
 
-            <!-- Shown after the service refused every pose of the description, for the photo or the text; the text is kept (US-5). -->
-            <TextView
-                android:id="@+id/descriptionError"
+        <!-- Shown after the service refused every pose of the description, for the photo or the text; the text is kept
+             (US-5). On a line of its own, over the one that leads to typing or back to Auto. -->
+        <TextView
+            android:id="@+id/descriptionError"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:accessibilityLiveRegion="polite"
+            android:text="@string/description_refused"
+            android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+            android:textColor="@color/pix_danger_text"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+        <!-- One line under the field, which says how to get to the other way (FR-4.15): to typing while the field says
+             Auto, back to Auto while it holds text; then the counter at its end, under the field's right edge. One
+             touch target high in every state, so nothing under it moves when one takes the other's place. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:gravity="center_vertical">
+
+            <FrameLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:accessibilityLiveRegion="polite"
-                android:text="@string/description_refused"
-                android:textAppearance="@style/TextAppearance.Pix.Body.Small"
-                android:textColor="@color/pix_danger_text"
-                android:visibility="gone"
-                tools:visibility="visible" />
+                android:layout_height="match_parent"
+                android:layout_weight="1">
+
+                <!-- Under a field that says Auto: it can be typed in. A little stronger than a caption, with a pencil
+                     in the accent, since it is all there is under the field then. -->
+                <TextView
+                    android:id="@+id/descriptionHelper"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:drawablePadding="6dp"
+                    android:drawableStart="@drawable/ic_edit_small"
+                    android:drawableTint="@color/pix_accent"
+                    android:text="@string/describe_auto_helper"
+                    android:textAppearance="@style/TextAppearance.Pix.Label"
+                    android:textColor="@color/pix_text_soft" />
+
+                <!-- Back to Auto, in the same place while the field holds text and is not waiting (Iter3-A13's ✕ before):
+                     it empties the field, so the one button asks for suggested poses again. A sentence with an arrow
+                     turning back, not a mark inside the field, which read as part of the text. -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/clearDescriptionButton"
+                    style="@style/Widget.Pix.Button.Text.Line"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_gravity="start"
+                    android:text="@string/back_to_auto"
+                    android:visibility="gone"
+                    app:icon="@drawable/ic_undo_small"
+                    tools:visibility="visible" />
+            </FrameLayout>
 
             <TextView
                 android:id="@+id/descriptionCounter"
@@ -205,8 +239,36 @@
             tools:text="Joonhyung is typing…"
             tools:visibility="visible" />
 
-        <!-- The descriptions used before (FR-4.11), hidden while there are none: the header with, in a session with a
-             friend, the All / With <name> switch, then the entries as chips, newest first, each with a ✕. -->
+        <!-- The options (FR-4.15), once the field was tapped or holds text: the situation's poses as chips, one
+             item_option_chip each. A tap writes the chip's words into the field, and another takes them out. -->
+        <LinearLayout
+            android:id="@+id/optionsSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:accessibilityHeading="true"
+                android:text="@string/options_label"
+                android:textAppearance="@style/TextAppearance.Pix.Overline" />
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/optionChips"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                app:chipSpacingHorizontal="8dp"
+                app:chipSpacingVertical="0dp" />
+        </LinearLayout>
+
+        <!-- The descriptions used before (FR-4.11), hidden while there are none, and under a field that says Auto until
+             it is tapped (FR-4.15): the header with, in a session with a friend, the All / With <name> switch, then the
+             entries as chips, newest first, each with a ✕. -->
         <LinearLayout
             android:id="@+id/historySection"
             android:layout_width="match_parent"

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.animation.Animator
@@ -13,6 +13,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
+import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.lifecycle.Lifecycle
@@ -29,6 +30,7 @@ import com.lastpenguin.pix.databinding.FragmentPickPoseBinding
 import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.PoseRequest
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.NoPersonFoundException
 import com.lastpenguin.pix.session.FakeCameraController
@@ -55,6 +57,8 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -67,11 +71,16 @@ import org.robolectric.shadows.ShadowToast
 
 /*
  * The four generation screens (R&S 6.3, FR-4.4–4.8, US-5; Testing Documentation 2.1.6) on the real Fragments,
- * with the shared GenerationViewModel put in the right phase before each screen's view is created. Generate poses: opens with the scene and the
+ * with the shared GenerationViewModel put in the right phase before each screen's view is created. Generate poses: opens with the scene,
+ * its field saying Auto and nothing under it (FR-4.15); a tap on the field shows the options and the
  * descriptions used before, newest first (FR-4.11; none hides them; a chip fills the field, and its ✕ drops it; in an
  * invitation's session, the switch to the ones used with the friend, kept while the link reconnects, for a set started
  * meanwhile), the one button starts a run, of the text or of suggested poses for an empty field (Iter3-A13), and opens
- * Generating poses; Back (the photo's review on Camera, the text kept); in a session, the hint, this
+ * Generating poses; the situation named on the photo's card and its options, Auto naming none and offering its own,
+ * and a run of an option's words alone (FR-4.15); a tap on the photo showing it large, once however often it is tapped,
+ * closed by its Back and by a tap on it (FR-4.15); straight from the shutter, the photo taken as arrived, so it comes
+ * in once, and none to come when the screen opens again from a set (#296; its move is in SceneArrivalTest); Back and system back to the camera to
+ * shoot again, the text kept (#296); Back (the photo's review on Camera, the text kept); in a session, the hint, this
  * phone's typing holding the field, the subject's typing shown and holding it, and the subject's Generate 4 poses that
  * comes first, which opens Generating poses (Design 2.6.5). Generating poses: the set
  * planned, candidates arriving with the count, all ready (to Pick a pose), none ready (to Couldn't create poses),
@@ -170,7 +179,6 @@ class GenerationScreensTest {
         activity.viewModel<GenerationViewModel>().apply {
             beginScene()
             takeScene()
-            useScene()
         }
 
     private fun generating(activity: FragmentActivity, description: String = "hands on hips") =
@@ -188,7 +196,7 @@ class GenerationScreensTest {
         (0 until historyChips.childCount).map { (historyChips.getChildAt(it) as Chip).text.toString() }
 
     @Test
-    fun describe_opensWithTheScene_andTheDescriptionsUsedBefore_newestFirst() {
+    fun describe_opensWithTheScene_sayingAuto_andATapShowsTheOptionsAndTheDescriptionsUsedBefore_newestFirst() {
         val modules = modules()
         usedBefore(modules)
         val (s, _) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }
@@ -198,11 +206,24 @@ class GenerationScreensTest {
         s.onFragment { fragment ->
             val binding = FragmentDescribePoseBinding.bind(fragment.requireView())
             assertNotNull(binding.sceneImage.drawable)
+            // The field says Auto, and nothing is under it but the line that says to tap it (FR-4.15).
+            assertEquals(string(R.string.describe_auto), binding.descriptionInput.hint.toString().lines().first())
+            assertEquals(View.VISIBLE, binding.descriptionHelper.visibility)
+            assertEquals(View.GONE, binding.optionsSection.visibility)
+            assertEquals(View.GONE, binding.historySection.visibility)
+            assertEquals(View.GONE, binding.descriptionError.visibility)
+
+            binding.descriptionInput.requestFocus()
+        }
+        idle()
+
+        s.onFragment { fragment ->
+            val binding = FragmentDescribePoseBinding.bind(fragment.requireView())
+            assertEquals(View.VISIBLE, binding.optionsSection.visibility)
             assertEquals(View.VISIBLE, binding.historySection.visibility)
             assertEquals(View.GONE, binding.historyFilter.visibility)
             assertEquals(listOf("Wave", "Jump"), binding.chipTexts())
             assertEquals(string(R.string.description_counter, 0, 100), binding.descriptionCounter.text.toString())
-            assertEquals(View.GONE, binding.descriptionError.visibility)
         }
     }
 
@@ -214,6 +235,7 @@ class GenerationScreensTest {
         idle()
 
         s.onFragment { fragment ->
+            FragmentDescribePoseBinding.bind(fragment.requireView()).descriptionInput.requestFocus()
             assertEquals(View.GONE, FragmentDescribePoseBinding.bind(fragment.requireView()).historySection.visibility)
         }
     }
@@ -334,17 +356,156 @@ class GenerationScreensTest {
         scenario = s
 
         s.onFragment {
-            val button = FragmentDescribePoseBinding.bind(it.requireView()).generateButton
-            assertEquals(it.getString(R.string.suggest_poses), button.text.toString())
-            button.performClick()
+            val binding = FragmentDescribePoseBinding.bind(it.requireView())
+            // The field says Auto, and the button reads the same as with a description (FR-4.15).
+            assertEquals(string(R.string.describe_auto), binding.descriptionInput.hint.toString().lines().first())
+            assertEquals(it.getString(R.string.generate_from_description), binding.generateButton.text.toString())
+            binding.generateButton.performClick()
         }
         idle()
         assertEquals(PoseRequest.Suggested, modules.generator.runs.single().request)
         assertEquals(R.id.generatingFragment, nav.currentDestination?.id)
     }
 
+    /** Generate poses for a scene photo taken for [situation]. */
+    private fun describing(activity: FragmentActivity, situation: Situation): GenerationViewModel =
+        activity.viewModel<GenerationViewModel>().apply {
+            chooseSituation(situation)
+            beginScene()
+            takeScene()
+        }
+
+    private fun FragmentDescribePoseBinding.optionTexts(): List<String> =
+        (0 until optionChips.childCount).map { (optionChips.getChildAt(it) as Chip).text.toString() }
+
+    /** The scene photo shown large over [fragment], or null while it is not. */
+    private fun largePhotoOf(fragment: Fragment): ScenePhotoFragment? =
+        fragment.childFragmentManager.findFragmentByTag(ScenePhotoFragment.TAG) as ScenePhotoFragment?
+
     @Test
-    fun describe_backAndSystemBack_returnToThePhotosReview_withTheTextKept() {
+    fun describe_namesTheSituationOnThePhotosCard_andOffersItsOptions() {
+        modules()
+        val (s, _) =
+            launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it, Situation.FULL_BODY) }
+        scenario = s
+
+        s.onFragment {
+            val binding = FragmentDescribePoseBinding.bind(it.requireView())
+            assertEquals(View.VISIBLE, binding.situationTag.visibility)
+            assertEquals(string(R.string.situation_full_body), binding.situationTag.text.toString())
+            assertEquals(Situation.FULL_BODY.poseOptions.map { id -> string(id) }, binding.optionTexts())
+        }
+    }
+
+    @Test
+    fun describe_forAuto_namesNoSituation_andOffersAutosOptions() {
+        modules()
+        val (s, _) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }
+        scenario = s
+
+        s.onFragment {
+            val binding = FragmentDescribePoseBinding.bind(it.requireView())
+            // The field says Auto already; a tag that says it too would be the same word twice.
+            assertEquals(View.GONE, binding.situationTag.visibility)
+            assertEquals(Situation.DEFAULT.poseOptions.map { id -> string(id) }, binding.optionTexts())
+        }
+    }
+
+    @Test
+    fun describe_anOptionAlone_startsARunOfItsWords() {
+        val modules = modules()
+        val (s, nav) =
+            launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it, Situation.FULL_BODY) }
+        scenario = s
+
+        s.onFragment {
+            val binding = FragmentDescribePoseBinding.bind(it.requireView())
+            binding.optionChips.getChildAt(0).performClick()
+            assertEquals(string(R.string.pose_option_peace_sign), binding.descriptionInput.text.toString())
+            binding.generateButton.performClick()
+        }
+        idle()
+
+        assertEquals(
+            PoseRequest.Described(string(R.string.pose_option_peace_sign)),
+            modules.generator.runs.single().request,
+        )
+        assertEquals(R.id.generatingFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun describe_straightFromTheShutter_takesThePhotoAsArrived_soItComesInOnce() {
+        modules()
+        var arriving = false
+        val (s, _) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { activity ->
+            arriving = describing(activity).uiState.value.sceneArriving
+        }
+        scenario = s
+
+        // It came from the shutter, and the screen has shown it coming (SceneArrivalTest): not again.
+        assertTrue(arriving)
+        s.onFragment {
+            assertFalse(it.requireActivity().viewModel<GenerationViewModel>().uiState.value.sceneArriving)
+        }
+    }
+
+    @Test
+    fun describe_openedAgainFromASet_hasNoPhotoToCome() {
+        modules()
+        var arriving = true
+        val (s, _) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { activity ->
+            // Back from Generating poses: the photo was on this screen before.
+            arriving = generating(activity).apply { stopGenerating() }.uiState.value.sceneArriving
+        }
+        scenario = s
+
+        assertFalse(arriving)
+    }
+
+    @Test
+    fun describe_aTapOnThePhoto_showsItLarge_once_andBackClosesIt() {
+        modules()
+        val (s, _) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }
+        scenario = s
+        s.onFragment { assertNull(largePhotoOf(it)) }
+
+        s.onFragment {
+            val button = FragmentDescribePoseBinding.bind(it.requireView()).scenePhotoButton
+            button.performClick()
+            button.performClick()
+        }
+        idle()
+
+        s.onFragment { fragment ->
+            assertEquals(1, fragment.childFragmentManager.fragments.count { it is ScenePhotoFragment })
+            val large = checkNotNull(largePhotoOf(fragment)).requireView()
+            val photo = large.findViewById<ImageView>(R.id.scenePhotoLarge)
+            assertSame(fragment.scenePhoto, (photo.drawable as BitmapDrawable).bitmap)
+            large.findViewById<View>(R.id.scenePhotoBack).performClick()
+        }
+        idle()
+
+        s.onFragment { assertNull(largePhotoOf(it)) }
+    }
+
+    @Test
+    fun describe_aTapOnTheLargePhoto_closesIt() {
+        modules()
+        val (s, _) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }
+        scenario = s
+        s.onFragment { FragmentDescribePoseBinding.bind(it.requireView()).scenePhotoButton.performClick() }
+        idle()
+
+        s.onFragment {
+            checkNotNull(largePhotoOf(it)).requireView().findViewById<View>(R.id.scenePhotoLarge).performClick()
+        }
+        idle()
+
+        s.onFragment { assertNull(largePhotoOf(it)) }
+    }
+
+    @Test
+    fun describe_backAndSystemBack_returnToTheCameraToShootAgain_withTheTextKept() {
         val back: List<(DescribePoseFragment) -> Unit> = listOf(
             { FragmentDescribePoseBinding.bind(it.requireView()).backButton.performClick() },
             { it.requireActivity().onBackPressedDispatcher.onBackPressed() },
@@ -361,8 +522,9 @@ class GenerationScreensTest {
             assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
             s.onFragment {
                 val state = it.requireActivity().viewModel<GenerationViewModel>().uiState.value
-                assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
-                assertNotNull(state.scene)
+                // The camera, to shoot again (#296): the photo is gone, and the text waits for the next one.
+                assertEquals(GenerationUiState.Phase.FRAMING, state.phase)
+                assertNull(state.scene)
                 assertEquals("Wave", state.description)
             }
             assertTrue(modules.generator.runs.isEmpty())
@@ -884,7 +1046,6 @@ class GenerationScreensTest {
             model.takeScene()
             // The scene is turned upright off the main thread, then checked for a person.
             idleUntil { model.uiState.value.let { it.scene != null && !it.checkingPerson } }
-            model.useScene()
             model.generate("hands on hips")
             val run = modules.generator.runs.single()
             run.plan(poses)

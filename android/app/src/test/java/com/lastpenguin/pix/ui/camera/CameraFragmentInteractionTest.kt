@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -210,8 +210,13 @@ class CameraFragmentInteractionTest {
     }
 
     @Test
-    fun scenePhoto_backCancelsOrShootsAgain_andUseThisPhotoOpensGeneratePoses() {
-        launch(FakeCameraController().apply { frame = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888) })
+    fun scenePhoto_backCancelsOrShootsAgain_andAPhotoWithAPersonOpensGeneratePosesByItself() {
+        val modules = launch(
+            FakeCameraController().apply {
+                frame =
+                    Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
+            },
+        )
         val nav = scenario!!.attachNav(R.id.cameraFragment)
         val generation = generation()
 
@@ -221,25 +226,28 @@ class CameraFragmentInteractionTest {
         idle()
         assertEquals(GenerationUiState.Phase.IDLE, generation.uiState.value.phase)
 
+        // Back while the photo is checked: the camera again, and nothing opens.
         generation.beginScene()
         idle()
+        modules.persons.gate = CompletableDeferred()
         onScreen { controls, _ -> controls.shutterButton.performClick() }
         idle()
-        assertEquals(GenerationUiState.Phase.REVIEWING, generation.uiState.value.phase)
+        assertEquals(GenerationUiState.Phase.CHECKING, generation.uiState.value.phase)
+        assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
         onScreen { _, fragment -> fragment.requireActivity().onBackPressedDispatcher.onBackPressed() }
         idle()
         assertEquals(GenerationUiState.Phase.FRAMING, generation.uiState.value.phase)
 
+        // One press of the shutter, with a person in the photo: Generate poses (#296).
+        modules.persons.gate = null
         onScreen { controls, _ -> controls.shutterButton.performClick() }
-        idle()
-        onScreen { controls, _ -> controls.usePhotoButton.performClick() }
         idle()
         assertEquals(R.id.describePoseFragment, nav.currentDestination?.id)
         assertEquals(GenerationUiState.Phase.DESCRIBING, generation.uiState.value.phase)
     }
 
     @Test
-    fun scenePhoto_withoutAPerson_useThisPhotoStaysOnCamera() {
+    fun scenePhoto_withoutAPerson_staysOnCamera_readyToShootAgain() {
         val modules = launch(
             FakeCameraController().apply {
                 frame =
@@ -254,12 +262,12 @@ class CameraFragmentInteractionTest {
         idle()
         onScreen { controls, _ -> controls.shutterButton.performClick() }
         idle()
-        // Even a click that reaches the disabled button opens nothing and sends nothing (FR-4.13).
-        onScreen { controls, _ -> controls.usePhotoButton.performClick() }
-        idle()
 
+        // Nothing opens and nothing is sent (FR-4.13); the shutter is there for another photo.
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
-        assertEquals(GenerationUiState.Phase.REVIEWING, generation.uiState.value.phase)
+        assertEquals(GenerationUiState.Phase.FRAMING, generation.uiState.value.phase)
+        assertTrue(generation.uiState.value.noPerson)
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.captureControls.visibility) }
         assertTrue(modules.generator.runs.isEmpty())
     }
 
@@ -666,7 +674,9 @@ class CameraFragmentInteractionTest {
     @Test
     fun scenePhoto_aTouchAnywhere_takesThePanelAway_andOnlyAnotherStartShowsItAgain() {
         val camera = FakeCameraController(hasFlash = true).apply { frame = ScreenTestSupport.bitmap(300, 400) }
-        launch(camera)
+        val modules = launch(camera)
+        // The check of the photo is held, so Back can shoot again.
+        modules.persons.gate = CompletableDeferred()
         onScreen { _, fragment -> fragment.requireActivity().viewModel<GenerationViewModel>().beginScene() }
         idle()
         onScreen { controls, _ -> assertTrue(controls.sceneGuide.isShown) }
@@ -679,7 +689,7 @@ class CameraFragmentInteractionTest {
         idle()
         onScreen { controls, _ -> assertFalse(controls.sceneGuide.isShown) }
 
-        // Shoot, and Back from the review: the camera again, without the panel.
+        // Shoot, and Back while the photo is checked: the camera again, without the panel.
         onScreen { controls, _ -> controls.shutterButton.performClick() }
         idle()
         onScreen { controls, _ -> controls.sceneBackButton.performClick() }
@@ -695,9 +705,10 @@ class CameraFragmentInteractionTest {
     }
 
     @Test
-    fun scenePhoto_whileFraming_theRatioIsChosenAsOnCamera_andIsNotOnTheReview() {
+    fun scenePhoto_whileFraming_theRatioIsChosenAsOnCamera_andNotWhileThePhotoIsHeld() {
         val camera = FakeCameraController(hasFlash = true).apply { frame = ScreenTestSupport.bitmap(300, 400) }
         val modules = launch(camera)
+        modules.persons.gate = CompletableDeferred()
         onScreen { _, fragment -> fragment.requireActivity().viewModel<GenerationViewModel>().beginScene() }
         idle()
 
@@ -715,7 +726,7 @@ class CameraFragmentInteractionTest {
         assertEquals(AspectRatio.R16_9, runBlocking { modules.settings.aspectRatio() })
         onScreen { controls, _ -> assertFalse(controls.aspectPanel.isShown) }
 
-        // The photo is taken: its ratio is the photo's, so the review has no ratio to choose.
+        // The photo is taken: its ratio is the photo's, so there is no ratio to choose while it is held.
         onScreen { controls, _ ->
             controls.aspectButton.performClick()
             controls.shutterButton.performClick()
@@ -726,8 +737,8 @@ class CameraFragmentInteractionTest {
             assertFalse(controls.aspectPanel.isShown)
         }
 
-        // The ratios were open at a shutter that no touch closed them for, as with TalkBack: Back from the review
-        // shows the camera without them.
+        // The ratios were open at a shutter that no touch closed them for, as with TalkBack: Back while the photo is
+        // checked shows the camera without them.
         onScreen { controls, _ -> controls.sceneBackButton.performClick() }
         idle()
         onScreen { controls, _ ->

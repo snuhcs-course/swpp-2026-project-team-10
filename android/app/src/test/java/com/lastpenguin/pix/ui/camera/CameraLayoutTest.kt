@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -62,6 +62,7 @@ import com.lastpenguin.pix.ui.session.SubjectFragment
 import java.time.Duration
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -93,14 +94,12 @@ private const val SCENE_PANEL_OVER_IMAGE_DP = 16
  * the thumbnail as far from the right edge, and the button beside it where Camera's shutter is, clear of both, with each of its labels at
  * font scale 1 and 1.3. The session photos' viewer over the whole screen,
  * on Subject view and on Camera.
- * The scene photo's review (R&S 6.3, #199): a 3:4 photo in the middle of the room under the bar with its message 12 dp
- * under it, a 9:16 one that leaves no room, with the message over its bottom on glass, and Use at the top right. The
- * step's title, while framing and while reviewing, on Back's and Use's line, the bar then as tall as the other
- * screens' headers, 8 dp above a 56 dp row (#204, #210).
- * A photo without a person: its alert at the start of the message's first line, not at the box's edge (#204).
+ * The scene photo just taken, held while it is checked (R&S 6.3, #296): a 3:4 photo exactly over the preview, under
+ * the flow's bar. The step's title, while framing and while the photo is held, on Back's line (#204, #210).
+ * A photo without a person: the panel that says so, whole above the shutter (#296).
  * The reference thumbnail hidden at the side (#237), in each corner: 16 dp of it in the preview, and its handle 48 dp
  * wide over that strip, inside the preview and above the zoom row; shown again, whole in its corner.
- * A photo taken with the phone held sideways, reviewed as framed while the photo sent on is turned upright (#206).
+ * A photo taken with the phone held sideways, held as framed while the photo sent on is turned upright (#206).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -251,11 +250,12 @@ class CameraLayoutTest {
         }
     }
 
-    // ---- The scene photo's review ----------------------------------------------------------------
+    // ---- The scene photo just taken, held --------------------------------------------------------
 
-    /** The scene photo step's review of a [width] x [height] px photo. */
-    private fun Camera.reviewing(width: Int, height: Int) {
+    /** The scene photo of [width] × [height] just taken, held while the phone looks for a person in it (#296). */
+    private fun Camera.holding(width: Int, height: Int) {
         (modules.camera as FakeCameraController).frame = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        modules.persons.gate = CompletableDeferred()
         val generation = activity.viewModel<GenerationViewModel>()
         generation.beginScene()
         idle()
@@ -279,33 +279,19 @@ class CameraLayoutTest {
     }
 
     @Test
-    fun scenePhotoReview_thePhotoInTheMiddleUnderTheBar_itsMessageUnderIt_andUseAtTheTopRight() {
+    fun sceneHeld_thePhotoLiesExactlyOverThePreview_underTheFlowsBar() {
         val screen = camera()
-        screen.reviewing(300, 400)
+        screen.holding(300, 400)
 
+        // Where the preview showed it, so the image seems to stop (#296).
         val photo = screen.controls.sceneStill.pictureBox()
+        val preview = screen.controls.previewContainer.box()
         assertEquals(360, photo.width())
         assertEquals(480, photo.height())
-        // As much room above, under the camera's own bar (48 dp above its overhang, #231), as below, to the screen's
-        // bottom at 705 dp.
-        assertTrue("$photo", abs((photo.top - 48) - (705 - photo.bottom)) <= 1)
-        val message = screen.controls.sceneMessage
-        assertTrue("${message.box()} under $photo", abs(message.box().top - (photo.bottom + 12)) <= 1)
-        assertNull(message.background)
-        // The flow's bar shows over the review, at the bar's bottom edge (#210).
+        assertTrue("$photo over $preview", abs(photo.top - preview.top) <= 1 && abs(photo.left - preview.left) <= 1)
+        // The flow's bar shows over it, at the bar's bottom edge (#210).
         assertTrue(screen.controls.sceneProgress.isShown)
-        assertTrue(screen.controls.sceneProgress.z > screen.controls.sceneReview.z)
-
-        // Use draws 40 dp in the middle of the bar above its overhang, on Back's line, its right edge 20 dp from the
-        // screen's (#210, #231).
-        val use = screen.controls.usePhotoButton as MaterialButton
-        val box = use.box()
-        val density = use.resources.displayMetrics.density
-        val drawnTop = box.top + (use.insetTop / density).roundToInt()
-        val drawnBottom = box.bottom - (use.insetBottom / density).roundToInt()
-        assertEquals(340, box.right)
-        assertEquals(40, drawnBottom - drawnTop)
-        assertEquals(24, (drawnTop + drawnBottom) / 2)
+        assertTrue(screen.controls.sceneProgress.z > screen.controls.sceneStill.z)
     }
 
     /** The middle of [this] on the screen, in dp. */
@@ -333,13 +319,14 @@ class CameraLayoutTest {
         assertEquals(icon, (screen.controls.sceneBackButton as MaterialButton).iconSize)
 
         (screen.modules.camera as FakeCameraController).frame = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
+        screen.modules.persons.gate = CompletableDeferred()
         generation.takeScene()
         idle()
-        assertEquals("reviewing", bar, screen.controls.topBar.box())
+        assertEquals("the photo held", bar, screen.controls.topBar.box())
     }
 
     @Test
-    fun scenePhoto_theTitle_isOnBacksLine_whileFramingAndReviewing() {
+    fun scenePhoto_theTitle_isOnBacksLine_whileFramingAndWhileThePhotoIsHeld() {
         val screen = camera()
         val generation = screen.activity.viewModel<GenerationViewModel>()
         generation.beginScene()
@@ -352,9 +339,10 @@ class CameraLayoutTest {
         assertEquals("framing", backMiddle, screen.controls.sceneTitle.middle(), 1f)
 
         (screen.modules.camera as FakeCameraController).frame = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
+        screen.modules.persons.gate = CompletableDeferred()
         generation.takeScene()
         idle()
-        assertEquals("reviewing", backMiddle, screen.controls.sceneTitle.middle(), 1f)
+        assertEquals("the photo held", backMiddle, screen.controls.sceneTitle.middle(), 1f)
     }
 
     @Test
@@ -430,24 +418,12 @@ class CameraLayoutTest {
     }
 
     @Test
-    fun scenePhotoReview_aPhotoThatLeavesNoRoom_hasItsMessageOverItsBottom_onGlass() {
-        val screen = camera()
-        screen.reviewing(288, 512)
-
-        val photo = screen.controls.sceneStill.pictureBox()
-        val message = screen.controls.sceneMessage
-        assertTrue("${message.box()} over $photo", message.box().top < photo.bottom)
-        assertTrue("${message.box()} 20 dp above the bottom", message.box().bottom <= 705 - 20)
-        assertNotNull(message.background)
-    }
-
-    @Test
-    fun scenePhotoReview_heldSideways_showsThePhotoAsFramed_andKeepsItUprightForThePoses() {
+    fun sceneHeld_sideways_showsThePhotoAsFramed_andKeepsItUprightForThePoses() {
         val screen = camera()
         screen.modules.turns.set(90)
-        screen.reviewing(300, 400)
+        screen.holding(300, 400)
         val generation = screen.activity.viewModel<GenerationViewModel>()
-        idleUntil { generation.uiState.value.phase == GenerationUiState.Phase.REVIEWING }
+        idleUntil { generation.uiState.value.phase == GenerationUiState.Phase.CHECKING }
         idle()
 
         val shown = screen.controls.sceneStill.drawable
@@ -457,21 +433,25 @@ class CameraLayoutTest {
     }
 
     @Test
-    fun scenePhotoReview_withoutAPerson_theAlertStartsTheFirstLine_besideItsWords() {
+    fun sceneWithoutAPerson_thePanelThatSaysSo_isWholeAboveTheShutter() {
         val screen = camera()
         screen.modules.persons.found = false
-        screen.reviewing(300, 400)
+        (screen.modules.camera as FakeCameraController).frame = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
+        val generation = screen.activity.viewModel<GenerationViewModel>()
+        generation.beginScene()
+        idle()
+        generation.takeScene()
+        idle()
 
-        val message = screen.controls.sceneMessage
-        val text = message.text as Spanned
-        // Not at the box's left edge, apart from centered lines (#204): in the text, before the first word.
-        assertTrue(message.compoundDrawablesRelative.all { it == null })
-        val alert = text.getSpans(0, text.length, InlineIconSpan::class.java).single()
-        assertEquals(0, text.getSpanStart(alert))
-        assertEquals(message.context.getString(R.string.scene_no_person_body), text.toString().trim())
-        // Never alone on a line, and two lines break evenly.
-        assertEquals(message.layout.getLineForOffset(0), message.layout.getLineForOffset(1))
-        assertEquals(LineBreaker.BREAK_STRATEGY_BALANCED, message.breakStrategy)
+        // Two lines of text at most at this width, in the panel where the framing hint stood (#296).
+        val panel = screen.controls.sceneGuide.box()
+        assertTrue(screen.controls.sceneGuide.isShown)
+        assertEquals(
+            screen.activity.getString(R.string.scene_no_person_title),
+            screen.controls.sceneGuideText.text.toString(),
+        )
+        assertTrue("$panel above the shutter", panel.bottom <= screen.controls.shutterButton.box().top)
+        assertTrue("$panel on the screen", panel.left >= 0 && panel.right <= 360)
     }
 
     // ---- Ratios -----------------------------------------------------------------------------

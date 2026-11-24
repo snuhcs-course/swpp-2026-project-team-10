@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -84,7 +84,7 @@ class GeneratingFragment : Fragment(R.layout.fragment_generating) {
             // Nothing is being generated, for example after the app process was restarted on this screen.
             GenerationUiState.Phase.IDLE,
             GenerationUiState.Phase.FRAMING,
-            GenerationUiState.Phase.REVIEWING,
+            GenerationUiState.Phase.CHECKING,
             GenerationUiState.Phase.DESCRIBING,
             -> navController.popBackStack(R.id.cameraFragment, false)
         }

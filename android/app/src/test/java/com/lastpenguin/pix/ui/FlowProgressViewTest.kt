@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.animation.ValueAnimator
@@ -25,7 +25,8 @@ import org.robolectric.shadows.ShadowChoreographer
  * The pose flow's bar (FlowProgressView, R&S 6.3, #210). Partitions: a step inside the flow, none, and past either end
  * (boundary); a move to another step, to the same step during a move, and with the phone's animations off; the screens
  * that show it from their layout, Generate poses, the set being generated, and Pick a pose, each at its step and across
- * the screen's width, past the layout's padding. The camera's scene photo steps are in CameraFragmentRenderTest, and
+ * the screen's width, past the layout's padding; four steps, since the scene photo's review went (#296). The camera's
+ * scene photo step is in CameraFragmentRenderTest, and
  * the bar filling as the step starts in CameraTransitionTest.
  */
 @RunWith(AndroidJUnit4::class)
@@ -58,7 +59,7 @@ class FlowProgressViewTest {
         assertEquals(0f, bar.fraction, 0f)
 
         bar.step = 3
-        assertEquals(0.6f, bar.fraction, 0.001f)
+        assertEquals(0.75f, bar.fraction, 0.001f)
 
         bar.step = FlowProgressView.STEPS + 4
         assertEquals(FlowProgressView.STEPS, bar.step)
@@ -76,20 +77,20 @@ class FlowProgressViewTest {
 
         bar.moveTo(2)
         assertEquals(2, bar.step)
-        assertEquals(0.4f, bar.fraction, 0.001f)
-        assertEquals(0.2f, bar.filled, 0.001f)
+        assertEquals(0.5f, bar.fraction, 0.001f)
+        assertEquals(0.25f, bar.filled, 0.001f)
         // The same step again: the move goes on.
         bar.moveTo(2)
         play(500)
-        assertEquals(0.4f, bar.filled, 0.001f)
+        assertEquals(0.5f, bar.filled, 0.001f)
 
         // Set, a step shows at once.
-        bar.step = 4
-        assertEquals(0.8f, bar.filled, 0.001f)
+        bar.step = 3
+        assertEquals(0.75f, bar.filled, 0.001f)
 
         setAnimatorScale(0f)
         bar.moveTo(1)
-        assertEquals(0.2f, bar.filled, 0.001f)
+        assertEquals(0.25f, bar.filled, 0.001f)
     }
 
     @Test
@@ -98,9 +99,9 @@ class FlowProgressViewTest {
         val width = (360 * density).toInt()
         val height = (705 * density).toInt()
         for ((layout, step) in listOf(
-            R.layout.fragment_describe_pose to 3,
-            R.layout.fragment_generating to 4,
-            R.layout.fragment_pick_pose to 5,
+            R.layout.fragment_describe_pose to 2,
+            R.layout.fragment_generating to 3,
+            R.layout.fragment_pick_pose to 4,
         )) {
             val root = LayoutInflater.from(context).inflate(layout, null) as ViewGroup
             root.measure(

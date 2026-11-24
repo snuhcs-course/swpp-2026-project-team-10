@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.settings
 
 import android.Manifest
@@ -145,7 +145,6 @@ class TutorialLayoutTest {
             activity.viewModel<GenerationViewModel>().apply {
                 beginScene()
                 takeScene()
-                useScene()
             }
         }.first
         idle()

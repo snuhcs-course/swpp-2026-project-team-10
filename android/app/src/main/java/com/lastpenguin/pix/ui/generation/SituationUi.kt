@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.view.LayoutInflater
@@ -53,6 +53,67 @@ internal val Situation.drawing: Int
         Situation.FULL_BODY -> R.drawable.situation_full_body
         Situation.LANDMARK -> R.drawable.situation_landmark
         Situation.SELFIE -> R.drawable.situation_selfie
+    }
+
+/**
+ * The options Generate poses offers under its field (FR-4.15, [#274]): poses often taken in the situation, each a few
+ * words that go into the description as they are (PoseOptions). A fixed list on the phone, so they cost no request and
+ * show at once; *Auto*'s serve a photo without a situation, as from an older photographer. Each was tried once as a
+ * description (Design 2.6.3): "facing the landmark" turned the view around instead of the person, and is not offered.
+ */
+internal val Situation.poseOptions: List<Int>
+    get() = when (this) {
+        Situation.DEFAULT -> listOf(
+            R.string.pose_option_peace_sign,
+            R.string.pose_option_waving,
+            R.string.pose_option_hand_in_pocket,
+            R.string.pose_option_arms_crossed,
+            R.string.pose_option_looking_back,
+            R.string.pose_option_arms_up,
+        )
+
+        Situation.HALF_BODY -> listOf(
+            R.string.pose_option_peace_sign,
+            R.string.pose_option_cheek_heart,
+            R.string.pose_option_chin_on_hand,
+            R.string.pose_option_arms_crossed,
+            R.string.pose_option_hand_through_hair,
+            R.string.pose_option_waving,
+        )
+
+        Situation.FULL_BODY -> listOf(
+            R.string.pose_option_peace_sign,
+            R.string.pose_option_hand_in_pocket,
+            R.string.pose_option_looking_back,
+            R.string.pose_option_walking,
+            R.string.pose_option_arms_up,
+            R.string.pose_option_thumbs_up,
+        )
+
+        Situation.BACKGROUND -> listOf(
+            R.string.pose_option_back_view,
+            R.string.pose_option_looking_far,
+            R.string.pose_option_walking_away,
+            R.string.pose_option_arms_wide,
+            R.string.pose_option_sitting_looking,
+        )
+
+        Situation.LANDMARK -> listOf(
+            R.string.pose_option_pointing,
+            R.string.pose_option_arms_wide,
+            R.string.pose_option_on_the_palm,
+            R.string.pose_option_peace_sign,
+            R.string.pose_option_arms_up,
+        )
+
+        Situation.SELFIE -> listOf(
+            R.string.pose_option_peace_sign,
+            R.string.pose_option_cheek_heart,
+            R.string.pose_option_wink,
+            R.string.pose_option_chin_in_hands,
+            R.string.pose_option_finger_on_cheek,
+            R.string.pose_option_waving,
+        )
     }
 
 /**

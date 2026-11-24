@@ -129,6 +129,12 @@
             app:destination="@id/generatingFragment"
             app:popUpTo="@id/describePoseFragment"
             app:popUpToInclusive="true" />
+        <!-- View on the notice that the poses are in the library (#297): the pose flow ends, so Back is Camera. -->
+        <action
+            android:id="@+id/action_describePose_to_library"
+            app:destination="@id/libraryFragment"
+            app:popUpTo="@id/describePoseFragment"
+            app:popUpToInclusive="true" />
     </fragment>
 
     <fragment

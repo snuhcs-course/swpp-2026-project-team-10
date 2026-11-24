@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -69,6 +69,7 @@ object PixViewModels {
                 share = container.poseSyncer,
                 descriptions = container.descriptionSyncer,
                 history = container.promptHistory,
+                library = container.poseLibrary,
                 partner = { container.sessionManager.state.value.partner },
                 phoneTurn = container.phoneTurns.turn,
             )
@@ -111,7 +112,7 @@ object PixViewModels {
         initializer {
             SubjectGeneratingViewModel(container.sessionManager, container.poseSyncer, container.descriptionSyncer)
         }
-        initializer { PoseSaveViewModel(container.referenceGuideMaker, container.savedGuideStore) }
+        initializer { PoseSaveViewModel(container.poseLibrary, container.savedGuideStore) }
         initializer { SubjectConfirmViewModel(container.sessionManager, container.confirmSyncer) }
         initializer {
             SubjectDescribeViewModel(container.sessionManager, container.descriptionSyncer, container.promptHistory)

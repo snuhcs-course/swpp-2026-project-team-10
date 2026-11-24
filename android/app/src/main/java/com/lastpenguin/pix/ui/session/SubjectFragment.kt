@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.animation.Animator
@@ -37,7 +37,6 @@ import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
-import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.PoseSetStep
@@ -384,12 +383,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                     viewModel.guideSaveNotices.collect { notice ->
                         val text = when (notice) {
                             GuideSaveNotice.SAVED -> getString(R.string.guide_saved_notice)
-
-                            GuideSaveNotice.SAVED_OLDEST_REMOVED ->
-                                getString(R.string.guide_saved_oldest_removed_notice, SavedGuideStore.MAX_SAVED)
-
                             GuideSaveNotice.REMOVED -> getString(R.string.guide_removed_notice)
-
                             GuideSaveNotice.FAILED -> getString(R.string.guide_save_failed_notice)
                         }
                         showToggleLabel(binding, text, guideSaveIcon(notice), guideSaveTint(notice))

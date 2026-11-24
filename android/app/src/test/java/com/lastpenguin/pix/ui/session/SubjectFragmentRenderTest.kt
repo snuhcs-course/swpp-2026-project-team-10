@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -1160,8 +1160,8 @@ class SubjectFragmentRenderTest {
         }
         idle()
 
-        // A second tap takes it out of the saved guides again (FR-6.16).
-        assertTrue(modules.saved.saved.value.isEmpty())
+        // A second tap makes it history again, still on this phone (FR-6.16, #297).
+        assertEquals(listOf("guide-1" to false), modules.saved.saved.value.map { it.id to it.favorite })
         onScreen { binding, _ ->
             assertEquals(string(R.string.guide_removed_notice), binding.toggleLabel.text.toString())
             assertEquals(string(R.string.save_guide), binding.saveGuideButton.contentDescription)

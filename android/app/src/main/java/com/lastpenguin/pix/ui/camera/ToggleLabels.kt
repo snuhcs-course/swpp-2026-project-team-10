@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.content.res.ColorStateList
@@ -37,17 +37,17 @@ internal fun setLabelIcon(chip: TextView, @DrawableRes icon: Int, @ColorRes tint
     TextViewCompat.setCompoundDrawableTintList(chip, ColorStateList.valueOf(context.getColor(tint)))
 }
 
-/** The bookmark of a *Save guide* notice: filled once saved, empty once removed. */
+/** The bookmark of a *Save guide* notice: filled once a favorite, empty once it is not (#297). */
 @DrawableRes
 internal fun guideSaveIcon(notice: GuideSaveNotice): Int = when (notice) {
-    GuideSaveNotice.SAVED, GuideSaveNotice.SAVED_OLDEST_REMOVED -> R.drawable.ic_bookmark_filled
+    GuideSaveNotice.SAVED -> R.drawable.ic_bookmark_filled
     GuideSaveNotice.REMOVED -> R.drawable.ic_bookmark
     GuideSaveNotice.FAILED -> R.drawable.ic_alert_small
 }
 
 @ColorRes
 internal fun guideSaveTint(notice: GuideSaveNotice): Int = when (notice) {
-    GuideSaveNotice.SAVED, GuideSaveNotice.SAVED_OLDEST_REMOVED -> R.color.pix_accent
+    GuideSaveNotice.SAVED -> R.color.pix_accent
     GuideSaveNotice.REMOVED -> R.color.pix_text
     GuideSaveNotice.FAILED -> R.color.pix_danger
 }

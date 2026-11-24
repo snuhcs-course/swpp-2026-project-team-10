@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -17,6 +17,7 @@ import com.lastpenguin.pix.generation.GenerationFailedException
 import com.lastpenguin.pix.generation.PersonDetector
 import com.lastpenguin.pix.generation.PlannedPose
 import com.lastpenguin.pix.generation.PoseGenerator
+import com.lastpenguin.pix.generation.PoseLibrary
 import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.PromptEntry
 import com.lastpenguin.pix.generation.PromptHistory
@@ -38,7 +39,9 @@ import kotlin.random.Random
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,6 +49,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -152,9 +156,15 @@ data class GenerationUiState(
 
 /**
  * What *Select* hands on to Reference confirm: the candidate, what its tip is asked from (FR-4.10), and how the phone
- * was held for the scene photo, which the guide is turned back by on the camera (Design 2.6.2).
+ * was held for the scene photo, which the guide is turned back by on the camera (Design 2.6.2), and the set's situation,
+ * which the guide keeps for the library (#270).
  */
-data class PoseUse(val image: Bitmap, val tipSource: TipSource?, val turn: Int = 0)
+data class PoseUse(
+    val image: Bitmap,
+    val tipSource: TipSource?,
+    val turn: Int = 0,
+    val situation: Situation? = null,
+)
 
 /**
  * Pose generation (Design 2.2, Figure 8). Shared by the Camera screen, for the scene photo, and the four
@@ -165,7 +175,9 @@ data class PoseUse(val image: Bitmap, val tipSource: TipSource?, val turn: Int =
  * session's friend from [partner] as the set started, once the server has accepted the description: a set whose first
  * candidate arrives (FR-4.11). A description the service refuses is not kept, also when its
  * variations give candidates, and leaves the history if it was there; the subject's phone is told with the failure
- * ([share]). Back on each screen goes one step back; Back from Pick a pose discards the set (#199).
+ * ([share]). Back on each screen goes one step back; Back from Pick a pose discards the set (#199). Each candidate
+ * that arrives is kept in the library as history through [library] (#297), so Back on *Generating poses* and *Pick a
+ * pose* asks nothing, and [posesKept] says where the poses went.
  * Owner: Server/AI/Sync (#7); Generate poses and the set on both phones Iter3-P16; the history Iter3-P24.
  */
 class GenerationViewModel(
@@ -177,6 +189,8 @@ class GenerationViewModel(
     private val share: PoseShare = PoseShare.None,
     private val descriptions: DescriptionShare = DescriptionShare.None,
     private val history: PromptHistory = PromptHistory.InMemory(),
+    /** Where each candidate is kept as history (#297); none keeps nothing, as in the tests of other parts. */
+    private val library: PoseLibrary? = null,
     /** How the phone is held (`PhoneTurns`): the scene photo is turned upright as it was at the shutter (FR-4.3). */
     private val phoneTurn: StateFlow<Int> = MutableStateFlow(0),
     /** Where a scene photo taken sideways is turned, off the main thread. */
@@ -197,6 +211,14 @@ class GenerationViewModel(
 
     /** Whether *Selfie* can be chosen: only on a phone with a front camera (FR-1.14, FR-4.8). */
     val selfieAvailable: StateFlow<Boolean> = camera.hasFrontCamera
+
+    private val _posesKept = Channel<Unit>(Channel.BUFFERED)
+
+    /**
+     * Back left a set with candidates for Generate poses (#297): its poses are in the library, which Generate poses
+     * says, with *View*. Read once.
+     */
+    val posesKept: Flow<Unit> = _posesKept.receiveAsFlow()
 
     private var generating: Job? = null
     private var shooting: Job? = null
@@ -569,7 +591,7 @@ class GenerationViewModel(
         get() = phase == GenerationUiState.Phase.DESCRIBING && descriptionWriter != Role.SUBJECT
 
     /**
-     * Back on Pick a pose, once confirmed, and on Couldn't create poses: Generate poses with the photo and the text
+     * Back on Pick a pose and on Couldn't create poses: Generate poses with the photo and the text
      * kept and the set discarded, on the subject's phone too; nothing is sent until the user asks again (FR-4.6, US-5,
      * #199).
      */
@@ -577,6 +599,7 @@ class GenerationViewModel(
         val state = _uiState.value
         val ended = state.phase == GenerationUiState.Phase.PICKING || state.phase == GenerationUiState.Phase.FAILED
         if (!ended || state.scene == null) return
+        if (state.phase == GenerationUiState.Phase.PICKING) tellPosesKept(state)
         _uiState.update {
             it.copy(
                 phase = GenerationUiState.Phase.DESCRIBING,
@@ -604,7 +627,7 @@ class GenerationViewModel(
     }
 
     /**
-     * Back on Generating poses: the requests stop and Generate poses shows again with the photo and the text, on the
+     * Back on Generating poses: the requests stop, the candidates that came are in the library (#297), and Generate poses shows again with the photo and the text, on the
      * subject's phone too (#199).
      */
     fun stopGenerating() {
@@ -613,6 +636,7 @@ class GenerationViewModel(
         generating?.cancel()
         generating = null
         closeSet()
+        tellPosesKept(state)
         _uiState.update {
             it.copy(
                 phase = GenerationUiState.Phase.DESCRIBING,
@@ -626,6 +650,11 @@ class GenerationViewModel(
             )
         }
         openDescription()
+    }
+
+    /** The set of [state] had candidates, which the library keeps: Generate poses says so (#297). */
+    private fun tellPosesKept(state: GenerationUiState) {
+        if (library != null && state.readyCount > 0) _posesKept.trySend(Unit)
     }
 
     /**
@@ -671,8 +700,9 @@ class GenerationViewModel(
         // Kept once the server accepts it, whichever phone wrote it, with the friend as the set starts; suggested
         // poses have no description to keep.
         describedSet = described.takeIf { it.isNotEmpty() }?.let { DescribedSet(id, it, partner()?.userId) }
-        share.open(id, _uiState.value.sceneTurn)
         val situation = _uiState.value.situation.forScene(selfie)
+        // Its situation goes along, so the subject's ♥ keeps it in the library (#270).
+        share.open(id, _uiState.value.sceneTurn, situation)
         _uiState.value = GenerationUiState(
             scene = scene,
             // Back goes on to the photo's review again, as framed.
@@ -740,7 +770,7 @@ class GenerationViewModel(
         }
         _uiState.update { it.copy(chosenBy = Role.PHOTOGRAPHER) }
         setId?.let { share.chosen(it, poseId, Role.PHOTOGRAPHER) }
-        return PoseUse(image, state.tipSource, state.sceneTurn)
+        return PoseUse(image, state.tipSource, state.sceneTurn, state.situation)
     }
 
     /** The subject's *Select* (FR-6.15): taken only for this set while nobody has chosen (AD-7). */
@@ -865,6 +895,8 @@ class GenerationViewModel(
                     is CandidateEvent.Ready -> {
                         record(id)
                         share.candidate(id, event.poseId, event.image)
+                        val state = _uiState.value
+                        library?.keep(id, event.poseId, event.image, state.sceneTurn, state.situation)
                     }
 
                     is CandidateEvent.Failed -> {

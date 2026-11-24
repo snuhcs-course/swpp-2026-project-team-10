@@ -1,8 +1,9 @@
-// AI-generated with Claude Code, 2026-11-23, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.util.Log
 import com.lastpenguin.pix.core.Timings
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
@@ -334,11 +335,16 @@ class GuideSyncer(
 
     private class Received(val begin: SessionMessage.GuideImageBegin, val guide: ReferenceGuide, val size: Int) {
         /**
-         * The guide with the `anchor` and `source` its image carried: where the photographer starts a guide from the
-         * subject, and what the subject's *Save guide* keeps (Design 2.5.1). A box that cannot place a guide is left out.
+         * The guide with the `anchor`, `source`, and `situation` its image carried: where the photographer starts a guide
+         * from the subject, and what the subject's *Save guide* keeps (Design 2.5.1, #270). A box that cannot place a
+         * guide is left out.
          */
         val placed: ReferenceGuide
-            get() = guide.copy(anchor = begin.anchor?.takeIf(::usable), source = begin.source ?: GuideSource.GALLERY)
+            get() = guide.copy(
+                anchor = begin.anchor?.takeIf(::usable),
+                source = begin.source ?: GuideSource.GALLERY,
+                situation = Situation.named(begin.situation),
+            )
     }
 
     /**
@@ -385,7 +391,7 @@ class GuideSyncer(
                 // The reference photo first: the photographer adopts the guide with it once the image is complete.
                 sendReferenceOf(guide, "to the photographer")
                 val image = encoded[guide.id] ?: withContext(dispatcher) { codec.encode(guide) }.also { cache(it) }
-                session.send(image.begin(guide.anchor, guide.source))
+                session.send(image.begin(guide.anchor, guide.source, guide.situation))
                 for (index in image.chunks.indices) session.send(image.chunk(index))
                 session.send(image.end())
                 Timings.mark("guide.sent", "image ${guide.id} ${image.bytes.size} B to the photographer")
@@ -492,7 +498,7 @@ class GuideSyncer(
             throw e
         }
         // The anchor and source go along for the subject's *Save guide*; the state that follows places the guide.
-        session.send(image.begin(guide.anchor, guide.source))
+        session.send(image.begin(guide.anchor, guide.source, guide.situation))
         for (index in image.chunks.indices) session.send(image.chunk(index))
         session.send(image.end())
         Timings.mark("guide.sent", "image ${guide.id} ${image.bytes.size} B in ${image.chunks.size} chunks")

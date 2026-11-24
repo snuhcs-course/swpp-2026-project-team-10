@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-17, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
@@ -7,14 +7,17 @@ import androidx.collection.LruCache
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.generation.PoseTips
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.TipSource
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
+import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.NoPersonFoundException
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
 import com.lastpenguin.pix.guide.SavedGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
+import com.lastpenguin.pix.guide.forSituation
 import com.lastpenguin.pix.guide.intoFrameHeldAt
 import com.lastpenguin.pix.session.ConfirmShare
 import com.lastpenguin.pix.session.Role
@@ -118,9 +121,27 @@ class ReferenceViewModel(
 
     private val libraryFilter = MutableStateFlow(LibraryFilter.ALL)
 
-    /** The library (FR-3.11): the saved guides of the chosen filter, and how many there are for each filter. */
-    val library: StateFlow<LibraryPage> = combine(savedGuideStore.saved, libraryFilter, ::libraryPage)
-        .stateIn(viewModelScope, SharingStarted.Eagerly, libraryPage(savedGuideStore.saved.value, LibraryFilter.ALL))
+    private val librarySituation = MutableStateFlow<Situation?>(null)
+
+    /** The guides selected in the library (#297); null while not selecting. */
+    private val librarySelection = MutableStateFlow<Set<String>?>(null)
+
+    /**
+     * The library (FR-3.11): the guides of the chosen filter and situation (#270), how many there are for each, and
+     * the selection (#297).
+     */
+    val library: StateFlow<LibraryPage> =
+        combine(savedGuideStore.saved, libraryFilter, librarySituation, librarySelection, ::libraryPage)
+            .stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                libraryPage(savedGuideStore.saved.value, LibraryFilter.ALL),
+            )
+
+    private val _memoFailures = Channel<Unit>(Channel.BUFFERED)
+
+    /** Each memo the storage could not keep, for the library to say so; read once. */
+    val memoFailures: Flow<Unit> = _memoFailures.receiveAsFlow()
 
     /** The thumbnails shown last, up to [THUMBNAIL_CACHE_BYTES], so scrolling back does not read them again. */
     private val thumbnails = object : LruCache<String, Bitmap>(THUMBNAIL_CACHE_BYTES) {
@@ -152,11 +173,26 @@ class ReferenceViewModel(
     fun openFor(fromSubject: Boolean) {
         forSubject = fromSubject && subject != null
         libraryFilter.value = LibraryFilter.ALL
+        librarySituation.value = null
+        librarySelection.value = null
     }
 
     /** A filter chip in the library. */
     fun onLibraryFilter(filter: LibraryFilter) {
         libraryFilter.value = filter
+    }
+
+    /** A situation's chip in the library (#270): shows its guides only, and a second tap shows every situation again. */
+    fun onLibrarySituation(situation: Situation) {
+        // Judged by what the library shows: a situation whose guides were all deleted is no longer chosen.
+        librarySituation.value = if (library.value.situation == situation) null else situation
+    }
+
+    /** *Save* on a saved guide's memo in the library (FR-3.11, #270); an empty one removes it. */
+    fun onSaveMemo(id: String, memo: String) {
+        viewModelScope.launch {
+            if (savedGuideStore.setMemo(id, memo).isFailure) _memoFailures.send(Unit)
+        }
     }
 
     /** A saved guide's thumbnail (Design 2.8, *Guide store*); null when its files cannot be read. */
@@ -202,16 +238,19 @@ class ReferenceViewModel(
      * The pose chosen on Pick a pose. With [tipFrom], the scene and the pose it was made from, its tip is asked for
      * as soon as its person is found, so it is usually ready when Camera opens (FR-4.10). [chosenBy] names the subject
      * when it was their pick in a session (FR-6.15). Its Reference confirm goes to the subject's phone too, which
-     * shows it while a session is connected. A pose its ♥ [saved] already (FR-4.14) goes on with that guide: its person
-     * is not cut out again, and on Camera the guide is the saved one. [turn] is how the phone was held for the scene
-     * photo; the guide is shown here on the candidate as it is, and turned back by it on the camera.
+     * shows it while a session is connected. The guide is the one the library [kept] for the candidate (#297), so its
+     * person is not cut out again, and on Camera the guide is the kept one, which *Save guide* finds; without [kept] the
+     * person is cut out here. [turn] is how the phone was held for the scene
+     * photo; the guide is shown here on the candidate as it is, and turned back by it on the camera. The guide keeps
+     * [situation], the set's, for the library (#270).
      */
     fun onCandidatePicked(
         image: Bitmap,
         tipFrom: TipSource? = null,
         chosenBy: String? = null,
-        saved: ReferenceGuide? = null,
+        kept: (suspend () -> Result<ReferenceGuide>)? = null,
         turn: Int = 0,
+        situation: Situation? = null,
     ) {
         _chosenBy.value = chosenBy
         picked = null
@@ -227,7 +266,9 @@ class ReferenceViewModel(
                     tipFor = guide.id
                 }
             },
-        ) { saved?.let { Result.success(it) } ?: maker.make(image, GuideSource.GENERATED) }
+        ) {
+            kept?.invoke() ?: maker.make(image, GuideSource.GENERATED).map { it.forSituation(situation) }
+        }
     }
 
     /** *Use this guide*. */
@@ -250,9 +291,19 @@ class ReferenceViewModel(
         // Its tip goes with it to the camera; leaving the screen now must not drop it.
         if (ready.guide.id == tipFor) tipFor = null
         use(ready.guide, heldAt)
+        keepPhotoGuide(ready.guide)
         _uiState.value = ReferenceUiState.Idle
         endShare { confirms.used(it, ready.guide.id, by) }
         return true
+    }
+
+    /**
+     * A guide from a photo, once used, stays in the library as history (#297), as each pose does through the library's
+     * own keeping; *Save guide* then marks it a favorite. A failed write leaves the guide on the camera all the same.
+     */
+    private fun keepPhotoGuide(guide: ReferenceGuide) {
+        if (guide.source != GuideSource.GALLERY) return
+        viewModelScope.launch { savedGuideStore.save(guide, GuideState(guideId = guide.id), favorite = false) }
     }
 
     /** The shared Reference confirm ends once, with [end]. */
@@ -308,12 +359,36 @@ class ReferenceViewModel(
         opening?.cancel()
     }
 
-    /** *Delete* on a saved guide, after the library asked; a guide on the camera stays there. */
-    fun onDeleteSaved(id: String) {
+    /** *Delete* on guides, after the library asked; a guide on the camera stays there. Selecting ends. */
+    fun onDeleteSaved(ids: Collection<String>) {
+        librarySelection.value = null
         viewModelScope.launch {
-            savedGuideStore.delete(id)
-            thumbnails.remove(id)
+            savedGuideStore.delete(ids)
+            ids.forEach(thumbnails::remove)
         }
+    }
+
+    /** A long press on a guide, or *Select* under ⋮ with no guide (#297): selecting starts, with [id] selected. */
+    fun onStartSelecting(id: String? = null) {
+        librarySelection.value = setOfNotNull(id) + librarySelection.value.orEmpty()
+    }
+
+    /** A tap on a guide while selecting: it is selected, or no longer is. */
+    fun onToggleSelected(id: String) {
+        // The selection itself, not the page, which follows it a moment later: quick taps must each count.
+        val selected = librarySelection.value ?: return
+        librarySelection.value = if (id in selected) selected - id else selected + id
+    }
+
+    /** *Select all* while selecting: every guide listed. */
+    fun onSelectAll() {
+        if (librarySelection.value == null) return
+        librarySelection.value = library.value.guides.mapTo(HashSet()) { it.id }
+    }
+
+    /** ✕ or Back while selecting: no guide is selected any longer. */
+    fun onStopSelecting() {
+        librarySelection.value = null
     }
 
     /** Separates the person; a newer photo (*Choose another photo*) replaces one still in progress. */

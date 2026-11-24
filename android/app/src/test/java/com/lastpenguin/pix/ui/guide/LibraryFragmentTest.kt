@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.guide
 
 import android.app.Activity
@@ -6,14 +6,19 @@ import android.content.DialogInterface
 import android.content.Intent
 import android.net.Uri
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.EditText
+import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.ViewCompat
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.android.material.chip.Chip
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentLibraryBinding
 import com.lastpenguin.pix.databinding.ItemLibraryGuideBinding
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
@@ -43,6 +48,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
+import org.robolectric.shadows.ShadowPopupMenu
 import org.robolectric.shadows.ShadowToast
 
 /*
@@ -50,9 +56,18 @@ import org.robolectric.shadows.ShadowToast
  * of both kinds (one cell each, newest first, with its kind's icon, its thumbnail, and TalkBack's name; the filters
  * with their counts, All chosen); a filter (only its kind; a kind with no guide says so, without the hint to save one);
  * a tap (the guide on the camera, back to the camera), a guide that cannot be opened (a message, the library stays),
- * the library left while a guide opens (the camera's guide kept); a long press, which TalkBack names *Delete saved
- * guide* (asks first: Cancel keeps it, Delete removes it); *Add photo* (a picked photo opens Reference confirm over the
+ * the library left while a guide opens (the camera's guide kept); *Add photo* (a picked photo opens Reference confirm over the
  * library); from Subject view (a tap goes back to Subject view, and so does the session ending).
+ * Situations and memos (#270): no guide with a situation (no chips, no words under the cells); guides with situations
+ * and a memo (each cell's situation and memo, TalkBack's name with both, a chip per situation with its count); a chip
+ * (its guides only, checked) and the same chip again (every guide); the pencil (the memo in the field, Save keeps the
+ * new one under the cell, Cancel keeps the old, an empty one removes it), a memo the storage cannot keep (a message).
+ * Favorites and selection (#297): a favorite (its tab with its count, its cell's heart, TalkBack's name); a long press,
+ * which TalkBack names *Select* (selecting with that guide: the count, its mark, Select all, Delete for Add photo, no
+ * pencil), a tap while selecting (selects another, never uses it; on a selected one, takes it out), Select all,
+ * none selected (Delete off), Delete (asks with the count: Cancel keeps them, Delete removes them and stops selecting),
+ * ✕ and Back (stop selecting, the library stays); ⋮ with Select (selecting with none) and Delete all (every guide the
+ * filter lists, after asking).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -107,8 +122,27 @@ class LibraryFragmentTest {
 
     private fun itemCount(): Int = onScreen { it.libraryGrid.adapter?.itemCount ?: 0 }
 
-    private fun saved(id: String, source: GuideSource = GuideSource.GALLERY) =
-        ReferenceGuide(id, bitmap(), bitmap(), 0.5f, source, reference = bitmap(60, 80))
+    private fun saved(id: String, source: GuideSource = GuideSource.GALLERY, situation: Situation? = null) =
+        ReferenceGuide(id, bitmap(), bitmap(), 0.5f, source, reference = bitmap(60, 80), situation = situation)
+
+    /** A photo with a memo and two AI poses, a landmark's and a selfie's, saved in that order. */
+    private fun withSituations(store: SavedGuideStore = SavedGuideStore.InMemory()): TestAppContainer {
+        runBlocking {
+            store.save(saved("photo"), GuideState())
+            store.setMemo("photo", "Mom at the beach")
+            store.save(saved("landmark", GuideSource.GENERATED, Situation.LANDMARK), GuideState())
+            store.save(saved("selfie", GuideSource.GENERATED, Situation.SELFIE), GuideState())
+        }
+        return TestAppContainer(saved = store)
+    }
+
+    private fun chips(): List<Chip> = onScreen { binding ->
+        (0 until binding.situationChips.childCount).map { binding.situationChips.getChildAt(it) as Chip }
+    }
+
+    private fun memoDialog(): AlertDialog = ShadowDialog.getLatestDialog() as AlertDialog
+
+    private fun memoField(): EditText = memoDialog().findViewById(R.id.input)!!
 
     /** Two photos and one AI pose, saved in that order, so the pose is the newest but one. */
     private fun withThree(store: SavedGuideStore = SavedGuideStore.InMemory()): TestAppContainer {
@@ -184,6 +218,94 @@ class LibraryFragmentTest {
     }
 
     @Test
+    fun noSituationOrMemo_showsNoChipsAndNoWordsUnderTheCells() {
+        launch(withThree())
+
+        assertFalse(onScreen { it.situationScroll.isShown })
+        assertFalse(cell(1).situationText.isShown)
+        assertFalse(cell(1).memoText.isShown)
+        assertTrue(cell(1).memoButton.isShown)
+    }
+
+    @Test
+    fun situationsAndAMemo_showUnderTheCellsAndAsChips() {
+        launch(withSituations())
+
+        assertEquals(listOf("Landmark 1", "Selfie 1"), chips().map { it.text.toString() })
+        assertFalse(chips().any { it.isChecked })
+        assertEquals("Selfie", cell(0).situationText.text.toString())
+        assertFalse(cell(0).memoText.isShown)
+        assertFalse(cell(2).situationText.isShown)
+        assertEquals("Mom at the beach", cell(2).memoText.text.toString())
+        assertTrue(cell(2).memoText.isShown)
+        val landmark = cell(1).thumbnail.contentDescription.toString()
+        assertTrue(landmark, landmark.endsWith(", for Landmark"))
+        val photo = cell(2).thumbnail.contentDescription.toString()
+        assertTrue(photo, photo.endsWith(". Memo: Mom at the beach"))
+    }
+
+    @Test
+    fun situationChip_showsItsGuidesOnly_andASecondTapShowsAllAgain() {
+        launch(withSituations())
+
+        chips()[0].performClick()
+        idleUntil { itemCount() == 1 }
+        assertEquals("Landmark", cell(0).situationText.text.toString())
+        assertTrue(chips()[0].isChecked)
+        assertFalse(chips()[1].isChecked)
+
+        chips()[0].performClick()
+        idleUntil { itemCount() == 3 }
+        assertFalse(chips().any { it.isChecked })
+    }
+
+    @Test
+    fun pencil_editsTheMemo_saveKeepsIt_cancelDoesNot_andAnEmptyOneRemovesIt() {
+        val modules = launch(withSituations())
+
+        cell(2).memoButton.performClick()
+        idle()
+        assertEquals("Mom at the beach", memoField().text.toString())
+        memoField().setText("Dad")
+        memoDialog().getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
+        idle()
+        assertEquals("Mom at the beach", modules.saved.saved.value.last().memo)
+
+        cell(2).memoButton.performClick()
+        idle()
+        memoField().setText("Dad on the bridge")
+        memoDialog().getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idleUntil { cell(2).memoText.text.toString() == "Dad on the bridge" }
+        assertEquals("Dad on the bridge", modules.saved.saved.value.last().memo)
+
+        cell(0).memoButton.performClick()
+        idle()
+        assertEquals("", memoField().text.toString())
+        cell(2).memoButton.performClick()
+        idle()
+        memoField().setText("")
+        memoDialog().getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idleUntil { !cell(2).memoText.isShown }
+        assertEquals("", modules.saved.saved.value.last().memo)
+    }
+
+    @Test
+    fun pencil_memoTheStorageCannotKeep_saysSo() {
+        val store = object : SavedGuideStore by SavedGuideStore.InMemory() {
+            override suspend fun setMemo(id: String, memo: String): Result<Unit> = Result.failure(IOException("full"))
+        }
+        launch(withThree(store))
+
+        cell(0).memoButton.performClick()
+        idle()
+        memoField().setText("Lost")
+        memoDialog().getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idle()
+
+        assertEquals(string(R.string.library_memo_failed), ShadowToast.getTextOfLatestToast())
+    }
+
+    @Test
     fun tap_putsTheGuideOnTheCameraAndGoesBack() {
         val modules = launch(withThree())
 
@@ -235,28 +357,149 @@ class LibraryFragmentTest {
     }
 
     @Test
-    fun longPress_asksFirst_cancelKeepsIt_deleteRemovesIt() {
+    fun longPress_selects_tapsSelectMore_andDeleteAsksFirst_cancelKeepsThem_deleteRemovesThem() {
         val modules = launch(withThree())
         val node = AccessibilityNodeInfo.obtain()
         cell(0).thumbnail.onInitializeAccessibilityNodeInfo(node)
         val longClick = node.actionList.single { it.id == AccessibilityNodeInfo.ACTION_LONG_CLICK }
-        assertEquals(string(R.string.delete_saved_guide), longClick.label)
+        assertEquals(string(R.string.library_select), longClick.label)
 
         cell(0).thumbnail.performLongClick()
         idle()
-        (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
+        assertEquals("1 selected", onScreen { it.titleText.text.toString() })
+        assertTrue(cell(0).selectMark.isShown)
+        assertEquals(string(R.string.library_guide_selected), ViewCompat.getStateDescription(cell(0).thumbnail))
+        assertFalse(cell(0).memoButton.isShown)
+        onScreen { binding ->
+            assertTrue(binding.selectAllButton.isShown)
+            assertFalse(binding.moreButton.isShown)
+            assertFalse(binding.addPhotoButton.isShown)
+            assertTrue(binding.deleteSelectedButton.isEnabled)
+        }
+
+        // A tap selects another, and does not put it on the camera.
+        cell(2).thumbnail.performClick()
+        idle()
+        assertNull(modules.guides.guide.value)
+        assertEquals("2 selected", onScreen { it.titleText.text.toString() })
+
+        onScreen { it.deleteSelectedButton.performClick() }
+        idle()
+        val ask = ShadowDialog.getLatestDialog() as AlertDialog
+        assertEquals(
+            "Delete 2 guides?",
+            ask.findViewById<TextView>(androidx.appcompat.R.id.alertTitle)?.text.toString(),
+        )
+        ask.getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
         idle()
         assertEquals(3, modules.saved.saved.value.size)
 
-        cell(0).thumbnail.performLongClick()
+        onScreen { it.deleteSelectedButton.performClick() }
         idle()
         (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_POSITIVE).performClick()
-        idleUntil { itemCount() == 2 }
+        idleUntil { itemCount() == 1 }
 
-        assertEquals(listOf("pose", "photo-1"), modules.saved.saved.value.map { it.id })
-        assertEquals(2, itemCount())
-        assertEquals("All 2", onScreen { it.filterAll.text.toString() })
+        assertEquals(listOf("pose"), modules.saved.saved.value.map { it.id })
+        assertEquals("Library", onScreen { it.titleText.text.toString() })
+        assertTrue(onScreen { it.addPhotoButton.isShown })
         assertEquals(R.id.libraryFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun selecting_selectAllSelectsEveryGuideListed_andBackStopsSelectingWithoutLeaving() {
+        launch(withThree())
+        cell(1).thumbnail.performLongClick()
+        idle()
+
+        onScreen { it.selectAllButton.performClick() }
+        idle()
+        assertEquals("3 selected", onScreen { it.titleText.text.toString() })
+        assertFalse(onScreen { it.selectAllButton.isEnabled })
+
+        // A tap on a selected guide takes it out again.
+        cell(1).thumbnail.performClick()
+        idle()
+        assertEquals("2 selected", onScreen { it.titleText.text.toString() })
+
+        scenario!!.onFragment { it.requireActivity().onBackPressedDispatcher.onBackPressed() }
+        idle()
+        assertEquals(R.id.libraryFragment, nav.currentDestination?.id)
+        assertEquals("Library", onScreen { it.titleText.text.toString() })
+        assertFalse(cell(0).selectMark.isShown)
+        assertTrue(cell(0).memoButton.isShown)
+    }
+
+    @Test
+    fun selecting_noGuideSelected_turnsDeleteOff_andCloseStopsSelecting() {
+        launch(withThree())
+        cell(0).thumbnail.performLongClick()
+        idle()
+        cell(0).thumbnail.performClick()
+        idle()
+
+        assertEquals("0 selected", onScreen { it.titleText.text.toString() })
+        assertFalse(onScreen { it.deleteSelectedButton.isEnabled })
+        assertEquals(string(R.string.library_close_selection), onScreen { it.backButton.contentDescription })
+        onScreen { it.backButton.performClick() }
+        idle()
+        assertEquals("Library", onScreen { it.titleText.text.toString() })
+    }
+
+    @Test
+    fun more_selectStartsSelecting_andDeleteAllDeletesEveryGuideTheFilterLists_afterAsking() {
+        val modules = launch(withThree())
+
+        onScreen { it.moreButton.performClick() }
+        idle()
+        clickMenuItem(R.id.selectGuides)
+        assertEquals("0 selected", onScreen { it.titleText.text.toString() })
+        onScreen { it.backButton.performClick() }
+        idle()
+
+        onScreen { it.filterPhotos.performClick() }
+        idleUntil { itemCount() == 2 }
+        onScreen { it.moreButton.performClick() }
+        idle()
+        clickMenuItem(R.id.deleteAllGuides)
+        val ask = ShadowDialog.getLatestDialog() as AlertDialog
+        assertEquals(
+            "Delete 2 guides?",
+            ask.findViewById<TextView>(androidx.appcompat.R.id.alertTitle)?.text.toString(),
+        )
+        ask.getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idleUntil { itemCount() == 0 }
+
+        // Only what the filter listed: the AI pose stays.
+        assertEquals(listOf("pose"), modules.saved.saved.value.map { it.id })
+    }
+
+    @Test
+    fun favorites_haveTheirTab_andAHeartOnTheirCell() {
+        val store = SavedGuideStore.InMemory()
+        runBlocking {
+            store.save(saved("photo-1"), GuideState(), favorite = false)
+            store.save(saved("pose", GuideSource.GENERATED), GuideState(), favorite = true)
+            store.save(saved("photo-2"), GuideState(), favorite = false)
+        }
+        launch(TestAppContainer(saved = store))
+
+        assertEquals("Favorites 1", onScreen { it.filterFavorites.text.toString() })
+        assertTrue(cell(1).favoriteIcon.isShown)
+        assertFalse(cell(0).favoriteIcon.isShown)
+        val name = cell(1).thumbnail.contentDescription.toString()
+        assertTrue(name, name.endsWith(", in Favorites"))
+
+        onScreen { it.filterFavorites.performClick() }
+        idleUntil { itemCount() == 1 }
+        assertTrue(onScreen { it.filterFavorites.isSelected })
+        assertEquals(R.drawable.ic_sparkle, shadowOf(cell(0).kindIcon.drawable).createdFromResId)
+    }
+
+    /** Taps [id] in the ⋮ menu that is open. */
+    private fun clickMenuItem(id: Int) {
+        val menu = ShadowPopupMenu.getLatestPopupMenu()
+        shadowOf(menu).onMenuItemClickListener.onMenuItemClick(menu.menu.findItem(id))
+        idle()
     }
 
     @Test

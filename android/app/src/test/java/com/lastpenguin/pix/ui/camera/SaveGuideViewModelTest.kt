@@ -1,11 +1,11 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Dongje Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import androidx.lifecycle.ViewModelStore
-import com.lastpenguin.pix.guide.GuideSaved
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.ReferenceGuide
+import com.lastpenguin.pix.guide.SavedGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.fakeGuide
@@ -29,13 +29,13 @@ import org.junit.Test
 
 /*
  * Partitions for *Save guide* on the Camera screen (FR-3.8), state-based, with the in-memory store.
- * onSaveGuide: a guide not saved yet (stored with its state, shown as saved, SAVED), a guide already saved
- * (REMOVED, taken out of the store and shown as not saved; a third tap saves it again), no guide (nothing), a full store (SAVED_OLDEST_REMOVED), a store another save fills
- * while this one writes (SAVED_OLDEST_REMOVED, as the store's save answers), a store that cannot write
+ * onSaveGuide: a guide not kept yet (stored with its state as a favorite, shown as saved, SAVED), a favorite
+ * (REMOVED: history again, still in the store, shown as not saved; a third tap marks it again), a guide kept as
+ * history (#297: marked a favorite, SAVED), no guide (nothing), a store that cannot write
  * (FAILED, not shown as saved, the button free again), a store that throws (the same, no crash), a second tap while
  * the first is writing (one save). A notice that comes while no screen collects waits for the screen.
- * guideSaved: a new guide (not saved), another guide replacing a saved one, a saved guide deleted from the store,
- * a saved guide put on the camera again with its id (saved).
+ * guideSaved: a new guide (not saved), another guide replacing a saved one, a saved guide deleted from the store, a
+ * guide kept only as history (not saved), a saved guide put on the camera again with its id (saved).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SaveGuideViewModelTest {
@@ -98,14 +98,32 @@ class SaveGuideViewModelTest {
         runCurrent()
 
         assertEquals(listOf(GuideSaveNotice.SAVED, GuideSaveNotice.REMOVED), notices)
-        assertTrue(saved.saved.value.isEmpty())
+        // History again (#297): still in the library, no longer a favorite.
+        assertEquals(listOf("g1" to false), saved.saved.value.map { it.id to it.favorite })
         assertFalse(model.uiState.value.guideSaved)
         // The guide stays on the camera.
         assertEquals("g1", model.uiState.value.guide?.id)
 
         model.onSaveGuide()
         runCurrent()
-        assertEquals(listOf("g1"), saved.saved.value.map { it.id })
+        assertEquals(listOf("g1" to true), saved.saved.value.map { it.id to it.favorite })
+        assertTrue(model.uiState.value.guideSaved)
+    }
+
+    @Test
+    fun onSaveGuide_guideKeptAsHistory_marksItAFavorite() = runTest(dispatcher) {
+        saved.save(fakeGuide("g1"), GuideState(), favorite = false)
+        val model = model()
+        guides.setGuide(fakeGuide("g1"))
+        runCurrent()
+        assertFalse(model.uiState.value.guideSaved)
+        val notices = notices(model)
+
+        model.onSaveGuide()
+        runCurrent()
+
+        assertEquals(listOf(GuideSaveNotice.SAVED), notices)
+        assertEquals(listOf("g1" to true), saved.saved.value.map { it.id to it.favorite })
         assertTrue(model.uiState.value.guideSaved)
     }
 
@@ -120,42 +138,6 @@ class SaveGuideViewModelTest {
 
         assertTrue(saved.saved.value.isEmpty())
         assertTrue(notices.isEmpty())
-    }
-
-    @Test
-    fun onSaveGuide_storeFull_savesAndSaysTheOldestWasRemoved() = runTest(dispatcher) {
-        repeat(SavedGuideStore.MAX_SAVED) { saved.save(fakeGuide("old$it"), GuideState()) }
-        val model = model()
-        guides.setGuide(fakeGuide("g1"))
-        runCurrent()
-        val notices = notices(model)
-
-        model.onSaveGuide()
-        runCurrent()
-
-        assertEquals(listOf(GuideSaveNotice.SAVED_OLDEST_REMOVED), notices)
-        assertEquals(SavedGuideStore.MAX_SAVED, saved.saved.value.size)
-        assertEquals("g1", saved.saved.value.first().id)
-    }
-
-    @Test
-    fun onSaveGuide_aSaveElsewhereFillsTheStoreFirst_saysTheOldestWasRemoved() = runTest(dispatcher) {
-        // 99 kept when Save guide is tapped; a ♥ on Pick a pose saves the 100th while this one is still writing.
-        repeat(SavedGuideStore.MAX_SAVED - 1) { saved.save(fakeGuide("old$it"), GuideState()) }
-        val slow = SlowStore(saved)
-        val model = model(slow)
-        guides.setGuide(fakeGuide("g1"))
-        runCurrent()
-        val notices = notices(model)
-
-        model.onSaveGuide()
-        runCurrent()
-        saved.save(fakeGuide("pose"), GuideState())
-        slow.release.complete(Unit)
-        runCurrent()
-
-        assertEquals(listOf(GuideSaveNotice.SAVED_OLDEST_REMOVED), notices)
-        assertEquals(SavedGuideStore.MAX_SAVED, saved.saved.value.size)
     }
 
     @Test
@@ -260,13 +242,13 @@ class SaveGuideViewModelTest {
 
     /** A store whose writes fail, as when the phone's storage is full. */
     private class FailingStore(private val inner: SavedGuideStore) : SavedGuideStore by inner {
-        override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<GuideSaved> =
+        override suspend fun save(guide: ReferenceGuide, state: GuideState, favorite: Boolean): Result<SavedGuide> =
             Result.failure(IOException("No space left"))
     }
 
     /** A store whose writes throw instead of failing, as with a bitmap that was recycled. */
     private class ThrowingStore(private val inner: SavedGuideStore) : SavedGuideStore by inner {
-        override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<GuideSaved> =
+        override suspend fun save(guide: ReferenceGuide, state: GuideState, favorite: Boolean): Result<SavedGuide> =
             throw IllegalStateException("Can't compress a recycled bitmap")
     }
 
@@ -275,10 +257,10 @@ class SaveGuideViewModelTest {
         val release = CompletableDeferred<Unit>()
         var calls = 0
 
-        override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<GuideSaved> {
+        override suspend fun save(guide: ReferenceGuide, state: GuideState, favorite: Boolean): Result<SavedGuide> {
             calls++
             release.await()
-            return inner.save(guide, state)
+            return inner.save(guide, state, favorite)
         }
     }
 }

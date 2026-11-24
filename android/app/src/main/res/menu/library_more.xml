@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The library's ⋮ (#297): Select, as a long press does, and Delete all, which asks first. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/selectGuides"
+        android:title="@string/library_select" />
+    <item
+        android:id="@+id/deleteAllGuides"
+        android:title="@string/library_delete_all" />
+</menu>

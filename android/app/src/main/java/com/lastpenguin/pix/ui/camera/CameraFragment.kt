@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -64,7 +64,6 @@ import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.GuideState
-import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.settings.TutorialScreen
@@ -515,12 +514,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                     viewModel.guideSaveNotices.collect { notice ->
                         val text = when (notice) {
                             GuideSaveNotice.SAVED -> getString(R.string.guide_saved_notice)
-
-                            GuideSaveNotice.SAVED_OLDEST_REMOVED ->
-                                getString(R.string.guide_saved_oldest_removed_notice, SavedGuideStore.MAX_SAVED)
-
                             GuideSaveNotice.REMOVED -> getString(R.string.guide_removed_notice)
-
                             GuideSaveNotice.FAILED -> getString(R.string.guide_save_failed_notice)
                         }
                         showToggleLabel(controls, text, guideSaveIcon(notice), guideSaveTint(notice))

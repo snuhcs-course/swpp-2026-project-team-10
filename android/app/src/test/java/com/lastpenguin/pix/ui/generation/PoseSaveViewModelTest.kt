@@ -1,10 +1,11 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModelStore
-import com.lastpenguin.pix.guide.GuideSaved
+import com.lastpenguin.pix.generation.PoseLibrary
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.NoPersonFoundException
@@ -16,8 +17,10 @@ import com.lastpenguin.pix.session.fakeBitmap
 import com.lastpenguin.pix.session.fakeGuide
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
@@ -36,15 +39,15 @@ import org.junit.Before
 import org.junit.Test
 
 /*
- * The ♥ on Pick a pose (FR-4.14), state-based, with a scripted guide maker and the in-memory store.
- * toggle (equivalence partitioning): an empty heart (Saving, then Saved with the guide in the library as a generated
- * pose, SAVED), a filled one (removed from the library, REMOVED), one still saving (ignored: one guide made), a candidate
- * without a person (nothing saved, NO_PERSON), a maker or a store that fails (nothing saved, FAILED).
- * Keys: the same pose id in another set (another heart); a guide deleted in the library (the heart empty again, and
- * a ♥ saves it anew).
- * The library's size (boundary): 99 saved (SAVED) and 100 (SAVED_OLDEST_REMOVED, the oldest gone); two hearts saved at
- * once with 99 kept, both seeing room before they save (one SAVED, and the one that deletes the oldest says so).
- * savedGuide: the guide a filled heart saved, for *Use this pose*; none for an empty heart or one deleted since.
+ * The ♥ on Pick a pose (FR-4.14, #297), state-based, with a scripted guide maker, the in-memory store, and the real
+ * PoseLibrary over them.
+ * toggle (equivalence partitioning): an empty heart (Saving, then Saved with the guide kept in the library as a favorite
+ * generated pose, SAVED, with the set's situation or none), a candidate the library kept already (marked, not cut out
+ * again), a filled one (history again, still in the library, REMOVED), one still saving (ignored: one guide made), a
+ * candidate without a person (nothing kept, NO_PERSON), a maker or a store that fails (nothing kept, FAILED).
+ * Keys: the same pose id in another set (another heart); a guide deleted in the library (the heart empty again, and a
+ * ♥ keeps it again without cutting it out again).
+ * keptGuide: waits for the cut, the same guide for the ♥ and *Select*, cut once.
  * results: kept until read, so a ♥ finished after Pick a pose was left still tells its set.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -53,6 +56,7 @@ class PoseSaveViewModelTest {
     private val store = ViewModelStore()
     private val maker = FakeMaker()
     private val saved = SavedGuideStore.InMemory()
+    private val library = PoseLibrary(maker, saved, CoroutineScope(dispatcher))
     private lateinit var model: PoseSaveViewModel
 
     private val first = PoseKey("set-1", "pose-1")
@@ -60,7 +64,7 @@ class PoseSaveViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(dispatcher)
-        model = PoseSaveViewModel(maker, saved)
+        model = PoseSaveViewModel(library, saved)
         store.put("saves", model)
     }
 
@@ -73,7 +77,7 @@ class PoseSaveViewModelTest {
     private fun generated(id: String) = ReferenceGuide(id, fakeBitmap(), fakeBitmap(), 0.75f, GuideSource.GENERATED)
 
     @Test
-    fun anEmptyHeart_savesTheCandidateAsAGeneratedPose() = runTest {
+    fun anEmptyHeart_keepsTheCandidateAsAFavoriteGeneratedPose() = runTest {
         model.toggle(first, fakeBitmap())
         runCurrent()
         assertEquals(Heart.Saving, model.hearts.value[first])
@@ -83,20 +87,50 @@ class PoseSaveViewModelTest {
         runCurrent()
 
         assertEquals(Heart.Saved("guide-1"), model.hearts.value[first])
-        assertEquals(listOf("guide-1" to GuideSource.GENERATED), saved.saved.value.map { it.id to it.source })
+        assertEquals(
+            listOf(Triple("guide-1", GuideSource.GENERATED, true)),
+            saved.saved.value.map { Triple(it.id, it.source, it.favorite) },
+        )
+        assertNull("no situation was given", saved.saved.value.single().situation)
         assertEquals(PoseSaveResult("set-1", PoseSaveNotice.SAVED), model.results.first())
     }
 
     @Test
-    fun aFilledHeart_removesTheGuideFromTheLibrary() = runTest {
+    fun anEmptyHeart_keepsTheSetsSituationInTheLibrary() = runTest {
+        model.toggle(first, fakeBitmap(), situation = Situation.FULL_BODY)
+        runCurrent()
+        maker.finish(Result.success(generated("guide-1")))
+        runCurrent()
+
+        assertEquals(listOf(Situation.FULL_BODY), saved.saved.value.map { it.situation })
+        assertEquals(Situation.FULL_BODY, saved.load("guide-1").getOrThrow().first.situation)
+    }
+
+    @Test
+    fun aCandidateTheLibraryKeptAlready_isMarkedWithoutCuttingItAgain() = runTest {
+        library.keep("set-1", "pose-1", fakeBitmap())
+        runCurrent()
+        maker.finish(Result.success(generated("guide-1")))
+        runCurrent()
+        assertEquals(listOf(false), saved.saved.value.map { it.favorite })
+
+        model.toggle(first, fakeBitmap())
+        runCurrent()
+
+        assertEquals(1, maker.sources.size)
+        assertEquals(Heart.Saved("guide-1"), model.hearts.value[first])
+        assertEquals(listOf(true), saved.saved.value.map { it.favorite })
+    }
+
+    @Test
+    fun aFilledHeart_makesThePoseHistoryAgain() = runTest {
         saveFirst("guide-1")
 
         model.toggle(first, fakeBitmap())
         runCurrent()
 
         assertNull(model.hearts.value[first])
-        assertEquals(emptyList<SavedGuide>(), saved.saved.value)
-        assertNull(model.savedGuide(first))
+        assertEquals(listOf("guide-1" to false), saved.saved.value.map { it.id to it.favorite })
         val (_, removed) = model.results.take(2).toList()
         assertEquals(PoseSaveResult("set-1", PoseSaveNotice.REMOVED), removed)
     }
@@ -137,7 +171,7 @@ class PoseSaveViewModelTest {
     @Test
     fun aStoreThatFails_leavesTheHeartEmpty() = runTest {
         val failing = FailingStore()
-        val failingModel = PoseSaveViewModel(maker, failing)
+        val failingModel = PoseSaveViewModel(PoseLibrary(maker, failing, CoroutineScope(dispatcher)), failing)
         store.put("failing", failingModel)
 
         failingModel.toggle(first, fakeBitmap())
@@ -146,7 +180,6 @@ class PoseSaveViewModelTest {
         runCurrent()
 
         assertNull(failingModel.hearts.value[first])
-        assertNull(failingModel.savedGuide(first))
         assertEquals(PoseSaveResult("set-1", PoseSaveNotice.FAILED), failingModel.results.first())
     }
 
@@ -169,75 +202,36 @@ class PoseSaveViewModelTest {
     }
 
     @Test
-    fun aGuideDeletedInTheLibrary_emptiesItsHeart_andAHeartSavesItAgain() = runTest {
+    fun aGuideDeletedInTheLibrary_emptiesItsHeart_andAHeartKeepsItAgainWithoutCutting() = runTest {
         saveFirst("guide-1")
 
         saved.delete("guide-1")
         runCurrent()
-
         assertNull(model.hearts.value[first])
-        assertNull(model.savedGuide(first))
+
         model.toggle(first, fakeBitmap())
         runCurrent()
-        assertEquals(1, maker.pending.size)
+
+        assertEquals(1, maker.sources.size)
+        assertEquals(Heart.Saved("guide-1"), model.hearts.value[first])
+        assertEquals(listOf("guide-1" to true), saved.saved.value.map { it.id to it.favorite })
     }
 
     @Test
-    fun savedGuide_isTheGuideAFilledHeartSaved() = runTest {
+    fun keptGuide_waitsForTheCut_andIsTheGuideTheHeartKept() = runTest {
         val guide = generated("guide-1")
-        model.toggle(first, fakeBitmap())
+        val kept = async { model.keptGuide(first, fakeBitmap()) }
         runCurrent()
-        assertNull(model.savedGuide(first))
+        assertTrue(kept.isActive)
+
         maker.finish(Result.success(guide))
         runCurrent()
-
-        assertSame(guide, model.savedGuide(first))
-        assertNull(model.savedGuide(PoseKey("set-1", "pose-2")))
-    }
-
-    @Test
-    fun aHeartWith99Saved_justSaves() = runTest {
-        fill(SavedGuideStore.MAX_SAVED - 1)
-
-        saveFirst("guide-new")
-
-        assertEquals(PoseSaveResult("set-1", PoseSaveNotice.SAVED), model.results.first())
-        assertEquals(SavedGuideStore.MAX_SAVED, saved.saved.value.size)
-        assertEquals("old-0", saved.saved.value.last().id)
-    }
-
-    @Test
-    fun aHeartWith100Saved_removesTheOldest_andSaysSo() = runTest {
-        fill(SavedGuideStore.MAX_SAVED)
-
-        saveFirst("guide-new")
-
-        assertEquals(PoseSaveResult("set-1", PoseSaveNotice.SAVED_OLDEST_REMOVED), model.results.first())
-        assertEquals(SavedGuideStore.MAX_SAVED, saved.saved.value.size)
-        assertTrue(saved.saved.value.none { it.id == "old-0" })
-    }
-
-    @Test
-    fun twoHeartsSavedAtOnceWith99_theOneThatRemovesTheOldestSaysSo() = runTest {
-        fill(SavedGuideStore.MAX_SAVED - 1)
-        val second = PoseKey("set-1", "pose-2")
-
         model.toggle(first, fakeBitmap())
-        model.toggle(second, fakeBitmap())
-        runCurrent()
-        maker.finish(Result.success(generated("guide-1")))
-        maker.finish(Result.success(generated("guide-2")))
         runCurrent()
 
-        assertEquals(
-            listOf(
-                PoseSaveResult("set-1", PoseSaveNotice.SAVED),
-                PoseSaveResult("set-1", PoseSaveNotice.SAVED_OLDEST_REMOVED),
-            ),
-            model.results.take(2).toList(),
-        )
-        assertEquals(SavedGuideStore.MAX_SAVED, saved.saved.value.size)
-        assertTrue(saved.saved.value.none { it.id == "old-0" })
+        assertSame(guide, kept.await().getOrThrow())
+        assertEquals("cut out once", 1, maker.sources.size)
+        assertEquals(Heart.Saved("guide-1"), model.hearts.value[first])
     }
 
     @Test
@@ -265,10 +259,6 @@ class PoseSaveViewModelTest {
         runCurrent()
     }
 
-    private suspend fun fill(count: Int) {
-        repeat(count) { saved.save(fakeGuide("old-$it"), GuideState()) }
-    }
-
     private class FakeMaker : ReferenceGuideMaker {
         val pending = ArrayDeque<CompletableDeferred<Result<ReferenceGuide>>>()
         val sources = mutableListOf<GuideSource>()
@@ -289,7 +279,7 @@ class PoseSaveViewModelTest {
 
     /** A library whose disk is full: nothing saves. */
     private class FailingStore : SavedGuideStore by SavedGuideStore.InMemory() {
-        override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<GuideSaved> =
+        override suspend fun save(guide: ReferenceGuide, state: GuideState, favorite: Boolean): Result<SavedGuide> =
             Result.failure(IOException("No space left"))
     }
 }

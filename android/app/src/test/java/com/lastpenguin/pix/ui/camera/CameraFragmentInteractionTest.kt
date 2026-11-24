@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -897,7 +897,8 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ -> controls.saveGuideButton.performClick() }
         idle()
 
-        assertTrue(modules.saved.saved.value.isEmpty())
+        // History again, still in the library (#297).
+        assertEquals(listOf("guide-1" to false), modules.saved.saved.value.map { it.id to it.favorite })
         onScreen { controls, _ ->
             assertEquals(string(R.string.guide_removed_notice), controls.toggleLabel.text.toString())
             assertEquals(string(R.string.save_guide), controls.saveGuideButton.contentDescription.toString())

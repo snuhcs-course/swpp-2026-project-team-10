@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A selected library cell (#297): the accent disc with a dark check. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/pix_accent"
+        android:pathData="M2,12a10,10 0 1,0 20,0a10,10 0 1,0 -20,0" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M7.5,12.3l3,3l6,-6.3"
+        android:strokeWidth="2.4"
+        android:strokeColor="@color/pix_on_accent"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

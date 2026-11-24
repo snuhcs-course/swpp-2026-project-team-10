@@ -1,10 +1,11 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
 import android.util.Log
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.generation.GenerationError
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.CoroutineDispatcher
@@ -37,9 +38,9 @@ interface PoseShare {
 
     /**
      * *Generate 4 poses* or *Skip* started the set [setId], in place of any other, from a scene photo held at
-     * [sceneTurn] (`PhoneTurns`).
+     * [sceneTurn] (`PhoneTurns`), for [situation] (FR-4.8), which the subject's ♥ keeps in the library (#270).
      */
-    fun open(setId: String, sceneTurn: Int = 0)
+    fun open(setId: String, sceneTurn: Int = 0, situation: Situation? = null)
 
     /** The candidates [setId] plans, [poseIds] in the order of their slots. */
     fun planned(setId: String, poseIds: List<String>)
@@ -69,7 +70,7 @@ interface PoseShare {
     object None : PoseShare {
         override val picks: Flow<SubjectPick> = emptyFlow()
 
-        override fun open(setId: String, sceneTurn: Int) = Unit
+        override fun open(setId: String, sceneTurn: Int, situation: Situation?) = Unit
 
         override fun planned(setId: String, poseIds: List<String>) = Unit
 
@@ -96,6 +97,8 @@ data class MirrorPoseSet(
     val poseIds: List<String> = emptyList(),
     /** How the photographer held the scene photo, 0, 90, 180, or 270, for a ♥ on the subject's *Pick a pose*. */
     val sceneTurn: Int = 0,
+    /** The situation the set is made for, which a ♥ keeps (#270); null from an older photographer. */
+    val situation: Situation? = null,
     /** In the order they arrived. */
     val candidates: Map<String, Bitmap> = emptyMap(),
     /** The set's planned candidates in the order of their slots; empty until planned, and from a photographer of
@@ -173,6 +176,8 @@ class PoseSyncer(
         val failure: GenerationError? = null,
         /** How the scene photo was held, which the set's start says. */
         val sceneTurn: Int = 0,
+        /** The set's situation, which its start says too. */
+        val situation: Situation? = null,
     ) {
         val open: Boolean get() = step == PoseSetStep.GENERATING || step == PoseSetStep.PICKING
     }
@@ -182,8 +187,8 @@ class PoseSyncer(
     private val subjectPicks = Channel<SubjectPick>(Channel.BUFFERED)
     override val picks: Flow<SubjectPick> = subjectPicks.receiveAsFlow()
 
-    override fun open(setId: String, sceneTurn: Int) {
-        shared.value = SharedSet(setId, PoseSetStep.GENERATING, sceneTurn = sceneTurn)
+    override fun open(setId: String, sceneTurn: Int, situation: Situation?) {
+        shared.value = SharedSet(setId, PoseSetStep.GENERATING, sceneTurn = sceneTurn, situation = situation)
     }
 
     override fun planned(setId: String, poseIds: List<String>) {
@@ -291,6 +296,7 @@ class PoseSyncer(
                             by = set.by,
                             failure = set.failure?.name,
                             sceneTurn = if (set.open) set.sceneTurn else 0,
+                            situation = if (set.open) set.situation?.apiName else null,
                         ),
                     )
                     sentStep = step
@@ -493,7 +499,12 @@ class PoseSyncer(
             PoseSetStep.GENERATING -> if (current?.setId != message.setId) {
                 answer(null)
                 val turn = message.sceneTurn.takeIf { it in SCENE_TURNS } ?: 0
-                _mirror.value = MirrorPoseSet(message.setId, PoseSetStep.GENERATING, sceneTurn = turn)
+                _mirror.value = MirrorPoseSet(
+                    message.setId,
+                    PoseSetStep.GENERATING,
+                    sceneTurn = turn,
+                    situation = Situation.named(message.situation),
+                )
             }
 
             PoseSetStep.PICKING -> if (current?.setId == message.setId) {

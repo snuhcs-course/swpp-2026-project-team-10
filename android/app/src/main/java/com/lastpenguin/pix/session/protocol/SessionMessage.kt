@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -327,6 +327,16 @@ sealed interface SessionMessage {
     @Serializable
     @SerialName("photo.shutter")
     data object PhotoShutter : SessionMessage
+
+    /**
+     * A photo of the photographer's shutter that will not come after all (#271): its save failed, or it could not be
+     * read or is too large, before its `photo.begin`. The subject stops waiting for it, so Subject view no longer says a
+     * photo is on its way. Reliable, since a lost one leaves the subject waiting until its 30 s end; a phone that does
+     * not know it ignores it, and waits as long.
+     */
+    @Serializable
+    @SerialName("photo.dropped")
+    data object PhotoDropped : SessionMessage
 
     /** Whether the photo is in the subject's album; without it, [reason] says why not. */
     @Serializable

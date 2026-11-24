@@ -193,7 +193,17 @@ class PhotoSyncer(
     }
 
     override fun notTaken(sessionId: String) {
-        if (currentSession() == sessionId) unconfirmed.updateAndGet { maxOf(it - 1, 0) }
+        if (currentSession() != sessionId) return
+        unconfirmed.updateAndGet { maxOf(it - 1, 0) }
+        dropped()
+    }
+
+    /**
+     * The subject waits for each photo from its `photo.shutter` on (#271): one that will not come after all, before its
+     * `photo.begin`, is said, or Subject view would say a photo is on its way until its 30 s end.
+     */
+    private fun dropped() {
+        if (currentSession() != null) session.send(SessionMessage.PhotoDropped)
     }
 
     private fun currentSession(): String? = session.state.value.liveSessionId()
@@ -250,9 +260,9 @@ class PhotoSyncer(
     }
 
     private suspend fun send(photo: Outgoing): Boolean {
-        val content = reader.open(photo.uri) ?: return false
+        val content = reader.open(photo.uri) ?: return false.also { dropped() }
         return content.stream.use { stream ->
-            if (content.bytes !in 1..MAX_PHOTO_BYTES) return@use false
+            if (content.bytes !in 1..MAX_PHOTO_BYTES) return@use false.also { dropped() }
             progress.value = Progress(photo.photoId)
             val chunks = ((content.bytes + CHUNK_BYTES - 1) / CHUNK_BYTES).toInt()
             val begin = SessionMessage.PhotoBegin(photo.photoId, FORMAT, content.bytes, chunks, photo.takenAt)
@@ -339,9 +349,9 @@ class PhotoSyncer(
 
     /**
      * Whether a photo of the photographer's is on its way to this phone's album (#271): from its `photo.shutter`, or its
-     * `photo.begin` when the shutter came during a drop, until it is saved, refused, or given up. A photo the
-     * photographer could not save never comes, so [STALL_MS] without a photo message ends the wait, as does the
-     * session's end.
+     * `photo.begin` when the shutter came during a drop, until it is saved, refused, or given up, by `photo.dropped`
+     * before its begin. A photographer's phone without `photo.dropped` never says so, and [STALL_MS] without a photo
+     * message ends the wait then, as does the session's end.
      */
     val receiving: Flow<Boolean> = awaited.map { it > 0 }.distinctUntilChanged()
 
@@ -368,6 +378,8 @@ class PhotoSyncer(
                         photoMessagesSeen.update { it + 1 }
                         _shutters.tryEmit(Unit)
                     }
+                    // A photo of a shutter that will not come: one fewer is on its way.
+                    if (message is SessionMessage.PhotoDropped) awaited.update { maxOf(it - 1, 0) }
                 }
             }
             launch {

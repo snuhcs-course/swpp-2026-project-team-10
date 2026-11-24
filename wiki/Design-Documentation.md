@@ -117,7 +117,7 @@
 | 4.0 | 2026-11-21 | Iteration 5 plan from the kickoff of 11/21: the task table with owners and due dates (2.9); the open decisions (*Still open*: the cutout, the options on *Generate poses*, pose generation started by the subject, the self-timer, the live view after a reconnection, a deleted account's Pix ID, remote focus next to the guide's gestures). Remote focus is planned, and the remote-control switch is dropped (2.5.1, 2.6.5, 2.9). |
 | 4.1 | 2026-11-21 | What an account keeps and the agreement before it is made, deleting an account, the privacy policy in Pix and at `/privacy`, the screens above the keyboard, and the retention pass (Iter5-P2, [#266]) (*Still open*, 2.1, 2.5.3, 2.6.8, 2.7, 2.8). |
 | 4.2 | 2026-11-23 | The subject's guide after a session: gone from Subject view at the session's end, held for the next `hello`, and what the photographer counts on after a `guide.clear` or a drop (Iter5-P4, [#268]) (2.1, 2.2, 2.5.1, 2.6.7). |
-| 4.3 | 2026-11-24 | UI fixes: switches for the grid and the horizon bar, the guide-edit toggle and the guide's tint, whose camera each phone shows, by the account's name in `hello`, and the photo on its way to the subject (2.5.1, 2.6.2, 2.6.5, 2.6.8; Iter5-P7, [#271]). |
+| 4.3 | 2026-11-24 | UI fixes: switches for the grid and the horizon bar, the guide-edit toggle and the guide's tint, whose camera each phone shows, by the account's name in `hello`, and the photo on its way to the subject, with `photo.dropped` (2.5.1, 2.6.2, 2.6.5, 2.6.8; Iter5-P7, [#271]). |
 
 </details>
 
@@ -1639,6 +1639,7 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `guide.confirm.image.begin` / `.chunk` / `.end` | P→S | reliable | chunks | The outline's mask, for the subject's *Your reference* |
 | `guide.confirm.use` | S→P | reliable | `confirmId`, `guideId` | The subject's *Use* |
 | `photo.shutter` | P→S | realtime | none | The shutter was pressed (Iter3-A12) |
+| `photo.dropped` | P→S | reliable | none | A shuttered photo will not come: not saved, unreadable, or too large ([#271]) |
 | `photo.begin` / `.chunk` / `.end` | P→S | reliable, bulk | chunks, with `takenAt` | A photo taken in the session, as saved (FR-6.14) |
 | `photo.ack` | S→P | reliable | `photoId`, `next` | The chunk the subject expects next |
 | `photo.saved` | S→P | reliable | `photoId`, `ok`, `reason` | Whether the photo is in the subject's album |
@@ -1987,6 +1988,17 @@ Sent once per description, after its first `pose.description`.
 ```
 
 Sent at each shutter press while connected, not while reconnecting, so the subject's video blinks at that moment (2.6.4, Iter3-A12). `photo.begin` comes only seconds later, once the photo is saved. A lost `photo.shutter` shows no blink.
+
+</details>
+
+<details>
+<summary><code>photo.dropped</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "photo.dropped", "seq": 1, "ts": 1759212500410, "b": {} }
+```
+
+Sent in a live session for a shuttered photo given up before its `photo.begin`: its save failed, or it could not be read or is over 40 MiB ([#271]). The subject waits for one photo fewer, so Subject view stops saying a photo is on its way (2.6.5). A phone that does not know the type ignores it and waits until its 30 s end, so `protocol` stays 3.
 
 </details>
 
@@ -2844,7 +2856,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - The subject sees "Photo saved to your Pix album" or "Couldn't save Dongje's photo". The photographer sees "Couldn't send a photo to Joonhyung" for an unreadable or refused photo, one over 40 MiB, or one stalled for 30 s.
   - `PhotoSyncer.sessionPhotos` lists the session's photos on this phone, oldest first: those taken on the photographer's phone, those saved on the subject's. It is null outside a session, empty until the first, and kept through a reconnect, which keeps the session's id ([#235]).
   - In a session, both phones' thumbnails show only the newest of these, so neither shows a photo from before. Both thumbnails are empty until the session's first photo. *Subject view*'s bottom row is Camera's, in thirds: *Guide* in the middle of the left third, where Camera's is, and the thumbnail in the middle of the right third (`showPhotoThumbnails`), on *Guide*'s icon line.
-  - In the middle, where Camera's shutter is, *Subject view* says "Dongje's camera" and "Live" once connected, centered on the line of *Guide*'s icon and the thumbnail; a step's button takes the place while it shows ([#271]). A long name, such as a Galaxy's own name "길동의 Galaxy S23 Ultra", makes the text smaller, down to 12 sp; a name still too long is cut short, so "'s camera" stays (`cameraTitle`). From a `photo.shutter`, or a `photo.begin` that came without one during a drop, until that photo is saved or refused, `PhotoSyncer.receiving` is true, and "Live" becomes "Receiving photo…" with a spinner. A photo the photographer gave up for the next is not waited for. 30 s without a photo message, as for a photo the photographer could not save, or the session's end, ends the wait (`STALL_MS`).
+  - In the middle, where Camera's shutter is, *Subject view* says "Dongje's camera" and "Live" once connected, centered on the line of *Guide*'s icon and the thumbnail; a step's button takes the place while it shows ([#271]). A long name, such as a Galaxy's own name "길동의 Galaxy S23 Ultra", makes the text smaller, down to 12 sp; a name still too long is cut short, so "'s camera" stays (`cameraTitle`). From a `photo.shutter`, or a `photo.begin` that came without one during a drop, until that photo is saved or refused, `PhotoSyncer.receiving` is true, and "Live" becomes "Receiving photo…" with a spinner. A photo the photographer gave up, before its begin (`photo.dropped`) or for the next photo, is not waited for. 30 s without a photo message, as from a phone that does not send `photo.dropped`, or the session's end, ends the wait (`STALL_MS`).
   - A tap on either opens the session's photos in a viewer over the whole screen, inside Pix (`PhotoViewer`): one page each, opened at the newest, under a header with Back, *Share*, and *Delete* and no title, decoded to the screen's long side (`photoToView`). The phone's gallery would put Pix in the background, where the video stops and, on the photographer's phone, the session ends after 60 s (2.8, *Lifecycle*).
   - A newer photo adds a page and keeps the page on screen. Back closes the viewer, and so does the session's end. On the subject's phone, a step the photographer starts meanwhile opens once it closes. While it is open, TalkBack reads only the viewer.
   - The viewer works as a gallery app's (FR-1.16, [#247]). A strip of 40 dp thumbnails is under the photo, each taking taps on 48 dp, with the one on screen outlined and the others dimmed. A tap on one shows its photo, and the strip scrolls to keep it in the middle. There is no counter; TalkBack reads each page and thumbnail as "Photo 2 of 12".

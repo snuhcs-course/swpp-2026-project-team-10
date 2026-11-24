@@ -56,7 +56,8 @@ import org.robolectric.RobolectricTestRunner
  * `photo.ack` and one more; a chunk that waits in `sendBulk` goes once.
  * Photographer, failures (fault injection): a photo that cannot be opened or read, one the subject refuses, one with
  * no answer for 30 s (just before and just after), and `sendBulk` saying the session is over; each is one `sendFailed`,
- * and the next photo goes on.
+ * and the next photo goes on. One that could not be saved or opened, before its `photo.begin`, is said `photo.dropped`
+ * (#271), and one sent is not; outside a session nothing is said.
  * Photographer, the session's end: every unconfirmed photo counted once, the one going included; a confirmed one not;
  * failures nothing read counted too. No failure is lost, however many come before they are read.
  * Subject, one photo (state-based): saved once with its `takenAt`, then its file gone; a `photo.ack` every 16 chunks.
@@ -70,7 +71,8 @@ import org.robolectric.RobolectricTestRunner
  * Subject, the session's other messages: a slow save, on real threads, leaves `incoming` read.
  * Subject, the shutter: each `photo.shutter` reaches a screen that listens; one that came before is not kept.
  * Subject, a photo on its way (state-based, boundary; #271): none at first; from a shutter until that photo is saved,
- * or refused by the album; from a `photo.begin` without its shutter, sent during a drop; two shutters until both photos;
+ * or refused by the album; from a `photo.begin` without its shutter, sent during a drop; two shutters until both photos,
+ * or one photo and the other's `photo.dropped`;
  * one the photographer gave up for the next; 30 s without a photo message (just before and just after), a chunk
  * starting that time again; and the session's end.
  * Both, the session's photos (state-based; Iter4-A2): none outside a session and an empty list at its start; on the
@@ -303,6 +305,29 @@ class PhotoSyncerTest {
     }
 
     @Test
+    fun `a photo that could not be saved is said dropped to the subject`() = runTest {
+        val (syncer, _) = sender()
+        val shot = checkNotNull(syncer.shutter())
+
+        syncer.notTaken(shot)
+        runCurrent()
+
+        assertEquals(listOf(SessionMessage.PhotoDropped), sentOf(SessionMessage.PhotoDropped::class.java))
+    }
+
+    @Test
+    fun `a photo not saved after its session ended is said to no one`() = runTest {
+        val (syncer, _) = sender()
+        val shot = checkNotNull(syncer.shutter())
+        session.setState(SessionState.Waiting("123456"))
+
+        syncer.notTaken(shot)
+        runCurrent()
+
+        assertTrue(sentOf(SessionMessage.PhotoDropped::class.java).isEmpty())
+    }
+
+    @Test
     fun `a photo taken while the link reconnects waits its turn`() = runTest {
         val (syncer, _) = sender()
         session.setState(SessionState.Reconnecting("s_1", since = 0))
@@ -406,6 +431,8 @@ class PhotoSyncerTest {
 
         assertEquals(1, failed())
         assertEquals(listOf(2L), begins.map { it.takenAt })
+        // The first never began, so the subject hears it will not come; the second began, so it is not dropped.
+        assertEquals(listOf(SessionMessage.PhotoDropped), sentOf(SessionMessage.PhotoDropped::class.java))
     }
 
     @Test
@@ -949,6 +976,21 @@ class PhotoSyncerTest {
         // The photographer gives the first up halfway and sends the second.
         deliverBegin("p1", first)
         deliverChunks("p1", first, until = 1)
+        deliverWhole("p2", jpeg(10))
+
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `a photo the photographer dropped before its begin is no longer waited for`() = runTest {
+        val (syncer, _, _) = receiver()
+        session.deliver(SessionMessage.PhotoShutter)
+        session.deliver(SessionMessage.PhotoShutter)
+        runCurrent()
+
+        session.deliver(SessionMessage.PhotoDropped)
+        runCurrent()
+        assertTrue(syncer.isReceiving())
         deliverWhole("p2", jpeg(10))
 
         assertFalse(syncer.isReceiving())

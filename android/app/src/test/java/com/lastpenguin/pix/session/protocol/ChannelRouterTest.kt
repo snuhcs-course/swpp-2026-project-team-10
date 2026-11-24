@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.FlashMode
@@ -69,6 +69,12 @@ class ChannelRouterTest {
         assertTrue(router.latestOnly(SessionMessage.GuideMove("g", 0.4f, 0.5f, 0.8f)))
         assertTrue(router.latestOnly(SessionMessage.ExposureSet(3)))
         assertFalse(router.latestOnly(SessionMessage.FlashSet(FlashMode.ON)))
+    }
+
+    @Test
+    fun `a dropped photo goes on the reliable channel, since a lost one keeps the subject waiting`() {
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PhotoDropped))
+        assertFalse(router.latestOnly(SessionMessage.PhotoDropped))
     }
 
     @Test

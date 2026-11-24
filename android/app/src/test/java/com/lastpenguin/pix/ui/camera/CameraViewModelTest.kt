@@ -791,45 +791,60 @@ class CameraViewModelTest {
     }
 
     @Test
-    fun `a new guide starts edit mode, and the shutter, hiding, or removing the guide ends it`() = runTest(dispatcher) {
-        runCurrent()
-        assertFalse(model.uiState.value.guideEditing)
-        model.setGuideEditing(true)
-        assertFalse(model.uiState.value.guideEditing)
+    fun `a new guide keeps the camera's gestures, and the shutter, another guide, hiding, or removal ends edit mode`() =
+        runTest(dispatcher) {
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+            model.setGuideEditing(true)
+            assertFalse(model.uiState.value.guideEditing)
 
-        guides.setGuide(guide("g1"))
-        runCurrent()
-        assertTrue(model.uiState.value.guideEditing)
-        model.setGuideEditing(false)
-        assertFalse(model.uiState.value.guideEditing)
-        model.setGuideEditing(true)
-        assertTrue(model.uiState.value.guideEditing)
+            // A guide is added: a pinch still zooms and a tap still focuses, until the toggle says otherwise (#304).
+            guides.setGuide(guide("g1"))
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+            model.setGuideEditing(true)
+            assertTrue(model.uiState.value.guideEditing)
+            model.setGuideEditing(false)
+            assertFalse(model.uiState.value.guideEditing)
+            model.setGuideEditing(true)
+            assertTrue(model.uiState.value.guideEditing)
 
-        model.onShutter()
-        assertFalse(model.uiState.value.guideEditing)
-        camera.capture.complete(Result.success(Uri.parse("content://media/1")))
-        runCurrent()
-        assertFalse(model.uiState.value.guideEditing)
+            // Saving it leaves it the same guide, so the mode stays under the finger.
+            model.onSaveGuide()
+            runCurrent()
+            assertTrue(model.uiState.value.guideSaved)
+            assertTrue(model.uiState.value.guideEditing)
 
-        guides.setGuide(guide("g2"))
-        runCurrent()
-        assertTrue(model.uiState.value.guideEditing)
-        guides.state.value = guides.state.value.copy(visible = false)
-        runCurrent()
-        assertFalse(model.uiState.value.guideEditing)
-        model.setGuideEditing(true)
-        assertFalse(model.uiState.value.guideEditing)
-        guides.state.value = guides.state.value.copy(visible = true)
-        runCurrent()
-        assertFalse(model.uiState.value.guideEditing)
-        model.setGuideEditing(true)
-        assertTrue(model.uiState.value.guideEditing)
+            model.onShutter()
+            assertFalse(model.uiState.value.guideEditing)
+            camera.capture.complete(Result.success(Uri.parse("content://media/1")))
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
 
-        model.setGuideEditing(true)
-        guides.setGuide(null)
-        runCurrent()
-        assertFalse(model.uiState.value.guideEditing)
-    }
+            // Another guide in place of one being edited is a new guide too.
+            model.setGuideEditing(true)
+            assertTrue(model.uiState.value.guideEditing)
+            guides.setGuide(guide("g2"))
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+
+            model.setGuideEditing(true)
+            guides.state.value = guides.state.value.copy(visible = false)
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+            model.setGuideEditing(true)
+            assertFalse(model.uiState.value.guideEditing)
+            guides.state.value = guides.state.value.copy(visible = true)
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+            model.setGuideEditing(true)
+            assertTrue(model.uiState.value.guideEditing)
+
+            model.setGuideEditing(true)
+            guides.setGuide(null)
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+        }
 
     private fun guide(id: String): ReferenceGuide {
         val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)

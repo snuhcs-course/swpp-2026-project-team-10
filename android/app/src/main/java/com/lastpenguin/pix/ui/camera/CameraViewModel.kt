@@ -175,7 +175,8 @@ data class CameraUiState(
     val guideState: GuideState = GuideState(),
     /**
      * Guide-edit mode (AD-17): while on, every drag and pinch on the preview edits the guide; while off, a pinch
-     * zooms the camera. On when a guide is added, off on the shutter or when the guide goes (Design 2.6.2).
+     * zooms the camera. Off for a new guide, on by its toggle, and off again on the shutter or when the guide is
+     * hidden, replaced, or removed (Design 2.6.2, #304).
      */
     val guideEditing: Boolean = false,
     /** The guide's reference is enlarged from its corner thumbnail (FR-3.9); every new guide starts small. */
@@ -359,8 +360,9 @@ class CameraViewModel(
         viewModelScope.launch {
             guides.guide.collect { guide ->
                 _uiState.update {
-                    // A new guide starts in edit mode so that it can be placed at once; no guide, no mode.
-                    val editing = guide != null && (guide !== it.guide || it.guideEditing)
+                    // A new guide starts with the camera's gestures, which are used more than the guide's (#304): the
+                    // mode holds only for the guide it was turned on for; no guide, no mode.
+                    val editing = guide != null && guide === it.guide && it.guideEditing
                     val expanded = it.referenceExpanded && guide === it.guide
                     // A saved copy keeps the guide's id and its photo, so it stays hidden; another guide's photo
                     // is one the user has not seen, so it shows.

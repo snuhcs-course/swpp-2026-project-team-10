@@ -53,8 +53,9 @@ import org.robolectric.annotation.GraphicsMode
  * The Camera screen's render paths (R&S 6.2, Testing Documentation 2.1.6), on the real Fragment under
  * FragmentScenario with a container of fakes. Partitions, one test each: camera permission denied or granted;
  * camera status STARTING, READY; the grid and the horizon bar on by default, and each off from Settings (#271); a
- * guide added, with the guide-edit toggle lit and the guide filled, the toggle tapped off (unlit, the same icon, no
- * fill; #271), hidden, removed by the shutter's end of edit mode; a photo saved or
+ * guide added, with the guide-edit toggle unlit and the guide not filled (#304), the toggle tapped on (lit, the guide
+ * filled) and off again (unlit, the same icon, no fill; #271), hidden, removed by the shutter's end of edit mode; a
+ * photo saved or
  * failed; the flash and brightness controls with and without the capability; the aspect ratio 4:3 and 16:9; the
  * scene photo step framing and reviewing, with Back at the top left of each (out to the camera, and from the review back
  * to framing) and Use at the top right of the review (#199), the flow's bar at its first and second step, the panel
@@ -210,7 +211,7 @@ class CameraFragmentRenderTest {
     // ---- Guide -----------------------------------------------------------------
 
     @Test
-    fun newGuide_turnsEditModeOnAndShowsItsControlsAndThumbnail() {
+    fun newGuide_keepsTheCamerasGestures_andShowsItsControlsAndThumbnail() {
         val modules = launch()
 
         modules.guides.setGuide(guide())
@@ -219,16 +220,17 @@ class CameraFragmentRenderTest {
         onScreen { controls, _ ->
             assertEquals(View.VISIBLE, controls.guideControls.visibility)
             assertEquals(View.VISIBLE, controls.editGuideButton.visibility)
-            // One person's outline, lit while a pinch moves the guide, whose inside is tinted then (#271).
-            assertTrue(controls.editGuideButton.isChecked)
+            // A new guide leaves the pinch and the tap to the camera (#304): one person's outline, unlit, and no tint
+            // inside the guide (#271).
+            assertFalse(controls.editGuideButton.isChecked)
             assertEquals(R.drawable.ic_guide_mode, shadowOf(controls.editGuideButton.plainIcon).createdFromResId)
             assertEquals(
-                activityColor(R.color.pix_guide),
+                activityColor(R.color.pix_text),
                 controls.editGuideButton.iconTint?.getColorForState(controls.editGuideButton.drawableState, 0),
             )
             assertTrue(controls.editGuideButton.isEnabled)
-            assertTrue(controls.guideOverlay.editable)
-            assertTrue(controls.guideOverlay.filled)
+            assertFalse(controls.guideOverlay.editable)
+            assertFalse(controls.guideOverlay.filled)
             // Remove guide in the light red that sets it apart from the panel's other controls (E3, #204).
             assertEquals(
                 activityColor(R.color.pix_danger_text),
@@ -236,8 +238,9 @@ class CameraFragmentRenderTest {
             )
             assertTrue(controls.opacitySlider.isEnabled)
             assertEquals(string(R.string.guide_opacity_percent, 50), controls.opacityValue.text.toString())
-            // How to move it is the tutorial's (FR-10.4): edit mode shows no hint.
-            assertEquals(View.INVISIBLE, controls.hintText.visibility)
+            // What a pinch does while the guide is on the camera and not being edited.
+            assertEquals(string(R.string.hint_pinch_zoom), controls.hintText.text.toString())
+            assertEquals(View.VISIBLE, controls.hintText.visibility)
             assertEquals(string(R.string.guide_change_description), controls.guideButton.contentDescription)
             assertTrue(controls.guideButton.isActivated)
             assertEquals(View.VISIBLE, controls.referenceThumbnail.visibility)
@@ -245,12 +248,27 @@ class CameraFragmentRenderTest {
     }
 
     @Test
-    fun editModeToggle_turnsTheModeOffAndThePinchZoomsAgain() {
+    fun editModeToggle_turnsTheModeOn_andASecondTapGivesThePinchBackToTheCamera() {
         val modules = launch()
         modules.guides.setGuide(guide())
         idle()
 
         onScreen { controls, _ -> controls.editGuideButton.performClick() }
+        idle()
+
+        onScreen { controls, _ ->
+            // Lit while a pinch moves the guide, whose inside is tinted then (#271). How to move it is the
+            // tutorial's (FR-10.4): edit mode shows no hint.
+            assertTrue(controls.editGuideButton.isChecked)
+            assertEquals(
+                activityColor(R.color.pix_guide),
+                controls.editGuideButton.iconTint?.getColorForState(controls.editGuideButton.drawableState, 0),
+            )
+            assertTrue(controls.guideOverlay.editable)
+            assertTrue(controls.guideOverlay.filled)
+            assertEquals(View.INVISIBLE, controls.hintText.visibility)
+            controls.editGuideButton.performClick()
+        }
         idle()
 
         onScreen { controls, _ ->

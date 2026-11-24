@@ -94,7 +94,7 @@ import org.robolectric.shadows.ShadowToast
  * place, a drag up and down, kept up while held, gone after the idle time), on the right and, near the image's right
  * edge, on the left; the focus box staying while the bar is up, held or not, both whole until the idle time and both
  * gone after it, or, on a camera without brightness, fading by itself; the toggle label for Hide / Show and a zoom step, replaced at once and gone after its time; the
- * pinch mode's label over the guide-edit toggle, Camera then Guide. A tap on the readout while the subject's pinch holds
+ * pinch mode's label over the guide-edit toggle, Guide then Camera, since a new guide starts with the camera's (#304). A tap on the readout while the subject's pinch holds
  * the zoom: no zoom, and the label names the subject (FR-7.6, #236).
  * A photo taken with the phone held sideways, saved as held (FR-1.5, #206).
  * The subject's tap to focus (FR-7.7): the focus box where they tapped, alone, with its notice, which goes sooner than
@@ -1313,14 +1313,14 @@ class CameraFragmentInteractionTest {
         idle()
         onScreen { controls, _ -> assertFalse(controls.pinchModeLabel.isShown) }
 
-        // A new guide starts in edit mode, so the first tap gives the pinch back to the camera.
+        // A new guide leaves the pinch to the camera (#304), so the first tap gives it to the guide.
         onScreen { controls, _ -> controls.editGuideButton.performClick() }
         idle()
         onScreen { controls, _ ->
             val label = controls.pinchModeLabel
             assertTrue(label.isShown)
-            assertEquals(string(R.string.pinch_mode_camera), label.text.toString())
-            assertEquals(string(R.string.pinch_mode_camera_description), label.contentDescription.toString())
+            assertEquals(string(R.string.pinch_mode_guide), label.text.toString())
+            assertEquals(string(R.string.pinch_mode_guide_description), label.contentDescription.toString())
             val toggle = IntArray(2).also(controls.editGuideButton::getLocationInWindow)
             val above = IntArray(2).also(label::getLocationInWindow)
             assertTrue(above[1] + label.height <= toggle[1])
@@ -1329,7 +1329,7 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ -> controls.editGuideButton.performClick() }
         idle()
         onScreen { controls, _ ->
-            assertEquals(string(R.string.pinch_mode_guide), controls.pinchModeLabel.text.toString())
+            assertEquals(string(R.string.pinch_mode_camera), controls.pinchModeLabel.text.toString())
         }
         shadowOf(Looper.getMainLooper()).idleFor(CameraViewModel.NOTICE_MS + 100, TimeUnit.MILLISECONDS)
         onScreen { controls, _ -> assertFalse(controls.pinchModeLabel.isShown) }

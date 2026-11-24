@@ -25,7 +25,9 @@ import org.junit.Test
  * from the base (set again, and its state echoed as the subject's) / at the base already, or no range at all
  * (answered at once, nothing set); a point inside the frame, at its edges (0 and 1), just outside, and no number; a camera that is not ready; a
  * drag's request still outstanding, which keeps its own answer; the tap's answer marked as such, and no other echo
- * of the subject's (a brightness set after the tap). The photographer's own focus (`camera.focus`): told
+ * of the subject's (a brightness set after the tap); a base the camera does not apply, answered with the current
+ * state after the wait and then forgotten, so a later change to that value is the photographer's. The photographer's
+ * own focus (`camera.focus`): told
  * to the subject while the session runs, and to no one before it starts or after it stops.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -707,6 +709,36 @@ class RemoteControlHandlerTest {
     }
 
     @Test
+    fun `a base the camera does not apply is answered with the current state, and then forgotten`() = runTest {
+        focusCamera.state.value = focusCamera.state.value.copy(exposure = 3)
+        focusHandler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+        focusCamera.applies = false
+
+        focusHandler.handle(SessionMessage.FocusSet(0.5f, 0.5f))
+        advanceTimeBy(400)
+        runCurrent()
+        assertTrue(echoes().isEmpty())
+
+        advanceTimeBy(200)
+        runCurrent()
+        // Where the camera is, as the tap's answer: the subject's bar starts from there.
+        assertEquals(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 3, focused = true),
+            echoes().single(),
+        )
+
+        // The photographer's own change to the base, later, is not the subject's.
+        session.sent.clear()
+        focusCamera.state.value = focusCamera.state.value.copy(exposure = 0)
+        runCurrent()
+        assertEquals(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true), echoes().single())
+        focusHandler.stop()
+    }
+
+    @Test
     fun `a focus request leaves a drag's outstanding brightness request to be answered`() = runTest {
         focusHandler.start(this)
         advanceTimeBy(200)
@@ -721,8 +753,14 @@ class RemoteControlHandlerTest {
         runCurrent()
 
         assertEquals(listOf(3, 0), focusCamera.exposureRequests)
-        // The subject's bar still learns where the camera is.
-        assertEquals(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true), echoes().single())
+        // The subject's bar still learns where the camera is: the drag's answer, then the tap's.
+        assertEquals(
+            listOf(
+                SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true),
+                SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, focused = true),
+            ),
+            echoes(),
+        )
         focusHandler.stop()
     }
 

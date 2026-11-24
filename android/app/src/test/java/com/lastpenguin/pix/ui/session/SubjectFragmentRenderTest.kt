@@ -80,7 +80,8 @@ import org.robolectric.shadows.ShadowToast
  * brightness beside it (FR-7.7, FR-7.3, #273): a tap inside the image (the focus asked for at the photographer's x, the
  * box there, the bar beside it), beside the image and in guide-edit mode (nothing), on a camera without point focus
  * (the bar alone); a drag on the bar (steps, then the final value; both gone after the idle time); a drag on the video
- * without the bar up (a tap first, nothing sent until the tap's answer, then steps from the brightness it gave); the
+ * without the bar up (a tap first, nothing sent until the tap's answer, then steps from the brightness it gave); a
+ * drag on the bar itself before the tap's answer (nothing sent, then from the brightness it gave); the
  * photographer's own focus (the box alone at its place on the mirror; this phone's bar up, which goes, or held under a
  * finger, where nothing moves; while a drag still waits for its tap's answer, which ends that drag); TalkBack's action
  * on the video (the focus at the image's middle and the bar, and nothing in guide-edit mode); the live view on mobile data (FR-6.13); the Guide button (FR-6.15) disabled until connected, adding or
@@ -724,6 +725,9 @@ class SubjectFragmentRenderTest {
         connect(modules, exposureRange = -4..4, focuses = true)
         tapTheImage()
         idle()
+        // The tap's answer: the camera is at its base, 0.
+        modules.session.deliver(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, focused = true))
+        idle()
 
         onScreen { binding, _ ->
             val bar = binding.exposureBar
@@ -746,6 +750,46 @@ class SubjectFragmentRenderTest {
             assertFalse(binding.exposureBar.isShown)
             assertFalse(binding.focusRing.isShown)
         }
+    }
+
+    @Test
+    fun aDragOnTheBarBeforeTheTapsAnswer_waitsForIt_andStartsFromTheBrightnessItGave() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, focuses = true)
+        // Left at +1.5 EV by an earlier drag.
+        modules.session.deliver(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 3))
+        idle()
+        tapTheImage()
+        idle()
+
+        val down = SystemClock.uptimeMillis()
+        var y = 0f
+        onScreen { binding, _ ->
+            val bar = binding.exposureBar
+            assertTrue(bar.isShown)
+            y = bar.height / 2f
+            touch(bar, MotionEvent.ACTION_DOWN, bar.width / 2f, y, down)
+            y -= wayFor(bar, 2)
+            touch(bar, MotionEvent.ACTION_MOVE, bar.width / 2f, y, down, down + 16)
+        }
+        idle()
+        assertTrue(brightnesses(modules).isEmpty())
+
+        modules.session.deliver(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 0, focused = true),
+        )
+        idle()
+        onScreen { binding, _ ->
+            val bar = binding.exposureBar
+            y -= 1f
+            touch(bar, MotionEvent.ACTION_MOVE, bar.width / 2f, y, down, down + 32)
+            y -= wayFor(bar, 2)
+            touch(bar, MotionEvent.ACTION_MOVE, bar.width / 2f, y, down, down + 48)
+            touch(bar, MotionEvent.ACTION_UP, bar.width / 2f, y, down, down + 64)
+        }
+        idle()
+        assertEquals(SessionMessage.ExposureSet(2, final = true), brightnesses(modules).last())
+        assertTrue(brightnesses(modules).none { it.index > 2 })
     }
 
     @Test

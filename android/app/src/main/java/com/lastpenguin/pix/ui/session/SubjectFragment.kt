@@ -992,6 +992,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
      * range, and the flash button, hidden when it has no flash (FR-7.3).
      */
     private fun renderCameraControls(binding: FragmentSubjectBinding, ui: SubjectUiState) {
+        // Until a tap to focus is answered, the bar shows the brightness from before it: its own drag waits too.
+        binding.exposureBar.awaitingValue = ui.baseAwaited
         binding.exposureBar.render(
             ui.exposureRange,
             ui.exposureStep,

@@ -73,7 +73,8 @@ sealed interface RemoteAction {
  * when it can focus on a point, and the brightness goes back to the photographer's base ([baseBrightness], FR-1.11).
  * The point has no echo, since focus has no lasting state. The tap is answered with the `camera.state` that carries
  * the base, as the subject's and marked `focused`, so the subject's bar knows where a drag starts from and takes no
- * other echo for it: at once when the camera has the base already, and otherwise when the camera reports it. It makes no brightness notice. A point outside the frame is
+ * other echo for it: at once when the camera has the base already, and otherwise when the camera reports it, or
+ * with where the camera is when it has not after [ECHO_TIMEOUT_MS]. It makes no brightness notice. A point outside the frame is
  * dropped, and so is a tap while the camera is not ready, as on Camera. The photographer's own tap goes the other
  * way as `camera.focus` ([focusedHere]), so the subject's phone shows the focus box too.
  *
@@ -111,6 +112,7 @@ class RemoteControlHandler(
     private var timeoutJob: Job? = null
     private var exposureTimeoutJob: Job? = null
     private var flashTimeoutJob: Job? = null
+    private var baseTimeoutJob: Job? = null
     private var pending: PendingValue<Float>? = null
 
     // False while the subject's pinch has sent steps but not its last value, so the camera still holds its lens.
@@ -158,6 +160,8 @@ class RemoteControlHandler(
         timeoutJob?.cancel()
         exposureTimeoutJob?.cancel()
         flashTimeoutJob?.cancel()
+        baseTimeoutJob?.cancel()
+        baseTimeoutJob = null
         zoomJob = null
         finalJob = null
         timeoutJob = null
@@ -384,8 +388,19 @@ class RemoteControlHandler(
         } else {
             // A drag's request still outstanding is left alone: its answer or its late application still tells the
             // subject where the camera is.
-            pendingBase = PendingValue(base, clock(), final = true)
+            val queued = PendingValue(base, clock(), final = true)
+            pendingBase = queued
             camera.setExposure(base)
+            baseTimeoutJob?.cancel()
+            baseTimeoutJob = scope?.launch {
+                // A camera that does not take the base reports nothing: the tap is then answered with where the camera
+                // is, and the base is no longer waited for, so a later change to that value is not taken for it.
+                delay(ECHO_TIMEOUT_MS)
+                camera.status.first { it != CameraStatus.STARTING }
+                if (pendingBase !== queued) return@launch
+                pendingBase = null
+                send(camera.zoom.value, Role.SUBJECT, final = true, focused = true)
+            }
         }
         if (caps.supportsFocusPoint) confirm(RemoteAction.Focus(x, y), "focus.applied", "$x $y")
     }
@@ -472,7 +487,10 @@ class RemoteControlHandler(
             confirm(RemoteAction.Flash(flash), "flash.applied", "$flash")
         }
         val baseRequest = pendingBase?.takeIf { it.value == exposure && now - it.at <= PENDING_MS }
-        if (baseRequest != null) pendingBase = null
+        if (baseRequest != null) {
+            pendingBase = null
+            baseTimeoutJob?.cancel()
+        }
         val bySubject = exposureRequest != null || flashRequest != null || baseRequest != null
         send(
             camera.zoom.value,

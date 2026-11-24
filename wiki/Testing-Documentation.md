@@ -128,6 +128,7 @@
 | 4.5 | 2026-11-24 | The scene photo straight to *Generate poses* (Iter5-A5, [#296]): its owner and tests, a step on IT-7, and what changes in IT-25 and IT-35 (1.1, 2.1.5, Appendix A). |
 | 4.6 | 2026-11-24 | The UI fixes (Iter5-P7, [#271]): their tests, and added steps on IT-20, IT-21, IT-33, and IT-34; the two heuristic findings they build (1.1, 2.1.5, 4.2, Appendix A). |
 | 4.7 | 2026-11-24 | Remote focus, with the brightness beside the focus box (Iter5-P9, [#273]): its owner and tests, IT-41, and what changes in IT-6 and US-12's step 4 (1.1, 2.1.5, 2.1.6, 4.3, Appendix A). |
+| 4.8 | 2026-11-24 | A new guide starts with the camera's gestures (Iter5-A8, [#304]): its owner and tests, and what changes in IT-5 and IT-34 (1.1, Appendix A). |
 
 </details>
 
@@ -218,6 +219,7 @@ One member writes and maintains each component's tests, following the module own
 | Remote focus, with the brightness beside the focus box (Iter5-P9, [#273]) | Managers, ViewModels, Views, the session protocol | `camera/` (`BaseBrightnessTest`), `session/` (`RemoteControlHandlerTest`, `RemoteControlMessagesTest`, `CameraMessagesTest`, `ChannelRouterTest`), `ui/session/` (`SessionViewModelTest`, `SubjectViewModelTest`, `SubjectFragmentRenderTest`, `SubjectTipScreenTest`, `SubjectControlTurnTest`), `ui/camera/` (`CameraControlsViewModelTest`, `CameraFragmentInteractionTest`, `CameraLayoutTest`, `ExposureBarViewTest`), `ui/settings/` (`TutorialLayoutTest`), `ui/` (`KoreanScreensTest`); IT-6 and IT-41 on two phones | 박동제 |
 | *Generate poses*: Auto, the options, and the scene photo large (Iter5-P10, [#274]) | Models, Views | `generation/` (`PoseOptionsTest`), `ui/generation/` (`DescriptionFormTest`, `SituationOptionsTest`, `GenerationScreensTest`), `ui/session/` (`SubjectDescribeFragmentTest`), `ui/` (`KoreanScreensTest`) | 박동제 |
 | The scene photo straight to *Generate poses* (Iter5-A5, [#296]) | ViewModels, Views | `ui/generation/` (`GenerationViewModelTest`, `SceneArrivalTest`, `GenerationScreensTest`, `SceneTurnTest`), `ui/camera/` (`CameraFragmentRenderTest`, `CameraFragmentInteractionTest`, `CameraLayoutTest`), `ui/` (`FlowProgressViewTest`, `HeaderActionTest`) | 박동제 |
+| A new guide starts with the camera's gestures (Iter5-A8, [#304]) | ViewModels, Views | `ui/camera/` (`CameraViewModelTest`, `GuideControlsViewModelTest`, `CameraFragmentRenderTest`, `CameraFragmentInteractionTest`); IT-5 and IT-34 on phones | 박동제 |
 | The live view after a reconnection, the UI fixes, and the self-timer (Iter5-P5, P7, P8) | Platform, ViewModels, Views | `session/`, `settings/`, `ui/camera/`, `ui/settings/`; the UI fixes also in `guide/`, `ui/session/`, `ui/`: `DataStoreAppSettingsTest`, `SettingsFragmentTest`, `CameraCompositionViewTest`, `CameraFragmentRenderTest`, `CameraLayoutTest`, `SubjectFragmentRenderTest`, `SubjectSessionPhotoTest`, `SessionViewModelTest`, `PhotoSyncerTest`, `MessageCodecTest`, `ChannelRouterTest`, `SessionIdentityTest`, `RtcSessionManagerTest`, `GuideOverlayViewTest`, `GuideLookTest`, `MaskMathTest`, `KoreanScreensTest` | 박재완 |
 | The library's situations and memos, the cutout, and pose generation started by the subject (Iter5-P6, P11, P12) | Managers, ViewModels, Views, the session protocol | `guide/`, `ui/guide/`, `session/`, `ui/session/`, `generation/` | 한준형 |
 | AI module tests: the outline and the person check (Iter5-P16, P17) | The phone's segmentation and person check; the server's person check | 3.1, 3.2 | 박재완 (the outline), 한준형 (the person check) |
@@ -1248,7 +1250,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 
 **Steps**
 
-1. Add a guide, and drag it on each phone in turn.
+1. Add a guide, and drag it on each phone in turn. *Changed in Iter5-A8 ([#304]): on the photographer's phone too, tap the guide-edit toggle first; a new guide no longer starts in guide-edit mode.*
 2. Hide and show it on the photographer's phone, then replace it through *Guide*.
 
 **Expected result**
@@ -1851,7 +1853,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 
 **Expected result**
 
-- Each toggle shows its label at the top of the image for 3 s, a new one at once, and TalkBack reads it. The mode label reads *Guide* or *Camera* over the toggle.
+- Each toggle shows its label at the top of the image for 3 s, a new one at once, and TalkBack reads it. The mode label reads *Guide* or *Camera* over the toggle. *Changed in Iter5-A8 ([#304]): with a new guide the toggle is off, so its first tap reads "Guide".*
 - Camera has no brightness button. The bar stands beside the focus box, inside the image, and starts at +1.0. It changes the brightness as a drag on the preview or on the bar moves. It goes after 3 s untouched, but not while TalkBack's focus is on it, and is back at +1.0 at the next tap.
 - A drag with the bar gone focuses where it started and moves from +1.0. A sideways drag changes nothing.
 - The horizon bar runs along the long side when the phone is on its side, and is gone past 20°.
@@ -2603,3 +2605,4 @@ Observations: every Iteration 4 step held, and no defect was found.
 [#296]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/296
 [#297]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/297
 [#298]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/298
+[#304]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/304

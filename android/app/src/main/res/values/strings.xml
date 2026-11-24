@@ -589,7 +589,7 @@
     <string name="tutorial_generate">Pick a situation, and AI makes four poses for it</string>
     <string name="tutorial_saved">Saved guides wait in My library</string>
     <string name="tutorial_move">Drag to move, pinch to resize</string>
-    <string name="tutorial_edit">The guide moves only while this is on</string>
+    <string name="tutorial_edit">Turn this on to move the guide</string>
     <string name="tutorial_fade">Fade it or hide it</string>
     <string name="tutorial_save">Save it to use again</string>
     <string name="tutorial_remove">Take the guide off</string>

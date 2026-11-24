@@ -15,5 +15,10 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 - [Dongje, 11-24] "When I used the app myself, a guide that is added always seems to start with the guide's gestures, and the camera's gestures need the button. Check this. If it is true: people use the camera's gestures more than the guide's, so the camera's gestures should be the default when a guide is added. Build it." (The agent found it true in `CameraViewModel`: a new guide turned guide-edit mode on, "so that it can be placed at once". It changed the rule test-first: the mode holds only for the guide it was turned on for, so a new guide, and another guide that replaces one, start with the mode off, as on Subject view. Four screen tests that assumed the old start were rewritten. R&S 4.6, Design 4.7, Testing 4.8, the flow 1 wireframe. The tutorial's tip on the toggle, "The guide moves only while this is on", still held, so it left the tip and asked whether to reword it, with "Turn this on to move the guide" as its recommendation.)
 - [Dongje, 11-24] "Change the tutorial's line as you recommended." (The tip on the toggle now reads "Turn this on to move the guide", "이 버튼을 켜면 가이드를 옮길 수 있어요" in Korean, since the toggle is off when the tips show.)
 
+## Camera drops the "Pinch to zoom" hint ([#306])
+
+- [Dongje, 11-24] "The plain camera does not show the line 'Pinch to zoom', but with a guide up it shows. The tutorial tells it too, and everyone knows a camera's zoom in and out, so the line can go. It is a small task, so start building at once." (The agent changed the three screen tests that expected the line, saw them fail, and took the line out of Camera's hint chip, which now says only "Guide hidden". It removed the string in both languages and the chip from two frames of the flow 1 wireframe. R&S 4.7, Design 4.8, Testing 4.9.)
+
 [#301]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/301
 [#304]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/304
+[#306]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/306

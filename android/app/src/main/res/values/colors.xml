@@ -93,6 +93,8 @@
     <color name="camera_level">#FFFFFFFF</color>
     <color name="camera_level_outline">#8C000000</color>
     <color name="camera_level_aligned">#D4AC24</color>
+    <!-- The inside of the guide while guide-edit mode is on (#271): the guide color at 25%, so the scene shows through. -->
+    <color name="camera_guide_fill">#405EEAD4</color>
     <!-- The dark outline of the brightness bar beside the focus box (Design 2.8). -->
     <color name="camera_exposure_outline">#5A000000</color>
     <!-- The photo behind Settings' guide preview: a sky over the ground. -->

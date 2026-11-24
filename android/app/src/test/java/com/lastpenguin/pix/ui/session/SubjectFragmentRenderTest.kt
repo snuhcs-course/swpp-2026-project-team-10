@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -13,6 +13,7 @@ import androidx.core.view.ViewCompat
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragmentInContainer
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.android.material.button.MaterialButton
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -97,6 +98,9 @@ import org.robolectric.shadows.ShadowToast
  * poses opened once per description and then by the same button, opened once Add a pose guide closes when it came
  * under the sheet, a set held here shown before it, and a close after Back, which says so. A tap on the readout while
  * the photographer's pinch holds the zoom: nothing sent, and the label names the photographer (FR-7.6, #236).
+ * The UAT's opinions (#271): the slot where Camera's shutter is empty until connected, then whose camera this is and
+ * "Live", given up to a step's button, with no notice saying it as well; *Leave* red; the guide-edit toggle one person icon, unlit with the guide plain and lit with it
+ * filled. The grid on by default and off from Settings.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -553,18 +557,23 @@ class SubjectFragmentRenderTest {
         onScreen { binding, _ ->
             assertEquals(View.VISIBLE, binding.editGuideButton.visibility)
             assertTrue(binding.editGuideButton.isEnabled)
+            // One person icon, unlit while a pinch zooms, and the guide plain (#271).
             assertFalse(binding.editGuideButton.isChecked)
-            // The toggle shows its mode: the camera while a pinch zooms (E2, #204).
-            assertEquals(R.drawable.ic_camera, shadowOf(binding.editGuideButton.plainIcon).createdFromResId)
+            assertEquals(R.drawable.ic_guide_mode, shadowOf(binding.editGuideButton.plainIcon).createdFromResId)
+            assertEquals(color(R.color.pix_text), binding.editGuideButton.shownIconColor())
             assertFalse(binding.guideOverlay.editable)
+            assertFalse(binding.guideOverlay.filled)
             binding.editGuideButton.performClick()
         }
         idle()
 
         onScreen { binding, _ ->
+            // Lit in the guide color, with the guide's inside tinted, while drags and pinches move it.
             assertTrue(binding.editGuideButton.isChecked)
             assertEquals(R.drawable.ic_guide_mode, shadowOf(binding.editGuideButton.plainIcon).createdFromResId)
+            assertEquals(color(R.color.pix_guide), binding.editGuideButton.shownIconColor())
             assertTrue(binding.guideOverlay.editable)
+            assertTrue(binding.guideOverlay.filled)
         }
 
         // The photographer hides the guide: it cannot be edited here until it is shown again (FR-7.2).
@@ -575,6 +584,69 @@ class SubjectFragmentRenderTest {
             assertFalse(binding.editGuideButton.isEnabled)
             assertFalse(binding.editGuideButton.isChecked)
             assertFalse(binding.guideOverlay.editable)
+            assertFalse(binding.guideOverlay.filled)
+        }
+    }
+
+    // ---- The shutter's slot, the notice, and Leave (#271) --------------------------------------
+
+    private fun color(id: Int): Int = scenarioContext().getColor(id)
+
+    private fun scenarioContext() = onScreen { _, fragment -> fragment.requireContext() }
+
+    /** The toggle's icon color in the state it is in. */
+    private fun MaterialButton.shownIconColor(): Int? =
+        iconTint?.getColorForState(drawableState, 0)
+
+    @Test
+    // At the Galaxy S22's width, where the name fits whole; CameraLayoutTest checks a name that does not.
+    @Config(qualifiers = "w360dp-h705dp-xxhdpi")
+    fun theShuttersSlot_isEmptyUntilConnected_thenSaysWhoseCameraItIsAndThatItIsLive() {
+        val modules = launch()
+        onScreen { binding, _ -> assertEquals(View.GONE, binding.cameraCaption.visibility) }
+
+        connect(modules, name = "Test Account 1")
+
+        onScreen { binding, _ ->
+            assertEquals(View.VISIBLE, binding.cameraCaption.visibility)
+            assertEquals(
+                string(R.string.subject_title, "Test Account 1"),
+                binding.cameraCaptionTitle.text.toString(),
+            )
+            assertEquals(string(R.string.subject_live), binding.cameraCaptionStatus.text.toString())
+            assertTrue(binding.cameraCaptionDot.isShown)
+            assertFalse(binding.cameraCaptionSpinner.isShown)
+            // The slot names the camera for the whole session, so no notice says it as well.
+            assertFalse(binding.toggleLabel.isShown)
+        }
+
+        // The link drops: the video says so, and the slot is empty again until it is back.
+        modules.session.setState(SessionState.Reconnecting("s1", 0L))
+        idle()
+        onScreen { binding, _ -> assertEquals(View.GONE, binding.cameraCaption.visibility) }
+    }
+
+    @Test
+    fun leave_isRed_asEndSessionIsOnCamera() {
+        launch()
+
+        // The danger style's text; its outline is an app attribute, which this test's host does not apply.
+        onScreen { binding, _ -> assertEquals(color(R.color.pix_danger_text), binding.leaveButton.currentTextColor) }
+    }
+
+    @Test
+    fun theGrid_isOnByDefault_andOffFromSettings() {
+        val modules = launch()
+        connect(modules)
+        onScreen { binding, _ -> assertTrue(binding.compositionOverlay.showGrid) }
+
+        runBlocking { modules.appSettings.setShowGrid(false) }
+        idle()
+
+        onScreen { binding, _ ->
+            assertFalse(binding.compositionOverlay.showGrid)
+            // Subject view has no horizon bar.
+            assertEquals(View.VISIBLE, binding.compositionOverlay.visibility)
         }
     }
 
@@ -1018,6 +1090,8 @@ class SubjectFragmentRenderTest {
             assertEquals(string(R.string.peer_creating_poses, "Dongje"), binding.connectingText.text.toString())
             assertEquals(View.VISIBLE, binding.pickPoseButton.visibility)
             assertEquals(string(R.string.generating_title), binding.pickPoseLabel.text.toString())
+            // The step's button takes the slot where the camera's name is (#271).
+            assertEquals(View.GONE, binding.cameraCaption.visibility)
         }
 
         // Back keeps it closed, though Subject view renders again; its button opens it again.

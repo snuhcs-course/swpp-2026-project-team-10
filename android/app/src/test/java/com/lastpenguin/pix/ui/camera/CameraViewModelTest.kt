@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -490,7 +490,7 @@ class CameraViewModelTest {
         assertEquals(listOf(Triple("s1", photo, 1_000L)), share.shared)
     }
 
-    /** A session s1 until a test changes it. */
+    /** In a session until a test sets [session] to null; each shot is named after the session it was taken in. */
     private class RecordingShare : PhotoShare {
         var session: String? = "s1"
         val shared = mutableListOf<Triple<String, Uri, Long>>()
@@ -498,12 +498,12 @@ class CameraViewModelTest {
 
         override fun shutter() = session
 
-        override fun taken(sessionId: String, uri: Uri, takenAt: Long) {
-            shared += Triple(sessionId, uri, takenAt)
+        override fun taken(shot: String, uri: Uri, takenAt: Long) {
+            shared += Triple(shot, uri, takenAt)
         }
 
-        override fun notTaken(sessionId: String) {
-            failed += sessionId
+        override fun notTaken(shot: String) {
+            failed += shot
         }
     }
 

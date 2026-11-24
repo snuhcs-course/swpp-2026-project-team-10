@@ -75,6 +75,9 @@ sealed interface SessionNotice {
      * [SessionViewModel.FOCUS_NOTICE_MS], and not for every tap (SessionViewModel.remoteFocus).
      */
     data class RemoteFocus(val name: String) : SessionNotice
+
+    /** A subject connected, so the live view starts: "Joonhyung is watching your camera" (#271). */
+    data class Watching(val name: String) : SessionNotice
 }
 
 /**
@@ -225,6 +228,9 @@ class SessionViewModel(
 
     /** The link dropped and the session goes on: the next Connected resumes it, with the `hello` it began with. */
     private var afterDrop = false
+
+    /** Whether the last state was Connected, so another Connected of the same connection says nothing new. */
+    private var wasConnected = false
     private var connectedJob: Job? = null
 
     /** When this session's last "set the focus" notice began, by [clock]; null before the first. */
@@ -456,6 +462,11 @@ class SessionViewModel(
         // Read for this Connected only: any other state between ends the session, and the next one has its own hello.
         val resumed = afterDrop && connected != null
         afterDrop = reconnecting
+        // The subject's live view starts: Camera says who watches it, once per connection, not after a drop (#271).
+        if (connected?.role == Role.PHOTOGRAPHER && !resumed && !wasConnected) {
+            _notices.tryEmit(SessionNotice.Watching(connected.peer.displayName))
+        }
+        wasConnected = connected != null
         if (liveNow && connectedJob == null) {
             // Another session's first tap to focus is said again; a reconnect is the same session.
             if (!resumed) focusNoticeAt = null

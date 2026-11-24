@@ -91,6 +91,8 @@ import org.junit.runner.RunWith
  * The subject's tap to focus (FR-7.7, FR-7.4): its box at every tap; its notice at the first tap, not at a tap while
  * the notice shows or in the quiet time after it (just before its end / at its end), again at the first tap of the
  * next session, and not again after a reconnect within that time.
+ * Who watches the camera (#271): a subject connecting is a notice on the photographer's phone, not again after a drop,
+ * again for the next subject once the room waited alone; none on the subject's phone.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 // Robolectric for ProcessLifecycleOwner, which the ViewModel observes for the background limit.
@@ -514,7 +516,45 @@ class SessionViewModelTest {
         session.deliver(image.end())
         runCurrent()
 
-        assertEquals(listOf(SessionNotice.RemoteGuide("Joonhyung")), notices)
+        assertEquals(listOf(SessionNotice.Watching("Joonhyung"), SessionNotice.RemoteGuide("Joonhyung")), notices)
+    }
+
+    @Test
+    fun aSubjectConnecting_isNoticed_notAgainAfterADrop_butAgainForTheNextSubject() = runTest(dispatcher) {
+        val notices = mutableListOf<SessionNotice>()
+        backgroundScope.launch { model.notices.collect { notices += it } }
+
+        session.setState(SessionState.Connected("s_1", PeerInfo("Test Account 1"), Role.PHOTOGRAPHER))
+        runCurrent()
+        assertEquals(listOf(SessionNotice.Watching("Test Account 1")), notices)
+
+        // The link drops and comes back: the same live view goes on.
+        session.setState(SessionState.Reconnecting("s_1", 0L))
+        runCurrent()
+        session.setState(SessionState.Connected("s_1", PeerInfo("Test Account 1"), Role.PHOTOGRAPHER))
+        runCurrent()
+        assertEquals(listOf(SessionNotice.Watching("Test Account 1")), notices)
+
+        // The subject left and the room waited alone: the next one starts a live view of its own.
+        session.setState(SessionState.Waiting("ABC123"))
+        runCurrent()
+        session.setState(SessionState.Connected("s_1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        runCurrent()
+        assertEquals(
+            listOf(SessionNotice.Watching("Test Account 1"), SessionNotice.Watching("Test Account 2")),
+            notices,
+        )
+    }
+
+    @Test
+    fun theSubjectsOwnConnection_isNoNotice() = runTest(dispatcher) {
+        val notices = mutableListOf<SessionNotice>()
+        backgroundScope.launch { model.notices.collect { notices += it } }
+
+        session.setState(SessionState.Connected("s_1", PeerInfo("Test Account 1"), Role.SUBJECT))
+        runCurrent()
+
+        assertTrue(notices.isEmpty())
     }
 
     /** A ViewModel on a camera that focuses on a point, whose time is [clock]. */

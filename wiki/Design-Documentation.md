@@ -119,7 +119,8 @@
 | 4.2 | 2026-11-23 | The subject's guide after a session: gone from Subject view at the session's end, held for the next `hello`, and what the photographer counts on after a `guide.clear` or a drop (Iter5-P4, [#268]) (2.1, 2.2, 2.5.1, 2.6.7). |
 | 4.3 | 2026-11-24 | *Generate poses* (Iter5-P10, [#274]): the field that says Auto, the situations' options as chips that only write into the field, what shows when, *Back to Auto*, one label for the button, and the scene photo large (*Still open*, 2.1, 2.4, 2.6.3, 2.6.5, 2.9). |
 | 4.4 | 2026-11-24 | The scene photo goes straight to *Generate poses* (Iter5-A5, [#296]): `CHECKING` in place of the review, the photo held on Camera and shrinking into its thumbnail, no person said on the camera, Back that shoots again, and a flow of four steps (2.2, 2.4, 2.6.2, 2.6.3, 2.6.5). |
-| 4.5 | 2026-11-24 | Remote focus as built (Iter5-P9, [#273]): `camera.focus.set` handled and answered with `camera.state`, the base brightness at a remote tap, the focus box and the brightness bar on Subject view (`FocusBrightness`), no tap in guide-edit mode, the notice that does not repeat, `camera.focus` for the photographer's own focus, `focused` on the `camera.state` that answers a tap, TalkBack's action on the video, and the tutorial's tip on the video (2.2, 2.5.1, 2.6.5, 2.6.8, 2.8, 2.9). |
+| 4.5 | 2026-11-24 | UI fixes: switches for the grid and the horizon bar, the guide-edit toggle and the guide's tint, whose camera each phone shows, by the account's name in `hello`, and the photo on its way to the subject, with `photo.dropped` and each photo's `shot` (2.5.1, 2.6.2, 2.6.5, 2.6.8; Iter5-P7, [#271]). |
+| 4.6 | 2026-11-24 | Remote focus as built (Iter5-P9, [#273]): `camera.focus.set` handled and answered with `camera.state`, the base brightness at a remote tap, the focus box and the brightness bar on Subject view (`FocusBrightness`), no tap in guide-edit mode, the notice that does not repeat, `camera.focus` for the photographer's own focus, `focused` on the `camera.state` that answers a tap, TalkBack's action on the video, and the tutorial's tip on the video (2.2, 2.5.1, 2.6.5, 2.6.8, 2.8, 2.9). |
 
 </details>
 
@@ -1645,8 +1646,9 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `guide.confirm` | P→S | reliable | `confirmId`, `step`, `guideId`, `by` | The photographer's *Reference confirm* of a chosen pose (FR-6.15) |
 | `guide.confirm.image.begin` / `.chunk` / `.end` | P→S | reliable | chunks | The outline's mask, for the subject's *Your reference* |
 | `guide.confirm.use` | S→P | reliable | `confirmId`, `guideId` | The subject's *Use* |
-| `photo.shutter` | P→S | realtime | none | The shutter was pressed (Iter3-A12) |
-| `photo.begin` / `.chunk` / `.end` | P→S | reliable, bulk | chunks, with `takenAt` | A photo taken in the session, as saved (FR-6.14) |
+| `photo.shutter` | P→S | realtime | `shot` | The shutter was pressed (Iter3-A12) |
+| `photo.dropped` | P→S | reliable | `shot` | A shuttered photo will not come: not saved, unreadable, or too large ([#271]) |
+| `photo.begin` / `.chunk` / `.end` | P→S | reliable, bulk | chunks, with `takenAt` and `shot` | A photo taken in the session, as saved (FR-6.14) |
 | `photo.ack` | S→P | reliable | `photoId`, `next` | The chunk the subject expects next |
 | `photo.saved` | S→P | reliable | `photoId`, `ok`, `reason` | Whether the photo is in the subject's album |
 
@@ -1670,7 +1672,7 @@ The subject never draws a reference photo, candidate, scene photo, or outline as
          "haveGuideId": null, "haveReferenceId": null } }
 ```
 
-Both phones send it once both channels are open. `name` is the device name from the system settings, or the model, at most 40 characters; it is not the Pix display name. Only the subject sets `haveGuideId` and `haveReferenceId`: the guide image and the reference photo it already holds, which the photographer then skips. The subject holds them past a session, in memory (`HeldGuide`), until another guide's image replaces them or a `guide.clear` drops them ([#268]).
+Both phones send it once both channels are open. `name` is the signed-in account's display name, or, signed out, the device name from the system settings or the model, at most 40 characters, counted by code point so an emoji is never cut in two ([#271]). Only the subject sets `haveGuideId` and `haveReferenceId`: the guide image and the reference photo it already holds, which the photographer then skips. The subject holds them past a session, in memory (`HeldGuide`), until another guide's image replaces them or a `guide.clear` drops them ([#268]).
 
 </details>
 
@@ -2001,10 +2003,21 @@ Sent once per description, after its first `pose.description`.
 <summary><code>photo.shutter</code> · realtime · P→S</summary>
 
 ```json
-{ "v": 3, "t": "photo.shutter", "seq": 1, "ts": 1759212499870, "b": {} }
+{ "v": 3, "t": "photo.shutter", "seq": 1, "ts": 1759212499870, "b": { "shot": "8d41c2e0-5b7a-4f3e-9c26-1a0f7e5d3b84" } }
 ```
 
-Sent at each shutter press while connected, not while reconnecting, so the subject's video blinks at that moment (2.6.4, Iter3-A12). `photo.begin` comes only seconds later, once the photo is saved. A lost `photo.shutter` shows no blink.
+Sent at each shutter press while connected, not while reconnecting, so the subject's video blinks at that moment (2.6.4, Iter3-A12). `photo.begin` comes only seconds later, once the photo is saved. A lost `photo.shutter` shows no blink. `shot` names the photo of this press, and its `photo.begin` or `photo.dropped` carries the same, so the subject waits for each photo by name ([#271]). A phone before #271 sends no `shot`.
+
+</details>
+
+<details>
+<summary><code>photo.dropped</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "photo.dropped", "seq": 1, "ts": 1759212500410, "b": { "shot": "8d41c2e0-5b7a-4f3e-9c26-1a0f7e5d3b84" } }
+```
+
+Sent in a live session for a shuttered photo given up before its `photo.begin`: its save failed, or it could not be read or is over 40 MiB ([#271]). The subject stops waiting for that `shot` only, so a drop whose `photo.shutter` was lost ends no other photo's wait (2.6.5). A phone that does not know the type ignores it and waits until its 30 s end, so `protocol` stays 3.
 
 </details>
 
@@ -2013,10 +2026,11 @@ Sent at each shutter press while connected, not while reconnecting, so the subje
 
 ```json
 { "v": 3, "t": "photo.begin", "seq": 1, "ts": 1759212500000,
-  "b": { "photoId": "3c7e1a52-9f0b-4d68-a1c4-6e2d8b7f0a19", "format": "jpeg", "bytes": 4718592, "chunks": 512, "takenAt": 1759212499870 } }
+  "b": { "photoId": "3c7e1a52-9f0b-4d68-a1c4-6e2d8b7f0a19", "format": "jpeg", "bytes": 4718592, "chunks": 512, "takenAt": 1759212499870,
+         "shot": "8d41c2e0-5b7a-4f3e-9c26-1a0f7e5d3b84" } }
 ```
 
-One photo at a time, in the order taken (2.6.5, *Photos on both phones*). `bytes` is the size of the JPEG as saved, so the subject keeps every pixel and the EXIF rotation. `takenAt` is when the photo was taken.
+One photo at a time, in the order taken (2.6.5, *Photos on both phones*). `bytes` is the size of the JPEG as saved, so the subject keeps every pixel and the EXIF rotation. `takenAt` is when the photo was taken. `shot` is its `photo.shutter`'s ([#271]); a phone before #271 sends none.
 
 </details>
 
@@ -2655,9 +2669,9 @@ guide size on screen:   hPx = height · H · s,   wPx = hPx · aspect
 - **A pose's guide.** Segmentation cuts the guide from the candidate as it is (2.6.1), and *Reference confirm* shows it there. *Use this guide* turns it back by the scene photo's turn into the frame (`intoFrameHeldAt`): its mask, outline, thumbnail, and `anchor`. It then starts where the person stood in the framed photo, and lies on the preview held the same way, on both phones (NFR-8). A picked photo and a saved guide go on as they are, so a pose's ♥ saves its guide already turned back (2.6.3, *Saving a pose*).
 - **The controls (FR-1.15, [#207]).** `TurningIcons` turns the controls the other way by the same quarter, so they stand upright to the user. They turn together, each around its own center, the shortest way, in 250 ms (`Motion.TURN_MS`); a half turn goes clockwise. A new turn during a turn goes on from where they are. The turn as a screen opens, and every turn with Android's animations off, is at once. A `TurningButton` turns its icon through a `RotateDrawable`, so its background and its tap area stay, and a new icon keeps the turn; with `turnsLabel` its label turns too. A `TurningLabel` is a text that turns, such as the zoom readout, in its pill. Both turn a label as one word in its own place and width (`TurnedLabelSpan`), so the view keeps its size. An icon or a thumbnail in a square, and a bottom-row button with its label under its icon, turn whole. On Camera these are the top bar's icons, the ratio, *Shoot together*'s icon, the zoom readout, the guide's icon buttons, the tip's and the guide-edit toggle's icons, *Guide*, the camera switch's icon, and the gallery thumbnail. On Subject view they are the top bar's icons, the zoom readout, the brightness, tip, *Save guide*, and guide-edit icons, *Guide*, *Pick a pose*, and the photo thumbnail; they follow the subject's own phone, and nothing is sent. The other texts stay, such as *Shoot together*'s label, as do the shutter, the preview and everything over it, the reference thumbnail, the panels, and the layout. The brightness bar's sun looks the same at every quarter, so it is not turned. The photo viewer over either screen turns whole, as a landscape screen while sideways (2.6.5).
 
-**Photographer composition aids (FR-1.9, FR-1.10).** `CameraCompositionView` draws in the same rectangle. The rule-of-thirds grid is 0.5 dp with a 1 dp dark outline. The horizon bar is 1.5 dp with a 2.5 dp outline, and its middle counter-rotates with the roll. `CameraLevelMonitor` smooths the gravity sensor, or the accelerometer. Beyond 45° of roll the phone counts as on its side (`CameraLevel.baseDegrees`, 0 or 90), and the bar runs along the frame's long side (`cameraLevelFromGravity`; Iter3-A15, [#182]). Level enters within ±2°, exits beyond ±3°, and turns the bar dark yellow (`#D4AC24`). The bar hides past 20° (`MAX_LEVEL_TILT_DEGREES`), on invalid readings, and with the phone face up or down. The aids never enter photos, analysis frames, or the stream.
+**Photographer composition aids (FR-1.9, FR-1.10).** `CameraCompositionView` draws in the same rectangle. The rule-of-thirds grid is 0.5 dp with a 1 dp dark outline. The horizon bar is 1.5 dp with a 2.5 dp outline, and its middle counter-rotates with the roll. `CameraLevelMonitor` smooths the gravity sensor, or the accelerometer. Beyond 45° of roll the phone counts as on its side (`CameraLevel.baseDegrees`, 0 or 90), and the bar runs along the frame's long side (`cameraLevelFromGravity`; Iter3-A15, [#182]). Level enters within ±2°, exits beyond ±3°, and turns the bar dark yellow (`#D4AC24`). The bar hides past 20° (`MAX_LEVEL_TILT_DEGREES`), on invalid readings, and with the phone face up or down. The aids never enter photos, analysis frames, or the stream. Settings turns the grid and the bar off apart (`showGrid`, `showLevel`; 2.6.8).
 
-**Camera zoom and the guide-edit mode (AD-17).** With guide-edit mode off, a pinch on the preview zooms; with it on, every drag and pinch edits the guide. The mode turns on when a guide is added and off at the shutter or when the guide is removed or hidden. On Subject view it starts off and chooses between `camera.zoom.set` and `guide.move` (2.6.5). The zoom row holds the readout, the pose tip's button (Camera only), and the mode's toggle. A tap on the readout steps through `quickZoomSteps` (FR-1.3): the camera's minimum when below 1×, then 1× and 2× where available. `nextZoomStep` takes the first step above the zoom (2 % tolerance), else the first; a tap before the last step is applied goes on from that step. On Subject view a late echo of an earlier step is ignored. The readout's tap area is at least 48 dp wide around a 28 dp pill, with Zoom in / Zoom out accessibility actions. The top bar's ratio button opens 3:4, 9:16, and 1:1 in a row (Iter3-A12, FR-1.13). Brightness is a bar beside the focus box (`ExposureBarView`; 2.8, *Camera labels and brightness*; [#182]). A lens switch keeps the pinch's target through `STARTING`.
+**Camera zoom and the guide-edit mode (AD-17).** With guide-edit mode off, a pinch on the preview zooms; with it on, every drag and pinch edits the guide. The mode turns on when a guide is added and off at the shutter or when the guide is removed or hidden. On Subject view it starts off and chooses between `camera.zoom.set` and `guide.move` (2.6.5). The zoom row holds the readout, the pose tip's button (Camera only), and the mode's toggle. The toggle is one person icon, lit in the guide color while the mode is on. Then `GuideOverlayView.filled` tints the inside of the guide in the guide color at 25 % (`camera_guide_fill`), whatever the line's color. The tint is the mask's inside at the outline's level (`guideInside`), made once per guide off the main thread (`GuideOutlines.inside`), never while drawing, and drawn under the outline ([#271]). A tap on the readout steps through `quickZoomSteps` (FR-1.3): the camera's minimum when below 1×, then 1× and 2× where available. `nextZoomStep` takes the first step above the zoom (2 % tolerance), else the first; a tap before the last step is applied goes on from that step. On Subject view a late echo of an earlier step is ignored. The readout's tap area is at least 48 dp wide around a 28 dp pill, with Zoom in / Zoom out accessibility actions. The top bar's ratio button opens 3:4, 9:16, and 1:1 in a row (Iter3-A12, FR-1.13). Brightness is a bar beside the focus box (`ExposureBarView`; 2.8, *Camera labels and brightness*; [#182]). A lens switch keeps the pinch's target through `STARTING`.
 
 **Screen layout (It 3, Iter3-A2).** `previewArea` puts the image at full width below the top bar: 1:1 inside the 4:3 area with the outside dimmed, not clipped, and 16:9 down under the controls. The controls keep one size and place for every ratio, and the panels above them sit below a 4:3 or 1:1 image and over a 16:9 one. `placeZoomRow` draws the zoom row 8 dp above the image's bottom or the first panel, whichever is higher. Every control takes taps on at least 48 × 48 dp (NFR-16): the top bar's buttons reach 4 dp over the image (`TOP_BAR_OVERHANG_DP`), and everything in the bar centers on the 48 dp above that part, the scene photo's title included (`@dimen/top_bar_overhang`, [#204]); the zoom row sits 6 dp above it (`ZOOM_ROW_MARGIN_DP`). While a session streams, `LiveDotView` blinks a red dot at the frame's top right on both phones (FR-6.6, FR-6.8). Subject view follows the same layout (2.6.5). The screens: R&S 6.2.
 
@@ -2876,6 +2890,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - The subject sees "Photo saved to your Pix album" or "Couldn't save Dongje's photo". The photographer sees "Couldn't send a photo to Joonhyung" for an unreadable or refused photo, one over 40 MiB, or one stalled for 30 s.
   - `PhotoSyncer.sessionPhotos` lists the session's photos on this phone, oldest first: those taken on the photographer's phone, those saved on the subject's. It is null outside a session, empty until the first, and kept through a reconnect, which keeps the session's id ([#235]).
   - In a session, both phones' thumbnails show only the newest of these, so neither shows a photo from before. Both thumbnails are empty until the session's first photo. *Subject view*'s bottom row is Camera's, in thirds: *Guide* in the middle of the left third, where Camera's is, and the thumbnail in the middle of the right third (`showPhotoThumbnails`), on *Guide*'s icon line.
+  - In the middle, where Camera's shutter is, *Subject view* says "Dongje's camera" and "Live" once connected, centered on the line of *Guide*'s icon and the thumbnail; a step's button takes the place while it shows ([#271]). A long name, such as a Galaxy's own name "길동의 Galaxy S23 Ultra", makes the text smaller, down to 12 sp; a name still too long is cut short, so "'s camera" stays (`cameraTitle`). Each photo is waited for by its `shot`: from its `photo.shutter`, or its `photo.begin` when the shutter was lost or came during a drop, until it is saved or refused. Meanwhile `PhotoSyncer.receiving` is true, and "Live" becomes "Receiving photo…" with a spinner. A photo the photographer gave up, before its begin (`photo.dropped`) or for the next photo, is not waited for, and each ends only its own wait. A `photo.shutter` that comes after its photo's `photo.dropped` or save, as the realtime channel allows, starts none (`Waits.ended`). A phone before #271 names no `shot`, so its photos are counted instead. 30 s without a photo message, as from a phone that does not send `photo.dropped`, or the session's end, ends the wait (`STALL_MS`).
   - A tap on either opens the session's photos in a viewer over the whole screen, inside Pix (`PhotoViewer`): one page each, opened at the newest, under a header with Back, *Share*, and *Delete* and no title, decoded to the screen's long side (`photoToView`). The phone's gallery would put Pix in the background, where the video stops and, on the photographer's phone, the session ends after 60 s (2.8, *Lifecycle*).
   - A newer photo adds a page and keeps the page on screen. Back closes the viewer, and so does the session's end. On the subject's phone, a step the photographer starts meanwhile opens once it closes. While it is open, TalkBack reads only the viewer.
   - The viewer works as a gallery app's (FR-1.16, [#247]). A strip of 40 dp thumbnails is under the photo, each taking taps on 48 dp, with the one on screen outlined and the others dimmed. A tap on one shows its photo, and the strip scrolls to keep it in the middle. There is no counter; TalkBack reads each page and thumbnail as "Photo 2 of 12".
@@ -2917,6 +2932,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - Not done yet: the photos against the phone's own camera on the same scenes, CameraX Extensions (`HDR`, `NIGHT`), and the S21.
 - **Photos.** Only the photographer takes photos.
 - **Notices.** Camera shows each final remote action for 3 s, named from `hello` (FR-7.4, 2.5.1): "Joonhyung set zoom to 2×", "… moved the guide", "… set brightness to +1.0", "… turned the flash on" or "off", "… set the flash to auto", or "… set a pose guide".
+  - Camera says "Joonhyung is watching your camera" for 3 s when a subject connects, not after a drop (`SessionNotice.Watching`, [#271]); a new subject after the room waited alone is a new start. Subject view has no such notice: its shutter slot names the camera for the whole session.
 - **The subject gone.** "Joonhyung left" or "… disconnected" (FR-6.10, FR-6.11) stays 10 s (`CameraViewModel.PEER_GONE_NOTICE_MS`), since the photographer may not be looking. It goes once the subject is back. A "Couldn't send" notice waits for it (FR-6.14).
 
 #### 2.6.6 Invitations and push (Iteration 3)
@@ -2978,7 +2994,7 @@ The settings screen (FR-10.1, R&S 6.10; Iter3-P23, [#123]) opens from a gear on 
 
 | Section | Rows |
 |----|----|
-| Camera | *Base brightness* |
+| Camera | *Base brightness*, *Grid*, *Horizon bar* |
 | Guide | Color, thickness, preview |
 | Shoot together | *Show the delay* |
 | General | *Language*, *Notifications* |
@@ -2989,6 +3005,7 @@ The settings screen (FR-10.1, R&S 6.10; Iter3-P23, [#123]) opens from a gear on 
 Each section's rows share one card, without dividers.
 
 - **Base brightness (FR-1.11, [#182]).** "Every photo starts from it. Tap to focus, then drag up or down to change it until the next tap." The slider runs from −2 to +2 EV in thirds, 0 by default, and shows its value, such as "+1.0". It is saved as `AppSettings.baseBrightness` (DataStore `base_brightness_ev`). Camera returns to it at each tap to focus (2.8, *Camera labels and brightness*). A camera with a smaller range clamps it.
+- **Grid and horizon bar (FR-1.9, FR-1.10, [#271]).** Two switches, on by default, kept as `AppSettings.showGrid` and `showLevel` (DataStore `show_grid`, `show_level`). `CameraCompositionView` draws each only while its switch is on; 1:1's dim stays. The grid's switch applies on Camera and Subject view, which has no bar. Camera's level sensor runs only while the screen is resumed and the bar is on.
 - **Guide look (FR-3.10).** Five colors: white, the default (FR-2.2); black; yellow; mint; and pink. Three thicknesses: about 1.5, 2, and 3 dp (`GuideThickness` 0.75, 1, 1.5), 2 dp by default. DataStore keeps them (`app_settings`).
   - A color is a `SRC_IN` filter on the white outline (`GuideOverlayView.lineColor`). The opacity still applies.
   - `GuideOutlines` traces another thickness from the mask off the main thread and keeps the last four. The default line shows until it is ready.

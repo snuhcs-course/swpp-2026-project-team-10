@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.FlashMode
@@ -73,9 +73,15 @@ class ChannelRouterTest {
     }
 
     @Test
+    fun `a dropped photo goes on the reliable channel, since a lost one keeps the subject waiting`() {
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PhotoDropped("shot-1")))
+        assertFalse(router.latestOnly(SessionMessage.PhotoDropped("shot-1")))
+    }
+
+    @Test
     fun `the shutter goes on the realtime channel, as a moment that is wrong late, and is never dropped as stale`() {
-        assertEquals(Channel.REALTIME, router.channelFor(SessionMessage.PhotoShutter))
-        assertFalse(router.latestOnly(SessionMessage.PhotoShutter))
+        assertEquals(Channel.REALTIME, router.channelFor(SessionMessage.PhotoShutter("shot-1")))
+        assertFalse(router.latestOnly(SessionMessage.PhotoShutter("shot-1")))
     }
 
     @Test

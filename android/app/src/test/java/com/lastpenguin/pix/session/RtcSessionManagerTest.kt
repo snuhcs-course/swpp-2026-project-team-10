@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.ChannelRouter
@@ -59,6 +59,7 @@ class RtcSessionManagerTest {
         haveGuideId: () -> String? = { null },
         haveReferenceId: () -> String? = { null },
         accessToken: suspend () -> String? = { null },
+        accountName: () -> String? = { null },
     ): RtcSessionManager {
         val manager = RtcSessionManager(
             signaling = signaling,
@@ -74,6 +75,7 @@ class RtcSessionManagerTest {
             haveGuideId = haveGuideId,
             haveReferenceId = haveReferenceId,
             accessToken = accessToken,
+            accountName = accountName,
         )
         backgroundScope.launch { manager.incoming.collect { incoming += it } }
         runCurrent()
@@ -221,6 +223,25 @@ class RtcSessionManagerTest {
         runCurrent()
 
         assertEquals(PeerConfig(Role.SUBJECT, relay), peers.created.single().config)
+        manager.leave(EndReason.LEFT)
+        runCurrent()
+    }
+
+    @Test
+    fun `hello names the signed-in account in place of the phone`() = runTest {
+        val manager = manager(accountName = { "Test Account 1" })
+        manager.start(SessionEntry.NewRoom, Role.PHOTOGRAPHER)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.RoomCreated("482915", "s_1"))
+        signaling.receive(SignalMessage.PeerJoined())
+        runCurrent()
+        val peer = peers.created.single()
+
+        peer.open()
+        runCurrent()
+
+        assertEquals("Test Account 1", (peer.sentMessages().first() as SessionMessage.Hello).name)
         manager.leave(EndReason.LEFT)
         runCurrent()
     }

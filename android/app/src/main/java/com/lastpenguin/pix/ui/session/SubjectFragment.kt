@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.animation.Animator
@@ -6,9 +6,12 @@ import android.animation.ValueAnimator
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
+import android.text.TextPaint
+import android.text.TextUtils
 import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.annotation.ColorRes
@@ -74,7 +77,6 @@ import com.lastpenguin.pix.ui.camera.previewArea
 import com.lastpenguin.pix.ui.camera.previewAspect
 import com.lastpenguin.pix.ui.camera.setLabelIcon
 import com.lastpenguin.pix.ui.camera.setReferenceActions
-import com.lastpenguin.pix.ui.camera.showGuideEditing
 import com.lastpenguin.pix.ui.camera.showPhotoThumbnails
 import com.lastpenguin.pix.ui.camera.showPinchModeLabel
 import com.lastpenguin.pix.ui.camera.showReference
@@ -111,7 +113,8 @@ import org.webrtc.VideoSink
  * poses*, candidates, and the chosen pose's outline open on this phone's screens of the same steps (Design 2.6.5).
  * The bottom row is Camera's: *Guide* at the left, and the session's newest photo as a thumbnail at the right, empty
  * until the first, which opens the session's photos in a viewer over the screen, inside Pix, so the session goes on
- * (FR-6.14).
+ * (FR-6.14). In the middle, where Camera's shutter is, it says whose camera this is and that it is live, or that a
+ * photo is coming (#271), for the whole session, so no notice says it again.
  * System back closes the viewer, or else asks first (R&S 6.9). The first time the video shows, the tutorial's tips of
  * this screen come over it (FR-10.4). The video fades in, dims under a text, moves to the photographer's new ratio as
  * their frame does, and blinks at their shutter (Design 2.6.4). Leaving for another screen, the video goes at once and
@@ -193,6 +196,12 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         }
         // The zoom row stays above the tip as it opens and closes.
         binding.bottomOverlays.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeZoomRow(binding) }
+        // The camera's name is fitted to the slot's width, known only after layout.
+        binding.cameraCaptionTitle.addOnLayoutChangeListener { title, left, _, right, _, oldLeft, _, oldRight, _ ->
+            if (right - left != oldRight - oldLeft) {
+                title.post { if (view != null) renderCaption(binding, viewModel.uiState.value) }
+            }
+        }
         binding.root.addOnLayoutChangeListener(placeVideo)
         binding.topBar.addOnLayoutChangeListener(placeVideo)
         binding.bottomPanel.addOnLayoutChangeListener(placeVideo)
@@ -283,6 +292,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         photoViewer.turnTo(turn)
                     }
                 }
+                // The grid as this phone's Settings says (FR-1.9); Subject view has no horizon bar.
+                launch { settingsViewModel.showGrid.collect { binding.compositionOverlay.showGrid = it } }
                 // The photographer's guide in this phone's own color and thickness (FR-3.10).
                 launch {
                     binding.guideOverlay.followLook(settingsViewModel.guideLook, viewModel.uiState.map { it.guide })
@@ -311,13 +322,13 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         renderOverlays(binding, ui)
                         // Guide-edit mode (AD-17): the overlay owns the video's touches while on; the pinch zooms while off.
                         binding.guideOverlay.editable = ui.guideEditing
+                        binding.guideOverlay.filled = ui.guideEditing
                         pinchZoom?.enabled = !ui.guideEditing
                         // The toggle sits beside the readout while a guide is on the video; a hidden guide cannot be edited.
                         binding.editGuideButton.isVisible = ui.guide != null
                         // Checked before enabled: MaterialButton ignores setChecked while it is disabled, so a
                         // hidden guide would leave the toggle drawn as on (found by SubjectFragmentRenderTest).
                         binding.editGuideButton.isChecked = ui.guideEditing
-                        binding.editGuideButton.showGuideEditing(ui.guideEditing)
                         binding.editGuideButton.isEnabled = ui.connected && ui.guideState.visible
                         if (ui.guide == null) binding.pinchModeLabel.isVisible = false
                         // Guide-colored once a guide is on the video; it then replaces the guide on both phones.
@@ -331,6 +342,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         binding.galleryButton.isEnabled = ui.lastPhoto != null
                         photoViewer.render(ui.photos, ui.photosOpen)
                         renderPoses(binding, ui)
+                        renderCaption(binding, ui)
                         renderCameraControls(binding, ui)
                         val ratio = zoomFormat.format(ui.zoom)
                         binding.zoomReadout.text = getString(R.string.zoom_ratio, ratio)
@@ -856,6 +868,39 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         } else if (describing && describeId != null) {
             if (inFront(binding) && viewModel.claimDescribeOpening(describeId)) openDescribe()
         }
+    }
+
+    /**
+     * The slot where Camera's shutter is (#271), once connected and while no step's button takes it: whose camera this
+     * is and that it is live, or, from the photographer's shutter until the photo is saved here, that it is coming
+     * (FR-6.14).
+     */
+    private fun renderCaption(binding: FragmentSubjectBinding, ui: SubjectUiState) {
+        binding.cameraCaption.isVisible = ui.connected && !binding.pickPoseButton.isVisible
+        val title = cameraTitle(binding.cameraCaptionTitle, ui.photographerName)
+        if (binding.cameraCaptionTitle.text.toString() != title) binding.cameraCaptionTitle.text = title
+        binding.cameraCaptionDot.isVisible = !ui.receivingPhoto
+        binding.cameraCaptionSpinner.isVisible = ui.receivingPhoto
+        binding.cameraCaptionStatus.setText(
+            if (ui.receivingPhoto) R.string.subject_receiving_photo else R.string.subject_live,
+        )
+    }
+
+    /**
+     * "Dongje's camera" for the slot: the name is the photographer's account, or their phone's while signed out, which
+     * can be long, such as "길동의 Galaxy S23 Ultra". The text gets smaller down to its smallest size first; a name
+     * that still does not fit is cut short, so "'s camera" stays.
+     */
+    private fun cameraTitle(view: TextView, name: String?): String {
+        if (name == null) return getString(R.string.subject_title_placeholder)
+        val full = getString(R.string.subject_title, name)
+        val width = (view.width - view.totalPaddingLeft - view.totalPaddingRight).toFloat()
+        if (width <= 0f) return full
+        val paint = TextPaint(view.paint).apply { textSize = view.autoSizeMinTextSize.toFloat() }
+        if (paint.measureText(full) <= width) return full
+        val rest = paint.measureText(getString(R.string.subject_title, ""))
+        val short = TextUtils.ellipsize(name, paint, (width - rest).coerceAtLeast(0f), TextUtils.TruncateAt.END)
+        return getString(R.string.subject_title, short)
     }
 
     /**

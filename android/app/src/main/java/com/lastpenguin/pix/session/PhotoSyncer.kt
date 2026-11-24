@@ -364,18 +364,37 @@ class PhotoSyncer(
      * The photographer's photos from their shutter on that are not yet saved, refused, or given up here: by shot, and
      * as a count for a phone before #271, whose messages name none.
      */
-    private data class Waits(val shots: Set<String> = emptySet(), val unnamed: Int = 0) {
+    private data class Waits(
+        val shots: Set<String> = emptySet(),
+        val unnamed: Int = 0,
+        /** The last shots whose wait ended, newest last, so a `photo.shutter` that comes after its end starts none. */
+        val ended: List<String> = emptyList(),
+    ) {
         val any: Boolean get() = shots.isNotEmpty() || unnamed > 0
 
-        fun add(shot: String?): Waits = if (shot != null) copy(shots = shots + shot) else copy(unnamed = unnamed + 1)
+        /**
+         * A `photo.shutter`. It comes on the realtime channel, so it can come after its photo's `photo.dropped` or
+         * `photo.saved`, on the reliable one: a shot whose wait already ended stays ended.
+         */
+        fun add(shot: String?): Waits = when {
+            shot == null -> copy(unnamed = unnamed + 1)
+            shot in ended -> this
+            else -> copy(shots = shots + shot)
+        }
 
         /** The photo of [shot] begins, its shutter heard or not; an unnamed begin is the one unnamed photo at least. */
         fun began(shot: String?): Waits =
             if (shot != null) copy(shots = shots + shot) else copy(unnamed = maxOf(unnamed, 1))
 
         /** The photo of [shot] came or will not: that wait, and only that one, ends. */
-        fun end(shot: String?): Waits =
-            if (shot != null) copy(shots = shots - shot) else copy(unnamed = maxOf(unnamed - 1, 0))
+        fun end(shot: String?): Waits = if (shot != null) {
+            copy(shots = shots - shot, ended = (ended - shot + shot).takeLast(ENDED_KEPT))
+        } else {
+            copy(unnamed = maxOf(unnamed - 1, 0))
+        }
+
+        /** No wait left, the ended shots kept. */
+        fun cleared(): Waits = Waits(ended = ended)
     }
 
     private val awaited = MutableStateFlow(Waits())
@@ -387,7 +406,7 @@ class PhotoSyncer(
      * Whether a photo of the photographer's is on its way to this phone's album (#271): from its `photo.shutter`, or its
      * `photo.begin` when the shutter was lost or came during a drop, until it is saved, refused, or given up, by
      * `photo.dropped` before its begin. Each is waited for by its shot, so a lost shutter or a dropped photo never ends
-     * another's wait. A photographer's phone before #271 never says a photo is dropped, and [STALL_MS] without a photo
+     * another's wait, and a shutter that comes after its photo's end starts none. A photographer's phone before #271 never says a photo is dropped, and [STALL_MS] without a photo
      * message ends the wait then, as does the session's end.
      */
     val receiving: Flow<Boolean> = awaited.map { it.any }.distinctUntilChanged()
@@ -424,7 +443,7 @@ class PhotoSyncer(
                 combine(awaited, photoMessagesSeen) { waits, _ -> waits.any }.collectLatest { waiting ->
                     if (!waiting) return@collectLatest
                     delay(STALL_MS)
-                    awaited.value = Waits()
+                    awaited.update { it.cleared() }
                 }
             }
             try {
@@ -555,6 +574,9 @@ class PhotoSyncer(
 
         /** No word from the subject for this long gives the photo up. Longer than a reconnect's 10 s. */
         const val STALL_MS = 30_000L
+
+        /** How many ended shots the subject keeps against a late `photo.shutter`, more than a burst of photos. */
+        private const val ENDED_KEPT = 16
 
         private const val FORMAT = "jpeg"
         private const val PART_SUFFIX = ".part"

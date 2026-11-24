@@ -73,7 +73,7 @@ import org.robolectric.RobolectricTestRunner
  * Subject, a photo on its way (state-based, boundary; #271): none at first; from a shutter until that photo is saved,
  * or refused by the album; from a `photo.begin` whose shutter was lost or came during a drop; two shutters until both
  * photos, or one photo and the other's `photo.dropped`; a `photo.dropped` whose shutter was lost, which ends no other
- * photo's wait; one the photographer gave up for the next; a photographer's phone before #271, whose messages name no
+ * photo's wait; a shutter that comes after its photo's drop or save, which starts none; one the photographer gave up for the next; a photographer's phone before #271, whose messages name no
  * shot, counted by its shutters; 30 s without a photo message (just before and just after), a chunk starting that time
  * again; and the session's end.
  * Both, the session's photos (state-based; Iter4-A2): none outside a session and an empty list at its start; on the
@@ -1024,6 +1024,30 @@ class PhotoSyncerTest {
         assertTrue(syncer.isReceiving())
 
         deliverWhole("p1", jpeg(10), shot = "a")
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `a shutter that comes after its photo's drop starts no wait`() = runTest {
+        val (syncer, _, _) = receiver()
+        // The drop, on the reliable channel, overtakes its shutter on the realtime one.
+        session.deliver(SessionMessage.PhotoDropped("a"))
+        runCurrent()
+
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        runCurrent()
+
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `a shutter that comes after its photo was saved starts no wait`() = runTest {
+        val (syncer, _, _) = receiver()
+        deliverWhole("p1", jpeg(10), shot = "a")
+
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        runCurrent()
+
         assertFalse(syncer.isReceiving())
     }
 

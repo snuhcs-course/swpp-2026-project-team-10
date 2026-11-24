@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.net.Uri
@@ -69,6 +69,10 @@ import org.robolectric.RobolectricTestRunner
  * Subject, what it tells: no saved photo is lost unread, and what a session left unread does not reach the next one.
  * Subject, the session's other messages: a slow save, on real threads, leaves `incoming` read.
  * Subject, the shutter: each `photo.shutter` reaches a screen that listens; one that came before is not kept.
+ * Subject, a photo on its way (state-based, boundary; #271): none at first; from a shutter until that photo is saved,
+ * or refused by the album; from a `photo.begin` without its shutter, sent during a drop; two shutters until both photos;
+ * one the photographer gave up for the next; 30 s without a photo message (just before and just after), a chunk
+ * starting that time again; and the session's end.
  * Both, the session's photos (state-based; Iter4-A2): none outside a session and an empty list at its start; on the
  * subject's phone each saved photo joins them in order, and a refused or broken photo, one the album fails to save, and
  * one saved before do not, nor one whose save ends after its session ended and another started; on the photographer's
@@ -890,6 +894,94 @@ class PhotoSyncerTest {
         session.deliver(SessionMessage.PhotoShutter)
         runCurrent()
         assertEquals(1, shutters)
+    }
+
+    // ---- A photo on its way --------------------------------------------------------------------------------------
+
+    private suspend fun PhotoSyncer.isReceiving(): Boolean = receiving.first()
+
+    @Test
+    fun `a shutter says a photo is on its way, until that photo is saved`() = runTest {
+        val (syncer, _, _) = receiver()
+        assertFalse(syncer.isReceiving())
+
+        session.deliver(SessionMessage.PhotoShutter)
+        runCurrent()
+        assertTrue(syncer.isReceiving())
+
+        deliverWhole("p1", jpeg(10))
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `a photo the album could not save is no longer on its way`() = runTest {
+        val (syncer, _, _) = receiver()
+        albumFails = true
+        session.deliver(SessionMessage.PhotoShutter)
+        runCurrent()
+
+        deliverWhole("p1", jpeg(10))
+
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `a photo whose shutter came during a drop is on its way from its begin`() = runTest {
+        val (syncer, _, _) = receiver()
+        val bytes = jpeg(10)
+
+        deliverBegin("p1", bytes)
+        assertTrue(syncer.isReceiving())
+
+        deliverChunks("p1", bytes)
+        deliverEnd("p1", bytes)
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `two shutters wait for both photos, also when the first was given up for the second`() = runTest {
+        val (syncer, _, _) = receiver()
+        session.deliver(SessionMessage.PhotoShutter)
+        session.deliver(SessionMessage.PhotoShutter)
+        runCurrent()
+        val first = jpeg(2 * PhotoSyncer.CHUNK_BYTES)
+
+        // The photographer gives the first up halfway and sends the second.
+        deliverBegin("p1", first)
+        deliverChunks("p1", first, until = 1)
+        deliverWhole("p2", jpeg(10))
+
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `thirty seconds without a photo message end the wait, and a chunk starts that time again`() = runTest {
+        val (syncer, _, _) = receiver()
+        val bytes = jpeg(2 * PhotoSyncer.CHUNK_BYTES)
+        session.deliver(SessionMessage.PhotoShutter)
+        runCurrent()
+
+        advanceTimeBy(PhotoSyncer.STALL_MS / 2)
+        deliverBegin("p1", bytes)
+        advanceTimeBy(PhotoSyncer.STALL_MS - 1)
+        runCurrent()
+        assertTrue(syncer.isReceiving())
+
+        advanceTimeBy(2)
+        runCurrent()
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `the session's end ends the wait`() = runTest {
+        val (syncer, job, _) = receiver()
+        session.deliver(SessionMessage.PhotoShutter)
+        runCurrent()
+
+        job.cancel()
+        runCurrent()
+
+        assertFalse(syncer.isReceiving())
     }
 
     // ---- The session's photos ----------------------------------------------------------------------------------

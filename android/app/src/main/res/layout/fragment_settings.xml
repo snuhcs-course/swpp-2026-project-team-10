@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Settings, from the gear on Camera (FR-10.1, R&S 6.10): the camera's base brightness (FR-1.11), the guide's color
+<!-- Settings, from the gear on Camera (FR-10.1, R&S 6.10): the camera's base brightness (FR-1.11), the grid (FR-1.9),
+     the horizon bar (FR-1.10), the guide's color
      and thickness with a preview (FR-3.10), the latency indicator (FR-10.3), the language (FR-10.2), notifications, the AI consent (FR-4.2), crash reports and usage data (FR-10.6), the Pix account, how
      to use Pix, and the app's version and licenses. Every choice applies at once and stays after a restart. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -113,6 +114,94 @@
                         android:minWidth="40dp"
                         android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
                         tools:text="+0.7" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- The grid (FR-1.9) and the horizon bar (FR-1.10), each on by default; a tap on a row turns its switch. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_list_card"
+                android:orientation="vertical"
+                android:paddingVertical="4dp">
+
+                <LinearLayout
+                    android:id="@+id/gridRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:minHeight="56dp"
+                    android:paddingVertical="8dp"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="12dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/settings_grid"
+                            android:textAppearance="@style/TextAppearance.Pix.BodyLarge" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/settings_grid_body"
+                            android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/gridSwitch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:contentDescription="@string/settings_grid" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/levelRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:minHeight="56dp"
+                    android:paddingVertical="8dp"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="12dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/settings_level"
+                            android:textAppearance="@style/TextAppearance.Pix.BodyLarge" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/settings_level_body"
+                            android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/levelSwitch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:contentDescription="@string/settings_level" />
                 </LinearLayout>
             </LinearLayout>
 

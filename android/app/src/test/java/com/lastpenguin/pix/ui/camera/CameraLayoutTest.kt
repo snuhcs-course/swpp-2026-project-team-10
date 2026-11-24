@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -91,7 +91,9 @@ private const val SCENE_PANEL_OVER_IMAGE_DP = 16
  * area, the row's height, and every control's, at least 48 dp (NFR-16). Subject view's video placed the same way;
  * its session photo's thumbnail (Iter4-A2) on Guide's icon line, shown before any photo, Guide where Camera's is and
  * the thumbnail as far from the right edge, and the button beside it where Camera's shutter is, clear of both, with each of its labels at
- * font scale 1 and 1.3. The session photos' viewer over the whole screen,
+ * font scale 1 and 1.3; in that place without a step, whose camera it is and "Live" (#271), on the icons' line and
+ * clear of both, with a short name, a Galaxy's own name, and a longer one cut short, and while a photo comes, at both
+ * font scales. The session photos' viewer over the whole screen,
  * on Subject view and on Camera.
  * The scene photo's review (R&S 6.3, #199): a 3:4 photo in the middle of the room under the bar with its message 12 dp
  * under it, a 9:16 one that leaves no room, with the message over its bottom on glass, and Use at the top right. The
@@ -787,10 +789,14 @@ class CameraLayoutTest {
 
     // ---- Subject view -----------------------------------------------------------------------
 
+    /** The container of the last [subjectView]. */
+    private var subjectModules: TestAppContainer? = null
+
     /** Subject view connected to a photographer framing in 16:9, with their video streaming. */
     private fun subjectView(fontScale: Float = 1f): FragmentSubjectBinding {
         if (fontScale != 1f) RuntimeEnvironment.setFontScale(fontScale)
         val modules = TestAppContainer().install()
+        subjectModules = modules
         val activity = activity()
         val fragment = SubjectFragment()
         activity.supportFragmentManager.beginTransaction().add(android.R.id.content, fragment).commitNow()
@@ -845,6 +851,7 @@ class CameraLayoutTest {
         )
         assertEquals(camerasGuide.centerY(), guideIcon.centerY())
         assertEquals(camerasGuide.width(), guideIcon.width())
+        assertCaptionInTheShuttersPlace(binding, shutter)
         binding.pickPoseButton.visibility = View.VISIBLE
         val labels = listOf(
             R.string.pick_pose_title,
@@ -874,6 +881,54 @@ class CameraLayoutTest {
             )
             assertTrue("$text: $thumbnail inside the screen", thumbnail.right <= 360 && thumbnail.bottom <= 705)
         }
+    }
+
+    /**
+     * Without a step, the slot says whose camera this is (#271): centered where Camera's shutter is, on the line of
+     * Guide's icon and the thumbnail, clear of both. A name that fits stays whole; a long one, such as a Galaxy's own
+     * name, is made smaller and then cut short, so "'s camera" stays; a photo on its way changes the second line.
+     */
+    private fun assertCaptionInTheShuttersPlace(binding: FragmentSubjectBinding, shutter: Rect) {
+        val modules = checkNotNull(subjectModules)
+        val names = listOf("Dongje", "길동의 Galaxy S23 Ultra", "Test Account With A Very Long Name")
+        val suffix = binding.root.context.getString(R.string.subject_title, "")
+        for (name in names) {
+            for (receiving in listOf(false, true)) {
+                modules.session.setState(SessionState.Connected("s1", PeerInfo(name), Role.SUBJECT))
+                idle()
+                binding.cameraCaptionStatus.setText(
+                    if (receiving) R.string.subject_receiving_photo else R.string.subject_live,
+                )
+                binding.cameraCaptionSpinner.visibility = if (receiving) View.VISIBLE else View.GONE
+                binding.cameraCaptionDot.visibility = if (receiving) View.GONE else View.VISIBLE
+                idle()
+                val what = "$name, receiving $receiving"
+                assertTrue("$what: the slot shows", binding.cameraCaption.isShown)
+                val caption = binding.cameraCaption.box()
+                val icon = binding.guideButtonIcon.box()
+                val thumbnail = binding.galleryButton.box()
+                assertTrue(
+                    "$what: $caption centered where the shutter is",
+                    abs(caption.centerX() - shutter.centerX()) <= 1,
+                )
+                assertTrue("$what: $caption on the icons' line $icon", abs(caption.centerY() - icon.centerY()) <= 1)
+                assertTrue("$what: and the thumbnail's $thumbnail", abs(caption.centerY() - thumbnail.centerY()) <= 1)
+                assertTrue("$what: clear of Guide", binding.guideButton.box().right <= caption.left)
+                assertTrue("$what: clear of the thumbnail", caption.right <= thumbnail.left)
+                val title = binding.cameraCaptionTitle
+                val text = title.text.toString()
+                if (name == "Dongje") {
+                    assertEquals(binding.root.context.getString(R.string.subject_title, name), text)
+                }
+                assertTrue("$what: \"$text\" keeps \"$suffix\"", text.endsWith(suffix))
+                assertEquals("$what: \"$text\" not cut at its end", 0, title.layout.getEllipsisCount(0))
+                // Within a pixel's rounding, as KoreanScreensTest's check of a cut text.
+                assertTrue("$what: one line in its height", title.layout.height <= title.height + 1)
+                assertEquals("$what: the status line whole", 0, binding.cameraCaptionStatus.layout.getEllipsisCount(0))
+            }
+        }
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
+        idle()
     }
 
     @Test

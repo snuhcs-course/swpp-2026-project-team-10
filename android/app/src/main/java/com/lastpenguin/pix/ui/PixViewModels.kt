@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -102,6 +102,7 @@ object PixViewModels {
                 container.tipSyncer,
                 sessionPhotos = container.photoSyncer.sessionPhotos,
                 deleter = container.photoDeleter,
+                receivingPhoto = container.photoSyncer.receiving,
                 phoneTurns = container.phoneTurns,
             )
         }

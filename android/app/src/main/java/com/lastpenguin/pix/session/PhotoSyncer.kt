@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.session
 
 import android.content.ContentResolver
@@ -23,13 +23,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -90,8 +93,8 @@ class ContentPhotoReader(private val resolver: ContentResolver) : PhotoReader {
  * reach the album says so in [sendFailed], and the next one goes on. [drop] ends it all with the session.
  *
  * Subject ([startAsReceiver]): writes the chunks to one file in [partDir], not to memory, saves it to [album] at
- * `photo.end`, and answers `photo.saved`. [received] says how each ended, for the subject's toast, and [shutters]
- * when each was taken, for Subject view's blink (Iter3-A12).
+ * `photo.end`, and answers `photo.saved`. [received] says how each ended, for the subject's toast, [shutters] when each
+ * was taken, for Subject view's blink (Iter3-A12), and [receiving] whether one is on its way, for its sign (#271).
  *
  * Both: [sessionPhotos] are the session's photos on this phone, taken or received, for the thumbnail and the viewer
  * of Camera and Subject view (Iter4-A2).
@@ -328,10 +331,25 @@ class PhotoSyncer(
     /** Each `photo.shutter` while a screen listens; one that no screen saw is a moment gone, not kept for later. */
     val shutters: Flow<Unit> = _shutters.asSharedFlow()
 
+    /** The photographer's photos from their shutter on that are not yet saved or refused here. */
+    private val awaited = MutableStateFlow(0)
+
+    /** Counts the photo messages, each of which shows that a photo is still on its way. */
+    private val photoMessagesSeen = MutableStateFlow(0L)
+
+    /**
+     * Whether a photo of the photographer's is on its way to this phone's album (#271): from its `photo.shutter`, or its
+     * `photo.begin` when the shutter came during a drop, until it is saved, refused, or given up. A photo the
+     * photographer could not save never comes, so [STALL_MS] without a photo message ends the wait, as does the
+     * session's end.
+     */
+    val receiving: Flow<Boolean> = awaited.map { it > 0 }.distinctUntilChanged()
+
     fun startAsReceiver(scope: CoroutineScope) {
         scope.launch(dispatcher) {
             clearParts()
             saved.clear()
+            awaited.value = 0
             // What an earlier session left unread is not about this one's photographer.
             while (_received.tryReceive().isSuccess) Unit
             // Files and the album take their time, and a reader of incoming that waits costs every reader its messages
@@ -342,9 +360,22 @@ class PhotoSyncer(
                     if (message is SessionMessage.PhotoBegin || message is SessionMessage.PhotoChunk ||
                         message is SessionMessage.PhotoEnd
                     ) {
+                        photoMessagesSeen.update { it + 1 }
                         photoMessages.trySend(message)
                     }
-                    if (message is SessionMessage.PhotoShutter) _shutters.tryEmit(Unit)
+                    if (message is SessionMessage.PhotoShutter) {
+                        awaited.update { it + 1 }
+                        photoMessagesSeen.update { it + 1 }
+                        _shutters.tryEmit(Unit)
+                    }
+                }
+            }
+            launch {
+                // A wait with no photo message for this long is over: that photo is not coming.
+                combine(awaited, photoMessagesSeen) { count, _ -> count }.collectLatest { count ->
+                    if (count == 0) return@collectLatest
+                    delay(STALL_MS)
+                    awaited.value = 0
                 }
             }
             try {
@@ -359,16 +390,21 @@ class PhotoSyncer(
             } finally {
                 abandon()
                 clearParts()
+                awaited.value = 0
             }
         }
     }
 
     private fun onBegin(begin: SessionMessage.PhotoBegin) {
+        // The photographer gave up the photo that was arriving, if this is another, so it is no longer awaited.
+        if (arriving?.let { it.begin.photoId != begin.photoId } == true) awaited.update { maxOf(it - 1, 0) }
         abandon()
         if (begin.photoId in saved) {
             session.send(SessionMessage.PhotoSaved(begin.photoId, ok = true))
             return
         }
+        // Its shutter may have come during a drop, and was then never sent.
+        awaited.update { maxOf(it, 1) }
         val refusal = when {
             begin.bytes !in 1..MAX_PHOTO_BYTES -> PhotoRefusal.TOO_LARGE
             begin.format != FORMAT -> PhotoRefusal.BROKEN
@@ -440,6 +476,7 @@ class PhotoSyncer(
 
     /** Tells the photographer, and this phone's person, how the photo ended: saved, or [refusal]. */
     private fun answer(photoId: String, refusal: PhotoRefusal?) {
+        awaited.update { maxOf(it - 1, 0) }
         session.send(SessionMessage.PhotoSaved(photoId, ok = refusal == null, reason = refusal))
         _received.trySend(refusal == null)
     }

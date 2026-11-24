@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-23, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -8,6 +8,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.lastpenguin.pix.BuildConfig
 import com.lastpenguin.pix.account.AuthRepository
+import com.lastpenguin.pix.account.AuthState
 import com.lastpenguin.pix.account.AuthTokens
 import com.lastpenguin.pix.account.BearerTokens
 import com.lastpenguin.pix.account.CredentialManagerGoogleIdTokens
@@ -259,6 +260,8 @@ class AppContainer(
                 // A session's socket counts as signed in, so friends see "In a session" and an invitation to this
                 // phone is BUSY meanwhile (FR-6.9).
                 accessToken = authRepository::freshAccessToken,
+                // The other phone names this one by its account while signed in, else by the phone's name (#271).
+                accountName = { (authRepository.state.value as? AuthState.SignedIn)?.account?.displayName },
                 // Loads the native WebRTC library on the first session, not at app start.
                 peers = WebRtcRuntime(appContext, frameSource, relayOnly = BuildConfig.RELAY_ONLY),
                 frameSource = frameSource,

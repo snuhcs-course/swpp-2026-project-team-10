@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.settings
 
 import android.content.Context
@@ -28,7 +28,7 @@ import kotlinx.coroutines.flow.stateIn
 
 /**
  * The choices on the settings screen that outlive the app (FR-10.1, Design 2.8): the guide's look, the camera's base
- * brightness, the latency indicator, crash reports and usage data (FR-10.6), and which screens' tutorial tips were seen
+ * brightness, the grid and the horizon bar, the latency indicator, crash reports and usage data (FR-10.6), and which screens' tutorial tips were seen
  * (FR-10.4). Each change applies at once, through the flows.
  * The language is not here: Android keeps it as Pix's per-app language (`AppCompatDelegate.setApplicationLocales`).
  * Owner: Settings (#123).
@@ -45,6 +45,12 @@ interface AppSettings {
      * drag after a tap to focus adds to it until the next tap; 0 by default.
      */
     val baseBrightness: StateFlow<Float>
+
+    /** Whether the camera screens draw the 3×3 grid (FR-1.9); on by default. */
+    val showGrid: StateFlow<Boolean>
+
+    /** Whether the Camera screen draws the horizon bar (FR-1.10); on by default. */
+    val showLevel: StateFlow<Boolean>
 
     /** The screens whose tutorial tips were seen; null until the stored answer is read, so none ever flash (FR-10.4). */
     val tutorialSeen: StateFlow<Set<TutorialScreen>?>
@@ -64,6 +70,10 @@ interface AppSettings {
     /** Kept within [BASE_BRIGHTNESS_EV]. */
     suspend fun setBaseBrightness(ev: Float)
 
+    suspend fun setShowGrid(show: Boolean)
+
+    suspend fun setShowLevel(show: Boolean)
+
     suspend fun setShareUsage(share: Boolean)
 
     /** Adds [screens] to the tips seen. */
@@ -77,6 +87,8 @@ interface AppSettings {
         look: GuideLook = GuideLook(),
         latency: Boolean = false,
         brightness: Float = 0f,
+        grid: Boolean = true,
+        level: Boolean = true,
         tutorial: Set<TutorialScreen>? = TutorialScreen.entries.toSet(),
         usage: Boolean? = true,
     ) : AppSettings {
@@ -88,6 +100,12 @@ interface AppSettings {
 
         private val _baseBrightness = MutableStateFlow(brightness)
         override val baseBrightness: StateFlow<Float> = _baseBrightness.asStateFlow()
+
+        private val _showGrid = MutableStateFlow(grid)
+        override val showGrid: StateFlow<Boolean> = _showGrid.asStateFlow()
+
+        private val _showLevel = MutableStateFlow(level)
+        override val showLevel: StateFlow<Boolean> = _showLevel.asStateFlow()
 
         private val _tutorialSeen = MutableStateFlow(tutorial)
         override val tutorialSeen: StateFlow<Set<TutorialScreen>?> = _tutorialSeen.asStateFlow()
@@ -109,6 +127,14 @@ interface AppSettings {
 
         override suspend fun setBaseBrightness(ev: Float) {
             _baseBrightness.value = ev.coerceIn(BASE_BRIGHTNESS_EV)
+        }
+
+        override suspend fun setShowGrid(show: Boolean) {
+            _showGrid.value = show
+        }
+
+        override suspend fun setShowLevel(show: Boolean) {
+            _showLevel.value = show
         }
 
         override suspend fun setShareUsage(share: Boolean) {
@@ -165,6 +191,12 @@ class DataStoreAppSettings(private val store: DataStore<Preferences>, scope: Cor
         preferences.map { (it[BASE_BRIGHTNESS] ?: 0f).coerceIn(BASE_BRIGHTNESS_EV) }
             .stateIn(scope, SharingStarted.Eagerly, 0f)
 
+    override val showGrid: StateFlow<Boolean> =
+        preferences.map { it[SHOW_GRID] ?: true }.stateIn(scope, SharingStarted.Eagerly, true)
+
+    override val showLevel: StateFlow<Boolean> =
+        preferences.map { it[SHOW_LEVEL] ?: true }.stateIn(scope, SharingStarted.Eagerly, true)
+
     override val tutorialSeen: StateFlow<Set<TutorialScreen>?> =
         preferences.map<Preferences, Set<TutorialScreen>?> { stored ->
             val names = stored[TUTORIAL_SEEN].orEmpty()
@@ -191,6 +223,10 @@ class DataStoreAppSettings(private val store: DataStore<Preferences>, scope: Cor
     override suspend fun setShowLatency(show: Boolean) = save { it[SHOW_LATENCY] = show }
 
     override suspend fun setBaseBrightness(ev: Float) = save { it[BASE_BRIGHTNESS] = ev.coerceIn(BASE_BRIGHTNESS_EV) }
+
+    override suspend fun setShowGrid(show: Boolean) = save { it[SHOW_GRID] = show }
+
+    override suspend fun setShowLevel(show: Boolean) = save { it[SHOW_LEVEL] = show }
 
     override suspend fun setShareUsage(share: Boolean) = save { it[SHARE_USAGE] = share }
 
@@ -220,6 +256,8 @@ class DataStoreAppSettings(private val store: DataStore<Preferences>, scope: Cor
         val GUIDE_THICKNESS = stringPreferencesKey("guide_thickness")
         val SHOW_LATENCY = booleanPreferencesKey("show_latency")
         val BASE_BRIGHTNESS = floatPreferencesKey("base_brightness_ev")
+        val SHOW_GRID = booleanPreferencesKey("show_grid")
+        val SHOW_LEVEL = booleanPreferencesKey("show_level")
         val TUTORIAL_SEEN = stringSetPreferencesKey("tutorial_seen_screens")
         val SHARE_USAGE = booleanPreferencesKey("share_usage")
     }

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.animation.ValueAnimator
@@ -15,6 +15,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import androidx.core.animation.doOnEnd
+import com.lastpenguin.pix.R
 import com.lastpenguin.pix.ui.Motion
 import kotlin.math.abs
 import kotlin.math.hypot
@@ -28,13 +29,21 @@ import kotlin.math.roundToInt
  * Changes of the guide itself are animated in drawing (Iter3-A13), apart from the view's own alpha, which the screens
  * fade with the grid: a new guide fades in as it grows from 95 %, a replaced one fades out meanwhile, and Hide, its
  * return, and Remove fade. A move, a resize, and the opacity are drawn at once, also during these, and the first
- * guide this view renders, such as the one already there when the screen opens, comes without any.
+ * guide this view renders, such as the one already there when the screen opens, comes without any. While [filled], the
+ * inside of the guide is tinted in the guide color (#271).
  */
 class GuideOverlayView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
 ) : View(context, attrs) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+        color = context.getColor(R.color.camera_guide_fill)
+    }
+    private val fillAlpha = fillPaint.alpha
+
+    /** The inside of the drawn guide's mask, made the first time that guide is [filled]. */
+    private var inside: Pair<ReferenceGuide, Bitmap>? = null
     private val frameBounds = RectF()
     private val guideBounds = RectF()
     private var guide: ReferenceGuide? = null
@@ -65,6 +74,17 @@ class GuideOverlayView @JvmOverloads constructor(
         isClickable = false
         isFocusable = false
     }
+
+    /**
+     * Guide-edit mode's sign on the guide (#271): while true, the inside of the guide is tinted in the guide color, the
+     * toggle's, whatever the line's color, so it reads as a thing to move. The screens set it with [editable].
+     */
+    var filled: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            postInvalidateOnAnimation()
+        }
 
     /** Guide-edit mode: drag and pinch are handled only while true, and then anywhere inside the camera image. */
     var editable: Boolean = true
@@ -230,6 +250,7 @@ class GuideOverlayView @JvmOverloads constructor(
         releaseTouch()
         stopAppearing()
         stopLeaving()
+        inside = null
         super.onDetachedFromWindow()
     }
 
@@ -401,21 +422,44 @@ class GuideOverlayView @JvmOverloads constructor(
         val image = bitmap ?: return
         val coming = appearing
         val scale = if (appearGrows) START_SCALE + (1f - START_SCALE) * coming else 1f
-        draw(canvas, image, guideBounds, frameBounds, (paint.alpha * coming).roundToInt(), scale)
+        val alpha = (paint.alpha * coming).roundToInt()
+        // Under the line, the same size as it, so the two meet at the outline's level.
+        if (filled) {
+            insideOf(guide)?.let {
+                draw(canvas, it, guideBounds, frameBounds, alpha * fillAlpha / 255, scale, fillPaint)
+            }
+        }
+        draw(canvas, image, guideBounds, frameBounds, alpha, scale)
     }
 
-    private fun draw(canvas: Canvas, image: Bitmap, bounds: RectF, frame: RectF, alpha: Int, scale: Float) {
+    /** The drawn guide's inside, made once per guide from its mask; null when it has none to read. */
+    private fun insideOf(guide: ReferenceGuide?): Bitmap? {
+        guide ?: return null
+        inside?.takeIf { it.first === guide }?.let { return it.second }
+        val mask = guide.mask.takeUnless { it.isRecycled } ?: return null
+        return guideInside(mask.maskPixels()).toMaskBitmap().also { inside = guide to it }
+    }
+
+    private fun draw(
+        canvas: Canvas,
+        image: Bitmap,
+        bounds: RectF,
+        frame: RectF,
+        alpha: Int,
+        scale: Float,
+        with: Paint = paint,
+    ) {
         if (image.isRecycled || alpha <= 0) return
-        val opacity = paint.alpha
+        val opacity = with.alpha
         val saved = canvas.save()
         try {
             // Keep the full destination rectangle: intersecting it with the frame would squeeze the whole image.
             canvas.clipRect(frame)
             canvas.scale(scale, scale, bounds.centerX(), bounds.centerY())
-            paint.alpha = alpha
-            canvas.drawBitmap(image, null, bounds, paint)
+            with.alpha = alpha
+            canvas.drawBitmap(image, null, bounds, with)
         } finally {
-            paint.alpha = opacity
+            with.alpha = opacity
             canvas.restoreToCount(saved)
         }
     }

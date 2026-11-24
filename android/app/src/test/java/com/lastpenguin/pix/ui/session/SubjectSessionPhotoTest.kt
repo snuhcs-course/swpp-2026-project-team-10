@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -71,6 +71,8 @@ import org.robolectric.shadows.ShadowToast
  * and the real PhotoSyncer, whose album saves each photo the photographer sends.
  * The thumbnail (state-based): empty and taking no tap before the first photo, with no viewer built yet, and for one
  * the album could not save; the first photo's, then a newer one's in its place.
+ * The photo on its way (state-based, #271): from the photographer's shutter, the slot where Camera's shutter is says
+ * it is coming, with a spinner, until it is saved, or the album could not save it; two shutters wait for both photos.
  * The viewer (state-based): the session's photos over the video, opened at the newest under Back, Share, and Delete,
  * with no title and no counter, with the session going on and the screen staying; a swipe shows the earlier ones, with
  * the strip of thumbnails under the photo, the one on screen selected, a tap on one showing it, TalkBack reading which
@@ -221,6 +223,58 @@ class SubjectSessionPhotoTest {
             assertFalse(binding.galleryButton.isEnabled)
             assertNull(binding.thumbnailShows())
         }
+    }
+
+    // ---- The photo on its way ---------------------------------------------------------------
+
+    private fun FragmentSubjectBinding.receivingShown(): Boolean {
+        val receiving = cameraCaptionStatus.text.toString() == string(R.string.subject_receiving_photo)
+        assertEquals(receiving, cameraCaptionSpinner.isShown)
+        assertEquals(!receiving, cameraCaptionDot.isShown)
+        return receiving && cameraCaption.isShown
+    }
+
+    @Test
+    fun thePhotographersShutter_saysAPhotoIsComing_untilItIsSaved() {
+        val modules = launch()
+        onScreen { binding, _ -> assertFalse(binding.receivingShown()) }
+
+        modules.session.deliver(SessionMessage.PhotoShutter)
+        idle()
+        onScreen { binding, _ -> assertTrue(binding.receivingShown()) }
+
+        modules.photo("p1")
+        onScreen { binding, _ ->
+            assertFalse(binding.receivingShown())
+            assertEquals(string(R.string.subject_live), binding.cameraCaptionStatus.text.toString())
+            assertSame(thumbnails[saved("p1")], binding.thumbnailShows())
+        }
+    }
+
+    @Test
+    fun twoShutters_waitForBothPhotos() {
+        val modules = launch()
+
+        modules.session.deliver(SessionMessage.PhotoShutter)
+        modules.session.deliver(SessionMessage.PhotoShutter)
+        modules.photo("p1")
+        onScreen { binding, _ -> assertTrue(binding.receivingShown()) }
+
+        modules.photo("p2")
+        onScreen { binding, _ -> assertFalse(binding.receivingShown()) }
+    }
+
+    @Test
+    fun aPhotoTheAlbumCouldNotSave_endsTheSign() {
+        val modules = launch()
+        modules.albumFails = true
+
+        modules.session.deliver(SessionMessage.PhotoShutter)
+        idle()
+        onScreen { binding, _ -> assertTrue(binding.receivingShown()) }
+
+        modules.photo("p1")
+        onScreen { binding, _ -> assertFalse(binding.receivingShown()) }
     }
 
     // ---- The viewer -------------------------------------------------------------------------

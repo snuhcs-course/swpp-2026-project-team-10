@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.animation.ValueAnimator
@@ -19,7 +19,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 
-/** Exercises Android Canvas composition (Robolectric native graphics), including the frame's letterbox clipping. */
+/**
+ * Exercises Android Canvas composition (Robolectric native graphics), including the frame's letterbox clipping. Guide-edit
+ * mode's fill (#271): off, none; on, the mask's inside in the guide color and nothing outside it, at the guide's opacity,
+ * the same color whatever the line's, and nothing for a hidden guide.
+ */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class GuideOverlayViewTest {
@@ -73,6 +77,53 @@ class GuideOverlayViewTest {
 
         assertPixel(rendered, 105, 240, Color.argb(128, 0, 0, 255))
         assertTrue(pixels(rendered).none { Color.red(it) > 0 })
+    }
+
+    @Test
+    fun filled_tintsTheMasksInsideInTheGuideColor_andNothingOutsideIt() = onMain {
+        val guide = guide(mask = leftHalf(), outline = solid(Color.TRANSPARENT))
+        val view = view(300, 400)
+        view.render(guide, GuideState(guideId = guide.id, opacity = 1f))
+        assertEmpty(snapshot(view))
+
+        view.filled = true
+        val rendered = snapshot(view)
+
+        // Bounds [80, 60, 220, 340]: the mask's left half covers x = 80..150, its right half x = 150..220.
+        assertPixel(rendered, 110, 200, guideFill(alpha = 64), tolerance = 6)
+        assertTransparent(rendered, 190, 200)
+        assertTransparent(rendered, 50, 200)
+    }
+
+    @Test
+    fun filled_followsTheGuidesOpacity() = onMain {
+        val guide = guide(mask = leftHalf(), outline = solid(Color.TRANSPARENT))
+        val view = view(300, 400)
+        view.filled = true
+        view.render(guide, GuideState(guideId = guide.id, opacity = 0.5f))
+
+        assertPixel(snapshot(view), 110, 200, guideFill(alpha = 32), tolerance = 8)
+    }
+
+    @Test
+    fun filled_keepsTheGuideColor_whateverTheLinesColor() = onMain {
+        val guide = guide(mask = leftHalf(), outline = solid(Color.TRANSPARENT))
+        val view = view(300, 400)
+        view.filled = true
+        view.lineColor = Color.YELLOW
+        view.render(guide, GuideState(guideId = guide.id, opacity = 1f))
+
+        assertPixel(snapshot(view), 110, 200, guideFill(alpha = 64), tolerance = 6)
+    }
+
+    @Test
+    fun filled_hiddenGuide_drawsNothing() = onMain {
+        val guide = guide(mask = leftHalf(), outline = solid(Color.BLUE))
+        val view = view(300, 400)
+        view.filled = true
+        view.render(guide, GuideState(guideId = guide.id, visible = false, opacity = 1f))
+
+        assertEmpty(snapshot(view))
     }
 
     @Test
@@ -272,6 +323,15 @@ class GuideOverlayViewTest {
     ) = ReferenceGuide(id, mask, outline, 0.5f, GuideSource.GALLERY)
 
     private fun solid(color: Int): Bitmap = bitmap(20, 40).apply { eraseColor(color) }
+
+    /** A mask whose left half is the person. */
+    private fun leftHalf(): Bitmap = bitmap(20, 40).apply {
+        val colors = IntArray(20 * 40) { if (it % 20 < 10) Color.BLACK else Color.TRANSPARENT }
+        setPixels(colors, 0, 20, 0, 0, 20, 40)
+    }
+
+    /** The fill's color, `camera_guide_fill`, as drawn at [alpha] over nothing. */
+    private fun guideFill(alpha: Int): Int = Color.argb(alpha, 0x5E, 0xEA, 0xD4)
 
     private fun bitmap(width: Int, height: Int): Bitmap =
         Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also(bitmaps::add)

@@ -117,6 +117,7 @@
     <string name="zoom_held_label">%1$s님이 배율을 바꾸고 있어요</string>
     <string name="remote_guide_move_notice">%1$s님이 가이드를 옮겼어요</string>
     <string name="remote_guide_notice">%1$s님이 포즈 가이드를 정했어요</string>
+    <string name="peer_watching_notice">%1$s님이 내 카메라를 보고 있어요</string>
     <string name="remote_brightness_notice">%1$s님이 밝기를 %2$s에 맞췄어요</string>
     <string name="remote_flash_on_notice">%1$s님이 플래시를 켰어요</string>
     <string name="remote_flash_off_notice">%1$s님이 플래시를 껐어요</string>
@@ -405,6 +406,8 @@
     <!-- Flow 5: Subject view, Connection lost -->
     <string name="subject_title">%1$s님의 카메라</string>
     <string name="subject_title_placeholder">상대 카메라</string>
+    <string name="subject_live">실시간으로 보는 중</string>
+    <string name="subject_receiving_photo">사진 받는 중…</string>
     <string name="leave">나가기</string>
     <string name="leave_session_title">카메라 공유에서 나갈까요?</string>
     <string name="subject_video_description">화면을 두 손가락으로 벌리거나 오므려 상대 카메라를 확대·축소할 수 있어요</string>
@@ -454,6 +457,10 @@
     <string name="settings_section_camera">카메라</string>
     <string name="settings_base_brightness">기본 밝기</string>
     <string name="settings_base_brightness_body">모든 사진이 이 밝기에서 시작해요. 화면을 눌러 초점을 맞춘 뒤 위아래로 밀면 다음에 누를 때까지 더 밝거나 어둡게 바뀌어요.</string>
+    <string name="settings_grid">격자선</string>
+    <string name="settings_grid_body">화면을 가로세로 3등분하는 선이에요.</string>
+    <string name="settings_level">수평계</string>
+    <string name="settings_level_body">가운데 막대가 수평이 맞으면 노란색으로 바뀌어요.</string>
     <string name="settings_section_guide">가이드</string>
     <string name="settings_guide_color">색</string>
     <string name="settings_guide_thickness">두께</string>

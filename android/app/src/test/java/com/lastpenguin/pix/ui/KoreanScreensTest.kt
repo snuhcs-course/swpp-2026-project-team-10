@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.Manifest
@@ -140,7 +140,8 @@ import org.robolectric.shadows.ShadowDialog
  * with Google;
  * Pix ID setup; Account, with
  * "Delete your Pix account?"; the room code; See their
- * camera; Session not found; Subject view, with the photographer's tip closed and open,
+ * camera; Session not found; Subject view, with whose camera it is and its notice, with a photo on its way (#271),
+ * with the photographer's tip closed and open,
  * and while the photographer picks a pose, with a guide to save, and with the session's photos open in the viewer,
  * readable or not (Iter4-A2); the subject's Pick a pose; Connection lost; Camera in a session with its photos open in the
  * viewer (Iter4-A2), and with the delay shown; Camera with Pix's album open in the viewer; Settings, signed in; How
@@ -828,6 +829,20 @@ class KoreanScreensTest {
             SessionMessage.Capabilities(CameraCapabilities(0.6f, 10f, listOf(1f, 2f), -4..4, 0.5f, true)),
         )
         // The "Connecting…" check runs every 500 ms on the main looper; let one more round see the session.
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        assertKorean(screen(), *people)
+    }
+
+    @Test
+    @Config(shadows = [ShadowSurfaceViewRenderer::class], instrumentedPackages = ["org.webrtc"])
+    fun subjectView_withAPhotoOnItsWay_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.SUBJECT))
+        modules.video.deliverFrame()
+        modules.photos.startAsReceiver(receiving)
+        modules.session.deliver(SessionMessage.PhotoShutter)
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
         assertKorean(screen(), *people)
     }

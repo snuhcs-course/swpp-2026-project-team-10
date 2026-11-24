@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.os.SystemClock
@@ -80,6 +80,8 @@ class RtcSessionManager(
     private val haveReferenceId: () -> String? = { null },
     /** The signed-in user's access token for each socket, or null when nobody is signed in (Design 2.5.2). */
     private val accessToken: suspend () -> String? = { null },
+    /** The signed-in account's name, which `hello` sends in place of the phone's; null when nobody is signed in. */
+    private val accountName: () -> String? = { null },
 ) : SessionManager, RemoteVideo {
 
     private val serial = dispatcher.limitedParallelism(1)
@@ -761,7 +763,7 @@ class RtcSessionManager(
         val hello = SessionMessage.Hello(
             appVersion = identity.appVersion,
             role = checkNotNull(role),
-            name = identity.name,
+            name = identity.nameFor(accountName()),
             haveGuideId = if (role == Role.SUBJECT) haveGuideId() else null,
             haveReferenceId = if (role == Role.SUBJECT) haveReferenceId() else null,
         )

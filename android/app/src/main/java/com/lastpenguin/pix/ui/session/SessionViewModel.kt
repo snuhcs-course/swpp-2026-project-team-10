@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-23, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import androidx.lifecycle.Lifecycle
@@ -68,6 +68,9 @@ sealed interface SessionNotice {
 
     /** A guide made on the subject's phone is now the guide: "Joonhyung set a pose guide" (FR-6.15, FR-7.4). */
     data class RemoteGuide(val name: String) : SessionNotice
+
+    /** A subject connected, so the live view starts: "Joonhyung is watching your camera" (#271). */
+    data class Watching(val name: String) : SessionNotice
 }
 
 /** The subject's toast about a photo from the photographer (FR-6.14), on whichever screen of the session is in front. */
@@ -202,6 +205,9 @@ class SessionViewModel(
 
     /** The link dropped and the session goes on: the next Connected resumes it, with the `hello` it began with. */
     private var afterDrop = false
+
+    /** Whether the last state was Connected, so another Connected of the same connection says nothing new. */
+    private var wasConnected = false
     private var connectedJob: Job? = null
     private var receiverJob: Job? = null
     private var photoJob: Job? = null
@@ -430,6 +436,11 @@ class SessionViewModel(
         // Read for this Connected only: any other state between ends the session, and the next one has its own hello.
         val resumed = afterDrop && connected != null
         afterDrop = reconnecting
+        // The subject's live view starts: Camera says who watches it, once per connection, not after a drop (#271).
+        if (connected?.role == Role.PHOTOGRAPHER && !resumed && !wasConnected) {
+            _notices.tryEmit(SessionNotice.Watching(connected.peer.displayName))
+        }
+        wasConnected = connected != null
         if (liveNow && connectedJob == null) {
             connectedJob = viewModelScope.launch {
                 coroutineScope {

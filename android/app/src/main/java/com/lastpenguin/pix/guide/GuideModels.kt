@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -13,7 +13,7 @@ data class ReferenceGuide(
     /**
      * ALPHA_8, the smoothed mask (Design 2.6.1, step 4), cropped to the person: opaque is the person. It holds none of
      * the reference's pixels, and it is what the other phone receives (`mask-png`, AD-6, AD-15). Never drawn as the
-     * guide, which is an outline only (FR-2.2).
+     * guide, which is an outline (FR-2.2); guide-edit mode tints its inside in one flat color (#271).
      */
     val mask: Bitmap,
     /** Same size as [mask]; light stroke, about 5.3 px (2 dp) on screen. */

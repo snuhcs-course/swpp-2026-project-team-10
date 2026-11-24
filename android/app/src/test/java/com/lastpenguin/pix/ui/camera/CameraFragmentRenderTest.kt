@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -37,6 +37,7 @@ import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -50,14 +51,17 @@ import org.robolectric.annotation.GraphicsMode
 /*
  * The Camera screen's render paths (R&S 6.2, Testing Documentation 2.1.6), on the real Fragment under
  * FragmentScenario with a container of fakes. Partitions, one test each: camera permission denied or granted;
- * camera status STARTING, READY; a guide added, hidden, removed by the shutter's end of edit mode; a photo saved or
+ * camera status STARTING, READY; the grid and the horizon bar on by default, and each off from Settings (#271); a
+ * guide added, with the guide-edit toggle lit and the guide filled, the toggle tapped off (unlit, the same icon, no
+ * fill; #271), hidden, removed by the shutter's end of edit mode; a photo saved or
  * failed; the flash and brightness controls with and without the capability; the aspect ratio 4:3 and 16:9; the
  * scene photo step framing and reviewing, with Back at the top left of each (out to the camera, and from the review back
  * to framing) and Use at the top right of the review (#199), the flow's bar at its first and second step, the panel
  * with what to frame and the accent shutter while framing only, all gone after the step (#210), its review while the
  * phone looks for a person and without one (FR-4.13), and
  * its light (FR-4.1) turned on and off, and on a camera without a flash;
- * a session connected and a peer leaving or dropping, whose notice stays 10 s and goes once the peer is back (#238),
+ * a session connected, with who watches the camera for 3 s (#271), and a peer leaving or dropping, whose notice stays
+ * 10 s and gives way once the peer is back (#238),
  * and the scene photo step in a session, without End session until it ends, a reconnect included; a guide added from
  * Subject view, with the reference thumbnail its phone sent (#234); the camera switch on a phone with and without a
  * front camera, gone while the
@@ -149,6 +153,35 @@ class CameraFragmentRenderTest {
             assertEquals(View.GONE, controls.flashButton.visibility)
             assertEquals(View.GONE, controls.exposureBar.visibility)
             assertFalse(controls.galleryButton.isEnabled)
+            // The grid and the horizon bar, on until Settings turns them off (FR-1.9, FR-1.10).
+            assertTrue(controls.compositionOverlay.showGrid)
+            assertTrue(controls.compositionOverlay.showLevel)
+        }
+    }
+
+    @Test
+    fun theGridOffInSettings_isNotDrawn_andTheBarStays() {
+        val modules = launch()
+
+        runBlocking { modules.appSettings.setShowGrid(false) }
+        idle()
+
+        onScreen { controls, _ ->
+            assertFalse(controls.compositionOverlay.showGrid)
+            assertTrue(controls.compositionOverlay.showLevel)
+        }
+    }
+
+    @Test
+    fun theBarOffInSettings_isNotDrawn_andTheGridStays() {
+        val modules = launch()
+
+        runBlocking { modules.appSettings.setShowLevel(false) }
+        idle()
+
+        onScreen { controls, _ ->
+            assertTrue(controls.compositionOverlay.showGrid)
+            assertFalse(controls.compositionOverlay.showLevel)
         }
     }
 
@@ -185,11 +218,16 @@ class CameraFragmentRenderTest {
         onScreen { controls, _ ->
             assertEquals(View.VISIBLE, controls.guideControls.visibility)
             assertEquals(View.VISIBLE, controls.editGuideButton.visibility)
+            // One person's outline, lit while a pinch moves the guide, whose inside is tinted then (#271).
             assertTrue(controls.editGuideButton.isChecked)
-            // The toggle shows the mode it is in: the person's outline while a pinch moves the guide (E2, #204).
             assertEquals(R.drawable.ic_guide_mode, shadowOf(controls.editGuideButton.plainIcon).createdFromResId)
+            assertEquals(
+                activityColor(R.color.pix_guide),
+                controls.editGuideButton.iconTint?.getColorForState(controls.editGuideButton.drawableState, 0),
+            )
             assertTrue(controls.editGuideButton.isEnabled)
             assertTrue(controls.guideOverlay.editable)
+            assertTrue(controls.guideOverlay.filled)
             // Remove guide in the light red that sets it apart from the panel's other controls (E3, #204).
             assertEquals(
                 activityColor(R.color.pix_danger_text),
@@ -215,10 +253,15 @@ class CameraFragmentRenderTest {
         idle()
 
         onScreen { controls, _ ->
+            // The same icon, unlit, while a pinch zooms, and no tint inside the guide (#271).
             assertFalse(controls.editGuideButton.isChecked)
-            // The camera while a pinch zooms (E2, #204).
-            assertEquals(R.drawable.ic_camera, shadowOf(controls.editGuideButton.plainIcon).createdFromResId)
+            assertEquals(R.drawable.ic_guide_mode, shadowOf(controls.editGuideButton.plainIcon).createdFromResId)
+            assertEquals(
+                activityColor(R.color.pix_text),
+                controls.editGuideButton.iconTint?.getColorForState(controls.editGuideButton.drawableState, 0),
+            )
             assertFalse(controls.guideOverlay.editable)
+            assertFalse(controls.guideOverlay.filled)
             assertEquals(string(R.string.hint_pinch_zoom), controls.hintText.text.toString())
             assertEquals(View.VISIBLE, controls.hintText.visibility)
         }
@@ -643,6 +686,7 @@ class CameraFragmentRenderTest {
             assertEquals(string(R.string.live_badge, "Joonhyung"), controls.liveDot.contentDescription.toString())
             assertEquals(View.VISIBLE, controls.endSessionButton.visibility)
             assertEquals(View.GONE, controls.shootTogetherButton.visibility)
+            assertEquals(string(R.string.peer_watching_notice, "Joonhyung"), controls.noticeText.text.toString())
         }
 
         modules.session.deliver(SessionMessage.Leave(EndReason.LEFT))
@@ -652,6 +696,24 @@ class CameraFragmentRenderTest {
             assertEquals(View.VISIBLE, controls.noticeText.visibility)
             assertEquals(string(R.string.peer_left, "Joonhyung"), controls.noticeText.text.toString())
         }
+    }
+
+    @Test
+    fun aSubjectConnecting_saysWhoIsWatching_forANoticesTime() {
+        val modules = launch()
+
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 1"), Role.PHOTOGRAPHER))
+        // The live light's first blink plays here, which moves the clock on a little.
+        idle()
+
+        onScreen { controls, _ ->
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+            assertEquals(string(R.string.peer_watching_notice, "Test Account 1"), controls.noticeText.text.toString())
+        }
+
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(CameraViewModel.NOTICE_MS))
+
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
     }
 
     @Test
@@ -694,7 +756,7 @@ class CameraFragmentRenderTest {
     }
 
     @Test
-    fun thePeerBackBeforeItsNoticeEnds_takesTheNoticeDown() {
+    fun thePeerBackBeforeItsNoticeEnds_replacesTheNotice_withWhoIsWatching() {
         val modules = launch()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
@@ -702,14 +764,17 @@ class CameraFragmentRenderTest {
         modules.session.setState(SessionState.Waiting("ABC123"))
         idle()
 
-        // The subject's Reconnect, seconds after its Connection lost.
+        // The subject's Reconnect, seconds after its Connection lost: its live view starts again (#271).
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
 
         onScreen { controls, _ ->
             assertEquals(View.VISIBLE, controls.liveDot.visibility)
-            assertEquals(View.GONE, controls.noticeText.visibility)
+            assertEquals(string(R.string.peer_watching_notice, "Joonhyung"), controls.noticeText.text.toString())
         }
+        // Its 3 s, not the 10 s of the notice it replaced (#238).
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(CameraViewModel.NOTICE_MS + 1))
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
     }
 
     @Test

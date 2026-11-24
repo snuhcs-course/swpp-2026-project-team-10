@@ -119,7 +119,7 @@
 | 4.2 | 2026-11-23 | The subject's guide after a session: gone from Subject view at the session's end, held for the next `hello`, and what the photographer counts on after a `guide.clear` or a drop (Iter5-P4, [#268]) (2.1, 2.2, 2.5.1, 2.6.7). |
 | 4.3 | 2026-11-24 | *Generate poses* (Iter5-P10, [#274]): the field that says Auto, the situations' options as chips that only write into the field, what shows when, *Back to Auto*, one label for the button, and the scene photo large (*Still open*, 2.1, 2.4, 2.6.3, 2.6.5, 2.9). |
 | 4.4 | 2026-11-24 | The scene photo goes straight to *Generate poses* (Iter5-A5, [#296]): `CHECKING` in place of the review, the photo held on Camera and shrinking into its thumbnail, no person said on the camera, Back that shoots again, and a flow of four steps (2.2, 2.4, 2.6.2, 2.6.3, 2.6.5). |
-| 4.5 | 2026-11-24 | Remote focus as built (Iter5-P9, [#273]): `camera.focus.set` handled and answered with `camera.state`, the base brightness at a remote tap, the focus box and the brightness bar on Subject view (`FocusBrightness`), no tap in guide-edit mode, the notice that does not repeat, `camera.focus` for the photographer's own focus, and the tutorial's tip on the video (2.2, 2.5.1, 2.6.5, 2.6.8, 2.8, 2.9). |
+| 4.5 | 2026-11-24 | Remote focus as built (Iter5-P9, [#273]): `camera.focus.set` handled and answered with `camera.state`, the base brightness at a remote tap, the focus box and the brightness bar on Subject view (`FocusBrightness`), no tap in guide-edit mode, the notice that does not repeat, `camera.focus` for the photographer's own focus, `focused` on the `camera.state` that answers a tap, TalkBack's action on the video, and the tutorial's tip on the video (2.2, 2.5.1, 2.6.5, 2.6.8, 2.8, 2.9). |
 
 </details>
 
@@ -1618,7 +1618,7 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `session.leave` | both | reliable | `reason` | Leaving on purpose |
 | `ping` / `pong` | both | realtime | `ts` | Round-trip time, every 2 s |
 | `camera.capabilities` | P→S | reliable | `capabilities` | Zoom and exposure ranges, flash, aspect ratios |
-| `camera.state` | P→S | steps realtime, final reliable | `zoom`, `exposure`, `flash`, `aspect`, `facing`, `by`, `final` | The applied camera values, and who changed them |
+| `camera.state` | P→S | steps realtime, final reliable | `zoom`, `exposure`, `flash`, `aspect`, `facing`, `by`, `final`, `focused` | The applied camera values, and who changed them |
 | `camera.zoom.set` | S→P | steps realtime, final reliable | `ratio`, `final`, `cancel` | The subject's pinch or readout tap (FR-7.1), or the cancel of a pinch held back (FR-7.6) |
 | `camera.zoom.hold` | P→S | reliable | `by` | Whose pinch holds the zoom, or null when it is free (FR-7.6) |
 | `camera.exposure.set` | S→P | steps realtime, final reliable | `index`, `final` | The subject's brightness bar (FR-7.3) |
@@ -1829,7 +1829,7 @@ A tap on the readout (a quick step, 2.6.2) and its *Zoom in* / *Zoom out* access
   "b": { "zoom": 2.0, "exposure": 3, "flash": "AUTO", "aspect": "R16_9", "by": "SUBJECT", "final": true } }
 ```
 
-Each zoom the camera reports applied goes at once as a step, and once more as final 100 ms after the last one. A change of exposure, flash, or ratio goes at once as final; a step of the subject's bar is echoed as a step. Every message holds the whole applied state, from the first one after `hello`; a missing `exposure`, `flash`, or `aspect` means 0, `OFF`, or `R4_3`. `by` is `SUBJECT` when the change answers the subject's request. The subject keeps the last message as `SessionManager.peerCamera` and fits its video area to `aspect` (AD-10). It logs `zoom.echo`, with the exposure and flash, for each final one with `by: SUBJECT` (NFR-7).
+Each zoom the camera reports applied goes at once as a step, and once more as final 100 ms after the last one. A change of exposure, flash, or ratio goes at once as final; a step of the subject's bar is echoed as a step. Every message holds the whole applied state, from the first one after `hello`; a missing `exposure`, `flash`, or `aspect` means 0, `OFF`, or `R4_3`. `by` is `SUBJECT` when the change answers the subject's request. `focused` is true only on the state that answers `camera.focus.set` ([#273]); an older photographer sends none. The subject keeps the last message as `SessionManager.peerCamera` and fits its video area to `aspect` (AD-10). It logs `zoom.echo`, with the exposure and flash, for each final one with `by: SUBJECT` (NFR-7).
 
 </details>
 
@@ -1862,7 +1862,7 @@ When `hasFlash` is false, the photographer answers with the unchanged state.
 { "v": 3, "t": "camera.focus.set", "seq": 1, "ts": 1759212355000, "b": { "x": 0.62, "y": 0.4 } }
 ```
 
-The subject's tap on the live video (FR-7.7): `x` and `y` are fractions of the photographer's frame, 0 to 1, as the photographer's preview shows it. The subject's video of the rear camera is a mirror, so the subject sends 1 − x of what it sees; the front camera's video is mirrored on both phones. The photographer calls `setFocusPoint` and sets its base brightness again (2.6.5). The point has no echo, since focus has no lasting state. The answer is the `camera.state` with that brightness, `by: SUBJECT`. A point outside 0 to 1 is dropped.
+The subject's tap on the live video (FR-7.7): `x` and `y` are fractions of the photographer's frame, 0 to 1, as the photographer's preview shows it. The subject's video of the rear camera is a mirror, so the subject sends 1 − x of what it sees; the front camera's video is mirrored on both phones. The photographer calls `setFocusPoint` and sets its base brightness again (2.6.5). The point has no echo, since focus has no lasting state. The answer is the `camera.state` with that brightness, `by: SUBJECT` and `focused: true`. A point outside 0 to 1 is dropped.
 
 </details>
 
@@ -2891,8 +2891,10 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - `PinchZoomController` owns the video's touches and reports the tap and a one-finger drag up or down, as on Camera. In guide-edit mode it is off, so a tap does not focus: the touch is the guide's. A tap outside the image does nothing.
   - `SubjectViewModel.onFocusTap` sends `camera.focus.set` with the point in the photographer's frame (2.5.1). It needs a camera that focuses on a point or has a brightness range (`camera.capabilities`).
   - `RemoteControlHandler` calls `setFocusPoint` on a camera that takes a point, and sets the base brightness from Settings again (`CameraCapabilities.baseExposureIndex`, the rule Camera's own tap uses). A camera that is not `READY` drops the tap.
-  - Every tap is answered with a `camera.state`, `by: SUBJECT`: at once when the camera has the base already, and otherwise when the camera reports it. It makes no brightness notice.
-  - Subject view shows the focus box at the tap and the brightness bar beside it (`FocusBrightness`, 2.8). A drag that starts with the bar down taps first. It then waits for the tap's answer, at most 400 ms (`SubjectUiState.baseAwaited`), so the bar starts from the photographer's base, which this phone does not know otherwise.
+  - Every tap is answered with a `camera.state`, `by: SUBJECT` and `focused: true`: at once when the camera has the base already, and otherwise when the camera reports it. It makes no brightness notice. The mark keeps the subject from taking another echo of its own for the answer, such as an earlier pinch's, which still carries the old brightness.
+  - Subject view shows the focus box at the tap and the brightness bar beside it (`FocusBrightness`, 2.8). A drag that starts with the bar down taps first. It then waits for the tap's answer, at most 400 ms (`SubjectUiState.baseAwaited`), so the bar starts from the photographer's base, which this phone does not know otherwise. If the bar went while the drag waited, the drag moves nothing.
+  - The bar goes when the photographer's ratio or camera changes: it stood beside a point of the old frame.
+  - TalkBack has no tap at a place on the video. The video's click action, "Focus and set the brightness", asks for the focus at the image's middle and moves TalkBack's focus onto the bar, which stays up while it has it.
   - The photographer's Camera shows the focus box alone where the subject tapped (`SessionViewModel.remoteFocus`). A brightness bar it has up goes, unless a finger is on it. The notice "Joonhyung set the focus" shows for 1.5 s, and no tap in the 2 s after it makes another (`FOCUS_NOTICE_MS`, `FOCUS_NOTICE_QUIET_MS`), so taps in a row do not repeat it. Another session's first tap is said again.
   - The photographer's own tap goes the other way. `CameraViewModel.onFocusTap` tells `RemoteControlHandler.focusedHere`, which sends `camera.focus` while a session runs. Subject view shows the focus box alone at that place (`SubjectViewModel.photographerFocus`), with no notice, as the photographer's other changes have none there. A bar it has up goes, unless a finger is on it.
 - **Permission (Could, FR-7.5).** `control.permission` with `allowed: false` would disable the subject's controls and drop its requests. Dropped at the kickoff of 11/21: short of time, and judged less important. Only the message exists, so remote control is always allowed.

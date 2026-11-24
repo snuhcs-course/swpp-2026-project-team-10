@@ -1,15 +1,23 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
+import android.animation.ValueAnimator
+import android.graphics.Bitmap
 import android.os.Bundle
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.LineHeightSpan
+import android.text.style.TextAppearanceSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import androidx.activity.addCallback
+import androidx.core.animation.doOnEnd
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.children
+import androidx.core.view.doOnLayout
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
@@ -22,7 +30,9 @@ import com.google.android.material.chip.Chip
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
 import com.lastpenguin.pix.generation.DESCRIPTION_MAX_LENGTH
+import com.lastpenguin.pix.generation.PoseOptions
 import com.lastpenguin.pix.generation.PromptEntry
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionState
@@ -37,21 +47,31 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
- * Generate poses (R&S 6.3, FR-4.8): the user describes a pose, picks a description used before (FR-4.11), or leaves the
- * field empty for the server to suggest four poses for the scene. Nothing is sent before the one button at the top
- * right, *Suggest* or *Generate* (Iter3-A13, #199). Back at the top left returns to the scene photo's review. In a
- * session
- * the subject sees this step too: one field at a time holds the description, and the subject's button goes on here like
- * this phone's own (Design 2.6.5). The photo's card names the situation it was taken for (FR-4.8). The first time it
- * opens, its tutorial tips come over it (FR-10.4).
- * Owner: Server/AI/Sync (#7); the step on both phones Iter3-P16; Back Iter4-P2.
+ * Generate poses (R&S 6.3, FR-4.8): the user leaves the field, which says Auto, for the server to suggest four poses
+ * for the scene, or taps it and describes a pose, chooses the situation's options, or picks a description used before
+ * (FR-4.11, FR-4.15). Nothing is sent before the one button at the top right, *Generate* (Iter3-A13, #199). It opens
+ * straight from the scene photo's shutter, the photo shrinking from where the camera held it into its place here
+ * (#296), and Back at the top left returns to the camera to shoot again. In a session the subject sees this step too:
+ * one field at a time holds
+ * the description, and the subject's button goes on here like this phone's own (Design 2.6.5). The photo's card names
+ * the situation it was taken for (FR-4.8), and a tap on the photo shows it large (FR-4.15). The first time it opens,
+ * its tutorial tips come over it (FR-10.4).
+ * Owner: Server/AI/Sync (#7); the step on both phones Iter3-P16; Back Iter4-P2; Auto, the options, and the large photo
+ * Iter5-P10; the photo straight from the shutter Iter5-A5.
  */
-class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
+class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose), ScenePhotoFragment.Host {
+
+    /** The scene photo, for its large view. */
+    override val scenePhoto: Bitmap?
+        get() = viewModel.uiState.value.scene
 
     private val viewModel: GenerationViewModel by activityViewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
     private val settingsViewModel: SettingsViewModel by activityViewModels { PixViewModels.Factory }
     private var form: DescriptionForm? = null
+
+    /** The scene photo shrinking into its place, while it does (#296). */
+    private var sceneArrival: ValueAnimator? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentDescribePoseBinding.bind(view)
@@ -62,6 +82,24 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
             return
         }
         binding.sceneImage.showScene(state.scene)
+        // Straight from the shutter (#296): the photo comes from where the camera held it into its place, once, and
+        // not when this screen is made again.
+        if (state.sceneArriving) {
+            viewModel.sceneArrived()
+            if (savedInstanceState == null) {
+                binding.root.doOnLayout {
+                    // As the camera held it: a photo taken sideways turns upright on its way.
+                    val arrival =
+                        binding.root.showArriving(
+                            state.scene,
+                            binding.sceneImage,
+                            binding.flowProgress,
+                            state.sceneTurn,
+                        )
+                    sceneArrival = arrival?.animator?.also { it.doOnEnd { sceneArrival = null } }
+                }
+            }
+        }
         val form = DescriptionForm(
             binding,
             // After a recreation the field restores its own text; otherwise it shows what the ViewModel kept (US-5).
@@ -77,12 +115,18 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
             onForget = viewModel::forget,
         )
         this.form = form
-        // The situation the photo was taken for (FR-4.8); another needs another photo.
-        binding.situationTag.isVisible = true
+        // The situation the photo was taken for (FR-4.8); another needs another photo. Auto is what the field says.
+        binding.situationTag.isVisible = state.situation != Situation.DEFAULT
         binding.situationTag.setText(state.situation.title)
-        binding.backButton.setOnClickListener { backToReview() }
+        form.showOptions(state.situation)
+        // The photo large, over this screen (FR-4.15); the typing ends first, so the keyboard is not left under it.
+        binding.scenePhotoButton.opensScenePhoto(this) {
+            form.stopTyping()
+            hideKeyboard()
+        }
+        binding.backButton.setOnClickListener { backToScene() }
         // System back does what Back does (R&S 6.9).
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { backToReview() }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { backToScene() }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -112,6 +156,7 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
 
     override fun onDestroyView() {
         form = null
+        sceneArrival?.cancel()
         super.onDestroyView()
     }
 
@@ -124,13 +169,13 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
         }
     }
 
-    /** Back: the scene photo's review on Camera, with the text kept for its *Use*. */
-    private fun backToReview() {
+    /** Back: the camera, to take another scene photo, with the text kept for it (#296). */
+    private fun backToScene() {
         hideKeyboard()
         form?.stopTyping()
-        // Pops first, so that this screen does not take the review's phase for anything to follow.
+        // Pops first, so that this screen does not take the camera's phase for anything to follow.
         findNavController().popBackStack(R.id.cameraFragment, false)
-        viewModel.backToReview()
+        viewModel.backToScene()
     }
 
     /** Nothing to describe: the camera, with the step discarded. */
@@ -147,12 +192,20 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose) {
 }
 
 /**
- * The description field, its counter and ✕, the descriptions used before (FR-4.11), and the one button of Generate
- * poses (FR-4.4, FR-4.8, US-5), on either phone. The button's label says what it starts: suggested poses while the
- * field is blank, which a blank description asks for, else poses of the description (Iter3-A13). Apart from the
- * fragments, so the form can be tested on the real layout without a ViewModel or navigation. [showHistory] lists the
- * descriptions used before as chips, all of them or, through the switch, those used with the session's friend; a chip
- * fills the field, and its ✕ asks [onForget] to drop it.
+ * The description field, its counter, the line under it, the situation's options (FR-4.15), the descriptions used before
+ * (FR-4.11), and the one button of Generate poses (FR-4.4, FR-4.8, US-5), on either phone. The button starts suggested
+ * poses while the field is blank, which a blank description asks for, else poses of the description (Iter3-A13); its
+ * label is the same for both, since the field itself says which (FR-4.15). Apart from the fragments, so the form can be
+ * tested on the real layout without a ViewModel or navigation.
+ *
+ * Empty and left alone, the field says Auto and what Auto does, with a line under it that says to tap it, and nothing
+ * else under it; while the field holds text, that line is *Back to Auto*, the way to the other choice in the same
+ * place. A tap, or a text, opens what is under it: [showOptions]'s chips, each of which writes its words into
+ * the field and takes them out again (PoseOptions), and [showHistory]'s, the descriptions used before, all of them or,
+ * through the switch, those used with the session's friend; such a chip fills the field, and its ✕ asks [onForget] to
+ * drop it. What a tap on the field or on a chip opened stays open when the field is empty again, so a closed keyboard
+ * uncovers it and a chip does not go from under the finger, until *Back to Auto* empties the field and folds it; what
+ * only a text opened, such as the other phone's, folds when the text goes.
  * In a session, the field holds the description while it is focused (Design 2.6.5): Done, a closed keyboard, and
  * leaving the screen end that, and [showShared] shows what the other phone wrote and waits while it types.
  */
@@ -188,17 +241,40 @@ class DescriptionForm(
     /** The other person types, or the link is paused: the chips wait with the field. */
     private var locked = false
 
+    /** The situation whose options show, and their words in the chips' order; none before [showOptions]. */
+    private var situation: Situation? = null
+    private var options: List<String> = emptyList()
+
+    /** The field or a chip was tapped on this phone: what is under the field shows until *Back to Auto* folds it. */
+    private var touched = false
+
+    /** What is under the field shows: this phone opened it, or the field holds a text, typed or the other phone's. */
+    private val opened: Boolean
+        get() = touched || input.length() > 0
+
+    /** Whether the field's hint says Auto, or shows the example; null before the first one is set. */
+    private var saysAuto: Boolean? = null
+
+    private val autoHint = autoHint()
+
     init {
-        // One line of input, so Done closes the keyboard, shown wrapped over up to four lines.
+        // One line of input, so Done closes the keyboard, shown wrapped over up to four lines. Three lines high at
+        // least, which the hint that says Auto takes, so nothing under the field moves when a text replaces the hint;
+        // set here, since a one-line input type sets the lines to one after the layout's own.
         input.setHorizontallyScrolling(false)
         input.maxLines = 4
+        input.minLines = AUTO_LINES
         if (text != null) input.setText(text)
-        renderText()
+        binding.descriptionError.isVisible = rejected
+        render()
         input.doAfterTextChanged { changed ->
             if (!showing) onTextChanged(changed?.toString().orEmpty())
-            renderText()
+            render()
         }
-        input.setOnFocusChangeListener { _, focused -> onFocusChanged(focused) }
+        input.setOnFocusChangeListener { _, focused ->
+            onFocusChanged(focused)
+            render()
+        }
         // Done and a closed keyboard end the typing; the keyboard still closes as before.
         input.setOnEditorActionListener { view, action, _ ->
             if (action == EditorInfo.IME_ACTION_DONE) view.clearFocus()
@@ -210,7 +286,6 @@ class DescriptionForm(
             keyboardShown = shown
             insets
         }
-        binding.descriptionError.isVisible = rejected
         binding.historyAll.setOnClickListener { showAll(true) }
         binding.historyWithPartner.setOnClickListener { showAll(false) }
 
@@ -218,13 +293,63 @@ class DescriptionForm(
             stopTyping()
             onGenerate(input.text.toString())
         }
-        // As if the text were deleted by hand: on both phones, and the button goes back to suggested poses.
-        binding.clearDescriptionButton.setOnClickListener { input.setText("") }
+        // As if the text were deleted by hand, on both phones: the field says Auto again, with nothing under it.
+        binding.clearDescriptionButton.setOnClickListener {
+            stopTyping()
+            touched = false
+            input.setText("")
+        }
     }
 
     /** The field no longer holds the description. */
     fun stopTyping() {
         if (input.hasFocus()) input.clearFocus()
+    }
+
+    /** Whether the service rejected the last description, said under the field (US-5). */
+    fun showRefused(rejected: Boolean) {
+        if (binding.descriptionError.isVisible == rejected) return
+        binding.descriptionError.isVisible = rejected
+        render()
+    }
+
+    /**
+     * The options of [situation], the one the scene photo was taken for, as chips (FR-4.15); *Auto*'s without one, as
+     * from an older photographer. A chip writes its words into the field and is checked while they are there, typed or
+     * shown; one whose words would pass the longest description cannot be chosen.
+     */
+    fun showOptions(situation: Situation?) {
+        val shown = situation ?: Situation.DEFAULT
+        if (shown == this.situation) return
+        this.situation = shown
+        val context = binding.root.context
+        options = shown.poseOptions.map(context::getString)
+        val chips = binding.optionChips
+        chips.removeAllViews()
+        val inflater = LayoutInflater.from(context)
+        for (option in options) {
+            val chip = inflater.inflate(R.layout.item_option_chip, chips, false) as Chip
+            chip.text = option
+            chip.setOnClickListener { choose(option) }
+            chips.addView(chip)
+        }
+        render()
+        // A description used before that is one of these options is not listed again under them.
+        renderHistory()
+    }
+
+    /** A tap on [option]'s chip: its words go into the field, or leave it. */
+    private fun choose(option: String) {
+        val chosen = PoseOptions.toggle(input.text.toString(), option)
+        if (chosen == null || locked) {
+            // The tap checked the chip by itself: back to what the field says.
+            renderOptions()
+            return
+        }
+        // Stays open if this takes the last words out: the chip does not go from under the finger.
+        touched = true
+        input.setText(chosen)
+        input.setSelection(input.length())
     }
 
     /**
@@ -247,10 +372,15 @@ class DescriptionForm(
         renderHistory()
     }
 
+    /** The descriptions used before that are not an option on the screen, whose chip is right above. */
+    private fun listed(): List<PromptEntry> =
+        usedBefore.filterNot { used -> options.any { it.equals(used.text.trim(), ignoreCase = true) } }
+
     private fun renderHistory() {
         val context = binding.root.context
         val partner = partner
-        binding.historySection.isVisible = usedBefore.isNotEmpty()
+        val listed = listed()
+        binding.historySection.isVisible = opened && listed.isNotEmpty()
         binding.historyFilter.isVisible = partner != null
         if (partner != null) {
             binding.historyWithPartner.text = context.getString(R.string.history_with, partner.displayName)
@@ -259,7 +389,7 @@ class DescriptionForm(
         val withPartner = partner?.takeUnless { showingAll }
         binding.historyAll.isSelected = withPartner == null
         binding.historyWithPartner.isSelected = withPartner != null
-        val shown = if (withPartner == null) usedBefore else usedBefore.filter { withPartner.userId in it.partners }
+        val shown = if (withPartner == null) listed else listed.filter { withPartner.userId in it.partners }
         val chips = binding.historyChips
         chips.removeAllViews()
         val inflater = LayoutInflater.from(context)
@@ -269,6 +399,7 @@ class DescriptionForm(
             chip.isEnabled = !locked
             // The chip's text replaces the field's, which the user can then edit (US-5).
             chip.setOnClickListener {
+                touched = true
                 input.setText(entry.text)
                 input.setSelection(input.length())
             }
@@ -276,7 +407,7 @@ class DescriptionForm(
             chip.setOnCloseIconClickListener { onForget(entry.text) }
             chips.addView(chip)
         }
-        binding.historyEmpty.isVisible = shown.isEmpty() && usedBefore.isNotEmpty()
+        binding.historyEmpty.isVisible = shown.isEmpty() && listed.isNotEmpty()
     }
 
     /**
@@ -305,25 +436,73 @@ class DescriptionForm(
         this.locked = locked
         binding.historyChips.children.forEach { it.isEnabled = !locked }
         binding.generateButton.isEnabled = !locked && !waiting
-        renderClear()
+        render()
         binding.descriptionTyping.isVisible = typing != null
         if (typing != null) binding.descriptionTyping.text = context.getString(R.string.peer_typing, typing)
         binding.sharedHint.isVisible = sharedWith != null
         if (sharedWith != null) binding.sharedHint.text = context.getString(R.string.shared_hint, sharedWith)
     }
 
-    /** The counter, the ✕, and the button's label, after each change of the field, typed or shown. */
-    private fun renderText() {
+    /**
+     * What follows the field's text and focus, after each change of either, typed or shown: Auto or the example as its
+     * hint, the line under it or the counter, *Back to Auto*, the checked options, and whether what is under it shows.
+     */
+    private fun render() {
         val context = binding.root.context
+        val empty = input.length() == 0
+        val focused = input.hasFocus()
+        if (focused) touched = true
+        // Left alone and empty, the field says Auto (FR-4.15); tapped, it shows an example to follow.
+        val auto = empty && !focused
+        if (saysAuto != auto) {
+            saysAuto = auto
+            input.hint = if (auto) autoHint else context.getString(R.string.describe_hint)
+            // The outline in the accent's tint: Auto is the value the field stands on.
+            input.isActivated = auto
+        }
         binding.descriptionCounter.text =
             context.getString(R.string.description_counter, input.length(), DESCRIPTION_MAX_LENGTH)
-        val label = if (input.text.isBlank()) R.string.suggest_poses else R.string.generate_from_description
-        binding.generateButton.setText(label)
-        renderClear()
+        binding.descriptionCounter.isVisible = !auto
+        // One line under the field: how to type while it says Auto, and the way back to Auto while it holds text.
+        binding.descriptionHelper.isVisible = auto && !locked
+        binding.clearDescriptionButton.isVisible = !empty && !locked
+        renderOptions()
+        binding.optionsSection.isVisible = opened && options.isNotEmpty()
+        binding.historySection.isVisible = opened && listed().isNotEmpty()
     }
 
-    /** The ✕, while there is text to clear and the field takes it. */
-    private fun renderClear() {
-        binding.clearDescriptionButton.isVisible = input.length() > 0 && !locked
+    /** Each option checked while the field's text has it, and off while it cannot be chosen. */
+    private fun renderOptions() {
+        val text = input.text.toString()
+        binding.optionChips.children.forEachIndexed { i, view ->
+            val chip = view as Chip
+            chip.isChecked = PoseOptions.has(text, options[i])
+            chip.isEnabled = !locked && PoseOptions.toggle(text, options[i]) != null
+        }
+    }
+
+    /**
+     * "Auto" over what Auto does, as the empty field's hint (FR-4.15): the first as a value in the accent, the way a
+     * camera shows a setting left on auto, the second as small text. Its three lines are no higher than three of the
+     * field's text, which the field always has room for ([AUTO_LINES]), so the field is as high with one as with the
+     * other.
+     */
+    private fun autoHint(): CharSequence {
+        val context = binding.root.context
+        val title = context.getString(R.string.describe_auto)
+        val body = context.getString(R.string.describe_auto_body)
+        return SpannableString("$title\n$body").apply {
+            val flags = Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            setSpan(TextAppearanceSpan(context, R.style.TextAppearance_Pix_Action_Accent), 0, title.length, flags)
+            setSpan(TextAppearanceSpan(context, R.style.TextAppearance_Pix_Body_Small), title.length + 1, length, flags)
+            // The field adds its line spacing to the hint's lines too. A pixel under the text's own line, so the hint
+            // is never the higher of the two, whatever the font does with its last line.
+            setSpan(LineHeightSpan.Standard(input.paint.getFontMetricsInt(null) - 1), 0, length, flags)
+        }
+    }
+
+    private companion object {
+        /** The lines of the hint that says Auto: "Auto", and what it does on two. */
+        const val AUTO_LINES = 3
     }
 }

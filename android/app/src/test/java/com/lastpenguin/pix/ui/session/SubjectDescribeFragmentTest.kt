@@ -1,16 +1,20 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
+import android.graphics.drawable.BitmapDrawable
 import android.os.Looper
 import android.view.View
+import android.widget.ImageView
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragmentInContainer
 import androidx.navigation.Navigation
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.android.material.chip.Chip
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.session.DescriptionEnd
 import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.EndReason
@@ -28,6 +32,8 @@ import com.lastpenguin.pix.session.sceneEnd
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
+import com.lastpenguin.pix.ui.generation.ScenePhotoFragment
+import com.lastpenguin.pix.ui.generation.poseOptions
 import java.time.Duration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +45,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -49,10 +56,12 @@ import org.robolectric.shadows.ShadowToast
 /*
  * The subject's Generate poses (R&S 6.6, FR-6.15, Design 2.6.5) on the real Fragment, with the photographer's
  * description delivered to the container's DescriptionSyncer. Partitions: the scene photo, the text, and the hint as on
- * the photographer's phone; the situation named on the photo's card, and none from an older photographer; the photographer typing (the field, the chips, and the buttons wait, saying who types) and
+ * the photographer's phone, and the photo large at a tap (FR-4.15); the situation named on the photo's card, and none
+ * for Auto or from an older photographer; the situation's options, Auto's from an older photographer, one sent at once
+ * after the photographer's text, and the photographer's own checked here (FR-4.15); the photographer typing (the field, the chips, and the buttons wait, saying who types) and
  * done; this phone's typing sent while it holds the field and given back when it ends; a description used before sent
  * at once from its chip, and the switch to the ones used with the photographer in an invitation's session; the one
- * button sent and waiting, and with the field cleared by its ✕, asking for suggested poses (Iter3-A13); the
+ * button sent and waiting, and with the field cleared by Back to Auto, asking for suggested poses (Iter3-A13); the
  * description's end by a set started (back to Subject view without a notice), by the photographer's close (a notice),
  * and an end kept from an earlier description (nothing); a go no end answers in
  * 5 s (a notice); Back (Subject view, the description kept); the link reconnecting (everything waits); the session
@@ -163,6 +172,84 @@ class SubjectDescribeFragmentTest {
         onScreen { binding ->
             assertEquals(View.VISIBLE, binding.situationTag.visibility)
             assertEquals(string(R.string.situation_landmark), binding.situationTag.text.toString())
+        }
+
+        // Auto is what the field says (FR-4.15).
+        step(modules, DescriptionStep.OPEN, "wave", situation = "default")
+
+        onScreen { binding -> assertEquals(View.GONE, binding.situationTag.visibility) }
+    }
+
+    private fun FragmentDescribePoseBinding.optionTexts(): List<String> =
+        (0 until optionChips.childCount).map { (optionChips.getChildAt(it) as Chip).text.toString() }
+
+    @Test
+    fun theOptions_areTheSituations_andAutosFromAnOlderPhotographer() {
+        val modules = describing()
+        launch()
+        // An older photographer names no situation.
+        onScreen { binding ->
+            assertEquals(Situation.DEFAULT.poseOptions.map { string(it) }, binding.optionTexts())
+        }
+
+        step(modules, DescriptionStep.OPEN, "wave", situation = "landmark")
+
+        onScreen { binding ->
+            assertEquals(Situation.LANDMARK.poseOptions.map { string(it) }, binding.optionTexts())
+        }
+    }
+
+    @Test
+    fun anOption_isSentAtOnce_afterWhatThePhotographerWrote() {
+        val modules = describing()
+        launch()
+
+        onScreen { it.optionChips.getChildAt(0).performClick() }
+        idle()
+
+        val chosen = "wave, " + string(R.string.pose_option_peace_sign)
+        assertEquals(chosen, onScreen { it.descriptionInput.text.toString() })
+        assertEquals(
+            listOf(
+                SessionMessage.PoseDescriptionEdit("d1", holding = true, text = chosen),
+                SessionMessage.PoseDescriptionEdit("d1", holding = false, text = chosen),
+            ),
+            edits(modules),
+        )
+    }
+
+    @Test
+    fun thePhotographersOption_isCheckedHere() {
+        val modules = describing()
+        launch()
+
+        step(modules, DescriptionStep.OPEN, string(R.string.pose_option_arms_up), Role.PHOTOGRAPHER)
+
+        onScreen { binding ->
+            val chips = (0 until binding.optionChips.childCount).map { binding.optionChips.getChildAt(it) as Chip }
+            assertEquals(
+                listOf(string(R.string.pose_option_arms_up)),
+                chips.filter {
+                    it.isChecked
+                }.map { it.text.toString() },
+            )
+            // While they choose, this phone's options wait.
+            assertTrue(chips.none { it.isEnabled })
+        }
+    }
+
+    @Test
+    fun aTapOnThePhoto_showsItLarge() {
+        describing()
+        launch()
+
+        onScreen { it.scenePhotoButton.performClick() }
+        idle()
+
+        scenario!!.onFragment { fragment ->
+            val large = fragment.childFragmentManager.findFragmentByTag(ScenePhotoFragment.TAG) as ScenePhotoFragment
+            val photo = large.requireView().findViewById<ImageView>(R.id.scenePhotoLarge)
+            assertSame(fragment.scenePhoto, (photo.drawable as BitmapDrawable).bitmap)
         }
     }
 
@@ -276,12 +363,12 @@ class SubjectDescribeFragmentTest {
 
         onScreen { binding ->
             binding.clearDescriptionButton.performClick()
-            assertEquals(string(R.string.suggest_poses), binding.generateButton.text.toString())
+            assertEquals(string(R.string.generate_from_description), binding.generateButton.text.toString())
             binding.generateButton.performClick()
         }
         idle()
 
-        // The ✕ goes to the photographer as an edit, as typing would, before the button.
+        // Back to Auto goes to the photographer as an edit, as typing would, before the button.
         assertEquals("", edits(modules).last().text)
         assertEquals(listOf(SessionMessage.PoseDescriptionGo("d1", "", suggest = true)), goes(modules))
     }

@@ -13,4 +13,7 @@
     <dimen name="situation_tile_gap">8dp</dimen>
     <!-- A thumbnail of the photo viewer's strip takes taps on 48 dp (NFR-16, item_photo_thumb). -->
     <dimen name="photo_thumb_touch">48dp</dimen>
+    <!-- Generate poses' description field (FR-4.15): each line of its text, and of the hint that says Auto, so the field
+         is as high with one as with the other. -->
+    <dimen name="description_line_height">20sp</dimen>
 </resources>

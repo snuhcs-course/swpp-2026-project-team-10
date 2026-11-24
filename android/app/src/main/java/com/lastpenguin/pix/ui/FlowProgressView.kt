@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.animation.ValueAnimator
@@ -14,7 +14,7 @@ import com.lastpenguin.pix.R
 
 /**
  * Where a screen is in the pose flow (R&S 6.3, #210): a thin bar under the top bar, filled to the screen's [step] of
- * [STEPS], the scene photo, its review, Generate poses, the set being generated, and Pick a pose. The accent, dimmed,
+ * [STEPS], the scene photo, Generate poses, the set being generated, and Pick a pose. The accent, dimmed,
  * on a dark track, filled from the start edge; [moveTo] moves the fill there in [Motion.MOVE_MS]. Each screen's title
  * already says where it is, so TalkBack skips it.
  * Owner: Pose generation (#210).
@@ -92,7 +92,10 @@ class FlowProgressView @JvmOverloads constructor(context: Context, attrs: Attrib
     }
 
     companion object {
-        /** The screens of the pose flow: the scene photo, its review, Generate poses, generating, and Pick a pose. */
-        const val STEPS = 5
+        /**
+         * The screens of the pose flow: the scene photo, Generate poses, generating, and Pick a pose. Five until the
+         * photo's review went (#296).
+         */
+        const val STEPS = 4
     }
 }

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -18,8 +18,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.text.SpannableStringBuilder
-import android.text.Spanned
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -47,6 +45,7 @@ import androidx.core.view.doOnPreDraw
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
+import androidx.core.widget.ImageViewCompat
 import androidx.core.widget.TextViewCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -884,28 +883,19 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         overlay.setLevel(null)
     }
 
-    /** Back and *Use* of the scene photo step (R&S 6.3, FR-4.1, #199). */
+    /** Back of the scene photo step (R&S 6.3, FR-4.1, #199); the step has no other button since #296. */
     private fun setupScenePhoto(controls: FragmentCameraBinding) {
         controls.sceneBackButton.setOnClickListener { sceneStepBack() }
-        controls.usePhotoButton.setOnClickListener {
-            val navController = findNavController()
-            // Generate poses asks what to pose before anything is sent (FR-4.8), once a person is found (FR-4.13).
-            if (navController.currentDestination?.id == R.id.cameraFragment && generationViewModel.useScene()) {
-                navController.navigate(R.id.action_camera_to_describePose)
-            }
-        }
         // System back does what Back does (R&S 6.9). It is enabled only during this step, so back leaves the app from
         // the plain camera as before.
         sceneBack = requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, enabled = false) {
             sceneStepBack()
         }
-        // The message follows the photo's place, which the room under the bar and the photo's shape decide.
-        controls.sceneReview.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeSceneMessage(controls) }
     }
 
-    /** Back during the scene photo: from the photo's review, the live camera again; from the live camera, the camera. */
+    /** Back during the scene photo: while the photo is checked, the live camera again; from the live camera, the camera. */
     private fun sceneStepBack() {
-        if (generationViewModel.uiState.value.phase == GenerationUiState.Phase.REVIEWING) {
+        if (generationViewModel.uiState.value.phase == GenerationUiState.Phase.CHECKING) {
             generationViewModel.retakeScene()
         } else {
             generationViewModel.cancel()
@@ -913,27 +903,15 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     }
 
     /**
-     * The review's message 12 dp under the photo, which fitCenter puts in the middle of the room under the bar; when
-     * the photo leaves it no room above the screen's 20 dp bottom margin, as with 9:16, it lies over the photo's
-     * bottom, on glass (R&S 6.3, #199).
+     * The scene photo has a person in it: Generate poses asks what to pose, with no step between (#296, FR-4.8). Once,
+     * from this screen; the photo stays held here while that screen comes in and shows it shrinking into its place.
      */
-    private fun placeSceneMessage(controls: FragmentCameraBinding) {
-        val still = controls.sceneStill
-        val message = controls.sceneMessage
-        val photo = still.drawable ?: return
-        if (still.width == 0 || still.height == 0 || photo.intrinsicWidth <= 0 || photo.intrinsicHeight <= 0) return
-        val density = resources.displayMetrics.density
-        val scale = minOf(
-            still.width.toFloat() / photo.intrinsicWidth,
-            still.height.toFloat() / photo.intrinsicHeight,
-        )
-        val photoBottom = still.top + (still.height + photo.intrinsicHeight * scale) / 2
-        val lowest = controls.sceneReview.height - SCENE_MESSAGE_MARGIN_DP * density - message.height
-        val under = photoBottom + SCENE_MESSAGE_GAP_DP * density
-        val top = minOf(under, lowest)
-        message.translationY = top - message.top
-        message.background =
-            if (top < under) AppCompatResources.getDrawable(requireContext(), R.drawable.bg_chip_glass) else null
+    private fun openGeneratePoses(scene: GenerationUiState) {
+        if (scene.phase != GenerationUiState.Phase.DESCRIBING || !scene.sceneArriving) return
+        val navController = findNavController()
+        if (navController.currentDestination?.id == R.id.cameraFragment) {
+            navController.navigate(R.id.action_camera_to_describePose)
+        }
     }
 
     private fun render(state: CameraUiState) {
@@ -987,11 +965,11 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideOverlay.editable = state.guideEditing
         controls.guideOverlay.filled = state.guideEditing
         // Computed once per render: while the scene photo is framed the guide is hidden, so the pinch zooms whatever
-        // the mode says, and while the photo is shown there is no zoom. Flipping it off and on again in one render
+        // the mode says, and while the photo taken is held there is no zoom. Flipping it off and on again in one render
         // would end a pinch in progress, which the detector cannot restart in the same touch stream.
         val scene = generationViewModel.uiState.value
         pinchZoom?.enabled = if (isScenePhotoActive(scene)) {
-            scene.phase != GenerationUiState.Phase.REVIEWING
+            scene.phase == GenerationUiState.Phase.FRAMING
         } else {
             !state.guideEditing
         }
@@ -1162,14 +1140,27 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         )
     }
 
-    /** Whether the scene photo for poses is being framed or reviewed; the top bar is its title then. */
+    /**
+     * Whether the scene photo for poses is being framed, or was just taken and is held; the top bar is its title
+     * then. Held too while Generate poses comes in, so the camera's own controls do not show under that change.
+     */
     private fun isScenePhotoActive(scene: GenerationUiState = generationViewModel.uiState.value): Boolean =
-        scene.phase == GenerationUiState.Phase.REVIEWING || scene.phase == GenerationUiState.Phase.FRAMING
+        scene.phase == GenerationUiState.Phase.FRAMING || isScenePhotoHeld(scene)
 
     /**
-     * The scene photo for poses is taken and confirmed on this screen (R&S 6.3, FR-4.1): the live camera with the
-     * shutter, then the photo with *Use this photo* and *Shoot again*. Applied last, over the camera's own controls,
-     * so that the step shows only what it needs.
+     * Whether the scene photo just taken is held over the preview (#296): while the phone looks for a person in it
+     * (FR-4.13), and, with one, until Generate poses has taken it.
+     */
+    private fun isScenePhotoHeld(scene: GenerationUiState): Boolean =
+        scene.phase == GenerationUiState.Phase.CHECKING ||
+            (scene.phase == GenerationUiState.Phase.DESCRIBING && scene.sceneArriving)
+
+    /**
+     * The scene photo for poses is taken on this screen (R&S 6.3, FR-4.1): the live camera with the shutter, then the
+     * photo held where the preview showed it for the moment the phone looks for a person in it. With one, Generate
+     * poses opens by itself; without one, the camera is live again and the panel above the shutter says so (#296;
+     * until Iteration 5 the photo waited here for *Use*). Applied last, over the camera's own controls, so that the
+     * step shows only what it needs.
      */
     private fun renderScenePhoto(
         controls: FragmentCameraBinding,
@@ -1177,16 +1168,15 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         camera: CameraUiState,
         ready: Boolean,
     ) {
-        val reviewing = scene.phase == GenerationUiState.Phase.REVIEWING
+        val held = isScenePhotoHeld(scene)
         val active = isScenePhotoActive(scene)
         sceneBack?.isEnabled = active
         controls.sceneTitle.isVisible = active
         controls.sceneBackButton.isVisible = active
-        controls.usePhotoButton.isVisible = reviewing
         val session = sessionViewModel.state.value
         val live = session is SessionState.Connected || session is SessionState.Reconnecting
         controls.shootTogetherButton.isVisible = !active && !live
-        // End session too leaves the scene photo's bar to its title and Use, and comes back after the step.
+        // End session too leaves the scene photo's bar to its title, and comes back after the step.
         controls.endSessionButton.isVisible = !active && live
         controls.settingsButton.isVisible = !active
         // Guide and the thumbnail keep their place, so the shutter stays where it is. The camera is the situation's (FR-4.8):
@@ -1194,23 +1184,23 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideButton.isInvisible = active
         controls.galleryButton.isInvisible = active
         if (active) controls.switchCameraButton.isInvisible = true
-        controls.sceneReview.isVisible = reviewing
-        // As the preview showed it, so a photo taken sideways looks as framed while the phone is still held so.
-        val photo = scene.framed.takeIf { reviewing }
+        controls.sceneStill.isVisible = held
+        // As the preview showed it and where it showed it, so the image seems to stop, also for a photo taken sideways.
+        val photo = scene.framed.takeIf { held }
         if (controls.sceneStill.tag !== photo) {
             controls.sceneStill.setImageBitmap(photo)
             controls.sceneStill.tag = photo
         }
-        // The photo is taken: no zoom until it is used or shot again (the pinch's enabled state is set in render).
-        controls.zoomReadout.isInvisible = reviewing
+        // The photo is taken: no zoom until it goes on or is shot again (the pinch's enabled state is set in render).
+        controls.zoomReadout.isInvisible = held
         // The scene photo is a frame of the live preview: a photo's flash and brightness do not apply to it. While the
         // scene is framed, the flash button keeps the phone's light on for it instead (FR-4.1). It says on only once
         // the camera has the light on, so it never claims a light that is not. The ratio is the frame's, so it is
         // chosen here as on Camera (#231), until the photo is taken.
         if (active) {
-            val light = !reviewing && camera.hasFlash
-            controls.cameraSettings.isVisible = !reviewing
-            if (reviewing) {
+            val light = !held && camera.hasFlash
+            controls.cameraSettings.isVisible = !held
+            if (held) {
                 controls.aspectPanel.isVisible = false
                 aspectsBack?.isEnabled = false
             }
@@ -1225,10 +1215,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             controls.editGuideButton.isVisible = false
             controls.tipButtonFrame.isVisible = false
         }
-        // Kept in place under the review, so the bottom panel, which places the preview, keeps its height.
-        controls.captureControls.isInvisible = reviewing
-        // Not before the phone has found a person in the photo (FR-4.13).
-        controls.usePhotoButton.isEnabled = reviewing && !scene.checkingPerson && !scene.noPerson
+        // Kept in place while the photo is held, so the bottom panel, which places the preview, keeps its height.
+        controls.captureControls.isInvisible = held
         // Where the step is in the pose flow, under the camera's own bar, so the image stays where it is (#231). While
         // framing, what to frame and what for, on the panel above the shutter until a touch takes it away, and the
         // shutter in the accent. Starting or ending the step plays as a change (Motion): the title fades in, the
@@ -1237,38 +1225,31 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val changed = before != null && before != active
         sceneShown = active
         controls.sceneProgress.isVisible = active
-        val step = if (reviewing) SCENE_REVIEW_STEP else SCENE_FRAMING_STEP
         when {
-            before == null -> controls.sceneProgress.step = step
+            before == null -> controls.sceneProgress.step = SCENE_STEP
 
             changed && active -> {
                 controls.sceneProgress.step = 0
-                controls.sceneProgress.moveTo(step)
+                controls.sceneProgress.moveTo(SCENE_STEP)
             }
 
-            else -> controls.sceneProgress.moveTo(step)
+            else -> controls.sceneProgress.moveTo(SCENE_STEP)
         }
         if (changed && active) {
             controls.sceneTitle.alpha = 0f
             controls.sceneTitle.fadeTo(1f, Motion.FADE_MS)
         }
-        val framing = active && !reviewing
-        showSceneGuide(controls, scene, shown = framing && scene.sceneHint, animate = before != null)
+        // The panel above the shutter while framing: what to frame (#210), or that the photo just taken had no one in
+        // it (FR-4.13, #296).
+        val framing = active && !held
+        val panel = framing && (scene.sceneHint || scene.noPerson)
+        showSceneGuide(controls, scene, shown = panel, animate = before != null)
         turnShutter(controls, framing, animate = changed)
         if (!active) return
 
-        val noPerson = reviewing && scene.noPerson
-        controls.sceneTitle.setText(
-            when {
-                noPerson -> R.string.scene_no_person_title
-                reviewing -> R.string.scene_review_title
-                else -> R.string.scene_title
-            },
-        )
-        // What to frame is on the panel above the shutter while framing (#210), and under the photo while it is
-        // reviewed is what it is for, or that it has no one in it; the hint chip over the image stays empty.
+        controls.sceneTitle.setText(R.string.scene_title)
+        // The hint chip over the image stays empty: the panel says what there is to say.
         showHint(controls.hintText, null)
-        if (reviewing) showSceneMessage(controls.sceneMessage, noPerson)
         // An earlier guide is not part of the scene photo and would be in the way of framing it.
         controls.guideOverlay.isVisible = false
         controls.guideControls.isVisible = false
@@ -1278,11 +1259,14 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         } else {
             controls.captureStatus.isVisible = false
         }
+        openGeneratePoses(scene)
     }
 
     /**
      * The panel that says what to frame (R&S 6.3): it rises in when the step starts, and fades out when a touch takes
      * it away while the scene is still framed ([GenerationUiState.sceneHint], #231); it goes at once with the step.
+     * After a photo without a person it rises in again with an alert, to say so and that another is needed
+     * ([GenerationUiState.noPerson], FR-4.13, #296), until a touch or the next shot.
      */
     private fun showSceneGuide(
         controls: FragmentCameraBinding,
@@ -1292,7 +1276,20 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     ) {
         val panel = controls.sceneGuide
         if (shown) {
-            controls.sceneGuideText.setText(scene.situation.framingHint)
+            val noPerson = scene.noPerson
+            controls.sceneGuideText.setText(
+                if (noPerson) R.string.scene_no_person_title else scene.situation.framingHint,
+            )
+            controls.sceneGuideNext.setText(if (noPerson) R.string.scene_no_person_body else R.string.scene_guide_next)
+            controls.sceneGuideIcon.setImageResource(
+                if (noPerson) R.drawable.ic_alert_small else R.drawable.ic_lightbulb,
+            )
+            ImageViewCompat.setImageTintList(
+                controls.sceneGuideIcon,
+                ColorStateList.valueOf(
+                    requireContext().getColor(if (noPerson) R.color.pix_danger else R.color.pix_text),
+                ),
+            )
             if (sceneGuideShown == true) return
             sceneGuideShown = true
             sceneGuideFading = false
@@ -1828,37 +1825,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         TextViewCompat.setCompoundDrawableTintList(chip, ColorStateList.valueOf(requireContext().getColor(tint)))
     }
 
-    /**
-     * Under the reviewed scene photo: what it is for, or that it has no one in it (FR-4.13). The alert starts the first
-     * line, so it stays beside the words when they wrap to two centered lines (#204).
-     */
-    private fun showSceneMessage(message: TextView, noPerson: Boolean) {
-        val context = requireContext()
-        message.isInvisible = false
-        message.setTextColor(context.getColor(if (noPerson) R.color.pix_text_soft else R.color.pix_text_muted))
-        if (!noPerson) {
-            message.setText(R.string.scene_review_body)
-            return
-        }
-        val density = resources.displayMetrics.density
-        val size = (CHIP_ICON_DP * density).roundToInt()
-        val alert = AppCompatResources.getDrawable(context, R.drawable.ic_alert_small)?.mutate()
-        alert?.setBounds(0, 0, size, size)
-        alert?.setTint(context.getColor(R.color.pix_danger))
-        // A no-break space under the icon, so a line never ends between the icon and the first word.
-        message.text = SpannableStringBuilder(NO_BREAK_SPACE).apply {
-            if (alert != null) {
-                setSpan(
-                    InlineIconSpan(alert, (SCENE_MESSAGE_ICON_GAP_DP * density).roundToInt()),
-                    0,
-                    length,
-                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
-                )
-            }
-            append(getString(R.string.scene_no_person_body))
-        }
-    }
-
     /** Sets [icon] at the start of [chip], at the size of the top bar's icons, or removes it for 0. */
     private fun setChipIcon(chip: TextView, @DrawableRes icon: Int) {
         val size = (CHIP_ICON_DP * resources.displayMetrics.density).roundToInt()
@@ -1975,20 +1941,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         private const val FOCUS_RING_FADE_MS = 200L
         private const val CHIP_ICON_DP = 14f
 
-        /** The scene photo's review: its message this far under the photo, and above the screen's bottom (#199). */
-        private const val SCENE_MESSAGE_GAP_DP = 12f
-        private const val SCENE_MESSAGE_MARGIN_DP = 20f
-
-        /** The pose flow's step while the scene photo is framed, and while it is reviewed (FlowProgressView, #210). */
-        private const val SCENE_FRAMING_STEP = 1
-        private const val SCENE_REVIEW_STEP = 2
+        /** The pose flow's step while the scene photo is framed, and while the photo taken is held (FlowProgressView, #210). */
+        private const val SCENE_STEP = 1
 
         /** How far below its place the scene photo's panel starts as it rises in (#210). */
         private const val RISE_DP = 12f
 
-        /** The no-person alert before the message's first word (#204). */
-        private const val SCENE_MESSAGE_ICON_GAP_DP = 6f
-        private const val NO_BREAK_SPACE = "\u00A0"
         private const val EXPOSURE_BAR_OVERLAP_DP = 12f
         private const val EXPOSURE_BAR_FADE_MS = 200L
 

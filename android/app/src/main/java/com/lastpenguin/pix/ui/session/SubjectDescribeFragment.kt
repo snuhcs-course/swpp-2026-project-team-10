@@ -1,7 +1,8 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
@@ -18,12 +19,15 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.session.DescriptionEnd
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.generation.DescriptionForm
+import com.lastpenguin.pix.ui.generation.ScenePhotoFragment
+import com.lastpenguin.pix.ui.generation.opensScenePhoto
 import com.lastpenguin.pix.ui.generation.showScene
 import com.lastpenguin.pix.ui.generation.title
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
@@ -34,15 +38,20 @@ import kotlinx.coroutines.launch
 
 /**
  * *Generate poses* on the subject's phone (R&S 6.6, FR-6.15): the photographer's scene photo and description, as on
- * their phone. This phone's field holds the description while it is typed in and the photographer's does not, and
- * says who types otherwise; the one button asks the photographer's phone, which starts the set: suggested poses for a
- * blank field, else poses of the description (Iter3-A13). The screen
+ * their phone, with the situation's options and the photo large at a tap (FR-4.15). This phone's field holds the
+ * description while it is typed in and the photographer's does not, and says who types otherwise; the one button asks
+ * the photographer's phone, which starts the set: suggested poses for a blank field, else poses of the description
+ * (Iter3-A13). The screen
  * closes when the description ends, saying so when the photographer closed it. It covers Subject view, so it follows
  * the session itself, like the guide screens (Design 2.6.5). The first time either phone's Generate poses opens here,
  * its tutorial tips come over it (FR-10.4).
  * Owner: Shared steps (Iter3-P16).
  */
-class SubjectDescribeFragment : Fragment(R.layout.fragment_describe_pose) {
+class SubjectDescribeFragment : Fragment(R.layout.fragment_describe_pose), ScenePhotoFragment.Host {
+
+    /** The photographer's scene photo as this phone got it, for its large view. */
+    override val scenePhoto: Bitmap?
+        get() = viewModel.uiState.value.scene
 
     private val viewModel: SubjectDescribeViewModel by viewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
@@ -63,6 +72,11 @@ class SubjectDescribeFragment : Fragment(R.layout.fragment_describe_pose) {
             onForget = viewModel::forget,
         )
         this.form = form
+        // The photo large, over this screen (FR-4.15); the typing ends first, so the keyboard is not left under it.
+        binding.scenePhotoButton.opensScenePhoto(this) {
+            form.stopTyping()
+            WindowCompat.getInsetsController(requireActivity().window, view).hide(WindowInsetsCompat.Type.ime())
+        }
         // Back leaves the photographer's description as it is; Subject view opens it again.
         binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { backToSubject() }
@@ -119,10 +133,13 @@ class SubjectDescribeFragment : Fragment(R.layout.fragment_describe_pose) {
             return
         }
         binding.sceneImage.showScene(ui.scene)
-        // The situation the photographer's photo was taken for (FR-4.8); none from an older photographer.
-        binding.situationTag.isVisible = ui.situation != null
-        ui.situation?.let { binding.situationTag.setText(it.title) }
-        binding.descriptionError.visibility = if (ui.rejected) View.VISIBLE else View.GONE
+        // The situation the photographer's photo was taken for (FR-4.8); none from an older photographer, nor for
+        // Auto, which the field says. Its options, or Auto's without one (FR-4.15).
+        val named = ui.situation?.takeIf { it != Situation.DEFAULT }
+        binding.situationTag.isVisible = named != null
+        named?.let { binding.situationTag.setText(it.title) }
+        form.showOptions(ui.situation)
+        form.showRefused(ui.rejected)
         val photographer = ui.photographerName
         val theirs = ui.writer == Role.PHOTOGRAPHER
         form.showShared(

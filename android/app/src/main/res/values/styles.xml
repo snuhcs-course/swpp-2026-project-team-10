@@ -49,6 +49,12 @@
         <item name="android:lineSpacingMultiplier">1.08</item>
     </style>
 
+    <!-- "Auto" in Generate poses' empty field (FR-4.15): a value in the accent, as a camera shows a setting left on
+         auto. -->
+    <style name="TextAppearance.Pix.Action.Accent">
+        <item name="android:textColor">@color/pix_accent</item>
+    </style>
+
     <style name="TextAppearance.Pix.Action.Small">
         <item name="android:textSize">14sp</item>
     </style>
@@ -191,6 +197,20 @@
         <item name="android:textColor">@color/button_text_text</item>
         <item name="rippleColor">@color/pix_ripple</item>
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
+    </style>
+
+    <!-- A text button that starts a line of its own at the content's edge, with a small icon before its words, such as
+         Back to Auto under Generate poses' field (FR-4.15): a sentence in the accent, a touch target high. -->
+    <style name="Widget.Pix.Button.Text.Line">
+        <item name="android:minWidth">0dp</item>
+        <item name="android:paddingStart">0dp</item>
+        <item name="android:paddingEnd">8dp</item>
+        <item name="android:textColor">@color/pix_accent</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Label</item>
+        <item name="iconTint">@color/pix_accent</item>
+        <item name="iconSize">16dp</item>
+        <item name="iconPadding">6dp</item>
+        <item name="iconGravity">textStart</item>
     </style>
 
     <!-- A pill over the preview: 44 dp of glass inside a 48 dp touch target. -->
@@ -475,6 +495,21 @@
         <item name="closeIcon">@drawable/ic_close</item>
         <item name="closeIconTint">@color/pix_text_muted</item>
         <item name="closeIconSize">16dp</item>
+    </style>
+
+    <!-- An option of Generate poses (FR-4.15): a tap writes its words into the description, and it is checked, in the
+         accent, while they are there. No check mark: the color says it. -->
+    <style name="Widget.Pix.OptionChip" parent="Widget.Material3.Chip.Filter">
+        <item name="chipBackgroundColor">@color/option_chip_background</item>
+        <item name="chipStrokeColor">@color/option_chip_stroke</item>
+        <item name="chipStrokeWidth">1dp</item>
+        <item name="chipMinHeight">36dp</item>
+        <item name="chipCornerRadius">18dp</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Label</item>
+        <item name="android:textColor">@color/option_chip_text</item>
+        <item name="rippleColor">@color/pix_ripple</item>
+        <item name="checkedIconVisible">false</item>
+        <item name="chipIconVisible">false</item>
     </style>
 
     <style name="Widget.Pix.PoseCard" parent="Widget.Material3.CardView.Outlined">

@@ -174,9 +174,7 @@
     <string name="scene_framing_hint_full_body">Frame the person from head to feet</string>
     <string name="scene_framing_hint_landmark">Frame the whole landmark with the person in it</string>
     <string name="scene_framing_hint_selfie">Frame your face with the place behind you</string>
-    <string name="scene_review_title">Use this photo?</string>
     <string name="scene_guide_next">Pix makes four poses from this photo</string>
-    <string name="scene_review_body">Pix sends this photo to create the poses.</string>
     <string name="shoot_again">Shoot again</string>
     <string name="scene_shot_failed">Couldn\'t take the photo. Try again.</string>
     <string name="scene_no_person_title">No one in this photo</string>
@@ -185,6 +183,36 @@
     <string name="describe_title">Generate poses</string>
     <string name="describe_label">Describe the pose</string>
     <string name="describe_hint">e.g. Leaning on the wall, one hand in a pocket</string>
+    <!-- Generate poses' field while it is empty and left alone (FR-4.15): Auto as its value, what Auto does, the
+         line under it that says to tap it, and the button in a field with text that goes back to Auto. -->
+    <string name="describe_auto">Auto</string>
+    <string name="describe_auto_body">Automatically makes the four poses that suit this photo\'s background best</string>
+    <string name="describe_auto_helper">Tap the field to describe the pose you want</string>
+    <string name="back_to_auto">Back to Auto</string>
+    <!-- The options under the field (FR-4.15): the section, then each option's words. They go into the description as
+         they are, between commas, so none has a comma (PoseOptions). -->
+    <string name="options_label">Common poses</string>
+    <string name="pose_option_peace_sign">Peace sign</string>
+    <string name="pose_option_waving">Waving</string>
+    <string name="pose_option_hand_in_pocket">Hand in pocket</string>
+    <string name="pose_option_arms_crossed">Arms crossed</string>
+    <string name="pose_option_looking_back">Looking back</string>
+    <string name="pose_option_arms_up">Both arms up</string>
+    <string name="pose_option_thumbs_up">Thumbs up</string>
+    <string name="pose_option_walking">Walking</string>
+    <string name="pose_option_cheek_heart">Cheek heart</string>
+    <string name="pose_option_chin_on_hand">Chin on hand</string>
+    <string name="pose_option_hand_through_hair">Hand through hair</string>
+    <string name="pose_option_pointing">Pointing at the landmark</string>
+    <string name="pose_option_arms_wide">Arms wide</string>
+    <string name="pose_option_on_the_palm">Landmark on the palm</string>
+    <string name="pose_option_back_view">Back view</string>
+    <string name="pose_option_looking_far">Looking into the distance</string>
+    <string name="pose_option_walking_away">Walking away</string>
+    <string name="pose_option_sitting_looking">Sitting and looking out</string>
+    <string name="pose_option_wink">Wink</string>
+    <string name="pose_option_chin_in_hands">Chin in both hands</string>
+    <string name="pose_option_finger_on_cheek">Finger on cheek</string>
     <string name="description_counter" translatable="false">%1$d/%2$d</string>
     <string name="description_refused">The last set was refused. Try a different description, or another photo.</string>
     <string name="description_rejected_message">Pix received a harmful prompt.</string>
@@ -196,14 +224,13 @@
     <string name="history_with">With %1$s</string>
     <string name="history_empty_with">Nothing used with %1$s yet</string>
     <string name="history_delete">Remove “%1$s” from the descriptions used before</string>
-    <!-- The one button of Generate poses, at its top right (Iter3-A13, #199): its label with an empty field and with a
-         description; then Pick a pose's Regenerate. -->
-    <string name="suggest_poses">Suggest</string>
+    <!-- The one button of Generate poses, at its top right (Iter3-A13, #199), whatever the field holds (FR-4.15); then
+         Pick a pose's Regenerate. -->
     <string name="generate_from_description">Generate</string>
     <string name="regenerate_poses">Regenerate</string>
-    <string name="clear_description">Clear the description</string>
     <string name="choosing_poses">Choosing poses…</string>
     <string name="scene_photo_description">The photo of the scene the poses are made from</string>
+    <string name="scene_photo_enlarge">View larger</string>
     <string name="creating_pose">Creating…</string>
     <string name="pose_failed">Couldn\'t create</string>
     <string name="ready_count">%1$d of %2$d ready</string>

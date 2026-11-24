@@ -150,24 +150,11 @@
                 android:text="@string/end_session"
                 android:visibility="gone"
                 tools:visibility="visible" />
-
-            <!-- The scene photo's review (R&S 6.3, #199): Generate poses opens, once a person is found (FR-4.13). Its
-                 right edge 20 dp from the screen's, like every screen's action at the top right. -->
-            <Button
-                android:id="@+id/usePhotoButton"
-                style="@style/Widget.Pix.Button.Header.Camera"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="10dp"
-                android:text="@string/use"
-                android:visibility="gone"
-                tools:visibility="visible" />
         </LinearLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- Where the scene photo is in the pose flow (R&S 6.3, #210): 1 of 5 while it is framed, 2 while it is reviewed.
-         Along the top bar's bottom edge, over the image's top and over the review, as under the other screens'
-         titles. -->
+    <!-- Where the scene photo is in the pose flow (R&S 6.3, #210): 1 of 4, also while the photo taken is held (#296).
+         Along the top bar's bottom edge, over the image's top, as under the other screens' titles. -->
     <com.lastpenguin.pix.ui.FlowProgressView
         android:id="@+id/sceneProgress"
         android:layout_width="0dp"
@@ -599,8 +586,10 @@
         </LinearLayout>
 
         <!-- While the scene photo for poses is framed (R&S 6.3, FR-4.8, #210): what to frame for the situation, and what
-             the photo is for, until a touch anywhere takes it away (#231). In the space below the image, or over it
-             when it reaches the controls, so it is see-through like the other panels over the image, and small. -->
+             the photo is for, until a touch anywhere takes it away (#231); after a photo without a person, that no one
+             was in it and that another is needed, with an alert for the bulb (FR-4.13, #296). In the space below the
+             image, or over it when it reaches the controls, so it is see-through like the other panels over the image,
+             and small. -->
         <LinearLayout
             android:id="@+id/sceneGuide"
             android:layout_width="match_parent"
@@ -621,6 +610,7 @@
                 android:background="@drawable/bg_scene_guide_icon">
 
                 <ImageView
+                    android:id="@+id/sceneGuideIcon"
                     android:layout_width="18dp"
                     android:layout_height="18dp"
                     android:layout_gravity="center"
@@ -915,45 +905,22 @@
 
     </LinearLayout>
 
-    <!-- The scene photo that was taken, over the camera, until it is used or Back shoots again (R&S 6.3, #199): in the
-         middle of the room under the top bar, which the bar's last 4 dp of touch height reach over, and what it is for
-         12 dp under it, or over its bottom when the photo leaves no room (placeSceneMessage). -->
-    <FrameLayout
-        android:id="@+id/sceneReview"
+    <!-- The scene photo that was just taken, held exactly over the preview, so the image seems to stop, while the
+         phone looks for a person in it and, with one, until Generate poses has taken it (R&S 6.3, FR-4.13, #296). It
+         fits the preview's place as the frame does, also the square in its 4:3 area. -->
+    <ImageView
+        android:id="@+id/sceneStill"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginTop="-4dp"
-        android:background="@color/camera_bar"
+        android:contentDescription="@string/scene_photo_description"
         android:outlineProvider="none"
+        android:scaleType="fitCenter"
         android:translationZ="2dp"
         android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/topBar">
-
-        <ImageView
-            android:id="@+id/sceneStill"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:contentDescription="@string/scene_photo_description"
-            android:scaleType="fitCenter" />
-
-        <!-- Two lines break evenly, and the no-person alert starts the first one (showSceneMessage, #204). -->
-        <TextView
-            android:id="@+id/sceneMessage"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top|center_horizontal"
-            android:layout_marginHorizontal="20dp"
-            android:accessibilityLiveRegion="polite"
-            android:breakStrategy="balanced"
-            android:gravity="center"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="6dp"
-            android:textAppearance="@style/TextAppearance.Pix.Body.Small"
-            tools:text="@string/scene_review_body" />
-    </FrameLayout>
+        app:layout_constraintBottom_toBottomOf="@id/previewContainer"
+        app:layout_constraintEnd_toEndOf="@id/previewContainer"
+        app:layout_constraintStart_toStartOf="@id/previewContainer"
+        app:layout_constraintTop_toTopOf="@id/previewContainer" />
 
     <!-- In a session, the session's photos (FR-1.6, R&S 6.5), over the whole screen and the camera, which goes on.
          Built in this empty holder when it first opens, so a screen that never opens it builds no pager. -->

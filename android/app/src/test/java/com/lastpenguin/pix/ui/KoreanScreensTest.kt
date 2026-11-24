@@ -85,6 +85,7 @@ import com.lastpenguin.pix.ui.generation.GeneratingFragment
 import com.lastpenguin.pix.ui.generation.GenerationFailedFragment
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.generation.PickPoseFragment
+import com.lastpenguin.pix.ui.generation.ScenePhotoFragment
 import com.lastpenguin.pix.ui.guide.AddGuideSheet
 import com.lastpenguin.pix.ui.guide.LibraryFragment
 import com.lastpenguin.pix.ui.guide.NoPersonFoundFragment
@@ -110,6 +111,7 @@ import com.lastpenguin.pix.ui.settings.PrivacyPolicyFragment
 import com.lastpenguin.pix.ui.settings.SettingsFragment
 import com.lastpenguin.pix.ui.settings.TutorialFragment
 import java.time.Duration
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -234,12 +236,15 @@ class KoreanScreensTest {
     }
 
     @Test
-    fun camera_takingAndReviewingTheScenePhoto_isInKorean() {
-        camera()
+    fun camera_takingTheScenePhoto_andHoldingItWhileItIsChecked_isInKorean() {
+        val modules = camera()
         scenario!!.onFragment { it.requireActivity().viewModel<GenerationViewModel>().beginScene() }
         assertKorean(screen())
 
+        // The photo held while the phone looks for a person in it (#296).
+        modules.persons.gate = CompletableDeferred()
         scenario!!.onFragment { FragmentCameraBinding.bind(it.requireView()).shutterButton.performClick() }
+        idle()
         assertKorean(screen())
     }
 
@@ -439,7 +444,6 @@ class KoreanScreensTest {
         activity.viewModel<GenerationViewModel>().apply {
             beginScene()
             takeScene()
-            useScene()
         }
 
     /** A set of [poses] planned for "손 흔들기", with [events] already in. */
@@ -461,6 +465,37 @@ class KoreanScreensTest {
         generationModules()
         scenario = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }.first
         assertKorean(screen())
+    }
+
+    @Test
+    fun describePoses_withTheFieldTapped_andWithOptionsChosen_isInKorean() {
+        generationModules()
+        scenario = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }.first
+        // Tapped: the example, the counter, and the options (FR-4.15).
+        scenario!!.onFragment { FragmentDescribePoseBinding.bind(it.requireView()).descriptionInput.requestFocus() }
+        idle()
+        assertKorean(screen())
+
+        // Two options in the field, with Back to Auto at its end.
+        scenario!!.onFragment {
+            val options = FragmentDescribePoseBinding.bind(it.requireView()).optionChips
+            options.getChildAt(0).performClick()
+            options.getChildAt(1).performClick()
+        }
+        idle()
+        assertKorean(screen())
+    }
+
+    @Test
+    fun describePoses_withThePhotoLarge_isInKorean() {
+        generationModules()
+        scenario = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) { describing(it) }.first
+        scenario!!.onFragment { FragmentDescribePoseBinding.bind(it.requireView()).scenePhotoButton.performClick() }
+        idle()
+
+        scenario!!.onFragment {
+            assertKorean(checkNotNull(it.childFragmentManager.findFragmentByTag(ScenePhotoFragment.TAG)).requireView())
+        }
     }
 
     @Test

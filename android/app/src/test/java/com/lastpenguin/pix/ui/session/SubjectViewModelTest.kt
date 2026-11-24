@@ -60,7 +60,8 @@ import org.junit.Test
  * turned back) / the front camera (x as seen); a point inside the frame, just outside it, and no number; before the
  * session is connected, in guide-edit mode (which also takes the bar down), and after a drop; a camera with point
  * focus, with a brightness range only, and with neither; the tap's answer awaited, answered by the subject's state and
- * not by the photographer's own or another echo of this phone's, timed out (1 ms before 400 ms / after it), and ended by a drop. The photographer's
+ * not by the photographer's own or another echo of this phone's, timed out (1 ms before 1 s / after it), answered after the photographer's own wait of 500 ms (still taken), and
+ * ended by a drop. The photographer's
  * own focus (`camera.focus`): shown where this phone has that point, on the rear camera's mirror and on the front
  * camera, and a point outside the frame dropped. The bar when the photographer's frame changes: another ratio and
  * another camera take it down, a state of the same frame does not.
@@ -750,13 +751,33 @@ class SubjectViewModelTest {
         }
 
     @Test
+    fun `an answer that the photographer gives only after its own wait is still taken`() = runTest(dispatcher) {
+        connectWithFocus()
+        session.deliver(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 3))
+        runCurrent()
+
+        // The photographer's camera did not report the base, so its phone answers after its 500 ms, and the link adds
+        // its own delay.
+        viewModel.onFocusTap(0.5f, 0.5f)
+        advanceTimeBy(700)
+        assertTrue(viewModel.uiState.value.baseAwaited)
+
+        session.deliver(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 0, focused = true),
+        )
+        runCurrent()
+        assertFalse(viewModel.uiState.value.baseAwaited)
+        assertEquals(0, viewModel.uiState.value.exposure)
+    }
+
+    @Test
     fun `a tap that gets no answer stops waiting after a moment, and at once when the link drops`() =
         runTest(dispatcher) {
             connectWithFocus()
             runCurrent()
 
             viewModel.onFocusTap(0.5f, 0.5f)
-            advanceTimeBy(399)
+            advanceTimeBy(999)
             assertTrue(viewModel.uiState.value.baseAwaited)
             advanceTimeBy(2)
             assertFalse(viewModel.uiState.value.baseAwaited)

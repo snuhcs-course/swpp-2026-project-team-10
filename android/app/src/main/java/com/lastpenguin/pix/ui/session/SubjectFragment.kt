@@ -1023,10 +1023,13 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     /**
      * A tap on the video inside the photographer's image (FR-7.7): their camera is asked to focus there, the box shows
      * where, and the brightness bar comes up beside it (FR-7.3), as a tap on Camera does. False when nothing was asked:
-     * a tap beside the image, or a camera that can do neither.
+     * a tap beside the image, a camera that can do neither, or a video that is not showing.
      */
     private fun onVideoTap(x: Float, y: Float): Boolean {
         val binding = view?.let(FragmentSubjectBinding::bind) ?: return false
+        // Not over a video that is not coming: the photographer's camera is paused or not yet seen, and would drop the
+        // request, so a box here would show a focus that was never set.
+        if (!videoShowing.value) return false
         val ui = viewModel.uiState.value
         val frame = videoFrame(binding, ui)
         if (frame.width <= 0f || x !in frame.left..frame.right || y !in frame.top..frame.bottom) return false

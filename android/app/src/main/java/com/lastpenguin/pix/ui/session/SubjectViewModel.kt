@@ -29,6 +29,7 @@ import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.MirrorReference
 import com.lastpenguin.pix.session.PoseSetEnd
 import com.lastpenguin.pix.session.PoseSyncer
+import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.RemoteVideo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionManager
@@ -791,10 +792,16 @@ class SubjectViewModel(
     private companion object {
         const val SEND_INTERVAL_MS = 50L
 
+        /** What the link may add to an answer's way, both directions together (NFR-7's 0.5 s for a remote action). */
+        const val LINK_ALLOWANCE_MS = 500L
+
         /**
-         * How long a tap to focus waits for its answer: well above the link's delay within NFR-9, and short enough
-         * that a drag begun with the tap still follows the finger when no answer comes (an older photographer).
+         * How long a tap to focus waits for its answer: as long as the photographer's phone itself waits for its
+         * camera before it answers (`RemoteControlHandler.ECHO_TIMEOUT_MS`), and the link's delay on top. Shorter, a
+         * drag would start from the brightness before the tap while the answer was still on its way. An answer comes
+         * in a tenth of a second or two as a rule; only an older photographer, which sends none, makes a drag begun
+         * with the tap wait this long.
          */
-        const val BASE_WAIT_MS = 400L
+        const val BASE_WAIT_MS = RemoteControlHandler.ECHO_TIMEOUT_MS + LINK_ALLOWANCE_MS
     }
 }

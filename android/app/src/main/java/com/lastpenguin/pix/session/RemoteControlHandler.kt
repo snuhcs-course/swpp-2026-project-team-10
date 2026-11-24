@@ -528,22 +528,28 @@ class RemoteControlHandler(
         var answered = false
     }
 
-    private companion object {
-        const val ZOOM_MATCH = 0.01f
+    companion object {
+        /**
+         * How long a final request, or the base of a tap to focus, waits for the camera to report it before it is
+         * answered with the current state. The subject's phone waits longer than this for a tap's answer
+         * (`SubjectViewModel`), so keep the two together.
+         */
+        const val ECHO_TIMEOUT_MS = 500L
+
+        private const val ZOOM_MATCH = 0.01f
 
         // How close the shown zoom must be for a pinch's last value to count as already applied: well inside the lens
         // hold band (CameraZoomPlan.HOLD_BAND), where a held lens shows its edge rather than the pinch's value.
-        const val SHOWN_MATCH = 0.001f
+        private const val SHOWN_MATCH = 0.001f
 
         /** How long a request stays the subject's: long enough for a lens switch or a photo save to finish. */
-        const val PENDING_MS = 5_000L
-        const val ECHO_TIMEOUT_MS = 500L
-        const val FINAL_DELAY_MS = 100L
+        private const val PENDING_MS = 5_000L
+        private const val FINAL_DELAY_MS = 100L
 
         /**
          * How long the subject's pinch keeps the zoom after its last request. A still finger sends nothing, so it is
          * well above the 50 ms between steps; a pinch ended normally frees it at its final value.
          */
-        const val HOLD_TIMEOUT_MS = 2_000L
+        private const val HOLD_TIMEOUT_MS = 2_000L
     }
 }

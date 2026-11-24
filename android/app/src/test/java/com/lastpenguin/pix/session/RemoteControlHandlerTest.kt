@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraStatus
@@ -7,6 +7,7 @@ import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -16,6 +17,16 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/*
+ * The photographer's side of remote control (Design 2.6.5; Testing Documentation 2.1.6), plain JVM on the fakes: the
+ * subject's zoom, brightness, flash, and guide moves applied, clamped, echoed, and reported once, with the cases the
+ * camera does not apply or applies late, and one phone zooming at a time. The tap to focus (FR-7.7, #273), by
+ * partition: a camera that focuses on a point / one with a brightness range only (no focus action); the brightness away
+ * from the base (set again, and its state echoed as the subject's) / at the base already, or no range at all
+ * (answered at once, nothing set); a point inside the frame, at its edges (0 and 1), just outside, and no number; a camera that is not ready; a
+ * drag's request still outstanding, which keeps its own answer. The photographer's own focus (`camera.focus`): told
+ * to the subject while the session runs, and to no one before it starts or after it stops.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemoteControlHandlerTest {
 
@@ -26,6 +37,12 @@ class RemoteControlHandlerTest {
     private val attributions = mutableListOf<Role?>()
     private val handler = RemoteControlHandler(session, camera, guides, attributions::add, clock = { now })
     private val actions = mutableListOf<RemoteAction>()
+
+    /** The photographer's base brightness from Settings, in EV, and a camera that focuses on a point (FR-7.7). */
+    private val baseBrightness = MutableStateFlow(0f)
+    private val focusCamera = FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true)
+    private val focusHandler =
+        RemoteControlHandler(session, focusCamera, guides, clock = { now }, baseBrightness = baseBrightness)
 
     private fun echoes(): List<SessionMessage.CameraStateUpdate> =
         session.sent.filterIsInstance<SessionMessage.CameraStateUpdate>()
@@ -551,6 +568,152 @@ class RemoteControlHandlerTest {
         assertTrue(attributions.isEmpty())
         assertTrue(actions.isEmpty())
         handler.stop()
+    }
+
+    @Test
+    fun `a focus request focuses there, puts the brightness back to the base, and is reported as one action`() =
+        runTest {
+            // +1 EV at 0.5 EV per index is index 2; a drag before the tap left the camera at 3.
+            baseBrightness.value = 1f
+            focusCamera.state.value = focusCamera.state.value.copy(exposure = 3)
+            backgroundScope.launch { focusHandler.actions.collect { actions += it } }
+            focusHandler.start(this)
+            advanceTimeBy(200)
+            runCurrent()
+            session.sent.clear()
+
+            focusHandler.handle(SessionMessage.FocusSet(0.62f, 0.4f))
+            runCurrent()
+
+            assertEquals(listOf(0.62f to 0.4f), focusCamera.focusPoints)
+            assertEquals(listOf(2), focusCamera.exposureRequests)
+            // The tap's answer: the state with the base, as the subject's, and no brightness notice.
+            assertEquals(
+                SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 2),
+                echoes().single(),
+            )
+            assertEquals(listOf<RemoteAction>(RemoteAction.Focus(0.62f, 0.4f)), actions)
+            focusHandler.stop()
+        }
+
+    @Test
+    fun `a focus request at the base brightness already is answered with the unchanged state`() = runTest {
+        backgroundScope.launch { focusHandler.actions.collect { actions += it } }
+        focusHandler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        focusHandler.handle(SessionMessage.FocusSet(0f, 1f))
+        runCurrent()
+
+        assertEquals(listOf(0f to 1f), focusCamera.focusPoints)
+        // The camera will not report a brightness it already has, and the subject's bar waits for where it starts.
+        assertTrue(focusCamera.exposureRequests.isEmpty())
+        assertEquals(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true), echoes().single())
+        assertEquals(listOf<RemoteAction>(RemoteAction.Focus(0f, 1f)), actions)
+        focusHandler.stop()
+    }
+
+    @Test
+    fun `a focus request outside the frame, or while the camera is not ready, changes nothing`() = runTest {
+        focusCamera.state.value = focusCamera.state.value.copy(exposure = 3)
+        backgroundScope.launch { focusHandler.actions.collect { actions += it } }
+        focusHandler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        focusHandler.handle(SessionMessage.FocusSet(1.2f, 0.5f))
+        focusHandler.handle(SessionMessage.FocusSet(0.5f, -0.1f))
+        focusHandler.handle(SessionMessage.FocusSet(Float.NaN, 0.5f))
+        focusCamera.setStatus(CameraStatus.STARTING)
+        focusHandler.handle(SessionMessage.FocusSet(0.5f, 0.5f))
+        runCurrent()
+
+        assertTrue(focusCamera.focusPoints.isEmpty())
+        assertTrue(focusCamera.exposureRequests.isEmpty())
+        assertTrue(echoes().isEmpty())
+        assertTrue(actions.isEmpty())
+        focusHandler.stop()
+    }
+
+    @Test
+    fun `on a camera without point focus the tap only puts the brightness back, and is no focus action`() = runTest {
+        // The class's camera: a brightness range, no point focus. Its handler has the default base, 0 EV.
+        camera.state.value = camera.state.value.copy(exposure = 2)
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        handler.handle(SessionMessage.FocusSet(0.5f, 0.5f))
+        runCurrent()
+
+        assertTrue(camera.focusPoints.isEmpty())
+        assertEquals(listOf(0), camera.exposureRequests)
+        assertEquals(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true), echoes().single())
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
+    fun `on a camera with point focus and no brightness range the tap focuses and is answered at once`() = runTest {
+        val plain = FakeCameraController(supportsFocusPoint = true)
+        val plainHandler = RemoteControlHandler(session, plain, guides, clock = { now })
+        backgroundScope.launch { plainHandler.actions.collect { actions += it } }
+        plainHandler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        plainHandler.handle(SessionMessage.FocusSet(0.5f, 0.5f))
+        runCurrent()
+
+        assertEquals(listOf(0.5f to 0.5f), plain.focusPoints)
+        assertTrue(plain.exposureRequests.isEmpty())
+        assertEquals(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true), echoes().single())
+        assertEquals(listOf<RemoteAction>(RemoteAction.Focus(0.5f, 0.5f)), actions)
+        plainHandler.stop()
+    }
+
+    @Test
+    fun `a focus request leaves a drag's outstanding brightness request to be answered`() = runTest {
+        focusHandler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+        // The camera takes neither the drag's last value nor the base that the tap asks for.
+        focusCamera.applies = false
+
+        focusHandler.handle(SessionMessage.ExposureSet(3, final = true))
+        focusHandler.handle(SessionMessage.FocusSet(0.5f, 0.5f))
+        advanceTimeBy(600)
+        runCurrent()
+
+        assertEquals(listOf(3, 0), focusCamera.exposureRequests)
+        // The subject's bar still learns where the camera is.
+        assertEquals(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true), echoes().single())
+        focusHandler.stop()
+    }
+
+    @Test
+    fun `the photographer's own focus is told to the subject only while the session runs`() = runTest {
+        handler.focusedHere(0.2f, 0.3f)
+        assertTrue(session.sent.isEmpty())
+
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+        handler.focusedHere(0.2f, 0.3f)
+        assertEquals(listOf<SessionMessage>(SessionMessage.Focused(0.2f, 0.3f)), session.sent.toList())
+
+        handler.stop()
+        session.sent.clear()
+        handler.focusedHere(0.5f, 0.5f)
+        assertTrue(session.sent.isEmpty())
     }
 
     @Test

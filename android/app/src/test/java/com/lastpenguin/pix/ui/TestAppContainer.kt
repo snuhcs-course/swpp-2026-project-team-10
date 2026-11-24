@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -212,7 +212,13 @@ class TestAppContainer(
         descriptionSyncer = descriptions,
         photoSyncer = photos,
         tipSyncer = tipSync,
-        remoteControlHandler = RemoteControlHandler(session, camera, guides, attributeGuideChanges = syncer::attribute),
+        remoteControlHandler = RemoteControlHandler(
+            session,
+            camera,
+            guides,
+            attributeGuideChanges = syncer::attribute,
+            baseBrightness = appSettings.baseBrightness,
+        ),
         mobileDataNotice = mobileData,
         appSettings = appSettings,
         appLanguage = language,

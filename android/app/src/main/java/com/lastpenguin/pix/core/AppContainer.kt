@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-23, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -331,6 +331,7 @@ class AppContainer(
                     cameraController,
                     guideRepository,
                     attributeGuideChanges = guideSyncer::attribute,
+                    baseBrightness = appSettings.baseBrightness,
                 ),
                 mobileDataNotice = DataStoreMobileDataNotice(appContext),
                 appSettings = appSettings,

@@ -123,6 +123,7 @@
     <string name="remote_guide_move_notice">%1$s moved the guide</string>
     <string name="remote_guide_notice">%1$s set a pose guide</string>
     <string name="remote_brightness_notice">%1$s set brightness to %2$s</string>
+    <string name="remote_focus_notice">%1$s set the focus</string>
     <string name="remote_flash_on_notice">%1$s turned the flash on</string>
     <string name="remote_flash_off_notice">%1$s turned the flash off</string>
     <string name="remote_flash_auto_notice">%1$s set the flash to auto</string>
@@ -463,7 +464,7 @@
     <string name="subject_title_placeholder">Photographer\'s camera</string>
     <string name="leave">Leave</string>
     <string name="leave_session_title">Leave the session?</string>
-    <string name="subject_video_description">Pinch the video to zoom the photographer\'s camera</string>
+    <string name="subject_video_description">Pinch the video to zoom the photographer\'s camera, or tap it to focus</string>
     <string name="peer_ended_session">%1$s ended the session</string>
     <!-- The same, when the session ended before the photographer's name arrived. -->
     <string name="peer_ended_session_unnamed">The photographer ended the session</string>
@@ -561,7 +562,7 @@
     <string name="help_together_title">Shoot together</string>
     <string name="help_together_body">On Shoot together, choose who takes the photo. Invite a Pix friend or show a code to the person in the photo, and their phone shows your camera live, with the same guide.</string>
     <string name="help_remote_title">From the subject\'s phone</string>
-    <string name="help_remote_body">The person in the photo can zoom, change the brightness and the flash, and move the guide from their own phone. Only the photographer takes the photo.</string>
+    <string name="help_remote_body">The person in the photo can zoom, set the focus, change the brightness and the flash, and move the guide from their own phone. Only the photographer takes the photo.</string>
     <string name="about_title">About Pix</string>
     <string name="about_version">Version</string>
     <string name="about_licenses">Open-source licenses</string>
@@ -586,8 +587,8 @@
     <string name="tutorial_describe">Write the pose you want</string>
     <string name="tutorial_suggest">Leave it empty and AI suggests four</string>
     <string name="tutorial_friend_title">When you\'re the subject</string>
-    <string name="tutorial_friend_zoom">Pinch to zoom the photographer\'s camera</string>
-    <string name="tutorial_friend_brightness">Change the brightness</string>
+    <string name="tutorial_friend_zoom">Tap the zoom button or pinch to zoom the photographer\'s camera</string>
+    <string name="tutorial_friend_focus">Tap to focus, then set the brightness beside it</string>
     <string name="tutorial_friend_move">Move the guide yourself</string>
     <string name="tutorial_friend_guide">Choose a guide from this phone</string>
 </resources>

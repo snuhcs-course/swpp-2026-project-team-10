@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -285,6 +285,24 @@ class CameraControlsViewModelTest {
         model.onFocusTap(0.25f, 0.75f)
 
         assertEquals(listOf(0.25f to 0.75f), camera.focusRequests)
+    }
+
+    @Test
+    fun onFocusTap_tellsWhereItFocused_onlyWhenTheCameraTookThePoint() = runTest(dispatcher) {
+        val told = mutableListOf<Pair<Float, Float>>()
+        model = CameraViewModel(camera, guides, settings, onFocused = { x, y -> told += x to y })
+        store.put("camera", model)
+        runCurrent()
+
+        model.onFocusTap(0.25f, 0.75f)
+        assertEquals(listOf(0.25f to 0.75f), told)
+
+        // Outside the frame, and on a camera that cannot focus on a point: nothing focused, so nothing told.
+        model.onFocusTap(1.2f, 0.5f)
+        camera.capabilities.value = capabilities(supportsFocusPoint = false)
+        runCurrent()
+        model.onFocusTap(0.5f, 0.5f)
+        assertEquals(1, told.size)
     }
 
     @Test

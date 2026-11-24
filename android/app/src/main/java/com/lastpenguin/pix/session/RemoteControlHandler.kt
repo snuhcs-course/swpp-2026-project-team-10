@@ -1,9 +1,10 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.baseExposureIndex
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.session.protocol.SessionMessage
@@ -12,7 +13,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -32,6 +35,9 @@ sealed interface RemoteAction {
     data class Brightness(val index: Int) : RemoteAction
 
     data class Flash(val mode: FlashMode) : RemoteAction
+
+    /** The subject's tap set the focus at [x], [y] of the photographer's frame, 0..1 (FR-7.7). */
+    data class Focus(val x: Float, val y: Float) : RemoteAction
 }
 
 /**
@@ -62,6 +68,15 @@ sealed interface RemoteAction {
  * a change of exposure, flash, aspect ratio, or the camera in use (#201), from either phone, is sent as soon as the
  * camera reports it, attributed to the subject when it matches the subject's pending request.
  *
+ * **Focus (It 5, FR-7.7).** `camera.focus.set` is the subject's tap, in fractions of the photographer's frame as the
+ * photographer's preview shows it. It does what a tap on Camera does (FR-1.4): the camera focuses and meters there
+ * when it can focus on a point, and the brightness goes back to the photographer's base ([baseBrightness], FR-1.11).
+ * The point has no echo, since focus has no lasting state. The tap is answered with the `camera.state` that carries
+ * the base, as the subject's, so the subject's bar knows where a drag starts from: at once when the camera has the
+ * base already, and otherwise when the camera reports it. It makes no brightness notice. A point outside the frame is
+ * dropped, and so is a tap while the camera is not ready, as on Camera. The photographer's own tap goes the other
+ * way as `camera.focus` ([focusedHere]), so the subject's phone shows the focus box too.
+ *
  * **Guide moves (It 2, FR-7.2).** `guide.move` carries the center and height the subject asks for, in frame
  * coordinates; [guides] clamps it with the limits of the photographer's frame and publishes the change, which
  * `GuideSyncer` echoes as `guide.state`; [attributeGuideChanges] tells the syncer that those changes are the
@@ -78,6 +93,8 @@ class RemoteControlHandler(
     private val clock: () -> Long = System::currentTimeMillis,
     /** Who holds the zoom; `CameraViewModel` takes it for the photographer's own pinch. */
     val zoomHold: ZoomHold = ZoomHold(),
+    /** The photographer's base brightness from Settings, in EV (FR-1.11), which a remote tap to focus sets again. */
+    private val baseBrightness: StateFlow<Float> = MutableStateFlow(0f),
 ) {
     private val _actions = MutableSharedFlow<RemoteAction>(extraBufferCapacity = 16)
 
@@ -100,6 +117,10 @@ class RemoteControlHandler(
     private var zoomSettled = true
     private var pendingExposure: PendingValue<Int>? = null
     private var pendingFlash: PendingValue<FlashMode>? = null
+
+    // The base brightness a tap to focus asked for, until the camera reports it: its echo is the subject's, without
+    // the notice of a brightness the subject chose.
+    private var pendingBase: PendingValue<Int>? = null
 
     /** Echoes every applied zoom while [scope] is active, starting with the current one. */
     fun start(scope: CoroutineScope) {
@@ -145,7 +166,18 @@ class RemoteControlHandler(
         pending = null
         pendingExposure = null
         pendingFlash = null
+        pendingBase = null
         scope = null
+    }
+
+    /**
+     * The photographer's own tap focused at [x], [y] of the frame (FR-7.7): the subject's phone shows the focus box
+     * there too. Only while a session runs; the brightness that the tap put back goes as `camera.state`.
+     */
+    fun focusedHere(x: Float, y: Float) {
+        if (scope == null) return
+        session.send(SessionMessage.Focused(x, y))
+        Timings.mark("focus.told", "$x $y")
     }
 
     /** Handles the subject's requests; other messages are ignored. */
@@ -154,6 +186,7 @@ class RemoteControlHandler(
             is SessionMessage.ZoomSet -> if (message.cancel) handleZoomCancel() else handleZoom(message)
             is SessionMessage.ExposureSet -> handleExposure(message)
             is SessionMessage.FlashSet -> handleFlash(message)
+            is SessionMessage.FocusSet -> handleFocus(message)
             is SessionMessage.GuideMove -> handleGuideMove(message)
             else -> Unit
         }
@@ -330,6 +363,33 @@ class RemoteControlHandler(
         }
     }
 
+    /**
+     * `camera.focus.set`: camera.setFocusPoint where the camera takes a point, and the base brightness again. Only a
+     * point the camera took is an action: without point focus the tap is only where the brightness bar comes up.
+     */
+    private fun handleFocus(request: SessionMessage.FocusSet) {
+        val (x, y) = request
+        Timings.mark("focus.received", "$x $y")
+        if (!x.isFinite() || !y.isFinite() || x !in 0f..1f || y !in 0f..1f) return
+        if (camera.status.value != CameraStatus.READY) return
+        val caps = camera.capabilities.value ?: return
+        // The subject's phone asks only of a camera that focuses on a point or has a brightness range.
+        if (!caps.supportsFocusPoint && caps.baseExposureIndex(baseBrightness.value) == null) return
+        if (caps.supportsFocusPoint) camera.setFocusPoint(x, y)
+        val base = caps.baseExposureIndex(baseBrightness.value)
+        if (base == null || (pendingExposure == null && camera.state.value.exposure == base)) {
+            // No brightness to set, or already there with nothing outstanding, so the camera will not emit again:
+            // answered now.
+            send(camera.zoom.value, Role.SUBJECT, final = true)
+        } else {
+            // A drag's request still outstanding is left alone: its answer or its late application still tells the
+            // subject where the camera is.
+            pendingBase = PendingValue(base, clock(), final = true)
+            camera.setExposure(base)
+        }
+        if (caps.supportsFocusPoint) confirm(RemoteAction.Focus(x, y), "focus.applied", "$x $y")
+    }
+
     /** `guide.move`: the photographer's repository clamps and applies it; GuideSyncer echoes the result. */
     private fun handleGuideMove(request: SessionMessage.GuideMove) {
         Timings.mark(
@@ -394,8 +454,8 @@ class RemoteControlHandler(
 
     /**
      * Exposure, flash, ratio, or the camera in use changed. A change that matches the subject's pending request is the
-     * subject's and gets its notice (brightness only for the slider's final value); a step of the subject's slider
-     * is echoed as a step, everything else as a final state.
+     * subject's and gets its notice (brightness only for the bar's final value, and none for the base that a tap to
+     * focus set); a step of the subject's bar is echoed as a step, everything else as a final state.
      */
     private fun onSettingsApplied(exposure: Int, flash: FlashMode) {
         val now = clock()
@@ -411,7 +471,9 @@ class RemoteControlHandler(
             flashTimeoutJob?.cancel()
             confirm(RemoteAction.Flash(flash), "flash.applied", "$flash")
         }
-        val bySubject = exposureRequest != null || flashRequest != null
+        val baseRequest = pendingBase?.takeIf { it.value == exposure && now - it.at <= PENDING_MS }
+        if (baseRequest != null) pendingBase = null
+        val bySubject = exposureRequest != null || flashRequest != null || baseRequest != null
         send(camera.zoom.value, if (bySubject) Role.SUBJECT else Role.PHOTOGRAPHER, exposureRequest?.final ?: true)
     }
 

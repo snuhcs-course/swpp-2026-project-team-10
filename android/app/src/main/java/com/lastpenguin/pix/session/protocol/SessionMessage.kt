@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -419,10 +419,23 @@ sealed interface SessionMessage {
     @SerialName("camera.flash.set")
     data class FlashSet(val mode: FlashMode) : SessionMessage
 
-    /** The subject's focus point in frame coordinates (FR-7.7, Could). No echo: focus has no lasting state. */
+    /**
+     * The subject's tap to focus, in fractions of the photographer's frame as the photographer's preview shows it
+     * (FR-7.7). The point has no echo, since focus has no lasting state; the answer is the `camera.state` with the
+     * brightness the tap put back.
+     */
     @Serializable
     @SerialName("camera.focus.set")
     data class FocusSet(val x: Float, val y: Float) : SessionMessage
+
+    /**
+     * P→S: where the photographer's own tap focused, in fractions of the photographer's frame as its preview shows
+     * it (FR-7.7, #273), so the subject sees the focus box too. Not kept: a phone that connects later gets none, and
+     * an older subject ignores the type.
+     */
+    @Serializable
+    @SerialName("camera.focus")
+    data class Focused(val x: Float, val y: Float) : SessionMessage
 
     /** Whether the photographer allows remote control (FR-7.5, Could). */
     @Serializable

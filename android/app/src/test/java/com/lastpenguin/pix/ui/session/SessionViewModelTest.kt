@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-23, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.net.Uri
@@ -88,6 +88,9 @@ import org.junit.runner.RunWith
  * The guide (#268, Design 2.5.1, 2.6.7): after a reconnect the photographer sends one changed while the link was down,
  * whatever the session's first `hello` named; in another session it goes by that session's `hello`; the subject's
  * copy stays through a reconnect and goes when the session ends.
+ * The subject's tap to focus (FR-7.7, FR-7.4): its box at every tap; its notice at the first tap, not at a tap while
+ * the notice shows or in the quiet time after it (just before its end / at its end), again at the first tap of the
+ * next session, and not again after a reconnect within that time.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 // Robolectric for ProcessLifecycleOwner, which the ViewModel observes for the background limit.
@@ -512,6 +515,97 @@ class SessionViewModelTest {
         runCurrent()
 
         assertEquals(listOf(SessionNotice.RemoteGuide("Joonhyung")), notices)
+    }
+
+    /** A ViewModel on a camera that focuses on a point, whose time is [clock]. */
+    private fun withPointFocus(clock: () -> Long): SessionViewModel {
+        val focusCamera = FakeCameraController(supportsFocusPoint = true)
+        val syncer = GuideSyncer(
+            session,
+            InMemoryGuideRepository(),
+            InMemoryGuideRepository(),
+            codec,
+            FakeGuideReferenceCodec(),
+            MirrorReference(),
+            dispatcher,
+        )
+        return SessionViewModel(
+            session,
+            focusCamera,
+            syncer,
+            RemoteControlHandler(session, focusCamera, InMemoryGuideRepository()),
+            mobileData,
+            invitations,
+            clock = clock,
+        ).also { store.put("focus", it) }
+    }
+
+    @Test
+    fun theSubjectsFocus_showsItsBoxAtEveryTap_andItsNoticeOnlyOnceInAWhile() = runTest(dispatcher) {
+        var now = 10_000L
+        val focusModel = withPointFocus { now }
+        val notices = mutableListOf<SessionNotice>()
+        val boxes = mutableListOf<RemoteFocus>()
+        backgroundScope.launch { focusModel.notices.collect { notices += it } }
+        backgroundScope.launch { focusModel.remoteFocus.collect { boxes += it } }
+        session.setState(SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        runCurrent()
+
+        session.deliver(SessionMessage.FocusSet(0.3f, 0.4f))
+        runCurrent()
+        assertEquals(listOf(SessionNotice.RemoteFocus("Joonhyung")), notices)
+
+        // While the notice shows, and at the last moment of the quiet time after it.
+        now += 1_000
+        session.deliver(SessionMessage.FocusSet(0.5f, 0.5f))
+        runCurrent()
+        now = 10_000L + SessionViewModel.FOCUS_NOTICE_MS + SessionViewModel.FOCUS_NOTICE_QUIET_MS - 1
+        session.deliver(SessionMessage.FocusSet(0.6f, 0.6f))
+        runCurrent()
+        assertEquals(listOf(RemoteFocus(0.3f, 0.4f), RemoteFocus(0.5f, 0.5f), RemoteFocus(0.6f, 0.6f)), boxes)
+        assertEquals(1, notices.size)
+
+        now += 1
+        session.deliver(SessionMessage.FocusSet(0.7f, 0.7f))
+        runCurrent()
+        assertEquals(4, boxes.size)
+        assertEquals(List(2) { SessionNotice.RemoteFocus("Joonhyung") }, notices)
+    }
+
+    @Test
+    fun theFocusNotice_comesAgainInTheNextSession_butNotAfterAReconnect() = runTest(dispatcher) {
+        var now = 10_000L
+        val focusModel = withPointFocus { now }
+        val notices = mutableListOf<SessionNotice>()
+        backgroundScope.launch { focusModel.notices.collect { notices += it } }
+        val connected = SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER)
+        session.setState(connected)
+        runCurrent()
+        session.deliver(SessionMessage.FocusSet(0.3f, 0.4f))
+        runCurrent()
+
+        // A short drop within the quiet time: the same session, so no second notice.
+        session.setState(SessionState.Reconnecting("s_1", 0L))
+        runCurrent()
+        session.setState(connected)
+        runCurrent()
+        now += 500
+        session.deliver(SessionMessage.FocusSet(0.5f, 0.5f))
+        runCurrent()
+        assertEquals(1, notices.size)
+
+        // Another session, still within that time.
+        session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        runCurrent()
+        session.setState(SessionState.Connected("s_2", PeerInfo("Sungmin"), Role.PHOTOGRAPHER))
+        runCurrent()
+        now += 500
+        session.deliver(SessionMessage.FocusSet(0.5f, 0.5f))
+        runCurrent()
+        assertEquals(
+            listOf(SessionNotice.RemoteFocus("Joonhyung"), SessionNotice.RemoteFocus("Sungmin")),
+            notices.filterIsInstance<SessionNotice.RemoteFocus>(),
+        )
     }
 
     @Test

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -42,10 +42,15 @@ import com.lastpenguin.pix.ui.camera.ReferenceCorner
 import com.lastpenguin.pix.ui.camera.ReferenceDrop
 import com.lastpenguin.pix.ui.camera.ToggleLabel
 import com.lastpenguin.pix.ui.camera.toggleSaved
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
@@ -93,8 +98,15 @@ data class SubjectUiState(
     val exposureStep: Float = 0f,
     /** The brightness to show: the slider's value during a drag, until the photographer echoes the applied one. */
     val exposure: Int = 0,
-    /** Whether the brightness slider is open above the readout. */
+    /** Whether the brightness bar is up, beside where this phone tapped the video (FR-7.3). */
     val brightnessOpen: Boolean = false,
+    /** Whether the photographer's camera focuses on a point, from `camera.capabilities`: a tap shows the box then. */
+    val supportsFocusPoint: Boolean = false,
+    /**
+     * A tap to focus is not answered yet, so the brightness the photographer's camera went back to is not known. A
+     * drag that began with that tap waits for it, so that it starts from there as on Camera (FR-1.11).
+     */
+    val baseAwaited: Boolean = false,
     /** False hides the flash button (FR-7.3). */
     val hasFlash: Boolean = false,
     /** The flash to show: the tapped mode, until the photographer echoes the applied one. */
@@ -158,6 +170,13 @@ data class SubjectUiState(
     /** Whether the photographer's camera has a brightness range to set (FR-7.3). */
     val hasBrightness: Boolean
         get() = exposureRange.first < exposureRange.last
+
+    /**
+     * Whether a tap on the video does something (FR-7.7): the camera focuses on a point or has a brightness to put
+     * back, as on Camera, and the touch is not the guide's.
+     */
+    val canFocus: Boolean
+        get() = connected && !guideEditing && (supportsFocusPoint || hasBrightness)
 }
 
 /**
@@ -209,6 +228,14 @@ class SubjectViewModel(
     /** One per photo the viewer could not delete, for its notice; kept until the screen reads it. */
     val photoNotDeleted: Flow<Unit> = _photoNotDeleted.receiveAsFlow()
 
+    private val _photographerFocus = MutableSharedFlow<RemoteFocus>(extraBufferCapacity = 16)
+
+    /**
+     * Each of the photographer's own taps to focus (`camera.focus`, FR-7.7), for the box on the video: where this phone
+     * shows that point, so turned to the mirror for the rear camera.
+     */
+    val photographerFocus: SharedFlow<RemoteFocus> = _photographerFocus.asSharedFlow()
+
     private val _toggleLabels = Channel<ToggleLabel>(Channel.CONFLATED)
 
     /** One label per zoom step, as on the Camera screen (Design 2.8); the newest replaces one not yet shown. */
@@ -251,6 +278,10 @@ class SubjectViewModel(
         session.send(SessionMessage.ExposureSet(index, final))
         Timings.mark("exposure.sent", "$index${if (final) " final" else ""}")
     }
+
+    // Runs while a tap to focus waits for its answer (SubjectUiState.baseAwaited).
+    private var baseWait: Job? = null
+
     private val guideSender = StepSender<GuideState>(viewModelScope, SEND_INTERVAL_MS) { state, final ->
         val guideId = state.guideId ?: return@StepSender
         session.send(SessionMessage.GuideMove(guideId, state.cx, state.cy, state.height, final))
@@ -293,6 +324,8 @@ class SubjectViewModel(
                     it.copy(
                         connected = connected != null,
                         photographerName = connected?.peer?.displayName ?: it.photographerName,
+                        // The bar is for a camera that can be reached.
+                        brightnessOpen = it.brightnessOpen && connected != null,
                     )
                 }
             }
@@ -308,6 +341,7 @@ class SubjectViewModel(
                         exposureRange = range,
                         exposureStep = caps?.exposureStep ?: 0f,
                         brightnessOpen = it.brightnessOpen && range.first < range.last,
+                        supportsFocusPoint = caps?.supportsFocusPoint ?: false,
                         hasFlash = caps?.hasFlash ?: false,
                     )
                 }
@@ -319,8 +353,18 @@ class SubjectViewModel(
         viewModelScope.launch { session.peerZoomHolder.collect { onZoomHolder(it) } }
         viewModelScope.launch {
             session.incoming.collect { message ->
+                if (message is SessionMessage.Focused) {
+                    // The photographer's own tap, in their frame: on the rear camera's mirror it is at 1 − x here.
+                    val (x, y) = message
+                    if (x.isFinite() && y.isFinite() && x in 0f..1f && y in 0f..1f) {
+                        _photographerFocus.tryEmit(RemoteFocus(if (_uiState.value.mirrored) 1f - x else x, y))
+                    }
+                    return@collect
+                }
                 if (message !is SessionMessage.CameraStateUpdate) return@collect
-                // While a pinch or the slider is moving its own steps rule the display; the echo wins once it ends.
+                // The subject's state after a tap to focus is its answer, with the brightness the camera went back to.
+                if (message.by == Role.SUBJECT) endBaseWait()
+                // While a pinch or the bar is moving its own steps rule the display; the echo wins once it ends.
                 _uiState.update {
                     it.copy(
                         zoom = shownZoom(message.zoom, message.by, shown = it.zoom),
@@ -541,7 +585,11 @@ class SubjectViewModel(
 
     /** The guide-edit mode toggle; there is no mode without a visible guide. */
     fun setGuideEditing(on: Boolean) {
-        _uiState.update { it.copy(guideEditing = on && it.guide != null && it.guideState.visible) }
+        _uiState.update {
+            val editing = on && it.guide != null && it.guideState.visible
+            // The video's touches are the guide's then, so the bar that a tap brought goes (FR-7.7).
+            it.copy(guideEditing = editing, brightnessOpen = it.brightnessOpen && !editing)
+        }
         if (!on) guideSender.cancel()
     }
 
@@ -669,6 +717,37 @@ class SubjectViewModel(
         if (final) exposureSender.finish(clamped) else exposureSender.step(clamped)
     }
 
+    /**
+     * A tap on the video at [x], [y] of the frame as this phone shows it, 0..1 (FR-7.7): asks the photographer's
+     * camera to focus there, which also puts its brightness back to the photographer's base, as a tap on Camera does.
+     * The rear camera's video is a mirror here, so x is turned back to the photographer's frame; the front camera's
+     * is mirrored on both phones. False when nothing was asked ([SubjectUiState.canFocus], a point outside the frame).
+     */
+    fun onFocusTap(x: Float, y: Float): Boolean {
+        val ui = _uiState.value
+        if (!ui.canFocus) return false
+        if (!x.isFinite() || !y.isFinite() || x !in 0f..1f || y !in 0f..1f) return false
+        val framed = if (ui.mirrored) 1f - x else x
+        session.send(SessionMessage.FocusSet(framed, y))
+        Timings.mark("focus.sent", "$framed $y")
+        // The answer is the `camera.state` with the base; a photographer that sends none is not waited for long.
+        baseWait?.cancel()
+        _uiState.update { it.copy(baseAwaited = true) }
+        baseWait = viewModelScope.launch {
+            delay(BASE_WAIT_MS)
+            baseWait = null
+            _uiState.update { it.copy(baseAwaited = false) }
+        }
+        return true
+    }
+
+    /** The tap's answer came, or nothing waits for it any longer. */
+    private fun endBaseWait() {
+        baseWait?.cancel()
+        baseWait = null
+        _uiState.update { it.copy(baseAwaited = false) }
+    }
+
     fun setBrightnessOpen(open: Boolean) {
         _uiState.update { it.copy(brightnessOpen = open && it.hasBrightness) }
     }
@@ -688,6 +767,7 @@ class SubjectViewModel(
     }
 
     private fun endInteractions() {
+        endBaseWait()
         pendingZoomStep = null
         zoomHeldBack = false
         zoomSender.cancel()
@@ -697,5 +777,11 @@ class SubjectViewModel(
 
     private companion object {
         const val SEND_INTERVAL_MS = 50L
+
+        /**
+         * How long a tap to focus waits for its answer: well above the link's delay within NFR-9, and short enough
+         * that a drag begun with the tap still follows the finger when no answer comes (an older photographer).
+         */
+        const val BASE_WAIT_MS = 400L
     }
 }

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.settings
 
 import android.app.Dialog
@@ -157,8 +157,25 @@ private fun guideOn(@IdRes overlay: Int): (View) -> Rect? = { root ->
     }
 }
 
-/** The touch point's size on the guide. */
+/**
+ * A touch point on the view [id], [x] of the way across it and [y] of the way down, while it shows: where to tap a
+ * view that is no control, as the video that a tap focuses (FR-7.7).
+ */
+private fun pointOn(@IdRes id: Int, x: Float, y: Float): (View) -> Rect? = { root ->
+    root.findViewById<View>(id)?.let(::boundsOnScreen)?.let { box ->
+        val half = (TOUCH_POINT_DP * root.resources.displayMetrics.density / 2).toInt()
+        val atX = box.left + (box.width() * x).toInt()
+        val atY = box.top + (box.height() * y).toInt()
+        Rect(atX - half, atY - half, atX + half, atY + half)
+    }
+}
+
+/** The touch point's size on the guide and on the video. */
 private const val TOUCH_POINT_DP = 56
+
+/** Where Subject view's focus tip points on the video: its middle, a third of the way down. */
+private const val FOCUS_TIP_X = 0.5f
+private const val FOCUS_TIP_Y = 0.33f
 
 /** The tips of each screen (FR-10.4), in the order they are placed: a caption placed first keeps the nearest place. */
 internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
@@ -238,10 +255,12 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
             // Guide is at the left, as on Camera, so its caption takes the empty middle.
             TutorialTip(R.string.tutorial_friend_guide, CaptionSide.END, locate = control(R.id.guideButtonIcon)),
             TutorialTip(R.string.tutorial_friend_zoom, CaptionSide.ABOVE, locate = control(R.id.zoomReadout)),
+            // No button: a tap on the video focuses, and the brightness comes up beside it (#273). In the video's
+            // upper half, clear of the row's captions.
             TutorialTip(
-                R.string.tutorial_friend_brightness,
-                CaptionSide.ABOVE,
-                locate = control(R.id.brightnessButton),
+                R.string.tutorial_friend_focus,
+                CaptionSide.BELOW,
+                locate = pointOn(R.id.videoContainer, FOCUS_TIP_X, FOCUS_TIP_Y),
             ),
             TutorialTip(R.string.tutorial_friend_move, CaptionSide.ABOVE, locate = control(R.id.editGuideButton)),
         ),

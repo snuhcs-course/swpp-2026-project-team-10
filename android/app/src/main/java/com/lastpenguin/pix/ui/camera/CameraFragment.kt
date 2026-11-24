@@ -8,7 +8,6 @@ import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Matrix
-import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.RenderEffect
 import android.graphics.Shader
@@ -77,6 +76,7 @@ import com.lastpenguin.pix.ui.fadeTo
 import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.generation.framingHint
+import com.lastpenguin.pix.ui.session.RemoteFocus
 import com.lastpenguin.pix.ui.session.SessionNotice
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
@@ -123,14 +123,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var toggleLabelJob: Job? = null
     private var pinchModeJob: Job? = null
 
-    // Where the brightness bar stands beside: the last tap to focus, or the middle of the image (null), and when it
-    // goes again without a touch (FR-1.11, Design 2.8).
-    private var brightnessAnchor: PointF? = null
-    private var brightnessIdleJob: Job? = null
-    private var exposureBarHiding = false
-
-    /** The focus box is beside the brightness bar, so it stays as long as the bar does and goes with it (Design 2.8). */
-    private var focusRingWithBar = false
+    // The focus box and the brightness bar beside it, as Subject view has them too (FR-1.4, FR-1.11, Design 2.8).
+    private var focusBrightness: FocusBrightness? = null
 
     // The last frame stays on screen through a ratio change or a lens switch, until the rebound preview streams
     // again (NFR-19, Design 2.6.2, 2.6.5).
@@ -264,8 +258,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // a finger is on it.
         controls.exposureBar.describe = ::formatEv
         controls.exposureBar.onChange = { index, _ -> viewModel.onExposureChange(index) }
-        controls.exposureBar.onTouching =
-            { touching -> if (touching) brightnessIdleJob?.cancel() else holdBrightness() }
+        focusBrightness = FocusBrightness(controls.focusRing, controls.exposureBar, viewLifecycleOwner.lifecycleScope) {
+            viewModel.setBrightnessOpen(false)
+        }
         // While the scene photo is taken, the flash button turns the phone's light on and off instead (FR-4.1).
         controls.flashButton.setOnClickListener {
             if (isScenePhotoActive()) generationViewModel.toggleLight() else viewModel.onFlashTap()
@@ -479,14 +474,21 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                             )
 
                             is SessionNotice.RemoteGuide -> getString(R.string.remote_guide_notice, notice.name)
+
+                            is SessionNotice.RemoteFocus -> getString(R.string.remote_focus_notice, notice.name)
                         }
-                        if (notice is SessionNotice.PeerGone) {
-                            peerGoneNotice = showNotice(controls, text, CameraViewModel.PEER_GONE_NOTICE_MS)
-                        } else {
-                            showNotice(controls, text)
+                        when (notice) {
+                            is SessionNotice.PeerGone ->
+                                peerGoneNotice = showNotice(controls, text, CameraViewModel.PEER_GONE_NOTICE_MS)
+
+                            // The focus box says the same, so its line is short (FR-7.7).
+                            is SessionNotice.RemoteFocus -> showNotice(controls, text, SessionViewModel.FOCUS_NOTICE_MS)
+
+                            else -> showNotice(controls, text)
                         }
                     }
                 }
+                launch { sessionViewModel.remoteFocus.collect { showRemoteFocus(controls, it) } }
                 launch {
                     sessionViewModel.photosNotSent.collect { notSent ->
                         val text = if (notSent.count == 1) {
@@ -569,7 +571,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
         render(viewModel.uiState.value)
         // A bar left up when the screen was made again still goes after a few seconds.
-        if (viewModel.uiState.value.brightnessOpen) holdBrightness()
+        if (viewModel.uiState.value.brightnessOpen) focusBrightness?.hold()
     }
 
     override fun onResume() {
@@ -606,10 +608,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         opacitySlider = null
         turningIcons?.stop()
         turningIcons = null
-        binding?.exposureBar?.finishDrag()
-        brightnessAnchor = null
-        exposureBarHiding = false
-        focusRingWithBar = false
+        focusBrightness?.clear()
+        focusBrightness = null
         move?.let {
             move = null
             it.cancel()
@@ -1195,7 +1195,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             controls.flashButton.setIconResource(if (camera.torch) R.drawable.ic_flash_on else R.drawable.ic_flash_off)
             controls.flashButton.contentDescription =
                 getString(if (camera.torch) R.string.scene_light_on else R.string.scene_light_off)
-            showExposureBar(controls, false)
+            focusBrightness?.show(false)
         }
         if (active) {
             controls.editGuideButton.isVisible = false
@@ -1396,73 +1396,14 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val range = state.exposureRange
         val hasBrightness = range.first < range.last
         controls.exposureBar.render(range, state.exposureStep, state.exposure, enabled = ready && hasBrightness)
-        placeExposureBar(controls, state)
-        showExposureBar(controls, state.brightnessOpen && hasBrightness)
+        focusBrightness?.place(imageFrame(controls, state))
+        focusBrightness?.show(state.brightnessOpen && hasBrightness)
     }
 
-    /**
-     * The brightness bar beside the focus box (Design 2.8): on its right, or its left near the image's right edge, and
-     * inside the image; at the middle of the image's right edge without a tap to focus.
-     */
-    private fun placeExposureBar(controls: FragmentCameraBinding, state: CameraUiState) {
-        val bar = controls.exposureBar
+    /** The camera's image in the preview, in the chosen ratio (AD-10). */
+    private fun imageFrame(controls: FragmentCameraBinding, state: CameraUiState): ViewfinderFrame {
         val preview = controls.previewView
-        val frame = fitViewfinderFrame(preview.width.toFloat(), preview.height.toFloat(), state.aspect.frameAspect)
-        if (frame.width <= 0f || frame.height <= 0f) return
-        val width = bar.layoutParams.width.toFloat()
-        val height = bar.layoutParams.height.toFloat()
-        val anchor = brightnessAnchor
-        if (anchor == null) {
-            // At the middle of the image's right edge, clear of the horizon bar across its middle.
-            bar.translationX = maxOf(frame.left, frame.right - width)
-            bar.translationY = frame.centerY - height / 2f
-            return
-        }
-        val x = anchor.x
-        val y = anchor.y
-        val half = controls.focusRing.layoutParams.width / 2f
-        // The bar's line is in the middle of its 48 dp touch area, so the area reaches a little over the box.
-        val overlap = EXPOSURE_BAR_OVERLAP_DP * resources.displayMetrics.density
-        val right = x + half - overlap
-        val left = if (right + width <= frame.right) right else x - half + overlap - width
-        bar.translationX = left.coerceIn(frame.left, maxOf(frame.left, frame.right - width))
-        bar.translationY = (y - height / 2f).coerceIn(frame.top, maxOf(frame.top, frame.bottom - height))
-    }
-
-    /** Shows the brightness bar at once, or fades it out (Design 2.8). */
-    private fun showExposureBar(controls: FragmentCameraBinding, show: Boolean) {
-        val bar = controls.exposureBar
-        if (show) {
-            if (exposureBarHiding || !bar.isVisible) {
-                exposureBarHiding = false
-                bar.animate().cancel()
-                bar.alpha = 1f
-                bar.isVisible = true
-            }
-        } else {
-            if (bar.isVisible && !exposureBarHiding) {
-                bar.finishDrag()
-                exposureBarHiding = true
-                bar.animate().alpha(0f).setDuration(EXPOSURE_BAR_FADE_MS).withEndAction {
-                    exposureBarHiding = false
-                    bar.isVisible = false
-                }
-            }
-            // The focus box beside it fades out with it, for any reason the bar goes.
-            if (focusRingWithBar) {
-                focusRingWithBar = false
-                fadeFocusRing(controls.focusRing, delay = 0L, duration = EXPOSURE_BAR_FADE_MS)
-            }
-        }
-    }
-
-    /** The brightness bar goes again after [BRIGHTNESS_IDLE_MS] without a touch on it. */
-    private fun holdBrightness() {
-        brightnessIdleJob?.cancel()
-        brightnessIdleJob = viewLifecycleOwner.lifecycleScope.launch {
-            delay(BRIGHTNESS_IDLE_MS)
-            if (binding?.exposureBar?.isHeld != true) viewModel.setBrightnessOpen(false)
-        }
+        return fitViewfinderFrame(preview.width.toFloat(), preview.height.toFloat(), state.aspect.frameAspect)
     }
 
     /** The ratios under the top bar in their order: the tallest first (FR-1.13). */
@@ -1538,48 +1479,31 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val hasBrightness = state.exposureRange.first < state.exposureRange.last
         if (state.cameraStatus != CameraStatus.READY || isScenePhotoActive()) return
         if (!state.supportsFocusPoint && !hasBrightness) return
-        val preview = controls.previewView
-        val frame = fitViewfinderFrame(preview.width.toFloat(), preview.height.toFloat(), state.aspect.frameAspect)
+        val frame = imageFrame(controls, state)
         if (frame.width <= 0f || x !in frame.left..frame.right || y !in frame.top..frame.bottom) return
         viewModel.onFocusTap((x - frame.left) / frame.width, (y - frame.top) / frame.height)
-        // A box left beside the bar by an earlier tap goes when this camera shows none, as the bar moves on alone.
-        if (focusRingWithBar && !state.supportsFocusPoint) {
-            fadeFocusRing(controls.focusRing, delay = 0L, duration = FOCUS_RING_FADE_MS)
-        }
-        focusRingWithBar = state.supportsFocusPoint && hasBrightness
-        if (state.supportsFocusPoint) showFocusRing(controls, x, y, alone = !hasBrightness)
-        // Brightness is set beside where the camera focused (FR-1.11, Design 2.8), or where the tap was on a camera
-        // that cannot focus on a point.
+        val focusBrightness = focusBrightness ?: return
+        focusBrightness.tap(x, y, focuses = state.supportsFocusPoint, brightness = hasBrightness)
         if (hasBrightness) {
-            brightnessAnchor = PointF(x, y)
             viewModel.setBrightnessOpen(true)
-            placeExposureBar(controls, viewModel.uiState.value)
-            holdBrightness()
+            focusBrightness.place(frame)
+            focusBrightness.hold()
         }
     }
 
     /**
-     * The focus box at the tap, shrinking into place (FR-1.4). [alone], without a brightness bar, it fades by itself
-     * after a moment; beside the bar it stays until the bar goes, and goes with it (showExposureBar).
+     * The subject's tap to focus (FR-7.7): the focus box where they tapped, alone, since the bar comes up for this
+     * phone's own tap. A bar this phone has up goes: the camera no longer focuses beside it, and the brightness is the
+     * base again. While a finger is on that bar nothing moves under it, and not during the scene photo, which shows no
+     * box for this phone's taps either.
      */
-    private fun showFocusRing(controls: FragmentCameraBinding, x: Float, y: Float, alone: Boolean) {
-        val ring = controls.focusRing
-        ring.animate().cancel()
-        ring.translationX = x - ring.layoutParams.width / 2f
-        ring.translationY = y - ring.layoutParams.height / 2f
-        ring.alpha = 1f
-        ring.scaleX = FOCUS_RING_START_SCALE
-        ring.scaleY = FOCUS_RING_START_SCALE
-        ring.isVisible = true
-        // The start delay stays with the view's animator, so a fade before would hold the shrink back.
-        ring.animate().scaleX(1f).scaleY(1f).setStartDelay(0L).setDuration(FOCUS_RING_SHRINK_MS).withEndAction {
-            if (alone) fadeFocusRing(ring, delay = FOCUS_RING_HOLD_MS, duration = FOCUS_RING_FADE_MS)
-        }
-    }
-
-    private fun fadeFocusRing(ring: View, delay: Long, duration: Long) {
-        ring.animate().cancel()
-        ring.animate().alpha(0f).setStartDelay(delay).setDuration(duration).withEndAction { ring.isVisible = false }
+    private fun showRemoteFocus(controls: FragmentCameraBinding, focus: RemoteFocus) {
+        if (controls.exposureBar.isHeld || isScenePhotoActive()) return
+        val frame = imageFrame(controls, viewModel.uiState.value)
+        if (frame.width <= 0f || frame.height <= 0f) return
+        // The box first: the bar's going then leaves it alone.
+        focusBrightness?.showBoxAlone(frame.left + focus.x * frame.width, frame.top + focus.y * frame.height)
+        viewModel.setBrightnessOpen(false)
     }
 
     /**
@@ -1921,10 +1845,6 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         private const val MIN_BLUR_PX = 0.5f
         private const val HALF_TURN = 180f
         private const val FLIP_CAMERA_DISTANCE = 8_000f
-        private const val FOCUS_RING_START_SCALE = 1.25f
-        private const val FOCUS_RING_SHRINK_MS = 150L
-        private const val FOCUS_RING_HOLD_MS = 700L
-        private const val FOCUS_RING_FADE_MS = 200L
         private const val CHIP_ICON_DP = 14f
 
         /** The pose flow's step while the scene photo is framed, and while the photo taken is held (FlowProgressView, #210). */
@@ -1933,10 +1853,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         /** How far below its place the scene photo's panel starts as it rises in (#210). */
         private const val RISE_DP = 12f
 
-        private const val EXPOSURE_BAR_OVERLAP_DP = 12f
-        private const val EXPOSURE_BAR_FADE_MS = 200L
-
         /** How long the brightness bar stays up without a touch (FR-1.11). */
-        const val BRIGHTNESS_IDLE_MS = 3_000L
+        const val BRIGHTNESS_IDLE_MS = FocusBrightness.IDLE_MS
     }
 }

@@ -118,6 +118,7 @@
     <string name="remote_guide_move_notice">%1$s님이 가이드를 옮겼어요</string>
     <string name="remote_guide_notice">%1$s님이 포즈 가이드를 정했어요</string>
     <string name="remote_brightness_notice">%1$s님이 밝기를 %2$s에 맞췄어요</string>
+    <string name="remote_focus_notice">%1$s님이 초점을 맞췄어요</string>
     <string name="remote_flash_on_notice">%1$s님이 플래시를 켰어요</string>
     <string name="remote_flash_off_notice">%1$s님이 플래시를 껐어요</string>
     <string name="remote_flash_auto_notice">%1$s님이 플래시를 자동으로 바꿨어요</string>
@@ -434,7 +435,7 @@
     <string name="subject_title_placeholder">상대 카메라</string>
     <string name="leave">나가기</string>
     <string name="leave_session_title">카메라 공유에서 나갈까요?</string>
-    <string name="subject_video_description">화면을 두 손가락으로 벌리거나 오므려 상대 카메라를 확대·축소할 수 있어요</string>
+    <string name="subject_video_description">화면을 두 손가락으로 벌리거나 오므려 상대 카메라를 확대·축소하고, 눌러서 초점을 맞출 수 있어요</string>
     <string name="peer_ended_session">%1$s님이 카메라 공유를 끝냈어요</string>
     <string name="peer_ended_session_unnamed">상대가 카메라 공유를 끝냈어요</string>
     <string name="camera_paused">상대 카메라가 잠시 중지됐어요.</string>
@@ -530,7 +531,7 @@
     <string name="help_together_title">카메라 공유</string>
     <string name="help_together_body">카메라 공유에서 누가 찍을지 고르세요. Pix 친구를 초대하거나 찍힐 사람에게 코드를 보여주면, 상대 폰에 내 카메라 화면이 같은 가이드와 함께 실시간으로 보여요.</string>
     <string name="help_remote_title">찍히는 사람의 폰에서</string>
-    <string name="help_remote_body">찍히는 사람은 자기 폰에서 줌, 밝기, 플래시를 바꾸고 가이드를 옮길 수 있어요. 사진은 찍는 사람만 찍어요.</string>
+    <string name="help_remote_body">찍히는 사람은 자기 폰에서 줌, 초점, 밝기, 플래시를 바꾸고 가이드를 옮길 수 있어요. 사진은 찍는 사람만 찍어요.</string>
     <string name="about_title">앱 정보</string>
     <string name="about_version">버전</string>
     <string name="about_licenses">오픈소스 라이선스</string>
@@ -555,8 +556,8 @@
     <string name="tutorial_describe">원하는 포즈를 적어요</string>
     <string name="tutorial_suggest">비워 두면 AI가 제안해요</string>
     <string name="tutorial_friend_title">찍히는 사람이 되면</string>
-    <string name="tutorial_friend_zoom">두 손가락으로 찍는 사람의 카메라를 확대해요</string>
-    <string name="tutorial_friend_brightness">밝기를 조절해요</string>
+    <string name="tutorial_friend_zoom">배율 버튼을 누르거나 두 손가락으로 찍는 사람의 카메라를 확대해요</string>
+    <string name="tutorial_friend_focus">화면을 눌러 초점을 맞추고 옆에서 밝기를 조절해요</string>
     <string name="tutorial_friend_move">가이드를 직접 옮겨요</string>
     <string name="tutorial_friend_guide">내 폰에서 가이드를 골라요</string>
 </resources>

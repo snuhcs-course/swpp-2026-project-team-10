@@ -767,6 +767,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         pinchZoom = null
         focusBrightness?.clear()
         focusBrightness = null
+        // The bar stood beside a box of this view, on its own time: a view made again shows neither.
+        viewModel.setBrightnessOpen(false)
         watchdog?.let(viewModel.video::detach)
         watchdog = null
         renderer?.release()
@@ -1059,7 +1061,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     }
 
     /**
-     * A drag up or down on the video (FR-7.3): with the bar up after a tap, it moves the brightness on from there.
+     * A drag up or down on the video (FR-7.3): with the bar up after a tap, it moves the brightness on from there, once
+     * that tap is answered.
      * Without it, the drag taps where it started first, as on Camera, which puts the photographer's brightness back to
      * their base: this phone learns that base from the tap's answer, so the drag's way counts from when it came
      * (`SubjectUiState.baseAwaited`), and the bar's sun starts there.
@@ -1080,6 +1083,11 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             if (!ui.brightnessOpen || !binding.exposureBar.isVisible) {
                 waiting = onVideoTap(x, y)
                 return waiting
+            }
+            // The bar is up, but its tap may not be answered yet: then it still shows the brightness from before.
+            if (ui.baseAwaited) {
+                waiting = true
+                return true
             }
             binding.exposureBar.startDrag()
             return binding.exposureBar.isDragging

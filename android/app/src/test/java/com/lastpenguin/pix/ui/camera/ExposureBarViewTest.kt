@@ -23,7 +23,7 @@ import org.robolectric.annotation.Config
  * step, and just under it; a drag past the range's end, which stops there; a camera without a step, which a drag leaves.
  * A value not known yet (Subject view after a tap to focus, #273), state-based: a touch and TalkBack's change while it
  * is awaited (nothing changes), and the same touch once it is known (a drag from the value shown then, by the finger's
- * way from there).
+ * way from there); a waiting touch on a bar that is disabled before the finger lifts, which holds it no longer.
  */
 @RunWith(AndroidJUnit4::class)
 @Config(qualifiers = "xxhdpi")
@@ -77,6 +77,22 @@ class ExposureBarViewTest {
         assertEquals(2, bar.index)
         assertEquals(listOf(2 to false, 2 to true), reported)
         assertFalse(bar.isHeld)
+    }
+
+    @Test
+    fun aWaitingTouch_onABarDisabledMeanwhile_holdsItNoLonger() {
+        val touching = mutableListOf<Boolean>()
+        val bar = bar(-4..4, 0.5f, value = 3).apply { onTouching = { touching += it } }
+        bar.awaitingValue = true
+        bar.touch(MotionEvent.ACTION_DOWN, 600f)
+        assertTrue(bar.isHeld)
+
+        // The link dropped under the finger: the screen disables the bar before the finger lifts.
+        bar.render(-4..4, 0.5f, 3, enabled = false)
+        assertFalse(bar.isHeld)
+        bar.touch(MotionEvent.ACTION_UP, 600f)
+        assertFalse(bar.isHeld)
+        assertEquals(listOf(true, false), touching)
     }
 
     @Test

@@ -100,6 +100,8 @@ class ExposureBarView @JvmOverloads constructor(
         this.range = range
         this.step = step
         isEnabled = enabled && range.first < range.last
+        // A bar that takes no touch has no finger waiting on it, whatever the finger still does.
+        if (!isEnabled) endWaiting()
         if (isDragging) return
         val clamped = value.coerceIn(range)
         ViewCompat.setStateDescription(this, describe(clamped))
@@ -145,7 +147,10 @@ class ExposureBarView @JvmOverloads constructor(
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (!isEnabled) return false
+        if (!isEnabled) {
+            endWaiting()
+            return false
+        }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 parent?.requestDisallowInterceptTouchEvent(true)
@@ -170,10 +175,7 @@ class ExposureBarView @JvmOverloads constructor(
             }
 
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                if (waiting) {
-                    waiting = false
-                    onTouching?.invoke(false)
-                }
+                endWaiting()
                 finishDrag()
             }
         }
@@ -181,6 +183,13 @@ class ExposureBarView @JvmOverloads constructor(
     }
 
     private var downY = 0f
+
+    /** The finger that waited for the value is off the bar, or the bar takes no touch any more. */
+    private fun endWaiting() {
+        if (!waiting) return
+        waiting = false
+        onTouching?.invoke(false)
+    }
 
     /** A drag starts from the index shown, on the bar or on the preview. */
     fun startDrag() {

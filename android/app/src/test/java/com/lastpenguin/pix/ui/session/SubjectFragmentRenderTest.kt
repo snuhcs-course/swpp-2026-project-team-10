@@ -12,6 +12,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import androidx.core.view.ViewCompat
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragmentInContainer
+import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.android.material.button.MaterialButton
 import com.lastpenguin.pix.R
@@ -81,7 +82,9 @@ import org.robolectric.shadows.ShadowToast
  * box there, the bar beside it), beside the image and in guide-edit mode (nothing), on a camera without point focus
  * (the bar alone); a drag on the bar (steps, then the final value; both gone after the idle time); a drag on the video
  * without the bar up (a tap first, nothing sent until the tap's answer, then steps from the brightness it gave); a
- * drag on the bar itself before the tap's answer (nothing sent, then from the brightness it gave); the
+ * drag on the bar itself before the tap's answer (nothing sent, then from the brightness it gave), and one on the
+ * video with the bar already up before that answer (the same, and no second tap); the bar after the screen's view is
+ * made again (gone); the
  * photographer's own focus (the box alone at its place on the mirror; this phone's bar up, which goes, or held under a
  * finger, where nothing moves; while a drag still waits for its tap's answer, which ends that drag); TalkBack's action
  * on the video (the focus at the image's middle and the bar, and nothing in guide-edit mode); a tap and TalkBack's
@@ -791,6 +794,74 @@ class SubjectFragmentRenderTest {
         idle()
         assertEquals(SessionMessage.ExposureSet(2, final = true), brightnesses(modules).last())
         assertTrue(brightnesses(modules).none { it.index > 2 })
+    }
+
+    @Test
+    fun aDragOnTheVideoWithTheBarUp_beforeTheTapsAnswer_waitsForItToo() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, focuses = true)
+        modules.session.deliver(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 3))
+        idle()
+        tapTheImage()
+        idle()
+        onScreen { binding, _ -> assertTrue(binding.exposureBar.isShown) }
+
+        // A drag on the video, away from the bar, before the tap is answered.
+        val down = SystemClock.uptimeMillis() + 500
+        var y = 0f
+        onScreen { binding, _ ->
+            val area = binding.videoContainer
+            val x = area.width * 0.8f
+            y = area.height * 0.8f
+            touch(area, MotionEvent.ACTION_DOWN, x, y, down)
+            y -= ViewConfiguration.get(area.context).scaledTouchSlop + 2f
+            touch(area, MotionEvent.ACTION_MOVE, x, y, down, down + 16)
+            y -= wayFor(area, 2)
+            touch(area, MotionEvent.ACTION_MOVE, x, y, down, down + 32)
+        }
+        idle()
+        // The bar was up, so the drag is no second tap; and nothing is sent from the brightness before the tap.
+        assertEquals(1, focuses(modules).size)
+        assertTrue(brightnesses(modules).isEmpty())
+
+        modules.session.deliver(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 0, focused = true),
+        )
+        idle()
+        onScreen { binding, _ ->
+            val area = binding.videoContainer
+            val x = area.width * 0.8f
+            y -= 1f
+            touch(area, MotionEvent.ACTION_MOVE, x, y, down, down + 48)
+            y -= wayFor(area, 2)
+            touch(area, MotionEvent.ACTION_MOVE, x, y, down, down + 64)
+            touch(area, MotionEvent.ACTION_UP, x, y, down, down + 80)
+        }
+        idle()
+        assertEquals(SessionMessage.ExposureSet(2, final = true), brightnesses(modules).last())
+        assertTrue(brightnesses(modules).none { it.index > 2 })
+    }
+
+    @Test
+    fun theBar_isGoneAfterTheScreensViewIsMadeAgain() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, focuses = true)
+        tapTheImage()
+        idle()
+        onScreen { binding, _ -> assertTrue(binding.exposureBar.isShown) }
+
+        // As when another screen, such as Settings, was in front: the view goes and is made again.
+        scenario!!.moveToState(Lifecycle.State.CREATED)
+        scenario!!.moveToState(Lifecycle.State.RESUMED)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+
+        onScreen { binding, fragment ->
+            assertFalse(binding.exposureBar.isShown)
+            assertFalse(binding.focusRing.isShown)
+        }
+        // And it stays gone: no bar is left up without its time running.
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(FocusBrightness.IDLE_MS + 500))
+        onScreen { binding, _ -> assertFalse(binding.exposureBar.isShown) }
     }
 
     @Test

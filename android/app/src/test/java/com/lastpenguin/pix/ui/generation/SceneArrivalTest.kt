@@ -7,7 +7,6 @@ import android.graphics.Rect
 import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
-import androidx.core.graphics.drawable.RoundedBitmapDrawable
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
 import com.lastpenguin.pix.ui.OwnActivities
@@ -32,7 +31,10 @@ import org.robolectric.shadows.ShadowChoreographer
  * flow's bar, in its own shape, with square corners; it stays there for the hold, as the screenshot's cut holds its
  * photo; halfway through the move it is halfway, eased in and out; it ends on its thumbnail, with the thumbnail's
  * round corners, and stops; a photo taller than the room under the bar starts as high as that room, in the middle;
- * with the phone's animations off nothing is drawn and nothing plays.
+ * with the phone's animations off nothing is drawn and nothing plays. A photo taken with the phone held sideways,
+ * upright here and so landscape: it starts as the camera held it, the frame's shape and turned back by the quarter
+ * turn, to the left or to the right, and is upright on its thumbnail; a photo taken upside down starts turned half
+ * round; an upright one is not turned.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -81,8 +83,9 @@ class SceneArrivalTest {
         assertEquals(held.width() * 1024 / 768, held.height())
         assertTrue(arrival.animator.isStarted)
         assertEquals(SceneArrival.HOLD_MS + SceneArrival.MOVE_MS, arrival.animator.duration)
-        val photo = arrival.photo as RoundedBitmapDrawable
+        val photo = arrival.photo
         assertEquals(0f, photo.cornerRadius, 0f)
+        assertEquals(0f, photo.turn, 0f)
 
         // Held where the camera showed it, long enough to be seen, as the screenshot's cut holds its photo.
         arrival.animator.currentPlayTime = SceneArrival.HOLD_MS
@@ -119,6 +122,49 @@ class SceneArrivalTest {
         assertTrue("$held", held.width() < binding.root.width)
         assertEquals((binding.root.width - held.width()) / 2, held.left)
         assertNotNull(arrival.animator)
+    }
+
+    @Test
+    fun aPhotoTakenSideways_startsAsTheCameraHeldIt_andTurnsUprightOnItsWay() {
+        // Held a quarter turn: the frame was 3:4 on the screen, and the photo, turned upright, is 4:3.
+        for ((turn, startsAt) in listOf(90 to -90f, 270 to 90f)) {
+            val (binding, scene) = screen(1024, 768)
+            ShadowChoreographer.setPaused(true)
+
+            val arrival =
+                checkNotNull(binding.root.showArriving(scene, binding.sceneImage, binding.flowProgress, turn))
+
+            // The frame as the camera held it: as wide as the screen and 4:3 high, under the bar. The photo is drawn
+            // into it turned back, so its own box has the frame's sides swapped around the frame's middle.
+            val top = binding.placeOf(binding.flowProgress).bottom
+            val frame = Rect(0, top, binding.root.width, top + binding.root.width * 1024 / 768)
+            assertEquals("$turn", frame, arrival.photo.covers())
+            assertEquals("$turn", startsAt, arrival.photo.turn, 0f)
+            assertEquals("$turn", frame.height(), arrival.photo.bounds.width())
+            assertEquals("$turn", frame.width(), arrival.photo.bounds.height())
+
+            ShadowChoreographer.setPaused(false)
+            shadowOf(
+                Looper.getMainLooper(),
+            ).idleFor(Duration.ofMillis(SceneArrival.HOLD_MS + SceneArrival.MOVE_MS + 100))
+
+            // Upright on its thumbnail, which is landscape.
+            assertEquals("$turn", binding.placeOf(binding.sceneImage), arrival.photo.bounds)
+            assertEquals("$turn", 0f, arrival.photo.turn, 0f)
+            setAnimatorScale(1f)
+        }
+    }
+
+    @Test
+    fun aPhotoTakenUpsideDown_startsTurnedHalfRound_inTheFramesOwnShape() {
+        val (binding, scene) = screen(768, 1024)
+        ShadowChoreographer.setPaused(true)
+
+        val arrival = checkNotNull(binding.root.showArriving(scene, binding.sceneImage, binding.flowProgress, 180))
+
+        assertEquals(180f, kotlin.math.abs(arrival.photo.turn), 0f)
+        assertEquals(arrival.photo.bounds, arrival.photo.covers())
+        assertEquals(binding.root.width, arrival.photo.bounds.width())
     }
 
     @Test

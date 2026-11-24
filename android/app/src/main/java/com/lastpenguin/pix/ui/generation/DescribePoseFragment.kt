@@ -88,7 +88,14 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose), ScenePho
             viewModel.sceneArrived()
             if (savedInstanceState == null) {
                 binding.root.doOnLayout {
-                    val arrival = binding.root.showArriving(state.scene, binding.sceneImage, binding.flowProgress)
+                    // As the camera held it: a photo taken sideways turns upright on its way.
+                    val arrival =
+                        binding.root.showArriving(
+                            state.scene,
+                            binding.sceneImage,
+                            binding.flowProgress,
+                            state.sceneTurn,
+                        )
                     sceneArrival = arrival?.animator?.also { it.doOnEnd { sceneArrival = null } }
                 }
             }

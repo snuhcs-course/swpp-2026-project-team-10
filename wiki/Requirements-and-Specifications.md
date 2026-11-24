@@ -95,7 +95,7 @@
 | 3.33 | 2026-11-21 | One server each for `main` and `dev`, in two versions, on the course servers and on AWS; the builds use AWS over HTTPS, and release builds allow no unencrypted traffic (NFR-14, 7). |
 | 4.0 | 2026-11-21 | Iteration 5 scope from the kickoff of 11/21 (4.1, 4.2): switches for the grid and the horizon bar (FR-1.9, FR-1.10), a self-timer (FR-1.17), the cutout as a guide (FR-2.2), the library's situations and memos (FR-3.11), options to choose on *Generate poses* (FR-4.15), deleting an account and what Sign up collects (FR-5.18, FR-5.19), pose generation started by the subject (FR-6.15), and remote focus (FR-7.3, FR-7.7). The beta test is on 12/7–12/11, not 12/2. The remote-control switch and the library's search are dropped (FR-7.5, FR-3.11, 6.5, 6.8, 7). |
 | 4.1 | 2026-11-21 | What an account keeps and the agreement before it is made, deleting an account, the privacy policy in Pix and at `/privacy`, and fields above the keyboard (FR-5.17–5.19, FR-10.1, FR-10.7, NFR-13, 6.4, 6.8, 6.9, 6.10; Iter5-P2, [#266]). |
-| 4.2 | 2026-11-24 | UI fixes: switches for the grid and the horizon bar, and UAT cycle 2's opinions: whose camera each phone shows, by the account's name, a red *Leave*, one icon for guide-edit mode with the guide tinted, and the photo on its way (FR-1.3, FR-6.6, FR-6.8, FR-6.14, 6.2, 6.5, 6.6, 6.10, 8; Iter5-P7, [#271]). |
+| 4.2 | 2026-11-24 | UI fixes: switches for the grid and the horizon bar, and UAT cycle 2's opinions: whose camera each phone shows, by the account's name, a red *Leave*, one icon for guide-edit mode with the guide tinted, and the photo on its way (FR-1.3, FR-6.6, FR-6.8, FR-6.14, 6.2, 6.5, 6.6, 6.8, 6.10, 8, Figures 1, 4, 5, 7; Iter5-P7, [#271]). |
 
 </details>
 
@@ -850,7 +850,6 @@ These screens follow from the requirements but are not in the wireframe yet. Eac
 |---|---|---|
 | Camera permission denied | Why the camera is needed; *Open settings*. Built (6.2), not drawn. | FR-1.2 |
 | The self-timer | Its control on Camera and the countdown over the preview. Iteration 5. | FR-1.17 |
-| Settings, the grid and the horizon bar | A switch for each, under *Camera*. Iteration 5. | FR-1.9, FR-1.10 |
 | The cutout guide | The guide as a cutout on Camera and Subject view, and the way to switch. Iteration 5. | FR-2.2 |
 | The library, situations and memos | The filter by situation, and a guide's memo. Iteration 5. | FR-3.11 |
 | *Generate poses*, the options | The options next to the description field. Iteration 5. | FR-4.15 |

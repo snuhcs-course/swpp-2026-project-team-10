@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -17,6 +17,7 @@ import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.PhoneTurns
 import com.lastpenguin.pix.camera.PhotoDeleter
+import com.lastpenguin.pix.camera.baseExposureIndex
 import com.lastpenguin.pix.camera.isAtZoomStep
 import com.lastpenguin.pix.camera.nextZoomStep
 import com.lastpenguin.pix.camera.quickZoomSteps
@@ -240,6 +241,8 @@ class CameraViewModel(
     private val phoneTurns: PhoneTurns = PhoneTurns.Fixed(),
     /** Who holds the zoom in a session (`RemoteControlHandler.zoomHold`, FR-7.6); free outside one. */
     private val zoomHold: ZoomHold = ZoomHold(),
+    /** Tells the subject's phone where a tap focused (`RemoteControlHandler.focusedHere`, FR-7.7). */
+    private val onFocused: (x: Float, y: Float) -> Unit = { _, _ -> },
 ) : ViewModel() {
 
     /** Follows how the phone is held while [owner], the camera screen, is in front (FR-1.5, FR-1.15). */
@@ -640,19 +643,17 @@ class CameraViewModel(
         val state = _uiState.value
         if (state.cameraStatus != CameraStatus.READY) return
         if (!x.isFinite() || !y.isFinite() || x !in 0f..1f || y !in 0f..1f) return
-        if (state.supportsFocusPoint) camera.setFocusPoint(x, y)
+        if (state.supportsFocusPoint) {
+            camera.setFocusPoint(x, y)
+            onFocused(x, y)
+        }
         // A new tap drops the brightness a drag added after the last one, back to the base (FR-1.11), also on a camera
         // that cannot focus on a point.
         applyBaseBrightness()
     }
 
     /** The exposure index of the base brightness for this camera, or null without exposure compensation. */
-    fun baseExposureIndex(): Int? {
-        val capabilities = camera.capabilities.value ?: return null
-        val range = capabilities.exposureRange
-        if (range.first >= range.last) return null
-        return ExposureScale.indexOf(baseBrightness.value, capabilities.exposureStep, range)
-    }
+    fun baseExposureIndex(): Int? = camera.capabilities.value?.baseExposureIndex(baseBrightness.value)
 
     private fun applyBaseBrightness() {
         baseExposureIndex()?.let(camera::setExposure)

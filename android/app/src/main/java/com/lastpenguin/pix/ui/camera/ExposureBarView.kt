@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.content.Context
@@ -65,8 +65,19 @@ class ExposureBarView @JvmOverloads constructor(
     // TalkBack's focus is on the bar.
     private var focused = false
 
-    /** A drag or TalkBack's focus is on the bar, so the screen keeps it up. */
-    val isHeld: Boolean get() = isDragging || focused
+    /**
+     * The value a change starts from is not known yet: on Subject view, the photographer's brightness after a tap to
+     * focus, until that tap is answered (FR-7.7). A touch that begins meanwhile is kept but changes nothing; once the
+     * value is known, its drag starts from the value shown then, by the finger's way from there. TalkBack's changes
+     * are not taken meanwhile.
+     */
+    var awaitingValue: Boolean = false
+
+    // A finger is on the bar and waits for the value.
+    private var waiting = false
+
+    /** A finger or TalkBack's focus is on the bar, so the screen keeps it up. */
+    val isHeld: Boolean get() = isDragging || focused || waiting
 
     /** Each new index, and the last again with `final` when the drag ends. */
     var onChange: ((index: Int, final: Boolean) -> Unit)? = null
@@ -89,6 +100,8 @@ class ExposureBarView @JvmOverloads constructor(
         this.range = range
         this.step = step
         isEnabled = enabled && range.first < range.last
+        // A bar that takes no touch has no finger waiting on it, whatever the finger still does.
+        if (!isEnabled) endWaiting()
         if (isDragging) return
         val clamped = value.coerceIn(range)
         ViewCompat.setStateDescription(this, describe(clamped))
@@ -134,22 +147,49 @@ class ExposureBarView @JvmOverloads constructor(
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (!isEnabled) return false
+        if (!isEnabled) {
+            endWaiting()
+            return false
+        }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 parent?.requestDisallowInterceptTouchEvent(true)
                 downY = event.y
-                startDrag()
+                if (awaitingValue) {
+                    waiting = true
+                    onTouching?.invoke(true)
+                } else {
+                    startDrag()
+                }
             }
 
-            MotionEvent.ACTION_MOVE -> dragTo(downY - event.y)
+            MotionEvent.ACTION_MOVE -> {
+                if (!isDragging) {
+                    if (awaitingValue) return true
+                    // The value is known now: the drag starts here, from it.
+                    downY = event.y
+                    waiting = false
+                    startDrag()
+                }
+                dragTo(downY - event.y)
+            }
 
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> finishDrag()
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                endWaiting()
+                finishDrag()
+            }
         }
         return true
     }
 
     private var downY = 0f
+
+    /** The finger that waited for the value is off the bar, or the bar takes no touch any more. */
+    private fun endWaiting() {
+        if (!waiting) return
+        waiting = false
+        onTouching?.invoke(false)
+    }
 
     /** A drag starts from the index shown, on the bar or on the preview. */
     fun startDrag() {
@@ -212,7 +252,7 @@ class ExposureBarView @JvmOverloads constructor(
                 onTouching?.invoke(false)
             }
         }
-        if (!isEnabled) return super.performAccessibilityAction(action, arguments)
+        if (!isEnabled || awaitingValue) return super.performAccessibilityAction(action, arguments)
         val next = when (action) {
             AccessibilityNodeInfo.ACTION_SCROLL_FORWARD -> index + 1
 

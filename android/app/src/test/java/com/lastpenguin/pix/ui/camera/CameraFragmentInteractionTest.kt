@@ -97,6 +97,9 @@ import org.robolectric.shadows.ShadowToast
  * pinch mode's label over the guide-edit toggle, Camera then Guide. A tap on the readout while the subject's pinch holds
  * the zoom: no zoom, and the label names the subject (FR-7.6, #236).
  * A photo taken with the phone held sideways, saved as held (FR-1.5, #206).
+ * The subject's tap to focus (FR-7.7): the focus box where they tapped, alone, with its notice, which goes sooner than
+ * the others; a tap soon after, the box without the notice; with this phone's own brightness bar up, which goes, or
+ * held under a finger, where nothing moves.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -1098,6 +1101,101 @@ class CameraFragmentInteractionTest {
         shadowOf(Looper.getMainLooper()).idleFor(1_500, TimeUnit.MILLISECONDS)
 
         onScreen { controls, _ -> assertFalse(controls.focusRing.isShown) }
+    }
+
+    @Test
+    fun theSubjectsTapToFocus_showsTheBoxThereAlone_andItsNoticeBriefly_butNotAtEveryTap() {
+        val camera = FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true)
+        val modules = launch(camera)
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+
+        // The display's frames held, so the box is seen before its animation runs to its end.
+        ShadowChoreographer.setPaused(true)
+        try {
+            modules.session.deliver(SessionMessage.FocusSet(0.25f, 0.5f))
+            idle()
+            onScreen { controls, _ ->
+                val preview = controls.previewView
+                val frame = fitViewfinderFrame(preview.width.toFloat(), preview.height.toFloat())
+                val ring = controls.focusRing
+                assertTrue(ring.isShown)
+                assertEquals(frame.left + frame.width * 0.25f, ring.translationX + ring.layoutParams.width / 2f, 1f)
+                assertEquals(frame.top + frame.height * 0.5f, ring.translationY + ring.layoutParams.height / 2f, 1f)
+                // The bar is for this phone's own tap.
+                assertFalse(controls.exposureBar.isShown)
+                assertTrue(controls.noticeText.isShown)
+                assertEquals(string(R.string.remote_focus_notice, "Joonhyung"), controls.noticeText.text.toString())
+            }
+        } finally {
+            ShadowChoreographer.setPaused(false)
+        }
+        assertEquals(listOf(0.25f to 0.5f), camera.focusPoints)
+
+        // The notice goes sooner than the other notices, and the box by itself.
+        shadowOf(Looper.getMainLooper()).idleFor(SessionViewModel.FOCUS_NOTICE_MS + 100, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ ->
+            assertFalse(controls.noticeText.isShown)
+            assertFalse(controls.focusRing.isShown)
+        }
+
+        // A tap soon after: the box again, the notice not.
+        ShadowChoreographer.setPaused(true)
+        try {
+            modules.session.deliver(SessionMessage.FocusSet(0.75f, 0.25f))
+            idle()
+            onScreen { controls, _ ->
+                assertTrue(controls.focusRing.isShown)
+                assertFalse(controls.noticeText.isShown)
+            }
+        } finally {
+            ShadowChoreographer.setPaused(false)
+        }
+    }
+
+    @Test
+    fun theSubjectsTapToFocus_takesDownThisPhonesBrightnessBar_unlessAFingerIsOnIt() {
+        val camera = FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true)
+        val modules = launch(camera)
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 3f) }
+        idle()
+
+        // Held: nothing moves under the finger.
+        val heldAt = onScreen { controls, _ ->
+            assertBoth(controls, shown = true)
+            touch(controls.exposureBar, MotionEvent.ACTION_DOWN, Pointer(1, 24f, 64f))
+            controls.focusRing.translationX
+        }
+        modules.session.deliver(SessionMessage.FocusSet(0.9f, 0.1f))
+        idle()
+        onScreen { controls, _ ->
+            assertBoth(controls, shown = true)
+            assertEquals(heldAt, controls.focusRing.translationX, 0f)
+            touch(controls.exposureBar, MotionEvent.ACTION_UP, Pointer(1, 24f, 64f))
+        }
+
+        // Let go: the bar goes at the next tap, and the box is where the subject tapped.
+        val viewModel = cameraViewModel()
+        ShadowChoreographer.setPaused(true)
+        try {
+            modules.session.deliver(SessionMessage.FocusSet(0.9f, 0.1f))
+            idle()
+            assertFalse(viewModel.uiState.value.brightnessOpen)
+            onScreen { controls, _ ->
+                val preview = controls.previewView
+                val frame = fitViewfinderFrame(preview.width.toFloat(), preview.height.toFloat())
+                val ring = controls.focusRing
+                assertTrue(ring.isShown)
+                assertEquals(1f, ring.alpha, 0f)
+                assertEquals(frame.left + frame.width * 0.9f, ring.translationX + ring.layoutParams.width / 2f, 1f)
+            }
+        } finally {
+            ShadowChoreographer.setPaused(false)
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(1_500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ -> assertBoth(controls, shown = false) }
     }
 
     /** The focus box and the brightness bar, both whole and in view, or both gone. */

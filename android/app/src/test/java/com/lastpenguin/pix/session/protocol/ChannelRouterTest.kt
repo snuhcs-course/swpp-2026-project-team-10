@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.FlashMode
@@ -65,6 +65,7 @@ class ChannelRouterTest {
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ExposureSet(3, final = true)))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.FlashSet(FlashMode.AUTO)))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.FocusSet(0.6f, 0.4f)))
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.Focused(0.4f, 0.4f)))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ControlPermission(false)))
         assertTrue(router.latestOnly(SessionMessage.GuideMove("g", 0.4f, 0.5f, 0.8f)))
         assertTrue(router.latestOnly(SessionMessage.ExposureSet(3)))

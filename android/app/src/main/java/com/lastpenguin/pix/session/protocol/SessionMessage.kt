@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -433,10 +433,23 @@ sealed interface SessionMessage {
     @SerialName("camera.flash.set")
     data class FlashSet(val mode: FlashMode) : SessionMessage
 
-    /** The subject's focus point in frame coordinates (FR-7.7, Could). No echo: focus has no lasting state. */
+    /**
+     * The subject's tap to focus, in fractions of the photographer's frame as the photographer's preview shows it
+     * (FR-7.7). The point has no echo, since focus has no lasting state; the answer is the `camera.state` with the
+     * brightness the tap put back.
+     */
     @Serializable
     @SerialName("camera.focus.set")
     data class FocusSet(val x: Float, val y: Float) : SessionMessage
+
+    /**
+     * P→S: where the photographer's own tap focused, in fractions of the photographer's frame as its preview shows
+     * it (FR-7.7, #273), so the subject sees the focus box too. Not kept: a phone that connects later gets none, and
+     * an older subject ignores the type.
+     */
+    @Serializable
+    @SerialName("camera.focus")
+    data class Focused(val x: Float, val y: Float) : SessionMessage
 
     /** Whether the photographer allows remote control (FR-7.5, Could). */
     @Serializable
@@ -447,7 +460,9 @@ sealed interface SessionMessage {
      * The camera values actually applied, and who changed them. Iteration 2 adds [exposure], [flash], and [aspect],
      * so the subject always has the whole camera state and fits its video, grid, and guide to [aspect] (AD-10).
      * [facing] is the camera in use (#201): the subject shows the rear camera's video as a mirror. An older phone
-     * sends none, which means the rear camera.
+     * sends none, which means the rear camera. [focused] marks the state that answers the subject's
+     * `camera.focus.set` (#273): its [exposure] is the brightness that tap left, which the subject's bar starts from.
+     * No other state of the subject's is that answer, so a zoom's or a brightness's echo cannot be taken for it.
      */
     @Serializable
     @SerialName("camera.state")
@@ -459,6 +474,7 @@ sealed interface SessionMessage {
         val flash: FlashMode = FlashMode.OFF,
         val aspect: AspectRatio = AspectRatio.R4_3,
         val facing: CameraFacing = CameraFacing.BACK,
+        val focused: Boolean = false,
     ) : SessionMessage
 
     @Serializable

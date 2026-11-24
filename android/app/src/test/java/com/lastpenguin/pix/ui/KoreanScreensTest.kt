@@ -6,6 +6,8 @@ import android.app.Application
 import android.graphics.Paint
 import android.net.Uri
 import android.os.Looper
+import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebResourceRequest
@@ -143,10 +145,11 @@ import org.robolectric.shadows.ShadowDialog
  * Pix ID setup; Account, with
  * "Delete your Pix account?"; the room code; See their
  * camera; Session not found; Subject view, with whose camera it is and its notice, with a photo on its way (#271),
- * with the photographer's tip closed and open,
+ * with the brightness bar up after a tap on the video (FR-7.7), with the photographer's tip closed and open,
  * and while the photographer picks a pose, with a guide to save, and with the session's photos open in the viewer,
  * readable or not (Iter4-A2); the subject's Pick a pose; Connection lost; Camera in a session with its photos open in the
- * viewer (Iter4-A2), and with the delay shown; Camera with Pix's album open in the viewer; Settings, signed in; How
+ * viewer (Iter4-A2), with the delay shown, and with the notice of the subject's tap to focus (FR-7.7); Camera with
+ * Pix's album open in the viewer; Settings, signed in; How
  * to use Pix; About Pix; the privacy policy, failed to load. On each, no visible text, hint, or content
  * description has an English word but what Korean keeps (KEPT) and the test's own data (names, Pix IDs, the server's
  * pose texts), and no text is cut off: none is ellipsized, has lines dropped, or is taller than its view, except a name
@@ -321,6 +324,22 @@ class KoreanScreensTest {
         idle()
 
         assertKorean(checkNotNull(ShadowDialog.getLatestDialog().window).decorView)
+    }
+
+    @Test
+    fun camera_inASessionWithTheSubjectsFocus_isInKorean() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
+        val modules = TestAppContainer(camera = FakeCameraController(supportsFocusPoint = true)).install()
+        scenario = launchFragmentInContainer<CameraFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        idle()
+        modules.session.deliver(SessionMessage.FocusSet(0.5f, 0.5f))
+        idle()
+        val root = screen()
+        assertEquals(true, FragmentCameraBinding.bind(root).noticeText.isShown)
+        assertKorean(root, *people)
     }
 
     @Test
@@ -880,6 +899,34 @@ class KoreanScreensTest {
         modules.session.deliver(SessionMessage.PhotoShutter("a"))
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
         assertKorean(screen(), *people)
+    }
+
+    @Test
+    @Config(shadows = [ShadowSurfaceViewRenderer::class], instrumentedPackages = ["org.webrtc"])
+    fun subjectView_withTheBrightnessBarUp_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.SUBJECT))
+        modules.video.deliverFrame()
+        modules.session.deliver(
+            SessionMessage.Capabilities(
+                CameraCapabilities(0.6f, 10f, listOf(1f, 2f), -4..4, 0.5f, true, supportsFocusPoint = true),
+            ),
+        )
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        scenario!!.onFragment { fragment ->
+            val area = FragmentSubjectBinding.bind(fragment.requireView()).videoContainer
+            val down = SystemClock.uptimeMillis()
+            for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
+                val event = MotionEvent.obtain(down, down, action, area.width / 2f, area.height / 2f, 0)
+                area.dispatchTouchEvent(event)
+                event.recycle()
+            }
+        }
+        val root = screen()
+        assertEquals(true, FragmentSubjectBinding.bind(root).exposureBar.isShown)
+        assertKorean(root, *people)
     }
 
     /** Subject view with two of the photographer's photos saved here and opened in the viewer. */

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.animation.Animator
@@ -10,6 +10,7 @@ import android.text.TextPaint
 import android.text.TextUtils
 import android.view.View
 import android.view.ViewGroup
+import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
@@ -44,6 +45,7 @@ import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.camera.ExposureScale
+import com.lastpenguin.pix.ui.camera.FocusBrightness
 import com.lastpenguin.pix.ui.camera.FramePlace
 import com.lastpenguin.pix.ui.camera.GuideSaveNotice
 import com.lastpenguin.pix.ui.camera.PhotoViewer
@@ -58,8 +60,8 @@ import com.lastpenguin.pix.ui.camera.ReferenceDragController
 import com.lastpenguin.pix.ui.camera.ReferencePlacement
 import com.lastpenguin.pix.ui.camera.TOP_BAR_OVERHANG_DP
 import com.lastpenguin.pix.ui.camera.ToggleLabel
-import com.lastpenguin.pix.ui.camera.TrackedSliderController
 import com.lastpenguin.pix.ui.camera.TurningIcons
+import com.lastpenguin.pix.ui.camera.ViewfinderFrame
 import com.lastpenguin.pix.ui.camera.ZOOM_ROW_MARGIN_DP
 import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
 import com.lastpenguin.pix.ui.camera.framePlace
@@ -127,7 +129,9 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private val settingsViewModel: SettingsViewModel by activityViewModels { PixViewModels.Factory }
     private val zoomFormat = DecimalFormat("0.0")
     private var pinchZoom: PinchZoomController? = null
-    private var brightnessSlider: TrackedSliderController? = null
+
+    // The focus box at this phone's tap and the brightness bar beside it, as on Camera (FR-7.3, FR-7.7).
+    private var focusBrightness: FocusBrightness? = null
     private var renderer: SurfaceViewRenderer? = null
     private var watchdog: FrameWatchdog? = null
     private var referenceDrag: ReferenceDragController? = null
@@ -190,7 +194,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                 }
             }
         }
-        // The zoom row stays above the brightness slider as it opens and closes.
+        // The zoom row stays above the tip as it opens and closes.
         binding.bottomOverlays.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeZoomRow(binding) }
         // The camera's name is fitted to the slot's width, known only after layout.
         binding.cameraCaptionTitle.addOnLayoutChangeListener { title, left, _, right, _, oldLeft, _, oldRight, _ ->
@@ -201,14 +205,19 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         binding.root.addOnLayoutChangeListener(placeVideo)
         binding.topBar.addOnLayoutChangeListener(placeVideo)
         binding.bottomPanel.addOnLayoutChangeListener(placeVideo)
-        // The whole area takes the pinch, the margins beside a video of another shape too.
+        // The whole area takes the pinch, the margins beside a video of another shape too. A tap inside the image asks
+        // the photographer's camera to focus there (FR-7.7), and a drag up or down sets its brightness (FR-7.3), as on
+        // Camera; the pinch controller owns the video's touches, so it reports both, and neither in guide-edit mode.
         pinchZoom = PinchZoomController(
             binding.videoContainer,
             range = { viewModel.uiState.value.let { if (it.canZoom) it.minZoom..it.maxZoom else null } },
             current = { viewModel.uiState.value.zoom },
+            onTap = { x, y -> onVideoTap(x, y) },
+            onDrag = videoBrightnessDrag,
             onZoom = viewModel::onZoomGesture,
         )
         setupZoomAccessibility(binding.zoomReadout)
+        setupFocusAccessibility(binding)
         // The icons turn with this phone, held as the subject holds it, and so do the zoom readout and Guide and Pick a
         // pose with their labels (FR-1.15); the other texts and the layout stay.
         viewModel.watchPhoneTurn(viewLifecycleOwner)
@@ -216,7 +225,6 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             controls = listOf(
                 binding.flashButton,
                 binding.settingsButton,
-                binding.brightnessButton,
                 binding.tipButton,
                 binding.saveGuideButton,
                 binding.editGuideButton,
@@ -228,13 +236,12 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             viewModel.setGuideEditing(!viewModel.uiState.value.guideEditing)
             showPinchMode(binding, viewModel.uiState.value.guideEditing)
         }
-        // The photographer's brightness and flash from this phone (FR-7.3), on the Camera screen's scale.
-        brightnessSlider = TrackedSliderController(
-            binding.brightnessSlider,
-            { ExposureScale.formatEv(sliderIndex(it), viewModel.uiState.value.exposureStep) },
-        ) { value, final -> viewModel.onExposureGesture(sliderIndex(value), final) }
-        binding.brightnessButton.setOnClickListener {
-            viewModel.setBrightnessOpen(!viewModel.uiState.value.brightnessOpen)
+        // The photographer's brightness from this phone (FR-7.3), on the Camera screen's bar: each step of a drag is
+        // sent as it comes and the last once more as final.
+        binding.exposureBar.describe = { ExposureScale.formatEv(it, viewModel.uiState.value.exposureStep) }
+        binding.exposureBar.onChange = viewModel::onExposureGesture
+        focusBrightness = FocusBrightness(binding.focusRing, binding.exposureBar, viewLifecycleOwner.lifecycleScope) {
+            viewModel.setBrightnessOpen(false)
         }
         binding.flashButton.setOnClickListener { viewModel.onFlashTap() }
         // The session's photos open over the video, inside Pix, so the session goes on (FR-6.14).
@@ -388,6 +395,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         showToggleLabel(binding, text, guideSaveIcon(notice), guideSaveTint(notice))
                     }
                 }
+                launch { viewModel.photographerFocus.collect { showPhotographerFocus(binding, it) } }
                 launch {
                     viewModel.toggleLabels.collect { label ->
                         when (label) {
@@ -450,7 +458,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
     override fun onPause() {
         pinchZoom?.finishInteraction()
-        brightnessSlider?.finishInteraction()
+        focusBrightness?.finishDrag()
         super.onPause()
     }
 
@@ -757,8 +765,10 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         referenceDrag = null
         pinchZoom?.finishInteraction()
         pinchZoom = null
-        brightnessSlider?.finishInteraction()
-        brightnessSlider = null
+        focusBrightness?.clear()
+        focusBrightness = null
+        // The bar stood beside a box of this view, on its own time: a view made again shows neither.
+        viewModel.setBrightnessOpen(false)
         watchdog?.let(viewModel.video::detach)
         watchdog = null
         renderer?.release()
@@ -979,19 +989,21 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         }
     }
 
-    /** Brightness and flash, hidden when the photographer's phone has no range or no flash (FR-7.3). */
+    /**
+     * The brightness bar beside the focus box, up after a tap on the video while the photographer's camera has a
+     * range, and the flash button, hidden when it has no flash (FR-7.3).
+     */
     private fun renderCameraControls(binding: FragmentSubjectBinding, ui: SubjectUiState) {
-        binding.brightnessButton.isVisible = ui.hasBrightness
-        binding.brightnessButton.isChecked = ui.brightnessOpen
-        binding.brightnessButton.isEnabled = ui.connected
-        binding.brightnessPanel.isVisible = ui.brightnessOpen
-        brightnessSlider?.render(
-            1f,
-            ExposureScale.sliderMax(ui.exposureRange),
-            ExposureScale.sliderValue(ui.exposure, ui.exposureRange),
+        // Until a tap to focus is answered, the bar shows the brightness from before it: its own drag waits too.
+        binding.exposureBar.awaitingValue = ui.baseAwaited
+        binding.exposureBar.render(
+            ui.exposureRange,
+            ui.exposureStep,
+            ui.exposure,
             enabled = ui.connected && ui.hasBrightness,
         )
-        binding.brightnessValue.text = ExposureScale.formatEv(ui.exposure, ui.exposureStep)
+        focusBrightness?.place(videoFrame(binding, ui))
+        focusBrightness?.show(ui.brightnessOpen)
         binding.flashButton.isVisible = ui.hasFlash
         binding.flashButton.isEnabled = ui.connected
         binding.flashButton.setIconResource(
@@ -1010,8 +1022,132 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         )
     }
 
-    /** The exposure index for a brightness slider position (ExposureScale, shared with the Camera screen). */
-    private fun sliderIndex(value: Float): Int = ExposureScale.index(value, viewModel.uiState.value.exposureRange)
+    /**
+     * A tap on the video inside the photographer's image (FR-7.7): their camera is asked to focus there, the box shows
+     * where, and the brightness bar comes up beside it (FR-7.3), as a tap on Camera does. False when nothing was asked:
+     * a tap beside the image, a camera that can do neither, or a video that is not showing.
+     */
+    private fun onVideoTap(x: Float, y: Float): Boolean {
+        val binding = view?.let(FragmentSubjectBinding::bind) ?: return false
+        // Not over a video that is not coming: the photographer's camera is paused or not yet seen, and would drop the
+        // request, so a box here would show a focus that was never set.
+        if (!videoShowing.value) return false
+        val ui = viewModel.uiState.value
+        val frame = videoFrame(binding, ui)
+        if (frame.width <= 0f || x !in frame.left..frame.right || y !in frame.top..frame.bottom) return false
+        if (!viewModel.onFocusTap((x - frame.left) / frame.width, (y - frame.top) / frame.height)) return false
+        val focusBrightness = focusBrightness ?: return false
+        focusBrightness.tap(x, y, focuses = ui.supportsFocusPoint, brightness = ui.hasBrightness)
+        if (ui.hasBrightness) {
+            viewModel.setBrightnessOpen(true)
+            focusBrightness.place(frame)
+            focusBrightness.hold()
+        }
+        return true
+    }
+
+    /**
+     * The photographer's own tap to focus (FR-7.7): the focus box at that place on this phone's video, alone, as the
+     * photographer's phone shows this phone's taps. A bar this phone has up goes, since the camera no longer focuses
+     * beside it and the brightness is the photographer's base again; while a finger is on it, nothing moves under it.
+     */
+    private fun showPhotographerFocus(binding: FragmentSubjectBinding, focus: RemoteFocus) {
+        if (binding.exposureBar.isHeld) return
+        val frame = videoFrame(binding, viewModel.uiState.value)
+        if (frame.width <= 0f || frame.height <= 0f) return
+        // The box first: the bar's going then leaves it alone.
+        focusBrightness?.showBoxAlone(frame.left + focus.x * frame.width, frame.top + focus.y * frame.height)
+        viewModel.setBrightnessOpen(false)
+    }
+
+    /**
+     * A drag up or down on the video (FR-7.3): with the bar up after a tap, it moves the brightness on from there, once
+     * that tap is answered.
+     * Without it, the drag taps where it started first, as on Camera, which puts the photographer's brightness back to
+     * their base: this phone learns that base from the tap's answer, so the drag's way counts from when it came
+     * (`SubjectUiState.baseAwaited`), and the bar's sun starts there.
+     */
+    private val videoBrightnessDrag = object : PinchZoomController.VerticalDrag {
+        // The tap this drag began with is not answered yet.
+        private var waiting = false
+
+        // How far up the finger was when the bar's drag began.
+        private var from = 0f
+
+        override fun onStart(x: Float, y: Float): Boolean {
+            val binding = view?.let(FragmentSubjectBinding::bind) ?: return false
+            val ui = viewModel.uiState.value
+            if (!ui.connected || !ui.hasBrightness) return false
+            waiting = false
+            from = 0f
+            if (!ui.brightnessOpen || !binding.exposureBar.isVisible) {
+                waiting = onVideoTap(x, y)
+                return waiting
+            }
+            // The bar is up, but its tap may not be answered yet: then it still shows the brightness from before.
+            if (ui.baseAwaited) {
+                waiting = true
+                return true
+            }
+            binding.exposureBar.startDrag()
+            return binding.exposureBar.isDragging
+        }
+
+        override fun onMove(up: Float) {
+            val bar = view?.let(FragmentSubjectBinding::bind)?.exposureBar ?: return
+            if (waiting) {
+                val ui = viewModel.uiState.value
+                // The bar went meanwhile, as at the photographer's own focus: this drag moves nothing any more.
+                if (!ui.brightnessOpen) {
+                    waiting = false
+                    return
+                }
+                if (ui.baseAwaited) return
+                waiting = false
+                from = up
+                bar.startDrag()
+            }
+            // Nothing while the bar is not dragged.
+            bar.dragTo(up - from)
+        }
+
+        override fun onEnd() {
+            waiting = false
+            focusBrightness?.finishDrag()
+        }
+    }
+
+    /** The photographer's image on this screen: the video's frame in their ratio, fitted in its area (AD-10). */
+    private fun videoFrame(binding: FragmentSubjectBinding, ui: SubjectUiState): ViewfinderFrame {
+        val area = binding.videoContainer
+        return fitViewfinderFrame(area.width.toFloat(), area.height.toFloat(), ui.aspect.frameAspect)
+    }
+
+    /**
+     * TalkBack has no tap at a place on the video, and the brightness button is gone (#273): its action on the video
+     * asks for the focus at the image's middle, which brings the bar, and moves its focus onto the bar, which stays up
+     * while it has it.
+     */
+    private fun setupFocusAccessibility(binding: FragmentSubjectBinding) {
+        ViewCompat.replaceAccessibilityAction(
+            binding.liveView,
+            AccessibilityActionCompat.ACTION_CLICK,
+            getString(R.string.focus_and_brightness_action),
+        ) { _, _ ->
+            val frame = videoFrame(binding, viewModel.uiState.value)
+            if (!onVideoTap(frame.centerX, frame.centerY)) return@replaceAccessibilityAction false
+            val bar = binding.exposureBar
+            // Once the bar shows. Without a screen reader the focus does not move, and the bar keeps its own time.
+            bar.post {
+                if (!bar.isShown) return@post
+                bar.performAccessibilityAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
+                if (!bar.isAccessibilityFocused) {
+                    bar.performAccessibilityAction(AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS, null)
+                }
+            }
+            true
+        }
+    }
 
     private fun setupZoomAccessibility(readout: View) {
         fun adjust(factor: Float): Boolean {
@@ -1084,7 +1220,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
     private fun leaveNow() {
         pinchZoom?.finishInteraction()
-        brightnessSlider?.finishInteraction()
+        focusBrightness?.finishDrag()
         sessionViewModel.leave()
         backToCamera()
     }

@@ -809,8 +809,8 @@ class CameraLayoutTest {
         assertReadoutTapArea(binding.zoomReadout, binding.zoomRow)
 
         binding.editGuideButton.visibility = View.VISIBLE
-        binding.brightnessButton.visibility = View.VISIBLE
-        binding.brightnessPanel.visibility = View.VISIBLE
+        // The brightness bar beside a tap's focus box (FR-7.3), as wide as a touch target.
+        binding.exposureBar.visibility = View.VISIBLE
         binding.galleryButton.visibility = View.VISIBLE
         idle()
         assertEveryControlAtLeast48(binding.root, "Subject view")
@@ -1001,13 +1001,13 @@ class CameraLayoutTest {
     }
 
     private fun assertTheTipFitsOnSubjectView(binding: FragmentSubjectBinding, font: String) {
-        // The row: brightness and the tip at its start, clear of the readout; Save guide and the toggle at its end.
+        // The row: the tip at its start, clear of the readout; Save guide and the toggle at its end.
         val row = binding.zoomRow.box()
-        val brightness = binding.brightnessButton.box()
         val tip = binding.tipButtonFrame.box()
         val readout = binding.zoomReadout.box()
         assertTrue("$font: the tip button shows", binding.tipButtonFrame.isShown)
-        assertEquals("$font: the tip button beside the brightness", brightness.right, tip.left)
+        // Inside the row's 12 dp of padding.
+        assertEquals("$font: the tip button at the row's start", row.left + 12, tip.left)
         assertTrue("$font: $tip clear of the readout $readout", tip.right <= readout.left)
         assertTrue("$font: the readout clear of Save guide", readout.right <= binding.saveGuideButton.box().left)
         assertTrue("$font: in the row", tip.top >= row.top && tip.bottom <= row.bottom)

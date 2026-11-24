@@ -1,6 +1,7 @@
 // AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
+import android.os.SystemClock
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -69,9 +70,21 @@ sealed interface SessionNotice {
     /** A guide made on the subject's phone is now the guide: "Joonhyung set a pose guide" (FR-6.15, FR-7.4). */
     data class RemoteGuide(val name: String) : SessionNotice
 
+    /**
+     * The subject's tap set the focus: "Joonhyung set the focus" (FR-7.7, FR-7.4). Shown for
+     * [SessionViewModel.FOCUS_NOTICE_MS], and not for every tap (SessionViewModel.remoteFocus).
+     */
+    data class RemoteFocus(val name: String) : SessionNotice
+
     /** A subject connected, so the live view starts: "Joonhyung is watching your camera" (#271). */
     data class Watching(val name: String) : SessionNotice
 }
+
+/**
+ * Where the other phone's tap set the focus (FR-7.7), for the focus box here: in fractions of the image as this phone
+ * shows it, the photographer's frame on Camera and its mirror on Subject view.
+ */
+data class RemoteFocus(val x: Float, val y: Float)
 
 /** The subject's toast about a photo from the photographer (FR-6.14), on whichever screen of the session is in front. */
 sealed interface PhotoNotice {
@@ -114,6 +127,7 @@ class SessionViewModel(
     private val descriptionSyncer: DescriptionSyncer? = null,
     private val photoSyncer: PhotoSyncer? = null,
     private val tipSyncer: TipSyncer? = null,
+    private val clock: () -> Long = SystemClock::elapsedRealtime,
 ) : ViewModel() {
 
     val state: StateFlow<SessionState> = session.state
@@ -128,6 +142,15 @@ class SessionViewModel(
 
     private val _notices = MutableSharedFlow<SessionNotice>(extraBufferCapacity = 16)
     val notices: SharedFlow<SessionNotice> = _notices.asSharedFlow()
+
+    private val _remoteFocus = MutableSharedFlow<RemoteFocus>(extraBufferCapacity = 16)
+
+    /**
+     * Each of the subject's taps to focus (FR-7.7), for the box on Camera. Its notice, [SessionNotice.RemoteFocus],
+     * comes with the first tap only: a tap while that notice shows ([FOCUS_NOTICE_MS]) or in the
+     * [FOCUS_NOTICE_QUIET_MS] after it makes none, so taps in a row do not keep saying the same line.
+     */
+    val remoteFocus: SharedFlow<RemoteFocus> = _remoteFocus.asSharedFlow()
 
     private val _photoNotices = Channel<PhotoNotice>(Channel.UNLIMITED)
 
@@ -209,6 +232,9 @@ class SessionViewModel(
     /** Whether the last state was Connected, so another Connected of the same connection says nothing new. */
     private var wasConnected = false
     private var connectedJob: Job? = null
+
+    /** When this session's last "set the focus" notice began, by [clock]; null before the first. */
+    private var focusNoticeAt: Long? = null
     private var receiverJob: Job? = null
     private var photoJob: Job? = null
     private var backgroundJob: Job? = null
@@ -442,6 +468,8 @@ class SessionViewModel(
         }
         wasConnected = connected != null
         if (liveNow && connectedJob == null) {
+            // Another session's first tap to focus is said again; a reconnect is the same session.
+            if (!resumed) focusNoticeAt = null
             connectedJob = viewModelScope.launch {
                 coroutineScope {
                     launch {
@@ -461,6 +489,16 @@ class SessionViewModel(
                                     _notices.tryEmit(SessionNotice.RemoteBrightness(name, action.index))
 
                                 is RemoteAction.Flash -> _notices.tryEmit(SessionNotice.RemoteFlash(name, action.mode))
+
+                                is RemoteAction.Focus -> {
+                                    _remoteFocus.tryEmit(RemoteFocus(action.x, action.y))
+                                    val now = clock()
+                                    val last = focusNoticeAt
+                                    if (last == null || now - last >= FOCUS_NOTICE_MS + FOCUS_NOTICE_QUIET_MS) {
+                                        focusNoticeAt = now
+                                        _notices.tryEmit(SessionNotice.RemoteFocus(name))
+                                    }
+                                }
                             }
                         }
                     }
@@ -561,10 +599,19 @@ class SessionViewModel(
         _notices.tryEmit(SessionNotice.PeerGone(name, message.reason))
     }
 
-    private companion object {
-        const val BACKGROUND_LIMIT_MS = 60_000L
+    companion object {
+        /**
+         * How long "Joonhyung set the focus" shows. Shorter than the other notices: the focus box beside it already
+         * says what happened, and it goes after about a second too.
+         */
+        const val FOCUS_NOTICE_MS = 1_500L
+
+        /** How long after that notice another tap to focus makes none. */
+        const val FOCUS_NOTICE_QUIET_MS = 2_000L
+
+        private const val BACKGROUND_LIMIT_MS = 60_000L
 
         /** WebRTC's `networkType` of a candidate on a cellular interface. */
-        const val CELLULAR = "cellular"
+        private const val CELLULAR = "cellular"
     }
 }

@@ -1,7 +1,9 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-18, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
+import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
+import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.generation.PoseTip
 import com.lastpenguin.pix.guide.GuideSaved
@@ -51,6 +53,19 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+/*
+ * Subject view's ViewModel (Design 2.6.5; Testing Documentation 2.1.6), plain JVM on the fakes: each control as a
+ * request to the photographer, shown at once, sent in steps, and settled by the echo, with the guide, *Save guide*, the
+ * tip, and the photographer's pose steps. The tap to focus (FR-7.7, #273), by partition: the rear camera's mirror (x
+ * turned back) / the front camera (x as seen); a point inside the frame, just outside it, and no number; before the
+ * session is connected, in guide-edit mode (which also takes the bar down), and after a drop; a camera with point
+ * focus, with a brightness range only, and with neither; the tap's answer awaited, answered by the subject's state and
+ * not by the photographer's own or another echo of this phone's, timed out (1 ms before 1 s / after it), answered after the photographer's own wait of 500 ms (still taken), and
+ * ended by a drop. The photographer's
+ * own focus (`camera.focus`): shown where this phone has that point, on the rear camera's mirror and on the front
+ * camera, and a point outside the frame dropped. The bar when the photographer's frame changes: another ratio and
+ * another camera take it down, a state of the same frame does not.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SubjectViewModelTest {
 
@@ -92,6 +107,25 @@ class SubjectViewModelTest {
             ),
         )
     }
+
+    /** A photographer whose camera focuses on a point and has a brightness range (FR-7.7). */
+    private fun connectWithFocus() {
+        session.setState(SessionState.Connected("s_1", PeerInfo("Dongje"), Role.SUBJECT))
+        session.deliver(
+            SessionMessage.Capabilities(
+                CameraCapabilities(
+                    0.6f,
+                    10f,
+                    listOf(1f, 2f),
+                    exposureRange = -4..4,
+                    exposureStep = 0.5f,
+                    supportsFocusPoint = true,
+                ),
+            ),
+        )
+    }
+
+    private fun focuses(): List<SessionMessage.FocusSet> = session.sent.filterIsInstance<SessionMessage.FocusSet>()
 
     private fun requests(): List<SessionMessage.ZoomSet> = session.sent.filterIsInstance<SessionMessage.ZoomSet>()
 
@@ -573,6 +607,188 @@ class SubjectViewModelTest {
             session.deliver(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 3))
             runCurrent()
             assertEquals(3, viewModel.uiState.value.exposure)
+        }
+
+    @Test
+    fun `a tap asks for the focus where the photographer's frame has it, turned back on the rear camera's mirror`() =
+        runTest(dispatcher) {
+            connectWithFocus()
+            runCurrent()
+            assertTrue(viewModel.uiState.value.supportsFocusPoint)
+
+            // The rear camera's video is a mirror here: what is at a quarter from the left is at three quarters there.
+            assertTrue(viewModel.onFocusTap(0.25f, 0.4f))
+            assertEquals(listOf(SessionMessage.FocusSet(0.75f, 0.4f)), focuses())
+
+            // The front camera's video comes mirrored, and the photographer's preview shows it the same way.
+            session.deliver(
+                SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, facing = CameraFacing.FRONT),
+            )
+            runCurrent()
+            assertTrue(viewModel.onFocusTap(0.25f, 0.4f))
+            assertEquals(SessionMessage.FocusSet(0.25f, 0.4f), focuses().last())
+        }
+
+    @Test
+    fun `the photographer's own focus shows where this phone has that point`() = runTest(dispatcher) {
+        val shown = mutableListOf<RemoteFocus>()
+        backgroundScope.launch { viewModel.photographerFocus.collect { shown += it } }
+        connectWithFocus()
+        runCurrent()
+
+        // The rear camera's video is a mirror here.
+        session.deliver(SessionMessage.Focused(0.25f, 0.4f))
+        // Not a point of the frame.
+        session.deliver(SessionMessage.Focused(1.5f, 0.4f))
+        session.deliver(SessionMessage.Focused(0.5f, Float.NaN))
+        runCurrent()
+        assertEquals(listOf(RemoteFocus(0.75f, 0.4f)), shown)
+
+        session.deliver(
+            SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, facing = CameraFacing.FRONT),
+        )
+        runCurrent()
+        session.deliver(SessionMessage.Focused(0.25f, 0.4f))
+        runCurrent()
+        assertEquals(RemoteFocus(0.25f, 0.4f), shown.last())
+    }
+
+    @Test
+    fun `a tap asks for nothing outside the frame, in guide-edit mode, or before the session is connected`() =
+        runTest(dispatcher) {
+            runCurrent()
+            assertFalse(viewModel.onFocusTap(0.5f, 0.5f))
+
+            connectWithFocus()
+            mirror.setGuide(fakeGuide("g1"))
+            runCurrent()
+            assertFalse(viewModel.onFocusTap(1.01f, 0.5f))
+            assertFalse(viewModel.onFocusTap(0.5f, -0.01f))
+            assertFalse(viewModel.onFocusTap(Float.NaN, 0.5f))
+
+            // The touch is the guide's while the mode is on, and the bar it would bring goes.
+            viewModel.setBrightnessOpen(true)
+            viewModel.setGuideEditing(true)
+            assertFalse(viewModel.uiState.value.brightnessOpen)
+            assertFalse(viewModel.onFocusTap(0.5f, 0.5f))
+            assertTrue(focuses().isEmpty())
+
+            viewModel.setGuideEditing(false)
+            assertTrue(viewModel.onFocusTap(0.5f, 0.5f))
+        }
+
+    @Test
+    fun `a tap needs a camera with point focus or a brightness range`() = runTest(dispatcher) {
+        // Zoom alone.
+        connect()
+        runCurrent()
+        assertFalse(viewModel.uiState.value.supportsFocusPoint)
+        assertFalse(viewModel.onFocusTap(0.5f, 0.5f))
+        assertTrue(focuses().isEmpty())
+
+        // A brightness range without point focus: the tap still puts the brightness back and brings the bar.
+        connectWithControls()
+        runCurrent()
+        assertTrue(viewModel.onFocusTap(0.5f, 0.5f))
+        assertEquals(1, focuses().size)
+    }
+
+    @Test
+    fun `a tap waits for its answer, which gives the brightness the camera went back to`() = runTest(dispatcher) {
+        connectWithFocus()
+        session.deliver(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 3))
+        runCurrent()
+        assertEquals(3, viewModel.uiState.value.exposure)
+
+        viewModel.onFocusTap(0.5f, 0.5f)
+        assertTrue(viewModel.uiState.value.baseAwaited)
+
+        // The photographer's own change is not the answer, nor is the echo of this phone's earlier pinch.
+        session.deliver(SessionMessage.CameraStateUpdate(2f, Role.PHOTOGRAPHER, final = true, exposure = 3))
+        session.deliver(SessionMessage.CameraStateUpdate(2f, Role.SUBJECT, final = true, exposure = 3))
+        runCurrent()
+        assertTrue(viewModel.uiState.value.baseAwaited)
+
+        session.deliver(
+            SessionMessage.CameraStateUpdate(2f, Role.SUBJECT, final = true, exposure = 0, focused = true),
+        )
+        runCurrent()
+        assertFalse(viewModel.uiState.value.baseAwaited)
+        assertEquals(0, viewModel.uiState.value.exposure)
+    }
+
+    @Test
+    fun `the bar goes when the photographer's frame changes, since it stood beside a point of the old one`() =
+        runTest(dispatcher) {
+            connectWithFocus()
+            runCurrent()
+            viewModel.onFocusTap(0.5f, 0.5f)
+            viewModel.setBrightnessOpen(true)
+
+            // The same frame: only the brightness changed.
+            session.deliver(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, exposure = 2))
+            runCurrent()
+            assertTrue(viewModel.uiState.value.brightnessOpen)
+
+            session.deliver(
+                SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, aspect = AspectRatio.R16_9),
+            )
+            runCurrent()
+            assertFalse(viewModel.uiState.value.brightnessOpen)
+
+            viewModel.setBrightnessOpen(true)
+            session.deliver(
+                SessionMessage.CameraStateUpdate(
+                    1f,
+                    Role.PHOTOGRAPHER,
+                    final = true,
+                    aspect = AspectRatio.R16_9,
+                    facing = CameraFacing.FRONT,
+                ),
+            )
+            runCurrent()
+            assertFalse(viewModel.uiState.value.brightnessOpen)
+        }
+
+    @Test
+    fun `an answer that the photographer gives only after its own wait is still taken`() = runTest(dispatcher) {
+        connectWithFocus()
+        session.deliver(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 3))
+        runCurrent()
+
+        // The photographer's camera did not report the base, so its phone answers after its 500 ms, and the link adds
+        // its own delay.
+        viewModel.onFocusTap(0.5f, 0.5f)
+        advanceTimeBy(700)
+        assertTrue(viewModel.uiState.value.baseAwaited)
+
+        session.deliver(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 0, focused = true),
+        )
+        runCurrent()
+        assertFalse(viewModel.uiState.value.baseAwaited)
+        assertEquals(0, viewModel.uiState.value.exposure)
+    }
+
+    @Test
+    fun `a tap that gets no answer stops waiting after a moment, and at once when the link drops`() =
+        runTest(dispatcher) {
+            connectWithFocus()
+            runCurrent()
+
+            viewModel.onFocusTap(0.5f, 0.5f)
+            advanceTimeBy(999)
+            assertTrue(viewModel.uiState.value.baseAwaited)
+            advanceTimeBy(2)
+            assertFalse(viewModel.uiState.value.baseAwaited)
+
+            viewModel.onFocusTap(0.5f, 0.5f)
+            viewModel.setBrightnessOpen(true)
+            session.setState(SessionState.Reconnecting("s_1", 0L))
+            runCurrent()
+            assertFalse(viewModel.uiState.value.baseAwaited)
+            assertFalse(viewModel.uiState.value.brightnessOpen)
+            assertFalse(viewModel.onFocusTap(0.5f, 0.5f))
         }
 
     @Test

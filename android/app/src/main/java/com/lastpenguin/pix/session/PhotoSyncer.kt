@@ -16,6 +16,7 @@ import java.io.IOException
 import java.io.InputStream
 import java.util.Base64
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.CRC32
 import kotlinx.coroutines.CoroutineDispatcher
@@ -41,24 +42,25 @@ import kotlinx.coroutines.withTimeoutOrNull
 /** What the Camera screen tells the subject's phone about its photos (FR-6.14), the photographer's side of [PhotoSyncer]. */
 interface PhotoShare {
     /**
-     * The shutter was pressed: the id of the session the photo belongs to, or null outside a session. A connected
-     * subject hears of it at once (`photo.shutter`).
+     * The shutter was pressed: the photo's shot, an id it keeps until it is sent or given up, or null outside a session.
+     * The photo belongs to the session running now. A connected subject hears of it at once (`photo.shutter`), and
+     * waits for that photo by its shot (#271).
      */
     fun shutter(): String?
 
-    /** The photo of [sessionId], from [shutter], taken at [takenAt], is saved here as [uri]. */
-    fun taken(sessionId: String, uri: Uri, takenAt: Long)
+    /** The photo of [shot], from [shutter], taken at [takenAt], is saved here as [uri]. */
+    fun taken(shot: String, uri: Uri, takenAt: Long)
 
-    /** The photo of [sessionId] could not be saved, so there is nothing to send. */
-    fun notTaken(sessionId: String)
+    /** The photo of [shot] could not be saved, so there is nothing to send. */
+    fun notTaken(shot: String)
 
     /** For a phone with nothing to share, such as the ViewModel's tests. */
     object None : PhotoShare {
         override fun shutter(): String? = null
 
-        override fun taken(sessionId: String, uri: Uri, takenAt: Long) = Unit
+        override fun taken(shot: String, uri: Uri, takenAt: Long) = Unit
 
-        override fun notTaken(sessionId: String) = Unit
+        override fun notTaken(shot: String) = Unit
     }
 }
 
@@ -157,7 +159,7 @@ class PhotoSyncer(
 
     // ---- Photographer -----------------------------------------------------------------------------------------
 
-    private data class Outgoing(val photoId: String, val uri: Uri, val takenAt: Long)
+    private data class Outgoing(val photoId: String, val uri: Uri, val takenAt: Long, val shot: String)
 
     /** How far the subject has the photo that is going; [saved] is its `photo.saved`. */
     private data class Progress(val photoId: String, val next: Int = 0, val saved: Boolean? = null)
@@ -176,34 +178,43 @@ class PhotoSyncer(
     /** One for each photo of this session that will not reach the subject's album; none is lost unread. */
     val sendFailed: Flow<Unit> = _sendFailed.receiveAsFlow()
 
-    override fun shutter(): String? = currentSession()?.also {
+    /** The session of each shot not yet taken or given up. */
+    private val shots = ConcurrentHashMap<String, String>()
+
+    override fun shutter(): String? {
+        val sessionId = currentSession() ?: return null
+        val shot = UUID.randomUUID().toString()
+        shots[shot] = sessionId
         unconfirmed.incrementAndGet()
-        if (session.state.value is SessionState.Connected) session.send(SessionMessage.PhotoShutter)
+        if (session.state.value is SessionState.Connected) session.send(SessionMessage.PhotoShutter(shot))
+        return shot
     }
 
     /**
      * Saving takes seconds, so another session may run by now: a photo goes only to the session of its shutter. One
      * whose session ended meanwhile was counted when it ended, by [drop].
      */
-    override fun taken(sessionId: String, uri: Uri, takenAt: Long) {
+    override fun taken(shot: String, uri: Uri, takenAt: Long) {
+        val sessionId = shots.remove(shot) ?: return
         if (currentSession() != sessionId) return
         keep(sessionId, uri)
         outgoing.update { it + uri }
-        queue.trySend(Outgoing(UUID.randomUUID().toString(), uri, takenAt))
+        queue.trySend(Outgoing(UUID.randomUUID().toString(), uri, takenAt, shot))
     }
 
-    override fun notTaken(sessionId: String) {
+    override fun notTaken(shot: String) {
+        val sessionId = shots.remove(shot) ?: return
         if (currentSession() != sessionId) return
         unconfirmed.updateAndGet { maxOf(it - 1, 0) }
-        dropped()
+        dropped(shot)
     }
 
     /**
      * The subject waits for each photo from its `photo.shutter` on (#271): one that will not come after all, before its
-     * `photo.begin`, is said, or Subject view would say a photo is on its way until its 30 s end.
+     * `photo.begin`, is said by its [shot], or Subject view would say a photo is on its way until its 30 s end.
      */
-    private fun dropped() {
-        if (currentSession() != null) session.send(SessionMessage.PhotoDropped)
+    private fun dropped(shot: String) {
+        if (currentSession() != null) session.send(SessionMessage.PhotoDropped(shot))
     }
 
     private fun currentSession(): String? = session.state.value.liveSessionId()
@@ -251,6 +262,7 @@ class PhotoSyncer(
     /** The session ended: what is not confirmed stays here. Returns how many photos that is, failures unread included. */
     fun drop(): Int {
         while (queue.tryReceive().isSuccess) Unit
+        shots.clear()
         progress.value = null
         // None goes any more, so a photo deleted on its way is deleted now.
         outgoing.value = emptySet()
@@ -260,12 +272,19 @@ class PhotoSyncer(
     }
 
     private suspend fun send(photo: Outgoing): Boolean {
-        val content = reader.open(photo.uri) ?: return false.also { dropped() }
+        val content = reader.open(photo.uri) ?: return false.also { dropped(photo.shot) }
         return content.stream.use { stream ->
-            if (content.bytes !in 1..MAX_PHOTO_BYTES) return@use false.also { dropped() }
+            if (content.bytes !in 1..MAX_PHOTO_BYTES) return@use false.also { dropped(photo.shot) }
             progress.value = Progress(photo.photoId)
             val chunks = ((content.bytes + CHUNK_BYTES - 1) / CHUNK_BYTES).toInt()
-            val begin = SessionMessage.PhotoBegin(photo.photoId, FORMAT, content.bytes, chunks, photo.takenAt)
+            val begin = SessionMessage.PhotoBegin(
+                photo.photoId,
+                FORMAT,
+                content.bytes,
+                chunks,
+                photo.takenAt,
+                photo.shot,
+            )
             Timings.mark("photo.sent", "begin ${photo.photoId} ${content.bytes}")
             if (!session.sendBulk(begin)) return@use false
             val saved = sendChunks(photo.photoId, stream, chunks)
@@ -341,25 +360,43 @@ class PhotoSyncer(
     /** Each `photo.shutter` while a screen listens; one that no screen saw is a moment gone, not kept for later. */
     val shutters: Flow<Unit> = _shutters.asSharedFlow()
 
-    /** The photographer's photos from their shutter on that are not yet saved or refused here. */
-    private val awaited = MutableStateFlow(0)
+    /**
+     * The photographer's photos from their shutter on that are not yet saved, refused, or given up here: by shot, and
+     * as a count for a phone before #271, whose messages name none.
+     */
+    private data class Waits(val shots: Set<String> = emptySet(), val unnamed: Int = 0) {
+        val any: Boolean get() = shots.isNotEmpty() || unnamed > 0
+
+        fun add(shot: String?): Waits = if (shot != null) copy(shots = shots + shot) else copy(unnamed = unnamed + 1)
+
+        /** The photo of [shot] begins, its shutter heard or not; an unnamed begin is the one unnamed photo at least. */
+        fun began(shot: String?): Waits =
+            if (shot != null) copy(shots = shots + shot) else copy(unnamed = maxOf(unnamed, 1))
+
+        /** The photo of [shot] came or will not: that wait, and only that one, ends. */
+        fun end(shot: String?): Waits =
+            if (shot != null) copy(shots = shots - shot) else copy(unnamed = maxOf(unnamed - 1, 0))
+    }
+
+    private val awaited = MutableStateFlow(Waits())
 
     /** Counts the photo messages, each of which shows that a photo is still on its way. */
     private val photoMessagesSeen = MutableStateFlow(0L)
 
     /**
      * Whether a photo of the photographer's is on its way to this phone's album (#271): from its `photo.shutter`, or its
-     * `photo.begin` when the shutter came during a drop, until it is saved, refused, or given up, by `photo.dropped`
-     * before its begin. A photographer's phone without `photo.dropped` never says so, and [STALL_MS] without a photo
+     * `photo.begin` when the shutter was lost or came during a drop, until it is saved, refused, or given up, by
+     * `photo.dropped` before its begin. Each is waited for by its shot, so a lost shutter or a dropped photo never ends
+     * another's wait. A photographer's phone before #271 never says a photo is dropped, and [STALL_MS] without a photo
      * message ends the wait then, as does the session's end.
      */
-    val receiving: Flow<Boolean> = awaited.map { it > 0 }.distinctUntilChanged()
+    val receiving: Flow<Boolean> = awaited.map { it.any }.distinctUntilChanged()
 
     fun startAsReceiver(scope: CoroutineScope) {
         scope.launch(dispatcher) {
             clearParts()
             saved.clear()
-            awaited.value = 0
+            awaited.value = Waits()
             // What an earlier session left unread is not about this one's photographer.
             while (_received.tryReceive().isSuccess) Unit
             // Files and the album take their time, and a reader of incoming that waits costs every reader its messages
@@ -374,20 +411,20 @@ class PhotoSyncer(
                         photoMessages.trySend(message)
                     }
                     if (message is SessionMessage.PhotoShutter) {
-                        awaited.update { it + 1 }
+                        awaited.update { it.add(message.shot) }
                         photoMessagesSeen.update { it + 1 }
                         _shutters.tryEmit(Unit)
                     }
-                    // A photo of a shutter that will not come: one fewer is on its way.
-                    if (message is SessionMessage.PhotoDropped) awaited.update { maxOf(it - 1, 0) }
+                    // That photo will not come; one whose shutter never arrived ends no other's wait.
+                    if (message is SessionMessage.PhotoDropped) awaited.update { it.end(message.shot) }
                 }
             }
             launch {
                 // A wait with no photo message for this long is over: that photo is not coming.
-                combine(awaited, photoMessagesSeen) { count, _ -> count }.collectLatest { count ->
-                    if (count == 0) return@collectLatest
+                combine(awaited, photoMessagesSeen) { waits, _ -> waits.any }.collectLatest { waiting ->
+                    if (!waiting) return@collectLatest
                     delay(STALL_MS)
-                    awaited.value = 0
+                    awaited.value = Waits()
                 }
             }
             try {
@@ -402,34 +439,35 @@ class PhotoSyncer(
             } finally {
                 abandon()
                 clearParts()
-                awaited.value = 0
+                awaited.value = Waits()
             }
         }
     }
 
     private fun onBegin(begin: SessionMessage.PhotoBegin) {
         // The photographer gave up the photo that was arriving, if this is another, so it is no longer awaited.
-        if (arriving?.let { it.begin.photoId != begin.photoId } == true) awaited.update { maxOf(it - 1, 0) }
+        val gone = arriving?.begin?.takeIf { it.photoId != begin.photoId }
+        if (gone != null) awaited.update { it.end(gone.shot) }
         abandon()
         if (begin.photoId in saved) {
             session.send(SessionMessage.PhotoSaved(begin.photoId, ok = true))
             return
         }
-        // Its shutter may have come during a drop, and was then never sent.
-        awaited.update { maxOf(it, 1) }
+        // Its shutter may have been lost, or come during a drop and never been sent.
+        awaited.update { it.began(begin.shot) }
         val refusal = when {
             begin.bytes !in 1..MAX_PHOTO_BYTES -> PhotoRefusal.TOO_LARGE
             begin.format != FORMAT -> PhotoRefusal.BROKEN
             begin.chunks.toLong() != (begin.bytes + CHUNK_BYTES - 1) / CHUNK_BYTES -> PhotoRefusal.BROKEN
             else -> null
         }
-        if (refusal != null) return answer(begin.photoId, refusal)
+        if (refusal != null) return answer(begin, refusal)
         arriving = try {
             partDir.mkdirs()
             Arriving(begin, File(partDir, "${UUID.randomUUID()}$PART_SUFFIX"))
         } catch (error: IOException) {
             Log.w(TAG, "No file for photo ${begin.photoId}", error)
-            answer(begin.photoId, PhotoRefusal.STORAGE)
+            answer(begin, PhotoRefusal.STORAGE)
             null
         }
     }
@@ -470,26 +508,26 @@ class PhotoSyncer(
             onSuccess = { uri ->
                 saved += end.photoId
                 sessionId?.let { keep(it, uri) }
-                answer(end.photoId, null)
+                answer(photo.begin, null)
                 Timings.mark("photo.applied", "saved ${end.photoId}")
             },
             onFailure = { error ->
                 Log.w(TAG, "Photo ${end.photoId} could not be saved", error)
-                answer(end.photoId, PhotoRefusal.STORAGE)
+                answer(photo.begin, PhotoRefusal.STORAGE)
             },
         )
         abandon()
     }
 
     private fun fail(photo: Arriving, refusal: PhotoRefusal) {
-        answer(photo.begin.photoId, refusal)
+        answer(photo.begin, refusal)
         abandon()
     }
 
-    /** Tells the photographer, and this phone's person, how the photo ended: saved, or [refusal]. */
-    private fun answer(photoId: String, refusal: PhotoRefusal?) {
-        awaited.update { maxOf(it - 1, 0) }
-        session.send(SessionMessage.PhotoSaved(photoId, ok = refusal == null, reason = refusal))
+    /** Tells the photographer, and this phone's person, how the photo of [begin] ended: saved, or [refusal]. */
+    private fun answer(begin: SessionMessage.PhotoBegin, refusal: PhotoRefusal?) {
+        awaited.update { it.end(begin.shot) }
+        session.send(SessionMessage.PhotoSaved(begin.photoId, ok = refusal == null, reason = refusal))
         _received.trySend(refusal == null)
     }
 

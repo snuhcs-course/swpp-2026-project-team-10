@@ -842,7 +842,7 @@ class KoreanScreensTest {
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.SUBJECT))
         modules.video.deliverFrame()
         modules.photos.startAsReceiver(receiving)
-        modules.session.deliver(SessionMessage.PhotoShutter)
+        modules.session.deliver(SessionMessage.PhotoShutter("a"))
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
         assertKorean(screen(), *people)
     }

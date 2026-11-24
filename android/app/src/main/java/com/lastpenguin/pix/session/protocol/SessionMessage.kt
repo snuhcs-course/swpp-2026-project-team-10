@@ -293,7 +293,8 @@ sealed interface SessionMessage {
 
     /**
      * A photo taken in a session, for the subject's "Pix" album (FR-6.14, Design 2.6.5): the JPEG as it was saved, of
-     * [bytes] in [chunks] chunks, taken at [takenAt].
+     * [bytes] in [chunks] chunks, taken at [takenAt]. [shot] is its shutter's, as in [PhotoShutter]; null from a phone
+     * before #271.
      */
     @Serializable
     @SerialName("photo.begin")
@@ -303,6 +304,7 @@ sealed interface SessionMessage {
         val bytes: Long,
         val chunks: Int,
         val takenAt: Long,
+        val shot: String? = null,
     ) : SessionMessage
 
     /** [data] is Base64 of at most 12 KiB, as for the guide image; the chunks come in order, one photo at a time. */
@@ -322,21 +324,23 @@ sealed interface SessionMessage {
     /**
      * The photographer pressed the shutter in a session (Design 2.5.1, Iter3-A12): the subject's video blinks then, as
      * the photographer's preview does, and not seconds later with the photo's `photo.begin`. It goes on the realtime
-     * channel, since a blink that comes late shows a moment that has passed, and one lost shows none.
+     * channel, since a blink that comes late shows a moment that has passed, and one lost shows none. [shot] names the
+     * photo, as its `photo.begin` or `photo.dropped` does, so the subject waits for each photo by name (#271); null
+     * from a phone before #271, whose shutters the subject counts instead.
      */
     @Serializable
     @SerialName("photo.shutter")
-    data object PhotoShutter : SessionMessage
+    data class PhotoShutter(val shot: String? = null) : SessionMessage
 
     /**
-     * A photo of the photographer's shutter that will not come after all (#271): its save failed, or it could not be
-     * read or is too large, before its `photo.begin`. The subject stops waiting for it, so Subject view no longer says a
-     * photo is on its way. Reliable, since a lost one leaves the subject waiting until its 30 s end; a phone that does
-     * not know it ignores it, and waits as long.
+     * The photo of the shutter [shot] will not come after all (#271): its save failed, or it could not be read or is
+     * too large, before its `photo.begin`. The subject stops waiting for that photo, and only that one, so Subject view
+     * no longer says a photo is on its way once none is. Reliable, since a lost one leaves the subject waiting until its
+     * 30 s end; a phone that does not know it ignores it, and waits as long.
      */
     @Serializable
     @SerialName("photo.dropped")
-    data object PhotoDropped : SessionMessage
+    data class PhotoDropped(val shot: String) : SessionMessage
 
     /** Whether the photo is in the subject's album; without it, [reason] says why not. */
     @Serializable

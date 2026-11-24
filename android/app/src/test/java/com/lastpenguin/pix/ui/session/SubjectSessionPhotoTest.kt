@@ -143,8 +143,8 @@ class SubjectSessionPhotoTest {
     }
 
     /** The photographer's photo [photoId] arrives and is saved here; its pictures are read off the main thread. */
-    private fun TestAppContainer.photo(photoId: String) {
-        deliverPhoto(photoId)
+    private fun TestAppContainer.photo(photoId: String, shot: String? = null) {
+        deliverPhoto(photoId, shot)
         settle()
     }
 
@@ -239,11 +239,11 @@ class SubjectSessionPhotoTest {
         val modules = launch()
         onScreen { binding, _ -> assertFalse(binding.receivingShown()) }
 
-        modules.session.deliver(SessionMessage.PhotoShutter)
+        modules.session.deliver(SessionMessage.PhotoShutter("a"))
         idle()
         onScreen { binding, _ -> assertTrue(binding.receivingShown()) }
 
-        modules.photo("p1")
+        modules.photo("p1", shot = "a")
         onScreen { binding, _ ->
             assertFalse(binding.receivingShown())
             assertEquals(string(R.string.subject_live), binding.cameraCaptionStatus.text.toString())
@@ -255,12 +255,12 @@ class SubjectSessionPhotoTest {
     fun twoShutters_waitForBothPhotos() {
         val modules = launch()
 
-        modules.session.deliver(SessionMessage.PhotoShutter)
-        modules.session.deliver(SessionMessage.PhotoShutter)
-        modules.photo("p1")
+        modules.session.deliver(SessionMessage.PhotoShutter("a"))
+        modules.session.deliver(SessionMessage.PhotoShutter("b"))
+        modules.photo("p1", shot = "a")
         onScreen { binding, _ -> assertTrue(binding.receivingShown()) }
 
-        modules.photo("p2")
+        modules.photo("p2", shot = "b")
         onScreen { binding, _ -> assertFalse(binding.receivingShown()) }
     }
 
@@ -269,11 +269,11 @@ class SubjectSessionPhotoTest {
         val modules = launch()
         modules.albumFails = true
 
-        modules.session.deliver(SessionMessage.PhotoShutter)
+        modules.session.deliver(SessionMessage.PhotoShutter("a"))
         idle()
         onScreen { binding, _ -> assertTrue(binding.receivingShown()) }
 
-        modules.photo("p1")
+        modules.photo("p1", shot = "a")
         onScreen { binding, _ -> assertFalse(binding.receivingShown()) }
     }
 

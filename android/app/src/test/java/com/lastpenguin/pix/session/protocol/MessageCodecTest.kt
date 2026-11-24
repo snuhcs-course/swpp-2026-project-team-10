@@ -86,11 +86,13 @@ class MessageCodecTest {
             SessionMessage.PoseDescriptionEdit("d1", holding = true, text = "벽에 기대기"),
             SessionMessage.PoseDescriptionGo("d1", "", suggest = true),
             SessionMessage.PhotoBegin("p1", "jpeg", 4_718_592, 525, 1_759_212_499_870L),
+            SessionMessage.PhotoBegin("p1", "jpeg", 4_718_592, 525, 1_759_212_499_870L, shot = "shot-1"),
             SessionMessage.PhotoChunk("p1", 0, "/9j/4AAQSkZJRgABAQ"),
             SessionMessage.PhotoEnd("p1", 3735928559L),
             SessionMessage.PhotoAck("p1", 48),
-            SessionMessage.PhotoShutter,
-            SessionMessage.PhotoDropped,
+            SessionMessage.PhotoShutter(),
+            SessionMessage.PhotoShutter("shot-1"),
+            SessionMessage.PhotoDropped("shot-1"),
             SessionMessage.PhotoSaved("p1", ok = true),
             SessionMessage.PhotoSaved("p1", ok = false, reason = PhotoRefusal.STORAGE),
             SessionMessage.Leave(EndReason.LEFT),
@@ -266,6 +268,17 @@ class MessageCodecTest {
              "b": {"guideId": "g1", "text": "Step back a little.", "lines": [{"kind": "frame", "text": "x"}]}}
         """.trimIndent()
         assertEquals(SessionMessage.GuideTip("g1", "Step back a little."), codec.decode(text)!!.message)
+    }
+
+    @Test
+    fun `a shutter and a photo's begin from a phone before #271 are read without a shot`() {
+        val shutter = """{"v": 3, "t": "photo.shutter", "seq": 1, "ts": 0, "b": {}}"""
+        assertEquals(SessionMessage.PhotoShutter(), codec.decode(shutter)!!.message)
+        val begin = """
+            {"v": 3, "t": "photo.begin", "seq": 1, "ts": 0,
+             "b": {"photoId": "p1", "format": "jpeg", "bytes": 10, "chunks": 1, "takenAt": 1}}
+        """.trimIndent()
+        assertEquals(SessionMessage.PhotoBegin("p1", "jpeg", 10, 1, 1), codec.decode(begin)!!.message)
     }
 
     @Test

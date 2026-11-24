@@ -42,7 +42,7 @@ class GuideOverlayView @JvmOverloads constructor(
     }
     private val fillAlpha = fillPaint.alpha
 
-    /** The inside of the drawn guide's mask, made the first time that guide is [filled]. */
+    /** The inside of a guide's mask from [fill], drawn while [filled] and only for that guide. */
     private var inside: Pair<ReferenceGuide, Bitmap>? = null
     private val frameBounds = RectF()
     private val guideBounds = RectF()
@@ -132,6 +132,18 @@ class GuideOverlayView @JvmOverloads constructor(
         restyled = next
         updateDrawing()
         postInvalidateOnAnimation()
+    }
+
+    /**
+     * Tints [inside] for [guide] while [filled]: its mask's inside, made off the main thread ([GuideOutlines.inside]),
+     * since a pass over a whole mask in [onDraw] would stall the screen as editing starts. Ignored for any other guide,
+     * and until it comes, the guide is drawn without a tint.
+     */
+    fun fill(guide: ReferenceGuide?, inside: Bitmap?) {
+        val next = if (guide != null && inside != null) guide to inside else null
+        if (this.inside?.first === next?.first && this.inside?.second === next?.second) return
+        this.inside = next
+        if (filled) postInvalidateOnAnimation()
     }
 
     /** Shows [guide] at [state]; null hides it. */
@@ -250,7 +262,6 @@ class GuideOverlayView @JvmOverloads constructor(
         releaseTouch()
         stopAppearing()
         stopLeaving()
-        inside = null
         super.onDetachedFromWindow()
     }
 
@@ -425,19 +436,11 @@ class GuideOverlayView @JvmOverloads constructor(
         val alpha = (paint.alpha * coming).roundToInt()
         // Under the line, the same size as it, so the two meet at the outline's level.
         if (filled) {
-            insideOf(guide)?.let {
-                draw(canvas, it, guideBounds, frameBounds, alpha * fillAlpha / 255, scale, fillPaint)
+            inside?.takeIf { it.first === guide }?.let {
+                draw(canvas, it.second, guideBounds, frameBounds, alpha * fillAlpha / 255, scale, fillPaint)
             }
         }
         draw(canvas, image, guideBounds, frameBounds, alpha, scale)
-    }
-
-    /** The drawn guide's inside, made once per guide from its mask; null when it has none to read. */
-    private fun insideOf(guide: ReferenceGuide?): Bitmap? {
-        guide ?: return null
-        inside?.takeIf { it.first === guide }?.let { return it.second }
-        val mask = guide.mask.takeUnless { it.isRecycled } ?: return null
-        return guideInside(mask.maskPixels()).toMaskBitmap().also { inside = guide to it }
     }
 
     private fun draw(

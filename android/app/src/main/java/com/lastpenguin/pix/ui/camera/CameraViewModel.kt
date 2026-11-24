@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -517,7 +517,7 @@ class CameraViewModel(
         // At the press, like the time: the phone may turn while an earlier photo is still being saved.
         val turn = phoneTurns.turn.value
         // Now, not once it is saved: the photo belongs to the session running at the shutter.
-        val sessionId = photos.shutter()
+        val shot = photos.shutter()
         // The press before, for the order below.
         val earlier = lastShot
         lastShot = viewModelScope.launch {
@@ -555,7 +555,7 @@ class CameraViewModel(
                         saved = result.isSuccess,
                         shutterMs = capturedAt?.let { it - pressedAt },
                         ms = endedAt - pressedAt,
-                        inSession = sessionId != null,
+                        inSession = shot != null,
                     ),
                 )
                 result.fold(
@@ -564,11 +564,11 @@ class CameraViewModel(
                         // session's.
                         newestSaved = uri
                         showNewestPhoto()
-                        sessionId?.let { photos.taken(it, uri, takenAt) }
+                        shot?.let { photos.taken(it, uri, takenAt) }
                     },
                     onFailure = { error ->
                         if (error is CancellationException) throw error
-                        sessionId?.let(photos::notTaken)
+                        shot?.let(photos::notTaken)
                         _uiState.update { it.copy(captureNotice = captureFailureNotice(error)) }
                     },
                 )

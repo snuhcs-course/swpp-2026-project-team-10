@@ -22,7 +22,8 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * Exercises Android Canvas composition (Robolectric native graphics), including the frame's letterbox clipping. Guide-edit
  * mode's fill (#271): off, none; on, the mask's inside in the guide color and nothing outside it, at the guide's opacity,
- * the same color whatever the line's, and nothing for a hidden guide.
+ * the same color whatever the line's, and nothing for a hidden guide; none until its inside comes, and none from an
+ * inside made for another guide.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -84,6 +85,7 @@ class GuideOverlayViewTest {
         val guide = guide(mask = leftHalf(), outline = solid(Color.TRANSPARENT))
         val view = view(300, 400)
         view.render(guide, GuideState(guideId = guide.id, opacity = 1f))
+        view.fill(guide, inside(guide))
         assertEmpty(snapshot(view))
 
         view.filled = true
@@ -101,6 +103,7 @@ class GuideOverlayViewTest {
         val view = view(300, 400)
         view.filled = true
         view.render(guide, GuideState(guideId = guide.id, opacity = 0.5f))
+        view.fill(guide, inside(guide))
 
         assertPixel(snapshot(view), 110, 200, guideFill(alpha = 32), tolerance = 8)
     }
@@ -112,6 +115,7 @@ class GuideOverlayViewTest {
         view.filled = true
         view.lineColor = Color.YELLOW
         view.render(guide, GuideState(guideId = guide.id, opacity = 1f))
+        view.fill(guide, inside(guide))
 
         assertPixel(snapshot(view), 110, 200, guideFill(alpha = 64), tolerance = 6)
     }
@@ -122,8 +126,26 @@ class GuideOverlayViewTest {
         val view = view(300, 400)
         view.filled = true
         view.render(guide, GuideState(guideId = guide.id, visible = false, opacity = 1f))
+        view.fill(guide, inside(guide))
 
         assertEmpty(snapshot(view))
+    }
+
+    @Test
+    fun filled_drawsNoTint_untilTheInsideComes_norOneMadeForAnotherGuide() = onMain {
+        val guide = guide(mask = leftHalf(), outline = solid(Color.TRANSPARENT))
+        val view = view(300, 400)
+        view.filled = true
+        view.render(guide, GuideState(guideId = guide.id, opacity = 1f))
+        assertEmpty(snapshot(view))
+
+        // A late result for the guide before never tints this one.
+        val before = guide(id = "before", mask = leftHalf(), outline = solid(Color.TRANSPARENT))
+        view.fill(before, inside(before))
+        assertEmpty(snapshot(view))
+
+        view.fill(guide, inside(guide))
+        assertPixel(snapshot(view), 110, 200, guideFill(alpha = 64), tolerance = 6)
     }
 
     @Test
@@ -329,6 +351,9 @@ class GuideOverlayViewTest {
         val colors = IntArray(20 * 40) { if (it % 20 < 10) Color.BLACK else Color.TRANSPARENT }
         setPixels(colors, 0, 20, 0, 0, 20, 40)
     }
+
+    /** The inside [GuideOutlines.inside] makes off the main thread. */
+    private fun inside(guide: ReferenceGuide): Bitmap = guideInside(guide.mask.maskPixels()).toMaskBitmap()
 
     /** The fill's color, `camera_guide_fill`, as drawn at [alpha] over nothing. */
     private fun guideFill(alpha: Int): Int = Color.argb(alpha, 0x5E, 0xEA, 0xD4)

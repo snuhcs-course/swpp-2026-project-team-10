@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 /**
@@ -17,11 +17,21 @@ class ChannelRouter {
 
     fun channelFor(message: SessionMessage): Channel = when (message) {
         is SessionMessage.GuideStateUpdate -> if (message.final) Channel.RELIABLE else Channel.REALTIME
+
         is SessionMessage.CameraStateUpdate -> if (message.final) Channel.RELIABLE else Channel.REALTIME
+
         is SessionMessage.ZoomSet -> if (message.final) Channel.RELIABLE else Channel.REALTIME
+
         is SessionMessage.GuideMove -> if (message.final) Channel.RELIABLE else Channel.REALTIME
+
         is SessionMessage.ExposureSet -> if (message.final) Channel.RELIABLE else Channel.REALTIME
+
         is SessionMessage.Ping, is SessionMessage.Pong, is SessionMessage.PhotoShutter -> Channel.REALTIME
+
+        // The subject's press of the shutter is a moment (#314): kept behind a full buffer or a drop, it would take a
+        // photo once the subject no longer waits for one. Sent at once or not at all, a lost one only asks again.
+        is SessionMessage.ShutterPress -> Channel.REALTIME
+
         else -> Channel.RELIABLE
     }
 

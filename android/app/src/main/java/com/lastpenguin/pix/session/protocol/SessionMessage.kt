@@ -461,20 +461,23 @@ sealed interface SessionMessage {
     /**
      * S → P: the subject pressed *Subject view*'s shutter (FR-7.8, #314). The photographer's phone takes a photo as
      * its own shutter does, at once, and answers with `camera.shutter.answer`; the photo itself is told and sent as
-     * any other (`photo.shutter`, `photo.begin`). A press is one moment: nothing is kept for later.
+     * any other (`photo.shutter`, `photo.begin`). A press is one moment, so it goes on the realtime channel, at once
+     * or not at all: one that came late would take a photo the subject no longer waits for. [press] numbers this
+     * phone's presses, and the answer names it.
      */
     @Serializable
     @SerialName("camera.shutter")
-    data object ShutterPress : SessionMessage
+    data class ShutterPress(val press: Int) : SessionMessage
 
     /**
-     * P → S: what became of the subject's `camera.shutter` (#314). [taken] is false when the photographer's phone
-     * took no photo: its Camera screen is not in front, it frames a pose's scene photo, or its camera is still taking
-     * the photo before. The subject's shutter is held until this answer.
+     * P → S: what became of the subject's `camera.shutter` numbered [press] (#314). [taken] is false when the
+     * photographer's phone took no photo: its Camera screen is not in front, it frames a pose's scene photo, or its
+     * camera is still taking the photo before. The subject's shutter is held until the answer to its own press; one
+     * that comes after that press was given up answers no later press.
      */
     @Serializable
     @SerialName("camera.shutter.answer")
-    data class ShutterAnswer(val taken: Boolean) : SessionMessage
+    data class ShutterAnswer(val taken: Boolean, val press: Int) : SessionMessage
 
     /**
      * S → P: the subject picked a situation on its *Add a pose guide* (FR-6.15, #276). The photographer's phone begins

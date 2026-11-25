@@ -857,12 +857,12 @@ class SessionViewModelTest {
         runCurrent()
         notices.clear()
 
-        session.deliver(SessionMessage.ShutterPress)
+        session.deliver(SessionMessage.ShutterPress(1))
         runCurrent()
 
         assertEquals(1, presses)
         assertEquals(listOf<SessionNotice>(SessionNotice.RemoteShutter("Joonhyung")), notices)
-        assertEquals(SessionMessage.ShutterAnswer(taken = true), session.sent.last())
+        assertEquals(SessionMessage.ShutterAnswer(taken = true, press = 1), session.sent.last())
     }
 
     @Test
@@ -874,11 +874,11 @@ class SessionViewModelTest {
         runCurrent()
         notices.clear()
 
-        session.deliver(SessionMessage.ShutterPress)
+        session.deliver(SessionMessage.ShutterPress(1))
         runCurrent()
 
         assertTrue(notices.isEmpty())
-        assertEquals(SessionMessage.ShutterAnswer(taken = false), session.sent.last())
+        assertEquals(SessionMessage.ShutterAnswer(taken = false, press = 1), session.sent.last())
     }
 
     // ---- The subject starts AI poses (FR-6.15, #276) --------------------------------------------------------------

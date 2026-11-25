@@ -658,6 +658,12 @@ class SubjectFragmentRenderTest {
 
     private fun presses(modules: TestAppContainer) = modules.session.sent.count { it is SessionMessage.ShutterPress }
 
+    /** The answer to the press sent last, which names that press. */
+    private fun answer(modules: TestAppContainer, taken: Boolean) {
+        val press = modules.session.sent.filterIsInstance<SessionMessage.ShutterPress>().last().press
+        modules.session.deliver(SessionMessage.ShutterAnswer(taken, press))
+    }
+
     /** Connected, with the photographer's video showing: the video's state is looked at every 500 ms. */
     private fun connectWithVideo(modules: TestAppContainer, name: String = "Dongje") {
         connect(modules, name = name)
@@ -704,7 +710,7 @@ class SubjectFragmentRenderTest {
         idle()
         assertEquals(1, presses(modules))
 
-        modules.session.deliver(SessionMessage.ShutterAnswer(taken = true))
+        answer(modules, taken = true)
         idle()
         onScreen { binding, _ ->
             assertTrue(binding.shutterButton.isEnabled)
@@ -720,7 +726,7 @@ class SubjectFragmentRenderTest {
         onScreen { binding, _ -> binding.shutterButton.performClick() }
         idle()
 
-        modules.session.deliver(SessionMessage.ShutterAnswer(taken = false))
+        answer(modules, taken = false)
         idle()
 
         assertEquals(string(R.string.subject_shutter_refused) to true, label())

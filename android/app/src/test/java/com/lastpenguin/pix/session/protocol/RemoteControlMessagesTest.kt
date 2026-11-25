@@ -20,7 +20,7 @@ import org.junit.Test
  * a round trip keeps every field; `final` left out means a step; `guide.state` from a phone without `by` means the
  * photographer, and the echo of a `guide.move` carries `by: SUBJECT`; `camera.zoom.hold` naming a holder, null, or no
  * holder at all, the last two meaning a free zoom, and a `camera.zoom.set` with `cancel`, which is false when left out (#236).
- * The subject's shutter (#314): the press, which has no field, and its answer, taken or not.
+ * The subject's shutter (#314): the press with its number, and its answer, taken or not, naming that number.
  * The subject's start of AI poses (#276): the situation's name, and the answer, begun or not.
  */
 class RemoteControlMessagesTest {
@@ -142,15 +142,15 @@ class RemoteControlMessagesTest {
 
     @Test
     fun theSubjectsShutter_andItsAnswer_designExamples_decode() {
-        val press = """{ "v": 3, "t": "camera.shutter", "seq": 9, "ts": 1759212355000, "b": {} }"""
+        val press = """{ "v": 3, "t": "camera.shutter", "seq": 9, "ts": 1759212355000, "b": { "press": 7 } }"""
         val taken = """{ "v": 3, "t": "camera.shutter.answer", "seq": 4, "ts": 1759212355100,
-            "b": { "taken": true } }"""
+            "b": { "taken": true, "press": 7 } }"""
         val refused = """{ "v": 3, "t": "camera.shutter.answer", "seq": 5, "ts": 1759212355100,
-            "b": { "taken": false } }"""
+            "b": { "taken": false, "press": 8 } }"""
 
-        assertEquals(SessionMessage.ShutterPress, decode(press))
-        assertEquals(SessionMessage.ShutterAnswer(taken = true), decode(taken))
-        assertEquals(SessionMessage.ShutterAnswer(taken = false), decode(refused))
+        assertEquals(SessionMessage.ShutterPress(press = 7), decode(press))
+        assertEquals(SessionMessage.ShutterAnswer(taken = true, press = 7), decode(taken))
+        assertEquals(SessionMessage.ShutterAnswer(taken = false, press = 8), decode(refused))
     }
 
     @Test
@@ -173,9 +173,9 @@ class RemoteControlMessagesTest {
             SessionMessage.FocusSet(0.62f, 0.4f),
             SessionMessage.Focused(0.38f, 0.4f),
             SessionMessage.ControlPermission(true),
-            SessionMessage.ShutterPress,
-            SessionMessage.ShutterAnswer(taken = true),
-            SessionMessage.ShutterAnswer(taken = false),
+            SessionMessage.ShutterPress(press = 7),
+            SessionMessage.ShutterAnswer(taken = true, press = 7),
+            SessionMessage.ShutterAnswer(taken = false, press = 8),
             SessionMessage.PoseStart("selfie"),
             SessionMessage.PoseStartAnswer(started = true),
             SessionMessage.PoseStartAnswer(started = false),

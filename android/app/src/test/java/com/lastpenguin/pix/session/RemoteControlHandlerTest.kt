@@ -596,11 +596,11 @@ class RemoteControlHandlerTest {
         advanceTimeBy(200)
         runCurrent()
 
-        handler.handle(SessionMessage.ShutterPress)
+        handler.handle(SessionMessage.ShutterPress(press = 1))
         runCurrent()
 
         assertEquals(1, presses)
-        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = true)), answers())
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = true, press = 1)), answers())
         assertEquals(listOf<RemoteAction>(RemoteAction.Shutter), actions)
         handler.stop()
     }
@@ -614,10 +614,10 @@ class RemoteControlHandlerTest {
         advanceTimeBy(200)
         runCurrent()
 
-        handler.handle(SessionMessage.ShutterPress)
+        handler.handle(SessionMessage.ShutterPress(press = 1))
         runCurrent()
 
-        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false)), answers())
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), answers())
         assertTrue(actions.isEmpty())
         handler.stop()
     }
@@ -629,10 +629,10 @@ class RemoteControlHandlerTest {
         advanceTimeBy(200)
         runCurrent()
 
-        handler.handle(SessionMessage.ShutterPress)
+        handler.handle(SessionMessage.ShutterPress(press = 1))
         runCurrent()
 
-        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false)), answers())
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), answers())
         assertTrue(actions.isEmpty())
         handler.stop()
     }
@@ -646,12 +646,16 @@ class RemoteControlHandlerTest {
         advanceTimeBy(200)
         runCurrent()
 
-        handler.handle(SessionMessage.ShutterPress)
-        handler.handle(SessionMessage.ShutterPress)
+        handler.handle(SessionMessage.ShutterPress(press = 4))
+        handler.handle(SessionMessage.ShutterPress(press = 5))
         runCurrent()
 
+        // Each answer names its press, so the subject's phone can tell them apart.
         assertEquals(
-            listOf(SessionMessage.ShutterAnswer(taken = true), SessionMessage.ShutterAnswer(taken = false)),
+            listOf(
+                SessionMessage.ShutterAnswer(taken = true, press = 4),
+                SessionMessage.ShutterAnswer(taken = false, press = 5),
+            ),
             answers(),
         )
         handler.stop()

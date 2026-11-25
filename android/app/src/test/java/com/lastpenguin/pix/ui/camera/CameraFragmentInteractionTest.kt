@@ -111,7 +111,7 @@ import org.robolectric.shadows.ShadowDialog
  * and the line is back after it; a drop during the subject's pinch, where the pinch's end must not take the line down.
  * The subject's shutter (#314, FR-7.8): a photo taken here with its notice; nothing while a pose's scene photo is
  * framed, neither a photo nor the scene; nothing while the camera is not ready; nothing once this screen is left, and
- * a photo again when it is back.
+ * a photo again when it is back; nothing with a sheet or the photos over the camera, which stays started under them.
  * The subject starts AI poses (#276, FR-6.15): the scene photo's step begun here for their situation, with its notice;
  * refused for a selfie without a front camera, while a scene photo is already framed (the step unchanged), and with a
  * sheet over the camera; without the agreement on this phone, asked first with the subject's name, begun once agreed,
@@ -507,11 +507,11 @@ class CameraFragmentInteractionTest {
     fun theSubjectsShutter_takesAPhotoHere_andSaysWhoTookIt() {
         val (modules, camera) = inASessionWithACameraThatSaves()
 
-        modules.session.deliver(SessionMessage.ShutterPress)
+        modules.session.deliver(SessionMessage.ShutterPress(1))
         idle()
 
         assertEquals(1, camera.photoTurns.size)
-        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = true)), shutterAnswers(modules))
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = true, press = 1)), shutterAnswers(modules))
         onScreen { controls, _ ->
             assertEquals(string(R.string.remote_shutter_notice, "Joonhyung"), controls.noticeText.text.toString())
             assertEquals(View.VISIBLE, controls.noticeText.visibility)
@@ -525,13 +525,13 @@ class CameraFragmentInteractionTest {
         generation.beginScene()
         idle()
 
-        modules.session.deliver(SessionMessage.ShutterPress)
+        modules.session.deliver(SessionMessage.ShutterPress(1))
         idle()
 
         // Neither a photo nor the pose's scene photo, which is the photographer's own step.
         assertTrue(camera.photoTurns.isEmpty())
         assertEquals(GenerationUiState.Phase.FRAMING, generation.uiState.value.phase)
-        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false)), shutterAnswers(modules))
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), shutterAnswers(modules))
     }
 
     @Test
@@ -540,11 +540,11 @@ class CameraFragmentInteractionTest {
         camera.setStatus(CameraStatus.STARTING)
         idle()
 
-        modules.session.deliver(SessionMessage.ShutterPress)
+        modules.session.deliver(SessionMessage.ShutterPress(1))
         idle()
 
         assertTrue(camera.photoTurns.isEmpty())
-        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false)), shutterAnswers(modules))
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), shutterAnswers(modules))
         onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
     }
 
@@ -555,17 +555,55 @@ class CameraFragmentInteractionTest {
         // Another screen covers Camera, as Settings does: its view goes, and the camera with it.
         scenario!!.moveToState(Lifecycle.State.CREATED)
         idle()
-        modules.session.deliver(SessionMessage.ShutterPress)
+        modules.session.deliver(SessionMessage.ShutterPress(1))
         idle()
         assertTrue(camera.photoTurns.isEmpty())
-        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false)), shutterAnswers(modules))
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), shutterAnswers(modules))
 
         scenario!!.moveToState(Lifecycle.State.RESUMED)
         idle()
-        modules.session.deliver(SessionMessage.ShutterPress)
+        modules.session.deliver(SessionMessage.ShutterPress(1))
         idle()
         assertEquals(1, camera.photoTurns.size)
-        assertEquals(SessionMessage.ShutterAnswer(taken = true), shutterAnswers(modules).last())
+        assertEquals(SessionMessage.ShutterAnswer(taken = true, press = 1), shutterAnswers(modules).last())
+    }
+
+    @Test
+    fun withASheetOverTheCamera_theSubjectsPressIsNotTaken() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+        val nav = scenario!!.attachNav(R.id.cameraFragment)
+        // Add a pose guide is open over Camera, which stays started under it with its camera running.
+        nav.navigate(R.id.action_camera_to_addGuide)
+        idle()
+
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idle()
+
+        assertTrue(camera.photoTurns.isEmpty())
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), shutterAnswers(modules))
+    }
+
+    @Test
+    fun withThePhotosOpenOverTheCamera_theSubjectsPressIsNotTaken() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+        val picture = Bitmap.createBitmap(4, 3, Bitmap.Config.ARGB_8888)
+        onScreen { _, fragment ->
+            fragment.thumbnailOf = { picture }
+            fragment.photoOf = { picture }
+        }
+        // The session's one photo, taken here, and the viewer opened on it.
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        settleReads()
+        onScreen { controls, _ -> controls.galleryButton.performClick() }
+        settleReads()
+        assertTrue(cameraViewModel().uiState.value.photosOpen)
+        assertEquals(1, camera.photoTurns.size)
+
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idle()
+
+        assertEquals(1, camera.photoTurns.size)
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), shutterAnswers(modules))
     }
 
     // ---- The subject starts AI poses (FR-6.15, #276) --------------------------------------------------------------

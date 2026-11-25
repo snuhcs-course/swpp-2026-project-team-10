@@ -340,6 +340,9 @@ class SubjectViewModel(
     // Runs while a press of the shutter waits for its answer (SubjectUiState.shutterWaiting).
     private var shutterWait: Job? = null
 
+    // How many times this phone's shutter asked for a photo: the number of the press that waits, if one does.
+    private var shutterPresses = 0
+
     private val guideSender = StepSender<GuideState>(viewModelScope, SEND_INTERVAL_MS) { state, final ->
         val guideId = state.guideId ?: return@StepSender
         session.send(SessionMessage.GuideMove(guideId, state.cx, state.cy, state.height, final))
@@ -433,8 +436,11 @@ class SubjectViewModel(
                     return@collect
                 }
                 if (message is SessionMessage.ShutterAnswer) {
-                    // Only a press that still waits is answered; one given up already has said so.
-                    if (endShutterWait() && !message.taken) _shutterRefusals.trySend(Unit)
+                    // Only the press that still waits is answered: one given up already has said so, and its answer,
+                    // come late, is not the next press's.
+                    if (message.press == shutterPresses && endShutterWait() && !message.taken) {
+                        _shutterRefusals.trySend(Unit)
+                    }
                     return@collect
                 }
                 if (message !is SessionMessage.CameraStateUpdate) return@collect
@@ -847,7 +853,9 @@ class SubjectViewModel(
     fun onShutter(): Boolean {
         val ui = _uiState.value
         if (!ui.connected || ui.shutterWaiting) return false
-        session.send(SessionMessage.ShutterPress)
+        // Numbered, so only its own answer ends its wait: one that comes after the wait is for no later press.
+        val press = ++shutterPresses
+        session.send(SessionMessage.ShutterPress(press))
         Timings.mark("shutter.sent")
         _uiState.update { it.copy(shutterWaiting = true) }
         shutterWait = viewModelScope.launch {

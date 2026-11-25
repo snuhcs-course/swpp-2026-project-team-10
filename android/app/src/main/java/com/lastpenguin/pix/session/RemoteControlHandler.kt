@@ -229,7 +229,7 @@ class RemoteControlHandler(
             is SessionMessage.FlashSet -> handleFlash(message)
             is SessionMessage.FocusSet -> handleFocus(message)
             is SessionMessage.GuideMove -> handleGuideMove(message)
-            is SessionMessage.ShutterPress -> handleShutter()
+            is SessionMessage.ShutterPress -> handleShutter(message)
             is SessionMessage.PoseStart -> handlePoseStart(message)
             else -> Unit
         }
@@ -257,12 +257,14 @@ class RemoteControlHandler(
 
     /**
      * `camera.shutter`: the Camera screen takes the photo, if it is in front and can, and the press is answered either
-     * way, so the subject's shutter is free again. Nothing is kept for later: a press is one moment.
+     * way, so the subject's shutter is free again. Nothing is kept for later: a press is one moment, which is why it
+     * comes on the realtime channel, at once or not at all.
      */
-    private fun handleShutter() {
+    private fun handleShutter(request: SessionMessage.ShutterPress) {
         val taken = shutter?.invoke() ?: false
         Timings.mark("shutter.remote", if (taken) "taken" else "refused")
-        session.send(SessionMessage.ShutterAnswer(taken))
+        // Named by its press, so an answer that comes late is not taken for the next press's.
+        session.send(SessionMessage.ShutterAnswer(taken, request.press))
         if (taken) _actions.tryEmit(RemoteAction.Shutter)
     }
 

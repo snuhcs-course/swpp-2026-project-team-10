@@ -73,7 +73,7 @@ import org.junit.Test
  * This phone's shutter (FR-7.8, #314; state-based, boundary): a press asks once and holds the shutter; a second press
  * meanwhile asks nothing; the answer frees it, taken (no line) or not (a line); no answer frees it after
  * SHUTTER_WAIT_MS with a line (1 ms before / at it); a press before the session is connected asks nothing; a drop
- * frees a waiting press without a line.
+ * frees a waiting press without a line; an answer to a press given up before, which answers no later press.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SubjectViewModelTest {
@@ -887,6 +887,9 @@ class SubjectViewModelTest {
 
     private fun presses(): Int = session.sent.count { it is SessionMessage.ShutterPress }
 
+    /** The number of the press sent last, which its answer names. */
+    private fun pressed(): Int = session.sent.filterIsInstance<SessionMessage.ShutterPress>().last().press
+
     private fun TestScope.refusals(): MutableList<Unit> {
         val refusals = mutableListOf<Unit>()
         backgroundScope.launch { viewModel.shutterRefusals.collect { refusals += it } }
@@ -908,7 +911,7 @@ class SubjectViewModelTest {
             assertFalse(viewModel.onShutter())
             assertEquals(1, presses())
 
-            session.deliver(SessionMessage.ShutterAnswer(taken = true))
+            session.deliver(SessionMessage.ShutterAnswer(taken = true, press = pressed()))
             runCurrent()
             assertFalse(viewModel.uiState.value.shutterWaiting)
             assertTrue(refusals.isEmpty())
@@ -925,7 +928,7 @@ class SubjectViewModelTest {
         runCurrent()
         viewModel.onShutter()
 
-        session.deliver(SessionMessage.ShutterAnswer(taken = false))
+        session.deliver(SessionMessage.ShutterAnswer(taken = false, press = pressed()))
         runCurrent()
 
         assertFalse(viewModel.uiState.value.shutterWaiting)
@@ -950,8 +953,33 @@ class SubjectViewModelTest {
         assertEquals(1, refusals.size)
 
         // An answer that comes after all changes nothing more.
-        session.deliver(SessionMessage.ShutterAnswer(taken = false))
+        session.deliver(SessionMessage.ShutterAnswer(taken = false, press = pressed()))
         runCurrent()
+        assertEquals(1, refusals.size)
+    }
+
+    @Test
+    fun `an answer that comes after its press was given up does not answer the next press`() = runTest(dispatcher) {
+        connect()
+        val refusals = refusals()
+        runCurrent()
+        viewModel.onShutter()
+        advanceTimeBy(SubjectViewModel.SHUTTER_WAIT_MS)
+        runCurrent()
+        assertEquals(1, refusals.size)
+
+        // The second press waits, and the first one's answer arrives only now.
+        assertTrue(viewModel.onShutter())
+        val pressed = session.sent.filterIsInstance<SessionMessage.ShutterPress>().map { it.press }
+        assertEquals(2, pressed.distinct().size)
+        session.deliver(SessionMessage.ShutterAnswer(taken = false, press = pressed[0]))
+        runCurrent()
+        assertTrue(viewModel.uiState.value.shutterWaiting)
+        assertEquals(1, refusals.size)
+
+        session.deliver(SessionMessage.ShutterAnswer(taken = true, press = pressed[1]))
+        runCurrent()
+        assertFalse(viewModel.uiState.value.shutterWaiting)
         assertEquals(1, refusals.size)
     }
 

@@ -1910,12 +1910,24 @@ class CameraFragment :
         get() = binding?.let { if (it.zoomRow.isShown) it.zoomRow else it.bottomPanel }
 
     /**
+     * Whether the camera itself is what the photographer looks at. Under a sheet, such as Add a pose guide, this screen
+     * stays started with its camera running, and so it does under its own photos: neither is "in front", and what the
+     * subject asks of the camera is refused then (#314, #276).
+     */
+    private fun cameraInFront(): Boolean {
+        // Without a navigation controller, as in a screen test, nothing can cover it.
+        val destination = runCatching { findNavController().currentDestination?.id }.getOrNull()
+        return (destination == null || destination == R.id.cameraFragment) && !viewModel.uiState.value.photosOpen
+    }
+
+    /**
      * The subject's shutter (FR-7.8, #314): this screen's own shutter, pressed for them at once. False when it took no
-     * photo: a pose's scene photo is being framed or held, which is the photographer's own step and never taken from
-     * the other phone, or the camera is not ready or still takes the photo before.
+     * photo: the camera is not in front ([cameraInFront]); a pose's scene photo is being framed or held, which is the
+     * photographer's own step and never taken from the other phone; or the camera is not ready or still takes the
+     * photo before.
      */
     private fun takeForSubject(controls: FragmentCameraBinding): Boolean {
-        if (isScenePhotoActive()) return false
+        if (!cameraInFront() || isScenePhotoActive()) return false
         if (!viewModel.onShutter()) return false
         blinkPreview(controls.previewScrim)
         return true
@@ -1923,15 +1935,13 @@ class CameraFragment :
 
     /**
      * The subject picked a situation for AI poses (FR-6.15, #276): the scene photo's step begins here, as if this
-     * phone's user had picked the tile, and [answer] hears whether it began. Only from the camera itself: a request
-     * that comes over a step, a sheet, the photos, or the question below is refused, and so is a selfie on a phone
-     * without a front camera. This phone sends the photo, so without its user's agreement (FR-4.2) the notice asks
+     * phone's user had picked the tile, and [answer] hears whether it began. Only from the camera itself
+     * ([cameraInFront]): a request that comes over a step, a sheet, the photos, or the question below is refused, and
+     * so is a selfie on a phone without a front camera. This phone sends the photo, so without its user's agreement (FR-4.2) the notice asks
      * first, saying who wants the poses; the step begins once they agree, and "Not now" refuses.
      */
     private fun startPosesForSubject(situation: Situation, answer: (Boolean) -> Unit) {
-        val destination = runCatching { findNavController().currentDestination?.id }.getOrNull()
-        val onCamera = destination == null || destination == R.id.cameraFragment
-        val free = onCamera && !isScenePhotoActive() && askedForSubject == null && !viewModel.uiState.value.photosOpen
+        val free = cameraInFront() && !isScenePhotoActive() && askedForSubject == null
         if (!free || !generationViewModel.chooseSituation(situation)) return answer(false)
         if (!generationViewModel.needsConsent) {
             generationViewModel.beginScene()

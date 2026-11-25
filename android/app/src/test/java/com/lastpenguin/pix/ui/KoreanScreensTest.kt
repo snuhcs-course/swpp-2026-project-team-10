@@ -356,7 +356,7 @@ class KoreanScreensTest {
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
         idle()
 
-        modules.session.deliver(SessionMessage.ShutterPress)
+        modules.session.deliver(SessionMessage.ShutterPress(1))
         idle()
 
         val root = screen()
@@ -1076,7 +1076,8 @@ class KoreanScreensTest {
 
         binding.shutterButton.performClick()
         idle()
-        modules.session.deliver(SessionMessage.ShutterAnswer(taken = false))
+        val press = modules.session.sent.filterIsInstance<SessionMessage.ShutterPress>().last().press
+        modules.session.deliver(SessionMessage.ShutterAnswer(taken = false, press = press))
         idle()
 
         val root = screen()

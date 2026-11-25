@@ -14,5 +14,12 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 - [Dongje, 11-24] "Point 5: 'the photographer's focus is not shown on the subject's screen'. Why? Had we not decided to go ahead? Tell me the reason." (The agent had read "5. Go ahead." as "go on as recommended", which was to leave it out, and had only noted that reading in a report. It built it: a new message, `camera.focus`, from the photographer's own tap, and the focus box alone on the subject's video, at 1 − x on the mirror.)
 - [Dongje, 11-24] "Also change the zoom button's tutorial line to '배율 버튼을 누르거나 두 손가락으로 찍는 사람의 카메라를 확대해요'." (Changed in both languages; the tips still fit on Subject view at font scale 1.3.)
 
+## Reconnecting lasts 30 s ([#293])
+
+- [Dongje, 11-25] "Assign issue #293 to me. Changing the timer from 10 to 30 looks like enough; will you check?" (The agent read the session code and the server. The wait is one constant, `RECONNECT_BUDGET_MS`, and the server needs no change, since it keeps an empty session for 60 s. Three more things came up: a photo on its way was given up after 30 s, the new wait's own length; Camera says nothing during the wait, which 10 s could bear; and whether WebRTC keeps its channel through a 20 s drop shows only on two phones.)
+- [Dongje, 11-25] "Show me the draft for point 2 first." (The agent drew Camera during the wait from the real layout: as it is now, with the live light off and no word; A, "Reconnecting with Joonhyung…" above the shutter for the whole wait; B, the plain "Reconnecting…" that *Subject view* has; and "Joonhyung disconnected" after the wait, as today.)
+- [Dongje, 11-25] "Build A." (Built test-first: the wait at 30 s, with a link back after 25 s and the end at 30 s; a photo given up after 45 s, checked against the wait; `SessionViewModel.reconnectingWith`; and Camera's line, held like "… is zooming" and shown before it, so a drop during the subject's pinch keeps it. R&S 4.10, Design 4.11, Testing 4.13.)
+
 [#268]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/268
 [#273]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/273
+[#293]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/293

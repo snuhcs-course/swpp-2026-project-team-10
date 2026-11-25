@@ -73,12 +73,18 @@ sealed interface SessionState {
 
     data class Connecting(val sessionId: String?) : SessionState
 
-    /** [partner] is the friend of an invitation's session (Design 2.6.6); null in a room code's. */
+    /**
+     * [partner] is the friend of an invitation's session (Design 2.6.6); null in a room code's. [drops] counts the drops
+     * this session came back from, so the state after a drop never equals the one before it: a state flow shows a
+     * reader only its latest value, and a reader that missed the `Reconnecting` between still sees that the link came
+     * back (#293).
+     */
     data class Connected(
         val sessionId: String,
         val peer: PeerInfo,
         val role: Role,
         val partner: SessionPartner? = null,
+        val drops: Int = 0,
     ) : SessionState
 
     /**

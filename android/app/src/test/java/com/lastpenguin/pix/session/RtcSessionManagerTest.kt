@@ -659,7 +659,14 @@ class RtcSessionManagerTest {
         peer.push(PeerEvent.Link(LinkState.CONNECTED))
         advanceTimeBy(6_000)
         runCurrent()
-        assertTrue(manager.state.value is SessionState.Connected)
+        assertEquals(1, (manager.state.value as SessionState.Connected).drops)
+
+        // Each drop it comes back from counts.
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+        peer.push(PeerEvent.Link(LinkState.CONNECTED))
+        runCurrent()
+        assertEquals(2, (manager.state.value as SessionState.Connected).drops)
 
         peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
         advanceTimeBy(RtcSessionManager.RECONNECT_BUDGET_MS + 100)
@@ -985,7 +992,11 @@ class RtcSessionManagerTest {
         peer.push(PeerEvent.Link(LinkState.CONNECTED))
         runCurrent()
         assertEquals("v=0 restart answer", peer.remote.last().sdp)
-        assertEquals(SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER), manager.state.value)
+        // Not the state before the drop: a reader that missed Reconnecting still sees the link came back (#293).
+        assertEquals(
+            SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER, drops = 1),
+            manager.state.value,
+        )
         // The same connection: its channels and video track stayed.
         assertEquals(1, peers.created.size)
         assertFalse(peer.closed)
@@ -1059,7 +1070,7 @@ class RtcSessionManagerTest {
 
         peer.push(PeerEvent.Link(LinkState.CONNECTED))
         runCurrent()
-        assertEquals(SessionState.Connected("s_1", PeerInfo("Dongje"), Role.SUBJECT), manager.state.value)
+        assertEquals(SessionState.Connected("s_1", PeerInfo("Dongje"), Role.SUBJECT, drops = 1), manager.state.value)
         assertEquals(1, peers.created.size)
         manager.leave(EndReason.LEFT)
     }

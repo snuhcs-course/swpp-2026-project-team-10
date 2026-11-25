@@ -78,7 +78,8 @@ import org.robolectric.RobolectricTestRunner
  * again; and the session's end.
  * Both, a drop (boundary; #293): the time the link is down does not count toward giving a photo up or ending its wait,
  * for the subject's answer, an ack, and the subject's own wait, with the drop late in the wait and as long as the
- * session tries; once the link is back the time starts over (just before its end / at its end).
+ * session tries; once the link is back the time starts over (just before its end / at its end), also after a drop so
+ * short that no reader saw its Reconnecting, which only the state after it tells.
  * Both, the session's photos (state-based; Iter4-A2): none outside a session and an empty list at its start; on the
  * subject's phone each saved photo joins them in order, and a refused or broken photo, one the album fails to save, and
  * one saved before do not, nor one whose save ends after its session ended and another started; on the photographer's
@@ -134,8 +135,14 @@ class PhotoSyncerTest {
     private fun TestScope.syncer(partDir: File = parts) =
         PhotoSyncer(session, reader, album, partDir, StandardTestDispatcher(testScheduler))
 
-    private fun connectedAs(role: Role) {
-        session.setState(SessionState.Connected("s_1", PeerInfo("Dongje", null), role))
+    private fun connectedAs(role: Role, drops: Int = 0) {
+        session.setState(SessionState.Connected("s_1", PeerInfo("Dongje", null), role, drops = drops))
+    }
+
+    /** A drop over before any reader runs: a state flow shows only its latest value, the state after it (#293). */
+    private fun dropTooShortToSee(role: Role) {
+        session.setState(SessionState.Reconnecting("s_1", since = 0))
+        connectedAs(role, drops = 1)
     }
 
     private fun uri(name: String): Uri = Uri.parse("content://media/$name")
@@ -207,6 +214,24 @@ class PhotoSyncerTest {
             runCurrent()
             assertEquals(1, failed())
         }
+
+    @Test
+    fun `a drop too short to be seen starts the time over all the same`() = runTest {
+        val (syncer, failed) = sender()
+        syncer.shoot(photo("1", 10), takenAt = 1)
+        runCurrent()
+        advanceTimeBy(PhotoSyncer.STALL_MS - 1_000)
+
+        dropTooShortToSee(Role.PHOTOGRAPHER)
+        runCurrent()
+
+        advanceTimeBy(PhotoSyncer.STALL_MS - 1)
+        runCurrent()
+        assertEquals(0, failed())
+        advanceTimeBy(2)
+        runCurrent()
+        assertEquals(1, failed())
+    }
 
     @Test
     fun `a photo that waited through a drop is sent when the subject answers after it`() = runTest {
@@ -1154,6 +1179,24 @@ class PhotoSyncerTest {
 
         connectedAs(Role.SUBJECT)
         runCurrent()
+        advanceTimeBy(PhotoSyncer.STALL_MS - 1)
+        runCurrent()
+        assertTrue(syncer.isReceiving())
+        advanceTimeBy(2)
+        runCurrent()
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `a drop too short to be seen starts the wait for a photo over all the same`() = runTest {
+        val (syncer, _, _) = receiver()
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        runCurrent()
+        advanceTimeBy(PhotoSyncer.STALL_MS - 1_000)
+
+        dropTooShortToSee(Role.SUBJECT)
+        runCurrent()
+
         advanceTimeBy(PhotoSyncer.STALL_MS - 1)
         runCurrent()
         assertTrue(syncer.isReceiving())

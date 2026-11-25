@@ -323,9 +323,17 @@ class PhotoSyncer(
         return merge(progress.filter(reached), stalls().map { null }).first()
     }
 
-    /** Whether the link is down and tried again, which the session does for its own time (Design 2.6.7). */
-    private val linkDown: Flow<Boolean>
-        get() = session.state.map { it is SessionState.Reconnecting }.distinctUntilChanged()
+    /**
+     * What a stall's time follows of the link: whether it is [down] and tried again, which the session does for its
+     * own time (Design 2.6.7), and how often it came [back]. The count tells of a drop even when no reader saw its
+     * `Reconnecting`: a state flow shows only its latest value, and the states around such a drop differ in it alone.
+     */
+    private data class Link(val down: Boolean, val back: Int)
+
+    private val link: Flow<Link>
+        get() = session.state
+            .map { Link(it is SessionState.Reconnecting, (it as? SessionState.Connected)?.drops ?: 0) }
+            .distinctUntilChanged()
 
     /**
      * Emits once the link has been up for [STALL_MS] in a row. The time a drop takes does not count, and the time
@@ -333,8 +341,8 @@ class PhotoSyncer(
      * through one is not given up for it (#293).
      */
     private fun stalls(): Flow<Unit> = channelFlow {
-        linkDown.collectLatest { down ->
-            if (down) return@collectLatest
+        link.collectLatest { link ->
+            if (link.down) return@collectLatest
             delay(STALL_MS)
             send(Unit)
         }
@@ -466,9 +474,10 @@ class PhotoSyncer(
             }
             launch {
                 // A wait with no photo message for this long is over: that photo is not coming. The time a drop
-                // takes does not count, as for the sender ([stalls]).
-                combine(awaited, photoMessagesSeen, linkDown) { waits, _, down ->
-                    waits.any && !down
+                // takes does not count, as for the sender ([stalls]): each change of the link starts the time again,
+                // as each photo message does.
+                combine(awaited, photoMessagesSeen, link) { waits, _, link ->
+                    waits.any && !link.down
                 }.collectLatest { waiting ->
                     if (!waiting) return@collectLatest
                     delay(STALL_MS)

@@ -120,6 +120,9 @@ class RtcSessionManager(
 
     /** The link that dropped while connected, still open, for its one `session_drop` event (Design 2.8, Telemetry). */
     private var drop: DropStart? = null
+
+    /** How many drops the running session came back from, told in [SessionState.Connected.drops]. */
+    private var dropsOver = 0
     private var role: Role? = null
 
     /** The last round trips of this phone's pings, newest last, for [latencyMs]. */
@@ -776,6 +779,7 @@ class RtcSessionManager(
         if (_state.value !is SessionState.Connecting || openChannels.size != 2) return
         connectTimeout?.cancel()
         connectTimeout = null
+        dropsOver = 0
         _state.value = SessionState.Connected(checkNotNull(sessionId), peerInfo(hello), checkNotNull(role), partner)
         Timings.mark("session.connected")
         reportAttempt(failure = null)
@@ -831,7 +835,10 @@ class RtcSessionManager(
         if (Channel.RELIABLE !in openChannels) return
         reconnectBudget?.cancel()
         reconnectBudget = null
-        _state.value = SessionState.Connected(state.sessionId, peerInfo(hello), checkNotNull(role), partner)
+        // Counted, so this state differs from the one before the drop for a reader that never saw Reconnecting (#293).
+        dropsOver++
+        _state.value =
+            SessionState.Connected(state.sessionId, peerInfo(hello), checkNotNull(role), partner, dropsOver)
         Timings.mark("session.reconnected", "${clock() - state.since} ms")
         reportDrop(recovered = true)
     }

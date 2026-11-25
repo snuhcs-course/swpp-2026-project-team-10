@@ -63,6 +63,7 @@ import com.lastpenguin.pix.ui.generation.SceneHandOff
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
@@ -790,6 +791,37 @@ class CameraFragmentInteractionTest {
             assertSame(after[photos[0]], photoViewerOn(controls.root).gridShows(2))
             assertEquals(1f, controls.galleryThumbnail.scaleX, 0f)
         }
+    }
+
+    @Test
+    fun anEditsReadOfTheLastPhoto_endingAfterANewPhotosRead_leavesTheNewPhotoShown() {
+        val modules = launch()
+        val photos = (1..4).map { TestAppContainer.savedPhoto("p$it") }
+        val pictures = photos.associateWith { Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888) }
+        // The edit's read of photo 3 waits until let go, on its own reading thread.
+        val holding = AtomicBoolean(false)
+        val letGo = CountDownLatch(1)
+        onScreen { _, fragment ->
+            fragment.thumbnailOf = { uri ->
+                if (uri == photos[2] && holding.get()) letGo.await(5, TimeUnit.SECONDS)
+                pictures[uri]
+            }
+        }
+        modules.album.value = photos.take(3)
+        settleReads()
+        onScreen { controls, _ -> assertSame(pictures[photos[2]], controls.thumbnailShows()) }
+
+        holding.set(true)
+        modules.photoEdits.value = 1
+        settleReads()
+        modules.album.value = photos
+        settleReads()
+        onScreen { controls, _ -> assertSame(pictures[photos[3]], controls.thumbnailShows()) }
+
+        // The edit's read ends last: the new photo stays.
+        letGo.countDown()
+        settleReads()
+        onScreen { controls, _ -> assertSame(pictures[photos[3]], controls.thumbnailShows()) }
     }
 
     @Test

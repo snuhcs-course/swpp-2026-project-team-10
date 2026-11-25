@@ -89,6 +89,8 @@ internal suspend fun showPhotoThumbnails(
                 }
             }
         }
+        // An edit's read of a photo since replaced, finishing after the new one's, shows nothing.
+        if (uri != shown) return
         if (picture == null) {
             thumbnail.setImageResource(R.drawable.gallery_placeholder)
         } else {

@@ -89,8 +89,7 @@ class LibraryFragment : Fragment(R.layout.fragment_library) {
         binding.libraryGrid.layoutManager = GridLayoutManager(requireContext(), COLUMNS)
         binding.libraryGrid.adapter = adapter
         gridMotion = binding.libraryGrid.itemAnimator
-        shownList = null
-        scrolledTo.clear()
+        places.clear()
         leaveWhenTheSessionEnds(viewModel)
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -190,14 +189,8 @@ class LibraryFragment : Fragment(R.layout.fragment_library) {
     /** The grid's own motion for a change within a list, a guide added, deleted, or moved. */
     private var gridMotion: RecyclerView.ItemAnimator? = null
 
-    /** The list the grid shows, by its tab and situation (#297); null before the first. */
-    private var shownList: Pair<LibraryFilter, Situation?>? = null
-
-    /** A list the grid is turning to, whose place to show is set once its guides are in. */
-    private var turningTo: Pair<LibraryFilter, Situation?>? = null
-
-    /** Where each list was left, by its tab and situation, while this screen is shown. */
-    private val scrolledTo = mutableMapOf<Pair<LibraryFilter, Situation?>, Parcelable?>()
+    /** Where each list was left, by its tab and situation, while this screen is shown, and the list the grid shows. */
+    private val places = ListPlaces<Pair<LibraryFilter, Situation?>, Parcelable>()
 
     /**
      * The page's guides in the grid. A change within the list moves its guides; another tab or situation (#297, #270)
@@ -207,20 +200,15 @@ class LibraryFragment : Fragment(R.layout.fragment_library) {
     private fun showList(binding: FragmentLibraryBinding, adapter: LibraryAdapter, page: LibraryPage) {
         val grid = binding.libraryGrid
         val list = page.filter to page.situation
-        val left = shownList
-        shownList = list
-        if (left != null && left != list) {
-            scrolledTo[left] = grid.layoutManager?.onSaveInstanceState()
+        if (places.ask(list) { grid.layoutManager?.onSaveInstanceState() }) {
             grid.stopScroll()
             grid.itemAnimator = null
-            turningTo = list
         }
         // Only the newest list's callback runs, so a change that comes before a turn is done still ends it.
         adapter.submitList(page.guides) {
-            val next = turningTo ?: return@submitList
-            turningTo = null
+            val arrival = places.committed(list) ?: return@submitList
             val layout = grid.layoutManager ?: return@submitList
-            scrolledTo[next]?.let(layout::onRestoreInstanceState) ?: layout.scrollToPosition(0)
+            arrival.place?.let(layout::onRestoreInstanceState) ?: layout.scrollToPosition(0)
             grid.doOnNextLayout { grid.itemAnimator = gridMotion }
             if (Motion.on()) {
                 grid.alpha = 0f

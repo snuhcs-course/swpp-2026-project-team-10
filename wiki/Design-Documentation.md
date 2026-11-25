@@ -127,6 +127,7 @@
 | 4.10 | 2026-11-25 | Who is zooming, on both phones, and what the photographer did, on the subject's: `camera.did`, `SessionViewModel.subjectZooming`, `SubjectViewModel.photographerLines` (Iter5-A1, [#292]). A single change of the zoom glides: `CameraController.glideZoom`, `ZoomGlide` (Iter5-A10, [#310]) (2.2, 2.5.1, 2.6.5, 2.8). |
 | 4.11 | 2026-11-25 | The library's situations and memos (Iter5-P6, [#270]): `ReferenceGuide.situation`, kept by the ♥, *Select*, and *Save guide* on both phones; `situation` in `pose.step` and `guide.image.begin`; `situation` and `memo` in `meta.json`, `setMemo`; the situation chips and the memo dialog (AD-16, 2.1, 2.3, 2.5.1, 2.6.2, 2.6.3, 2.8). |
 | 4.12 | 2026-11-25 | The library's history, favorites, and selection (Iter5-A6, [#297]): `PoseLibrary` keeps each candidate, and a used photo guide is kept, as history; ♥ and *Save guide* mark favorites (`setFavorite`, `favorite` in `meta.json`); no limit of 100; the tabs *All* and *Favorites*, opening on *All*, with no tab per kind and no *Add photo*, a ♥ on each cell (`onToggleFavorite`), *Save guide* drawn as a ♥, selection, and ⋮; Back on *Generating poses* and *Pick a pose* without asking, with `posesKept` and *View* (AD-16, 2.1, 2.3, 2.4, 2.6.2, 2.6.3, 2.8). |
+| 4.13 | 2026-11-25 | Reconnection tries for 30 s, not 10 s; Camera says who it reconnects with for the whole wait (`SessionViewModel.reconnectingWith`), read from `Reconnecting`'s new `peer` and `role`; a photo's 30 s without word no longer count a drop, which `Connected`'s new `drops` tells of (Iter5-A2, [#293]; 1.1.3, 1.1.4, 2.3, 2.4, 2.6.7, 2.8). |
 
 </details>
 
@@ -209,7 +210,7 @@ Pix is one Android app in two roles, **photographer** and **subject**, plus a sm
 | **Session photo** | Shutter → `photo.shutter` → saved in Pictures/Pix → `photo.begin`, `.chunk`, `.end`, paced by `photo.ack` → subject's Pictures/Pix → `photo.saved` | Data channel | — |
 | **Sign-in** | Pix ID and password → `POST /auth/login` or `/auth/signup`, or Google ID token → `POST /auth/google` → tokens in DataStore. A signed-in phone in front holds a signaling socket for presence. | HTTP, WebSocket | — |
 | **Invitation** | `POST /invitations` → session with the photographer's place → push, link, or *See their camera* → `POST /invitations/{id}/accept` → the friend's place → both phones `session.join` → session setup | HTTP, FCM, WebSocket, WebRTC | Push ≤ 5 s; live view ≤ 10 s after *Accept* (NFR-9) |
-| **Reconnection** | ICE disconnected → `Reconnecting` on both phones → each `session.join` over a new socket → the photographer's ICE restart on the same connection → connected, or *Connection lost* after 10 s | WebSocket, WebRTC | ≤ 10 s (NFR-11) |
+| **Reconnection** | ICE disconnected → `Reconnecting` on both phones → each `session.join` over a new socket → the photographer's ICE restart on the same connection → connected, or *Connection lost* after 30 s | WebSocket, WebRTC | ≤ 30 s (NFR-11) |
 | **Saved guide** | Guide store ↔ app private storage; the library reads thumbnails on demand (2.8) | On device | — |
 
 #### 1.1.4 Main sequences
@@ -298,8 +299,8 @@ sequenceDiagram
   participant SV as Pix server
   participant P as Photographer app
   Note over S,P: the subject's network drops, ICE state DISCONNECTED on both phones
-  S->>S: SessionState Reconnecting (10 s budget)
-  P->>P: SessionState Reconnecting (10 s budget), takes its place again over a new socket
+  S->>S: SessionState Reconnecting (30 s budget)
+  P->>P: SessionState Reconnecting (30 s budget), takes its place again over a new socket
   S->>SV: session.join (sessionId, rejoin, rejoinToken) over a new socket
   SV-->>S: session.joined
   SV-->>P: peer.rejoined
@@ -308,7 +309,7 @@ sequenceDiagram
   S->>SV: signal (answer)
   SV->>P: signal (answer)
   Note over P,S: ICE connected again on the same connection, whose channels stayed open
-  Note over S: or, after 10 s, Connection lost
+  Note over S: or, after 30 s, Connection lost
 ```
 
 *Figure 3c. A short drop recovers without a new invitation (FR-6.12, NFR-11). The photographer creates every offer, so it also starts the ICE restart.*
@@ -1423,8 +1424,8 @@ sealed interface SessionState {   // 2.4
     data class Waiting(val code: String) : SessionState              // photographer: code shown, waiting for the subject
     data class Inviting(val invitationId: String) : SessionState     // photographer: invitation sent, its place taken
     data class Connecting(val sessionId: String?) : SessionState
-    data class Connected(val sessionId: String, val peer: PeerInfo, val role: Role, val partner: SessionPartner? = null) : SessionState
-    data class Reconnecting(val sessionId: String, val since: Long, val partner: SessionPartner? = null) : SessionState
+    data class Connected(val sessionId: String, val peer: PeerInfo, val role: Role, val partner: SessionPartner? = null, val drops: Int = 0) : SessionState   // drops this session came back from
+    data class Reconnecting(val sessionId: String, val since: Long, val partner: SessionPartner? = null, val peer: PeerInfo? = null, val role: Role? = null) : SessionState   // peer and role as Connected said them
     data class Ended(val reason: EndReason) : SessionState
 }
 val SessionState.partner: SessionPartner?   // the friend while Connected or Reconnecting; null over a room code
@@ -1538,8 +1539,8 @@ stateDiagram-v2
   Connected --> Reconnecting: ICE disconnected or failed
   Connected --> Waiting: room code photographer, subject left or link lost
   Reconnecting --> Connected: link connected again, reliable channel open
-  Reconnecting --> Waiting: room code photographer, 10 s passed
-  Reconnecting --> Ended: 10 s passed, reliable channel closed, place gone, leave, or peer left
+  Reconnecting --> Waiting: room code photographer, 30 s passed
+  Reconnecting --> Ended: 30 s passed, reliable channel closed, place gone, leave, or peer left
   Connected --> Ended: leave, peer left, or reliable channel closed
   Ended --> Idle: next room (photographer)
   Ended --> Inviting: next invitation
@@ -1566,7 +1567,7 @@ stateDiagram-v2
 
 - `peer.left` with `CONNECTION_LOST` changes nothing while `Connected` or `Reconnecting`: it is often the other phone's old socket. The link decides.
 - The reliable channel closing ends the session at once, since it closes only when the other phone closed its connection. A realtime channel that closes alone hands its messages to the reliable one.
-- After 10 s the photographer says "&lt;name&gt; disconnected" and returns to `Waiting`, or ends an invitation's session. The subject goes to `Ended(CONNECTION_LOST)`.
+- After 30 s the photographer says "&lt;name&gt; disconnected" and returns to `Waiting`, or ends an invitation's session. The subject goes to `Ended(CONNECTION_LOST)`.
 - The subject's *Reconnect* (`SessionEntry.Rejoin`) retakes its place with its rejoin token while the photographer holds the session; without a token it joins the code again.
 
 A photographer whose app stays in the background for 60 s leaves the session. `Ended` stays until the next session starts, and the screens return to the camera by themselves.
@@ -3001,24 +3002,26 @@ Subject view's controls are requests. The photographer's phone applies them in a
 #### 2.6.7 Reconnection and sessions across networks (Iteration 3)
 
 - **ICE.** Each phone gets its own Cloudflare STUN and TURN credentials from the server's `turn` module, valid for 4 h (AD-14, 2.5.2). Without a key, or when Cloudflare fails or takes over 3 s, it gets STUN only. WebRTC tries a direct path, then the relay. A debug build with `pix.relayOnly=true` uses only the relay (`IceTransportsType.RELAY`).
-- **Drop detection.** `PeerConnection` `DISCONNECTED` or `FAILED` moves both phones to `Reconnecting`, with a 10 s budget (NFR-11).
+- **Drop detection.** `PeerConnection` `DISCONNECTED` or `FAILED` moves both phones to `Reconnecting`, with a 30 s budget (`RtcSessionManager.RECONNECT_BUDGET_MS`, NFR-11). It was 10 s until Iteration 5: T2 of UAT cycle 2 found that too short ([#293]).
   - The subject's video keeps its last frame, dimmed, with "Reconnecting…" (2.6.4). Its controls and shared-step buttons wait (2.6.5).
   - The photographer's live light goes out, *End session* stays, and frames keep flowing. `peer.left` with `CONNECTION_LOST` is ignored then.
+  - Camera says "Reconnecting with &lt;name&gt;…" above the shutter for the whole wait (`SessionViewModel.reconnectingWith`, [#293]). The line has no time of its own, like "… is zooming" (2.6.5), and shows before it. Another notice takes its place for its own time.
+  - `Reconnecting` carries `Connected`'s `peer` and `role`, and the line is read from them alone. A state flow shows a reader only its latest value, so a reader can miss the `Connected` before a drop.
   - The reliable channel closes only when the other phone closed its connection. Its closing ends the session: the photographer returns to `Waiting`, the subject to *Connection lost*.
   - If only the realtime channel closes, its messages use the reliable one (`realtimeLost`).
 - **Restart.**
-  - Each phone opens a new socket at once, since OkHttp's 15 s pings would outlast the budget. It sends `session.join` with `rejoin: true` and its token (2.5.2). The server moves the place, also from a socket it thinks open, and sends `peer.rejoined`.
+  - Each phone opens a new socket at once, since OkHttp's 15 s pings would take most of the budget to find a dead one. It sends `session.join` with `rejoin: true` and its token (2.5.2). The server moves the place, also from a socket it thinks open, and sends `peer.rejoined`.
   - The photographer sends an ICE-restart offer (`restartIce`) when its place is back and at every `peer.rejoined`, even on a working link. A restart waits for the last offer's answer, or 2 s. An answer with no offer pending is dropped.
   - Candidates wait for their description, and the photographer holds the subject's candidates until the new answer applies. Signals go only over a socket that holds the place.
   - The connection, both channels, the video track, and the reliable queue stay. `Reconnecting` ends when ICE connects with both channels open.
   - The photographer then resends `camera.capabilities`, `camera.state`, the guide image unless the subject holds it (2.5.1, `guide.image.*`), the final `guide.state`, and the open shared steps (2.5.1).
   - A dropped socket reopens after 1 s, doubling to 30 s. While reconnecting it reopens every second, outside the doubling.
-- **Give up.** After 10 s the photographer says "&lt;name&gt; disconnected". It returns to `Waiting`, or ends an invitation's session. The subject shows *Connection lost*.
+- **Give up.** After 30 s the photographer says "&lt;name&gt; disconnected", in place of the reconnecting line. It returns to `Waiting`, or ends an invitation's session. The subject shows *Connection lost*.
   - *Reconnect* (`SessionEntry.Rejoin`) sends `session.join` with `rejoin: false`, the token, and the first credentials. It works while the photographer holds the session, up to 60 s after its last socket. Without a token it joins the code again. In an invitation's session it says the session has ended.
   - A failure before the server answers keeps the token; a refusal drops it.
   - If the photographer is off the server then, the subject resends `session.join` on `peer.rejoined`, so the photographer still gets `peer.joined`.
   - A refused rejoin (`NOT_FOUND`, `FORBIDDEN`) ends a reconnecting session with "The session has ended". A running session goes on phone to phone.
-- **Photos (FR-6.14).** A photo in flight waits through a drop: the subject keeps its partial file, and `sendBulk` resumes once connected. `PhotoSyncer` runs for the whole session. After 10 s the photographer says "Couldn't send" (2.6.5).
+- **Photos (FR-6.14).** A photo in flight waits through a drop: the subject keeps its partial file, and `sendBulk` resumes once connected. `PhotoSyncer` runs for the whole session. Its 30 s without word (`STALL_MS`) count only while the link is up, and start over once it is back, on both phones ([#293]): the session alone decides how long a drop may last. `Connected.drops` counts the drops a session came back from, so the time also starts over after a drop too short for a reader to see its `Reconnecting`. When the budget ends, the photographer says "Couldn't send" (2.6.5).
 - **Server deploys and restarts.** To a phone these look like a dropped socket. Sessions and room codes continue, since they live in the session store (AD-18, 2.7; 2.8, Deployment). The photographer restarts ICE once (`peer.rejoined`).
 - **Cellular notice (FR-6.13).** The first time a session's selected pair uses a cellular interface (`SessionManager.path`), the app says "The live view uses mobile data." Camera shows it as a notice, Subject view as a toast. It waits in `SessionViewModel.mobileDataPending` until shown, and only then is recorded in DataStore (`MobileDataNotice`). A session that ends first drops it.
 - **Measurement.** `Timings` marks `ice.connected`, `ice.disconnected`, `ice.restarted`, and the pair type (`host`, `srflx`, `relay`) for NFR-5 and NFR-10. It marks `session.reconnecting`, `signaling.rejoined`, and `session.reconnected <ms>` for NFR-11. `ice.pair` logs each pair, such as `local=relay/tcp remote=srflx network=cellular` (`LinkStatsParser`).
@@ -3255,11 +3258,11 @@ erDiagram
 | Pose generation | 60 s per run on the phone, 60 s per request from server to image API; the phone usually ends first, before the server's `504` (2.6.3) |
 | Other model calls | Each model's own limit on the server (2.6.3); the phone waits 10 s for variations, then repeats the description, and 15 s for a tip |
 | Session connecting | 15 s |
-| Reconnecting | 10 s before a dropped link counts as lost (2.4, 2.6.7) |
+| Reconnecting | 30 s before a dropped link counts as lost (2.4, 2.6.7) |
 | Signaling socket dropped in a session or while a room waits | Again after 1 s; every 1 s while reconnecting, otherwise doubling to 30 s |
 | Photographer's app in the background | 60 s, then it leaves the session |
 | Remote requests | 500 ms until an unanswered final request is answered; 5 s in which a late one is still the subject's (2.6.5) |
-| Session photo | Given up after 30 s without word from the subject (2.6.5) |
+| Session photo | Given up after 30 s without word from the subject, not counting a drop (2.6.5, 2.6.7) |
 | Room code | 10 min |
 | Invitation | 60 s (`PIX_INVITATION_TTL_SECONDS`); after an accept, at least 15 s for the friend's phone to take its place (`PIX_INVITATION_JOIN_SECONDS`); the photographer's phone gives up after 80 s without the server's word |
 | TURN credentials | 4 h (`PIX_TURN_TTL_SECONDS`, 14400) |
@@ -3325,7 +3328,7 @@ erDiagram
 | `guide_made` | Each guide from a gallery photo or a generated pose, also when it is left before it is made | `source`, `outcome` (`made`, `no_person`, `failed`, `cancelled`), `ms` | NFR-3 |
 | `poses_ended` | Each pose set's end, also when Back leaves it while generating | `request` (`suggested`, `described`), `situation`, `outcome` (`ok`, `cancelled`, or the `GenerationError`), `ready`, `total`, `ms` | FR-4.7, NFR-4 |
 | `session_connect` | Each try to connect, the subject's from its start and the photographer's from the subject joining | `entry`, `role`, `outcome` (`connected` or the `EndReason`), `ms` | NFR-10 |
-| `session_drop` | Each link that dropped while connected, once: back within the 10 s, or not, also when the session or its subject ends first | `role`, `recovered` (1 or 0), `ms` | NFR-11 |
+| `session_drop` | Each link that dropped while connected, once: back within the 30 s, or not, also when the session or its subject ends first | `role`, `recovered` (1 or 0), `ms` | NFR-11 |
 | `photo_taken` | Each shutter press | `outcome` (`saved`, `failed`), `shutter_ms` (until the camera took it), `ms`, `in_session` | NFR-19 |
 
 - Each field is an event-scoped custom definition in the linked Analytics property: a dimension, or a metric for a count or a time (milliseconds for `ms` and `shutter_ms`). Analytics' reports show only registered fields, from their registration on, so a new field is registered before its release.
@@ -3727,6 +3730,7 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#284]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/284
 [#285]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/285
 [#292]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/292
+[#293]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/293
 [#294]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/294
 [#296]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/296
 [#297]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/297

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.animation.ValueAnimator
@@ -27,6 +27,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
@@ -42,13 +43,12 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowChoreographer
-import org.robolectric.shadows.ShadowToast
 
 /*
  * Reference confirm's render paths (R&S 6.2, FR-2.3, FR-2.4; Testing Documentation 2.1.6), on the real Fragment.
  * Partitions on the reference state: nothing yet, working (the person is being found), ready (the outline shown
  * and Use this guide enabled, which puts the guide on the camera), no person found (to that screen), and a photo
- * that could not be used (a toast and the camera). Back on a generated pose's guide, or another photo from the
+ * that could not be used (a notice and the camera). Back on a generated pose's guide, or another photo from the
  * gallery in its place, stops the ask for its tip. Back by where the reference was chosen (#294): a photo from the
  * camera's Add a pose guide (that sheet again over the camera, without its gallery, the guide on the camera the same
  * one; the system's Back too), from Subject view's (its sheet over Subject view), from the library (the library), and
@@ -150,7 +150,7 @@ class ReferenceConfirmFragmentTest {
 
         assertSame(made, modules.guides.guide.value)
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
-        assertEquals(string(R.string.peer_used_guide, "Joonhyung"), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.peer_used_guide, "Joonhyung"), shownNotice())
         assertEquals(
             SessionMessage.GuideConfirm(confirmId, ConfirmStep.USED, made.id, Role.SUBJECT),
             confirmSteps(modules).last(),
@@ -544,7 +544,7 @@ class ReferenceConfirmFragmentTest {
         modules.maker.finish(Result.failure(IOException("unreadable")))
         idle()
 
-        assertEquals(string(R.string.couldnt_use_photo), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.couldnt_use_photo), shownNotice())
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
     }
 }

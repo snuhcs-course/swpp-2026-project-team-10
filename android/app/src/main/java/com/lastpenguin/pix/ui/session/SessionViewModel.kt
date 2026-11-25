@@ -86,7 +86,7 @@ sealed interface SessionNotice {
  */
 data class RemoteFocus(val x: Float, val y: Float)
 
-/** The subject's toast about a photo from the photographer (FR-6.14), on whichever screen of the session is in front. */
+/** The subject's notice about a photo from the photographer (FR-6.14), on whichever screen of the session is in front. */
 sealed interface PhotoNotice {
     data object Saved : PhotoNotice
 

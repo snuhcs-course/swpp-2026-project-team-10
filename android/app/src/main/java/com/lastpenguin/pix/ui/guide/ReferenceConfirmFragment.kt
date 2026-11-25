@@ -3,7 +3,6 @@ package com.lastpenguin.pix.ui.guide
 
 import android.os.Bundle
 import android.view.View
-import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.annotation.IdRes
 import androidx.core.os.bundleOf
@@ -25,6 +24,7 @@ import com.lastpenguin.pix.ui.fadeTo
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.showOutline
+import com.lastpenguin.pix.ui.showNotice
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -99,7 +99,7 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
                     viewModel.usedBySubject.collect {
                         subjectName(sessionViewModel.state.value)?.let { name ->
                             val text = getString(R.string.peer_used_guide, name)
-                            Toast.makeText(requireContext(), text, Toast.LENGTH_SHORT).show()
+                            showNotice(text)
                         }
                         backToShooting(viewModel)
                     }
@@ -145,7 +145,7 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
             )
 
             ReferenceUiState.Failed -> {
-                Toast.makeText(requireContext(), R.string.couldnt_use_photo, Toast.LENGTH_SHORT).show()
+                showNotice(R.string.couldnt_use_photo)
                 backToShooting(viewModel)
             }
 

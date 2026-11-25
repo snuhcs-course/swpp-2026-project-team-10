@@ -51,8 +51,10 @@
     <color name="pix_on_live">#0B2A1E</color>
     <color name="pix_guide">#5EEAD4</color>
     <color name="pix_guide_stroke">#805EEAD4</color>
-    <!-- The guide color at 20%: the guide slider's halo, and the guide-edit toggle while the mode is on. -->
+    <!-- The guide color at 20%: the guide slider's halo. -->
     <color name="pix_guide_soft">#335EEAD4</color>
+    <!-- The guide color at 20% over pix_glass, as one color: the guide-edit toggle's glass while the mode is on. -->
+    <color name="pix_guide_glass">#A9254F4A</color>
     <color name="pix_danger">#FF6B57</color>
     <!-- The blinking light while a session streams the camera (FR-6.8), the red of a recording light. -->
     <color name="pix_recording">#FF3B30</color>

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -29,6 +29,7 @@ import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.camera.ZoomablePhotoView
@@ -64,7 +65,6 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
-import org.robolectric.shadows.ShadowToast
 
 /*
  * The session's photos on Subject view (FR-6.14, R&S 6.6; Iter4-A2), on the real Fragment with a container of fakes
@@ -550,7 +550,7 @@ class SubjectSessionPhotoTest {
         (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_POSITIVE).performClick()
         settle()
 
-        assertEquals(string(R.string.photo_not_deleted), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.photo_not_deleted), shownNotice())
         onScreen { binding, _ ->
             assertEquals(2, binding.viewer().stripCount())
             assertSame(pictures[saved("p2")], binding.viewerShows())

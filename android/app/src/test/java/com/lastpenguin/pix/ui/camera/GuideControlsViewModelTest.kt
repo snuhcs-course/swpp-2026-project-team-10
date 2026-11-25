@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import androidx.lifecycle.ViewModelStore
@@ -18,6 +18,8 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -28,6 +30,9 @@ import org.junit.Test
  * Reference thumbnail (FR-3.9): enlarge and shrink a guide's reference; a guide without a reference and no guide
  * (stays small); the same guide's state changing (stays enlarged); a new guide and a removed guide (back to small);
  * a corner chosen by a drop, kept for the next guide.
+ * Remove guide and its Undo (#298): a placed guide removed, with one notice, and put back as the same guide where it
+ * was; Undo after another guide went on, after the guide came back, and twice (nothing); Remove with no guide (no
+ * notice).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class GuideControlsViewModelTest {
@@ -273,5 +278,80 @@ class GuideControlsViewModelTest {
 
         assertTrue(guides.state.value.visible)
         assertTrue(changes.isEmpty())
+    }
+
+    // ---- Remove guide and its Undo (#298) ---------------------------------------------------
+
+    @Test
+    fun onRemoveGuide_thenUndo_putsTheSameGuideBackWhereItWas() = runTest(dispatcher) {
+        val guide = fakeGuide("g1")
+        guides.setGuide(guide)
+        guides.update(final = true) { it.copy(cx = 0.3f, cy = 0.6f, height = 1.2f, opacity = 0.7f) }
+        val placed = guides.state.value
+        val notices = mutableListOf<Unit>()
+        backgroundScope.launch { model.guideRemoved.collect { notices += it } }
+        runCurrent()
+
+        model.onRemoveGuide()
+        runCurrent()
+        assertNull(guides.guide.value)
+        assertEquals(1, notices.size)
+
+        model.onUndoRemoveGuide()
+        runCurrent()
+        assertSame(guide, guides.guide.value)
+        assertEquals(placed, guides.state.value)
+        assertSame(guide, model.uiState.value.guide)
+    }
+
+    @Test
+    fun onUndoRemoveGuide_afterAnotherGuide_changesNothing() = runTest(dispatcher) {
+        guides.setGuide(fakeGuide("g1"))
+        runCurrent()
+        model.onRemoveGuide()
+        val other = fakeGuide("g2")
+        guides.setGuide(other)
+        runCurrent()
+
+        model.onUndoRemoveGuide()
+        runCurrent()
+
+        assertSame(other, guides.guide.value)
+        // Nothing waits to come back once that guide is removed too.
+        guides.setGuide(null)
+        model.onUndoRemoveGuide()
+        assertNull(guides.guide.value)
+    }
+
+    @Test
+    fun onUndoRemoveGuide_twice_putsItBackOnce() = runTest(dispatcher) {
+        val guide = fakeGuide("g1")
+        guides.setGuide(guide)
+        runCurrent()
+        model.onRemoveGuide()
+        model.onUndoRemoveGuide()
+        runCurrent()
+        guides.update(final = true) { it.copy(cx = 0.2f) }
+        val moved = guides.state.value
+
+        model.onUndoRemoveGuide()
+        runCurrent()
+
+        assertSame(guide, guides.guide.value)
+        assertEquals(moved, guides.state.value)
+    }
+
+    @Test
+    fun onRemoveGuide_noGuide_sendsNoNotice() = runTest(dispatcher) {
+        val notices = mutableListOf<Unit>()
+        backgroundScope.launch { model.guideRemoved.collect { notices += it } }
+        runCurrent()
+
+        model.onRemoveGuide()
+        model.onUndoRemoveGuide()
+        runCurrent()
+
+        assertTrue(notices.isEmpty())
+        assertNull(guides.guide.value)
     }
 }

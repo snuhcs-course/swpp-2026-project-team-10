@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -25,6 +25,7 @@ import com.lastpenguin.pix.session.fakeGuide
 import com.lastpenguin.pix.session.protocol.ConfirmStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import java.time.Duration
@@ -36,13 +37,13 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowChoreographer
-import org.robolectric.shadows.ShadowToast
 
 /*
  * The subject's Your reference (R&S 6.6, FR-6.15, Design 2.6.5) on the real Fragment, with the photographer's confirm
@@ -202,7 +203,7 @@ class SubjectConfirmFragmentTest {
         step(modules, ConfirmStep.USED, "g1", Role.PHOTOGRAPHER)
 
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
-        assertEquals(string(R.string.peer_used_guide, "Dongje"), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.peer_used_guide, "Dongje"), shownNotice())
     }
 
     @Test
@@ -213,7 +214,7 @@ class SubjectConfirmFragmentTest {
         step(modules, ConfirmStep.CLOSED)
 
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
-        assertEquals(string(R.string.peer_closed_reference, "Dongje"), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.peer_closed_reference, "Dongje"), shownNotice())
     }
 
     @Test
@@ -226,7 +227,7 @@ class SubjectConfirmFragmentTest {
         step(modules, ConfirmStep.USED, "g1", Role.SUBJECT)
 
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
-        assertEquals(0, ShadowToast.shownToastCount())
+        assertNull(shownNotice())
     }
 
     @Test
@@ -245,7 +246,7 @@ class SubjectConfirmFragmentTest {
         val nav = launch()
 
         assertEquals(R.id.subjectConfirmFragment, nav.currentDestination?.id)
-        assertEquals(0, ShadowToast.shownToastCount())
+        assertNull(shownNotice())
         assertTrue(onScreen { it.useGuideButton.isEnabled })
     }
 
@@ -258,7 +259,7 @@ class SubjectConfirmFragmentTest {
 
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(ConfirmSyncer.USE_TIMEOUT_MS + 100))
 
-        assertEquals(string(R.string.guide_use_failed), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.guide_use_failed), shownNotice())
         onScreen { binding ->
             assertTrue(binding.useGuideButton.isEnabled)
             binding.useGuideButton.performClick()

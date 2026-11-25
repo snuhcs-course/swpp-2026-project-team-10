@@ -1,9 +1,8 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
 import android.view.View
-import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -23,6 +22,7 @@ import com.lastpenguin.pix.ui.generation.PoseCandidateAdapter
 import com.lastpenguin.pix.ui.generation.PoseSlot
 import com.lastpenguin.pix.ui.generation.aspectOf
 import com.lastpenguin.pix.ui.generation.showScene
+import com.lastpenguin.pix.ui.showNotice
 import kotlinx.coroutines.launch
 
 /**
@@ -65,7 +65,7 @@ class SubjectGeneratingFragment : Fragment(R.layout.fragment_generating) {
                                     if (ui.allFailed) R.string.peer_poses_failed else R.string.peer_stopped_poses,
                                     name,
                                 )
-                            Toast.makeText(requireContext(), text, Toast.LENGTH_SHORT).show()
+                            showNotice(text)
                         }
                         backToSubject()
                     }

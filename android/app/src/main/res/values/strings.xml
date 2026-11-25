@@ -4,6 +4,8 @@
 
     <!-- Common -->
     <string name="cancel">Cancel</string>
+    <!-- A notice's action that takes back what was just done (#298). -->
+    <string name="undo">Undo</string>
     <string name="back">Back</string>
     <string name="back_to_camera">Back to camera</string>
     <string name="try_again">Try again</string>
@@ -85,6 +87,8 @@
     <string name="show_reference">Show</string>
     <string name="reference_hidden">Hidden</string>
     <string name="edit_guide">Edit guide</string>
+    <!-- After Remove guide, with Undo for a few seconds (FR-3.6, #298). -->
+    <string name="guide_removed_from_camera">Guide removed</string>
     <!-- Pose tips (FR-4.10): the banner over the bottom of the preview and the button in the top bar. -->
     <string name="tip_preparing">Preparing a tip…</string>
     <string name="tip_failed">Couldn\'t get a tip for this pose</string>
@@ -103,6 +107,7 @@
     <string name="brightness">Brightness</string>
     <string name="live_badge">Live · %1$s connected</string>
     <string name="end_session">End session</string>
+    <string name="end_session_title">End the session?</string>
     <string name="peer_left">%1$s left</string>
     <string name="peer_disconnected">%1$s disconnected</string>
     <string name="session_photo_saved">Photo saved to your Pix album</string>

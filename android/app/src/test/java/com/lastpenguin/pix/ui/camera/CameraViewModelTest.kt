@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -781,13 +781,26 @@ class CameraViewModelTest {
 
     @Test
     fun `removing the guide clears the repository`() = runTest(dispatcher) {
+        val guide = guide("g1")
+        guides.setGuide(guide)
         runCurrent()
 
         model.onRemoveGuide()
         runCurrent()
 
-        assertEquals(listOf<ReferenceGuide?>(null), guides.set)
+        assertEquals(listOf(guide, null), guides.set)
         assertNull(model.uiState.value.guide)
+    }
+
+    @Test
+    fun `removing without a guide changes nothing`() = runTest(dispatcher) {
+        runCurrent()
+
+        model.onRemoveGuide()
+        runCurrent()
+
+        // Nothing to clear, and nothing for Undo to put back (#298).
+        assertEquals(emptyList<ReferenceGuide?>(), guides.set)
     }
 
     @Test

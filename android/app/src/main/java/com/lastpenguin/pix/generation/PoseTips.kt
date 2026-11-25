@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-02, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -35,8 +35,10 @@ data class GuideTip(val guideId: String, val state: TipState)
  * The tip for the guide on Camera (FR-4.10; Design 2.6.3, Pose tips). [prepare] asks for the tip of a guide made from
  * a candidate while the user looks at it on Reference confirm; when that guide goes on Camera, its tip comes with it,
  * and when another guide does, or none, there is no tip, so a guide from the gallery or a saved guide never has one,
- * even a saved copy of the guide on Camera, which keeps its id. Only the newest guide's tip and the one on Camera are
- * asked for, and [discard] drops the newest when that guide is not used. A tip kept is asked again when the screens'
+ * even a saved copy of the guide on Camera, which keeps its id. A guide removed from Camera keeps its tip aside until
+ * another guide goes on, so Remove guide's Undo, which puts back the same guide, brings its tip back too (#298). Only
+ * the newest guide's tip, the one on Camera, and that removed one are asked for, and [discard] drops the newest when
+ * that guide is not used. A tip kept is asked again when the screens'
  * language changes, so Camera never shows it in the language it had before (FR-10.2). Kept in memory only, like the
  * candidates.
  * Owner: Pose tips.
@@ -57,15 +59,19 @@ class PoseTips(
         var request: Job? = null
     }
 
-    /** The tips kept: the one of the guide on Camera and the one being prepared, by guide id. */
+    /**
+     * The tips kept, by guide id: the one of the guide on Camera, the one being prepared, and the one of the guide
+     * removed from Camera, [removed], until another guide goes on.
+     */
     private data class Tips(
         val onCamera: String? = null,
         val pending: String? = null,
+        val removed: String? = null,
         val states: Map<String, TipState> = emptyMap(),
         val asked: Map<String, Asked> = emptyMap(),
     ) {
         fun kept(): Tips {
-            val keep = { id: String -> id == onCamera || id == pending }
+            val keep = { id: String -> id == onCamera || id == pending || id == removed }
             return copy(states = states.filterKeys(keep), asked = asked.filterKeys(keep))
         }
     }
@@ -87,15 +93,25 @@ class PoseTips(
     init {
         scope.launch {
             // Each guide put on Camera, not each id: a saved guide keeps the id of the guide it was saved from.
+            var shown: ReferenceGuide? = null
+            var removed: ReferenceGuide? = null
             guideOnCamera.distinctUntilChanged { old, new -> old === new }.collect { guide ->
                 val id = guide?.id
-                // Only the guide the tip was prepared for brings one; the one on Camera before loses its own.
+                // The same guide back after it was removed, by Undo, takes its tip back; a saved copy is another one.
+                val back = guide != null && guide === removed
+                removed = if (guide == null) shown else null
+                shown = guide
+                val aside = removed?.id
+                // Only the guide the tip was prepared for brings one; the one on Camera before loses its own, unless it
+                // was removed for none, which keeps it aside.
+                val keep = { key: String, tips: Tips -> key == tips.pending || key == aside || (back && key == id) }
                 change {
                     Tips(
                         onCamera = id,
                         pending = it.pending.takeIf { pending -> pending != id },
-                        states = it.states.filterKeys { key -> key == it.pending },
-                        asked = it.asked.filterKeys { key -> key == it.pending },
+                        removed = aside,
+                        states = it.states.filterKeys { key -> keep(key, it) },
+                        asked = it.asked.filterKeys { key -> keep(key, it) },
                     )
                 }
             }

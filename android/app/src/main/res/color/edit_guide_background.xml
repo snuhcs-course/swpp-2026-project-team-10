@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The guide-edit mode toggle: a faint guide-colored tile while the mode is on (checked). -->
+<!-- The guide-edit mode toggle: glass like the other icons over the image, tinted with the guide's color while the mode
+     is on (checked). -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:color="@color/pix_guide_soft" android:state_checked="true" />
-    <item android:color="@android:color/transparent" />
+    <item android:color="@color/pix_guide_glass" android:state_checked="true" />
+    <item android:color="@color/pix_glass" />
 </selector>

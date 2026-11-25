@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The track of a header's small switch (Widget.Pix.Button.Segment.Small): inset by the buttons' own 8 dp, so it hugs
+     their 32 dp shapes while each takes taps on 48 dp (#298). -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/bg_segment_track"
+    android:insetTop="8dp"
+    android:insetBottom="8dp" />

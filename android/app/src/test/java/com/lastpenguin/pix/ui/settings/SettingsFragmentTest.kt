@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.content.Intent
@@ -21,6 +21,7 @@ import com.lastpenguin.pix.settings.Language
 import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.tutorialOver
 import com.lastpenguin.pix.ui.TestAppContainer
@@ -37,7 +38,6 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
-import org.robolectric.shadows.ShadowToast
 
 /*
  * Settings on the real screen (FR-10.1–10.4, FR-10.6, FR-10.7, FR-1.9, FR-1.10, FR-3.10, FR-4.2), with the settings in
@@ -429,7 +429,7 @@ class SettingsFragmentTest {
         }
 
         assertEquals(emptySet<TutorialScreen>(), modules.appSettings.tutorialSeen.value)
-        assertEquals(string(R.string.settings_tutorial_reset), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.settings_tutorial_reset), shownNotice())
         // Nothing opens over Settings: each screen shows its own tips the next time it opens.
         scenario!!.onFragment { assertNull(tutorialOver(it)) }
         assertEquals(R.id.settingsFragment, nav.currentDestination?.id)

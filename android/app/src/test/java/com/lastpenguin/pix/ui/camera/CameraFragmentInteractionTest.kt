@@ -117,8 +117,9 @@ import org.robolectric.shadows.ShadowDialog
  * meets a countdown, left to its own photo without a refusal.
  * The subject starts AI poses (#276, FR-6.15): the scene photo's step begun here for their situation, with its notice;
  * refused for a selfie without a front camera, while a scene photo is already framed (the step unchanged), with a
- * sheet over the camera, and while this phone's timer counts down (the countdown going on to its photo); without the
- * agreement on this phone, asked first with the subject's name, begun once agreed,
+ * sheet over the camera, and while this phone's timer counts down (the countdown going on to its photo); a press, and
+ * a start, while one of this screen's own questions is up (the agreement, End session), taken again once it is
+ * answered; without the agreement on this phone, asked first with the subject's name, begun once agreed,
  * refused at "Not now", and a second request refused while the question is up.
  */
 @RunWith(AndroidJUnit4::class)
@@ -792,6 +793,48 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.countdownPanel.visibility) }
 
         idleFor(2_100)
+        assertEquals(1, camera.photoTurns.size)
+    }
+
+    @Test
+    fun whileTheAgreementIsAsked_theSubjectsPressIsNotTaken() {
+        val camera = FakeCameraController().apply { photo = Uri.parse("content://media/external/images/9") }
+        val modules = TestAppContainer(camera = camera).apply { consent.given = false }
+        inASession(modules)
+        modules.session.deliver(SessionMessage.PoseStart("default"))
+        idle()
+        assertTrue((ShadowDialog.getLatestDialog() as AlertDialog).isShowing)
+
+        // The question covers the camera: the photographer reads it, and no photo is taken behind it.
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idle()
+
+        assertTrue(camera.photoTurns.isEmpty())
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), shutterAnswers(modules))
+    }
+
+    @Test
+    fun whileEndSessionIsAsked_neitherTheSubjectsPressNorTheirStartOfPosesIsTaken() {
+        val camera = FakeCameraController().apply { photo = Uri.parse("content://media/external/images/9") }
+        val modules = TestAppContainer(camera = camera)
+        inASession(modules)
+        onScreen { controls, _ -> controls.endSessionButton.performClick() }
+        assertTrue((ShadowDialog.getLatestDialog() as AlertDialog).isShowing)
+
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        modules.session.deliver(SessionMessage.PoseStart("full_body"))
+        idle()
+
+        assertTrue(camera.photoTurns.isEmpty())
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), shutterAnswers(modules))
+        assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers(modules))
+
+        // Answered with Cancel, the camera is in front again.
+        (ShadowDialog.getLatestDialog() as AlertDialog).getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+        idle()
+        modules.session.deliver(SessionMessage.ShutterPress(2))
+        idle()
         assertEquals(1, camera.photoTurns.size)
     }
 

@@ -2112,13 +2112,16 @@ class CameraFragment :
 
     /**
      * Whether the camera itself is what the photographer looks at. Under a sheet, such as Add a pose guide, this screen
-     * stays started with its camera running, and so it does under its own photos: neither is "in front", and what the
-     * subject asks of the camera is refused then (#314, #276).
+     * stays started with its camera running, and so it does under its own photos and under a question of its own, the
+     * AI notice for the subject's poses or "End the session?": none of them is "in front", and what the subject asks
+     * of the camera is refused then (#314, #276). A new dialog of this screen belongs here too.
      */
     private fun cameraInFront(): Boolean {
         // Without a navigation controller, as in a screen test, nothing can cover it.
         val destination = runCatching { findNavController().currentDestination?.id }.getOrNull()
-        return (destination == null || destination == R.id.cameraFragment) && !viewModel.uiState.value.photosOpen
+        val asking = askedForSubject != null || endSessionDialog?.isShowing == true
+        return (destination == null || destination == R.id.cameraFragment) && !viewModel.uiState.value.photosOpen &&
+            !asking
     }
 
     /**
@@ -2144,7 +2147,7 @@ class CameraFragment :
      */
     private fun startPosesForSubject(situation: Situation, answer: (PoseStartStep) -> Unit) {
         val counting = viewModel.uiState.value.countdown != null
-        val free = cameraInFront() && !isScenePhotoActive() && askedForSubject == null && !counting
+        val free = cameraInFront() && !isScenePhotoActive() && !counting
         if (!free || !generationViewModel.chooseSituation(situation)) return answer(PoseStartStep.REFUSED)
         if (!generationViewModel.needsConsent) {
             generationViewModel.beginScene()

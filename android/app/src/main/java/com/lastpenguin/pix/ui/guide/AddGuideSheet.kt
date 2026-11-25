@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.content.DialogInterface
@@ -34,7 +34,8 @@ import kotlinx.coroutines.launch
  * *Keep the current guide* closes it (FR-3.6). Opened from Subject view ([ARG_FROM_SUBJECT]), the guide goes to the
  * photographer, and the situations wait for the shared steps (FR-6.15, Design 2.6.5). A tile dims and shrinks under the
  * finger and goes on at release; once a tap goes on, the sheet ignores every other (#243). The first time it opens from
- * Camera, its tutorial tips come over it (FR-10.4).
+ * Camera, its tutorial tips come over it (FR-10.4). Back on Reference confirm and on No person found open it again for
+ * a photo picked from it, the second with the gallery's picker over it ([ARG_OPEN_GALLERY], #294).
  * Owner: PM (#5); *Generate poses here* starts #7; saved guides #58; from Subject view Iter3-P9; the library #170; the
  * tiles as buttons and the picker kept open #243.
  */
@@ -102,6 +103,9 @@ class AddGuideSheet : BottomSheetDialogFragment() {
             goOn { findNavController().navigate(R.id.action_addGuide_to_library) }
         }
         binding.cancelButton.setOnClickListener { goOn(::dismiss) }
+        // Back on No person found opens this sheet with its gallery (#294): the picker at once, as a tap on its row,
+        // and only for the sheet as it first opens, not for one made anew while the picker is up.
+        if (savedInstanceState == null && arguments?.getBoolean(ARG_OPEN_GALLERY) == true) goOn(pickPhoto)
 
         val savedGuides = SavedGuideList(binding)
         viewLifecycleOwner.lifecycleScope.launch {
@@ -156,5 +160,8 @@ class AddGuideSheet : BottomSheetDialogFragment() {
     companion object {
         /** The navigation argument set by Subject view's *Guide* button. */
         const val ARG_FROM_SUBJECT = "fromSubject"
+
+        /** The navigation argument set by Back on No person found: the gallery's picker opens with the sheet (#294). */
+        const val ARG_OPEN_GALLERY = "openGallery"
     }
 }

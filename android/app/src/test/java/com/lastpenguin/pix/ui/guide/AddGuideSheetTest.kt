@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.animation.ValueAnimator
@@ -62,7 +62,10 @@ import org.robolectric.shadows.ShadowDialog
  * the tile still pressed, and under the consent notice it is itself again; once a tap goes on, every other tap on the
  * sheet is ignored. My library (FR-3.8, FR-3.11): nothing saved (no count); the row, which opens the library and closes
  * the sheet, once however often it is tapped. The gallery's picker (FR-2.7, #243): closed without a photo (the sheet
- * stays open and takes taps again, the guide on the camera unchanged) or with one (Reference confirm). The order at the
+ * stays open and takes taps again, the guide on the camera unchanged) or with one (Reference confirm). Opened for its
+ * gallery, as Back on No person found opens it (#294): the picker at once and only one, closed without a photo (the
+ * sheet stays and takes taps) or with one (Reference confirm), none again for a sheet made anew, and none when the
+ * sheet is opened from its button. The order at the
  * Galaxy S22's 360 × 705 dp, at font scale 1.0 and 1.3 (boundary, #243): the title, then What are you taking? with the
  * tiles, Auto's badge whole on its tile, then the guide from a photo with its two rows, each whole and clear of the
  * next. From Subject view (FR-6.15): no situations, Add a pose guide as the title, and Replace only for a guide on the
@@ -99,10 +102,17 @@ class AddGuideSheetTest {
         event.recycle()
     }
 
-    private fun launch(modules: TestAppContainer = TestAppContainer(), fromSubject: Boolean = false): TestAppContainer {
+    private fun launch(
+        modules: TestAppContainer = TestAppContainer(),
+        fromSubject: Boolean = false,
+        openGallery: Boolean = false,
+    ): TestAppContainer {
         modules.install()
         scenario = launchFragment<AddGuideSheet>(
-            fragmentArgs = bundleOf(AddGuideSheet.ARG_FROM_SUBJECT to fromSubject),
+            fragmentArgs = bundleOf(
+                AddGuideSheet.ARG_FROM_SUBJECT to fromSubject,
+                AddGuideSheet.ARG_OPEN_GALLERY to openGallery,
+            ),
             themeResId = R.style.Theme_Pix,
         )
         scenario!!.onFragment {
@@ -237,6 +247,65 @@ class AddGuideSheetTest {
         tile(Situation.DEFAULT).root.performClick()
         idle()
         assertEquals(GenerationUiState.Phase.FRAMING, generation.uiState.value.phase)
+    }
+
+    @Test
+    fun openedForItsGallery_opensThePickerAtOnce_andClosingItLeavesTheSheetTakingTaps() {
+        launch(openGallery = true)
+        val nav = scenario!!.attachNav(R.id.addGuideSheet)
+
+        scenario!!.onFragment { fragment ->
+            val activity = shadowOf(fragment.requireActivity())
+            val picker = checkNotNull(activity.nextStartedActivityForResult) { "no picker opened" }
+            // Once: the sheet opened one picker, not one per start.
+            assertNull(activity.nextStartedActivityForResult)
+            activity.receiveResult(picker.intent, Activity.RESULT_CANCELED, null)
+        }
+        idle()
+
+        assertTrue(sheet.requireDialog().isShowing)
+        assertEquals(R.id.addGuideSheet, nav.currentDestination?.id)
+        tile(Situation.DEFAULT).root.performClick()
+        idle()
+        assertEquals(GenerationUiState.Phase.FRAMING, generation.uiState.value.phase)
+    }
+
+    @Test
+    fun openedForItsGallery_aPhotoPicked_opensReferenceConfirm() {
+        launch(openGallery = true)
+        val nav = scenario!!.attachNav(R.id.addGuideSheet)
+
+        scenario!!.onFragment { fragment ->
+            val activity = shadowOf(fragment.requireActivity())
+            val picker = checkNotNull(activity.nextStartedActivityForResult) { "no picker opened" }
+            activity.receiveResult(
+                picker.intent,
+                Activity.RESULT_OK,
+                Intent().setData(Uri.parse("content://photos/1")),
+            )
+        }
+        idle()
+
+        assertEquals(R.id.referenceConfirmFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun openedForItsGallery_aSheetMadeAnew_opensNoSecondPicker() {
+        launch(openGallery = true)
+        scenario!!.onFragment { checkNotNull(shadowOf(it.requireActivity()).nextStartedActivityForResult) }
+
+        // The language or the font size changes while the picker is up: the sheet comes back without another one.
+        scenario!!.recreate()
+        idle()
+
+        scenario!!.onFragment { assertNull(shadowOf(it.requireActivity()).nextStartedActivityForResult) }
+    }
+
+    @Test
+    fun openedFromItsButton_opensNoPickerByItself() {
+        launch()
+
+        scenario!!.onFragment { assertNull(shadowOf(it.requireActivity()).nextStartedActivityForResult) }
     }
 
     @Test

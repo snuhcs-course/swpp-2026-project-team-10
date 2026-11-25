@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.Manifest
@@ -450,6 +450,15 @@ class KoreanScreensTest {
         scenario = launchFragmentInContainer<NoPersonFoundFragment>(themeResId = R.style.Theme_Pix).also {
             it.attachNav(R.id.noPersonFoundFragment)
         }
+        assertKorean(screen())
+    }
+
+    @Test
+    fun noPersonFound_afterAPhoto_withItsLineToGoBack_isInKorean() {
+        TestAppContainer().install()
+        scenario = launchPrepared<NoPersonFoundFragment>(R.id.noPersonFoundFragment) {
+            it.viewModel<ReferenceViewModel>().onPhotoPicked(Uri.parse("content://photos/1"))
+        }.first
         assertKorean(screen())
     }
 

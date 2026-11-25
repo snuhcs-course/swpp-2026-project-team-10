@@ -64,6 +64,7 @@ import com.lastpenguin.pix.ui.session.SessionViewModel
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
@@ -757,6 +758,39 @@ class CameraFragmentInteractionTest {
     }
 
     private fun FragmentCameraBinding.thumbnailShows(): Bitmap? = (galleryThumbnail.drawable as? BitmapDrawable)?.bitmap
+
+    @Test
+    fun aPhotoEditedInPlace_isReadAgain_inTheThumbnailAndTheGrid_withoutGrowingInAsANewOne() {
+        val modules = launch()
+        val photos = (1..3).map { TestAppContainer.savedPhoto("p$it") }
+        // Each photo as it was, and as an app's edit saved over it, under the same URI.
+        val before = photos.associateWith { Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888) }
+        val after = photos.associateWith { Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888) }
+        val edited = AtomicBoolean(false)
+        onScreen { _, fragment ->
+            fragment.thumbnailOf = { (if (edited.get()) after else before)[it] }
+            fragment.cellOf = { uri, _ -> (if (edited.get()) after else before)[uri] }
+        }
+        modules.album.value = photos
+        settleReads()
+        onScreen { controls, _ -> controls.galleryButton.performClick() }
+        settleReads()
+        onScreen { controls, _ ->
+            assertSame(before[photos[2]], controls.thumbnailShows())
+            assertSame(before[photos[2]], photoViewerOn(controls.root).gridShows(0))
+        }
+
+        edited.set(true)
+        modules.photoEdits.value = 1
+        settleReads()
+
+        onScreen { controls, _ ->
+            assertSame(after[photos[2]], controls.thumbnailShows())
+            assertSame(after[photos[2]], photoViewerOn(controls.root).gridShows(0))
+            assertSame(after[photos[0]], photoViewerOn(controls.root).gridShows(2))
+            assertEquals(1f, controls.galleryThumbnail.scaleX, 0f)
+        }
+    }
 
     @Test
     fun galleryButton_outsideASession_showsTheAlbumsNewest_andOpensPixsAlbumInPix_asAGrid_thenThePhotoTapped() {

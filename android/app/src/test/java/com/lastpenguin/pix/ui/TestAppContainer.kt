@@ -187,10 +187,14 @@ class TestAppContainer(
     var rereads = 0
         private set
 
+    /** How many times a photo of [album] was changed in place, as an app's edit saved over it; a test moves it. */
+    val photoEdits = MutableStateFlow(0)
+
     private val phonePhotos = object : PhonePhotoSource {
         override val photos: StateFlow<List<Uri>> = album
         override val access: StateFlow<PhotoAccess> = photoAccess
         override val albums: StateFlow<List<PhoneAlbum>> = this@TestAppContainer.albums
+        override val edits: StateFlow<Int> = photoEdits
 
         override suspend fun refresh() {
             rereads++

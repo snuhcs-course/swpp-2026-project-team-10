@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.content.Context
@@ -14,9 +14,13 @@ import com.lastpenguin.pix.ui.Motion
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** The size asked of MediaStore for a 40 dp thumbnail, enough at the densest screens. */
@@ -61,13 +65,19 @@ internal fun Context.photoToView(uri: Uri): Bitmap {
 /**
  * Shows each of [photos] in [thumbnail], read through [load] off the main thread (FR-1.6, FR-6.14): the placeholder
  * without one, or when it cannot be read; the full photo can still be opened then. A photo that comes while the
- * screen is open grows in; the one there as it opens just shows. Runs until cancelled, as the screen's collectors do.
+ * screen is open grows in; the one there as it opens just shows. Each of [edits], a photo changed in place under the
+ * same URI (`PhonePhotos.edits`), reads the one shown again, which just shows. Runs until cancelled, as the screen's
+ * collectors do.
  */
-internal suspend fun showPhotoThumbnails(photos: Flow<Uri?>, thumbnail: ImageView, load: (Uri) -> Bitmap?) {
-    var opening = true
-    photos.distinctUntilChanged().collectLatest { uri ->
-        val taken = !opening
-        opening = false
+internal suspend fun showPhotoThumbnails(
+    photos: Flow<Uri?>,
+    thumbnail: ImageView,
+    edits: Flow<Int> = flowOf(0),
+    load: (Uri) -> Bitmap?,
+): Unit = coroutineScope {
+    var shown: Uri? = null
+
+    suspend fun show(uri: Uri?, grow: Boolean) {
         val picture = uri?.let {
             withContext(Dispatchers.IO) {
                 try {
@@ -83,8 +93,18 @@ internal suspend fun showPhotoThumbnails(photos: Flow<Uri?>, thumbnail: ImageVie
             thumbnail.setImageResource(R.drawable.gallery_placeholder)
         } else {
             thumbnail.setImageBitmap(picture)
-            if (taken) thumbnail.growIn()
+            if (grow) thumbnail.growIn()
         }
+    }
+
+    // A photo edited in place: the one shown, read again, just shown.
+    launch { edits.distinctUntilChanged().drop(1).collectLatest { show(shown, grow = false) } }
+    var opening = true
+    photos.distinctUntilChanged().collectLatest { uri ->
+        val taken = !opening
+        opening = false
+        shown = uri
+        show(uri, taken)
     }
 }
 

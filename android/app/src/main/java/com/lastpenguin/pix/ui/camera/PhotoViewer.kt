@@ -102,7 +102,8 @@ internal class PhotoViewer(
             override fun onDismiss() = onBack()
         },
     )
-    private val strip = PhotoStrip(ThumbnailReader(scope, STRIP_CACHE_BYTES, thumbnail)) { position ->
+    private val stripReader = ThumbnailReader(scope, STRIP_CACHE_BYTES, thumbnail)
+    private val strip = PhotoStrip(stripReader) { position ->
         built?.photoViewerPages?.setCurrentItem(position, false)
     }
 
@@ -113,9 +114,8 @@ internal class PhotoViewer(
     private val cellPx = holder.resources.displayMetrics.let { screen ->
         (minOf(screen.widthPixels, screen.heightPixels) + GRID_COLUMNS - 1) / GRID_COLUMNS
     }
-    private val cells = PhotoCells(ThumbnailReader(scope, CELL_CACHE_BYTES) { uri -> cell(uri, cellPx) }) { uri ->
-        onPick(uri)
-    }
+    private val cellReader = ThumbnailReader(scope, CELL_CACHE_BYTES) { uri -> cell(uri, cellPx) }
+    private val cells = PhotoCells(cellReader) { uri -> onPick(uri) }
 
     /**
      * An album's cover in px: one of the Albums tab's two columns, less the list's and the card's pads (14 dp and
@@ -124,8 +124,8 @@ internal class PhotoViewer(
     private val coverPx = holder.resources.displayMetrics.let { screen ->
         ((minOf(screen.widthPixels, screen.heightPixels) - ALBUMS_PAD_DP * screen.density) / ALBUM_COLUMNS).roundToInt()
     }
-    private val albumCards =
-        AlbumCards(ThumbnailReader(scope, COVER_CACHE_BYTES) { uri -> cell(uri, coverPx) }) { id -> onOpenAlbum(id) }
+    private val coverReader = ThumbnailReader(scope, COVER_CACHE_BYTES) { uri -> cell(uri, coverPx) }
+    private val albumCards = AlbumCards(coverReader) { id -> onOpenAlbum(id) }
 
     /** The gallery's tab and the album opened from it at the last render, so another starts at its top. */
     private var shownView: Pair<GalleryTab, String?>? = null
@@ -207,6 +207,15 @@ internal class PhotoViewer(
             },
         )
         return binding
+    }
+
+    /**
+     * A photo shown was changed in place, as an app's edit saved over it under the same URI (`PhonePhotos.edits`): the
+     * pictures kept by URI go, and what shows is read again.
+     */
+    fun forgetPictures() {
+        for (reader in listOf(stripReader, cellReader, coverReader)) reader.forget()
+        for (shown in listOf(strip, cells, albumCards, pages)) shown.notifyItemRangeChanged(0, shown.itemCount)
     }
 
     /** Turns the viewer upright for a phone held at [turn], as the screen's controls turn (FR-1.16). */
@@ -816,6 +825,9 @@ private class ThumbnailReader(
     private val cache = object : LruCache<Uri, Bitmap>(bytes) {
         override fun sizeOf(key: Uri, value: Bitmap) = value.allocationByteCount
     }
+
+    /** Drops every thumbnail kept, so each is read again when it shows. */
+    fun forget() = cache.evictAll()
 
     /** Shows [uri]'s thumbnail in [image]: at once when it is kept, or by the job returned, once it is read. */
     fun show(image: ImageView, uri: Uri): Job? {

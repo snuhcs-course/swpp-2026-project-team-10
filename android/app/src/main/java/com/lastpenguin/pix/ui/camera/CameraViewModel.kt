@@ -244,6 +244,8 @@ data class CameraUiState(
     val phonePhotos: List<Uri> = emptyList(),
     /** How much of the phone's photos [phonePhotos] has, which the photo permission decides (FR-1.6). */
     val photoAccess: PhotoAccess = PhotoAccess.ALL,
+    /** How many times a photo shown was changed in place (`PhonePhotos.edits`): its kept pictures are read again. */
+    val photoEdits: Int = 0,
     /** The albums of [phonePhotos], the one with the newest photo first, for the Albums tab (FR-1.6). */
     val photoAlbums: List<PhoneAlbum> = emptyList(),
     /** The viewer's tab outside a session (FR-1.6): Photos at each opening. */
@@ -313,6 +315,8 @@ class CameraViewModel(
     private val photoAlbums: StateFlow<List<PhoneAlbum>> = MutableStateFlow(emptyList()),
     /** Reads the permission and the phone's photos again (`PhonePhotos.refresh`). */
     private val rereadPhotos: suspend () -> Unit = {},
+    /** How many times a photo of [phonePhotos] was changed in place (`PhonePhotos.edits`). */
+    private val photoEdits: Flow<Int> = flowOf(0),
     /** The photos of the session running now (`PhotoSyncer.sessionPhotos`, FR-1.6); null outside a session. */
     private val sessionPhotos: Flow<List<Uri>?> = flowOf(null),
     /** Deletes a photo from the viewer, from the phone and the session's photos (`AppContainer.photoDeleter`). */
@@ -472,6 +476,9 @@ class CameraViewModel(
                 albums = read
                 showNewestPhoto()
             }
+        }
+        viewModelScope.launch {
+            photoEdits.collect { edits -> _uiState.update { it.copy(photoEdits = edits) } }
         }
         viewModelScope.launch {
             photoAccess.collect { access ->
@@ -802,7 +809,14 @@ class CameraViewModel(
         val state = _uiState.value
         when {
             state.countdown != null -> cancelCountdown()
-            state.timer == ShutterTimer.OFF -> take()
+
+            state.timer == ShutterTimer.OFF -> {
+                // The open panels close, as at the countdown's start and the camera's own shutter, also for a shutter
+                // that no touch came with (TalkBack, a keyboard), or the menu would show again when framing comes back.
+                _uiState.update { it.copy(aspectsOpen = false, menuOpen = false) }
+                take()
+            }
+
             camera.status.value == CameraStatus.READY -> startCountdown(state.timer.seconds, take)
         }
     }

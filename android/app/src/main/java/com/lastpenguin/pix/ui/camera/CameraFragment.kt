@@ -672,10 +672,13 @@ class CameraFragment :
                     }
                 }
                 launch {
-                    // A new photo, taken here or received, grows into the thumbnail (FR-1.6).
-                    showPhotoThumbnails(viewModel.uiState.map { it.lastPhoto }, controls.galleryThumbnail) {
-                        thumbnailOf(it)
-                    }
+                    // A new photo, taken here or received, grows into the thumbnail (FR-1.6); one edited in place is read
+                    // again.
+                    showPhotoThumbnails(
+                        viewModel.uiState.map { it.lastPhoto },
+                        controls.galleryThumbnail,
+                        viewModel.uiState.map { it.photoEdits },
+                    ) { thumbnailOf(it) }
                 }
             }
         }
@@ -725,6 +728,7 @@ class CameraFragment :
         dismissUndo()
         photoViewer?.stop()
         photoViewer = null
+        photoEditsShown = null
         photosBack = null
         pinchZoom?.finishInteraction()
         pinchZoom = null
@@ -1036,6 +1040,9 @@ class CameraFragment :
         controls.cameraSettings.layoutParams = params
     }
 
+    /** The photos' edits (`CameraUiState.photoEdits`) at the last render; null before the first. */
+    private var photoEditsShown: Int? = null
+
     /** The top bar's own start and end padding, from its layout, before the scene photo's. */
     private var plainBar: IntArray? = null
 
@@ -1233,6 +1240,9 @@ class CameraFragment :
         )) {
             control.alpha = dim
         }
+        // A photo changed in place since the last render: the viewer's pictures kept by URI are stale.
+        if (photoEditsShown != null && photoEditsShown != state.photoEdits) photoViewer?.forgetPictures()
+        photoEditsShown = state.photoEdits
         photoViewer?.render(
             state.viewerPhotos,
             state.photosOpen,

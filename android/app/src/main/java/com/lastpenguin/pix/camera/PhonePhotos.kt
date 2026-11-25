@@ -86,6 +86,12 @@ interface PhonePhotoSource {
     /** How much of the phone's photos [photos] has. */
     val access: StateFlow<PhotoAccess>
 
+    /**
+     * How many times a photo already in [photos] was changed in place, as an app's edit saved over it, which keeps its
+     * URI: a picture kept by URI is stale once this moves, and is read again.
+     */
+    val edits: StateFlow<Int>
+
     /** Reads the permission and the photos again, after the permission was asked; returns once [photos] has them. */
     suspend fun refresh()
 }
@@ -153,6 +159,12 @@ class PhonePhotos(
     private val _access = MutableStateFlow(PhotoAccess.OWN)
     override val access: StateFlow<PhotoAccess> = _access
 
+    private val _edits = MutableStateFlow(0)
+    override val edits: StateFlow<Int> = _edits
+
+    /** When each photo read was last changed, by its id, to tell a photo edited in place from one unchanged. */
+    private var modified: Map<Long, Long> = emptyMap()
+
     /** The photos read that another app saved, which Pix may not delete itself. */
     @Volatile
     private var others: Set<Uri> = emptySet()
@@ -182,6 +194,10 @@ class PhonePhotos(
         _access.value = readAccess()
         val read = read()
         others = read.others
+        // A photo that was there before and changed since: an edit saved over it, under the same URI.
+        val before = modified
+        modified = read.modified
+        if (read.modified.any { (id, at) -> before[id]?.let { it != at } == true }) _edits.value++
         _photos.value = read.photos
         _albums.value = read.albums
     }
@@ -221,8 +237,16 @@ class PhonePhotos(
         return PhotoDeletion.Failed
     }
 
-    /** What one read finds: every photo Pix may read, oldest first, their albums, and those another app saved. */
-    private class Found(val photos: List<Uri>, val albums: List<PhoneAlbum>, val others: Set<Uri>)
+    /**
+     * What one read finds: every photo Pix may read, oldest first, their albums, those another app saved, and when each
+     * was last changed, by its id.
+     */
+    private class Found(
+        val photos: List<Uri>,
+        val albums: List<PhoneAlbum>,
+        val others: Set<Uri>,
+        val modified: Map<Long, Long> = emptyMap(),
+    )
 
     private fun read(): Found = try {
         val own = ownIds()
@@ -234,6 +258,7 @@ class PhonePhotos(
                 MediaStore.MediaColumns._ID,
                 MediaStore.MediaColumns.DATE_TAKEN,
                 MediaStore.MediaColumns.DATE_ADDED,
+                MediaStore.MediaColumns.DATE_MODIFIED,
                 MediaStore.MediaColumns.BUCKET_ID,
                 MediaStore.MediaColumns.BUCKET_DISPLAY_NAME,
                 MediaStore.MediaColumns.RELATIVE_PATH,
@@ -247,6 +272,7 @@ class PhonePhotos(
             val id = rows.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
             val taken = rows.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_TAKEN)
             val added = rows.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
+            val changed = rows.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
             val bucket = rows.getColumnIndexOrThrow(MediaStore.MediaColumns.BUCKET_ID)
             val bucketName = rows.getColumnIndexOrThrow(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME)
             val path = rows.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
@@ -258,13 +284,14 @@ class PhonePhotos(
                 val folder = rows.getString(bucket)?.let {
                     Folder(it, rows.getString(bucketName), rows.getString(path))
                 }
-                read += Read(uri, rows.getLong(id), at, rows.getLong(id) in own, folder)
+                read += Read(uri, rows.getLong(id), at, rows.getLong(id) in own, folder, rows.getLong(changed))
             }
             read.sortWith(compareBy(Read::at, Read::id))
             Found(
                 photos = read.map(Read::uri),
                 albums = albumsOf(read),
                 others = read.filterNot(Read::ours).mapTo(HashSet(), Read::uri),
+                modified = read.associate { it.id to it.modified },
             )
         } ?: Found(emptyList(), emptyList(), emptySet())
     } catch (error: Exception) {
@@ -318,7 +345,14 @@ class PhonePhotos(
 
     private class Folder(val id: String, val name: String?, val path: String?)
 
-    private class Read(val uri: Uri, val id: Long, val at: Long, val ours: Boolean, val folder: Folder?)
+    private class Read(
+        val uri: Uri,
+        val id: Long,
+        val at: Long,
+        val ours: Boolean,
+        val folder: Folder?,
+        val modified: Long,
+    )
 
     private companion object {
         const val TAG = "PhonePhotos"

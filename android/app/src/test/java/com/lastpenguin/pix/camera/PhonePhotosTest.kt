@@ -40,6 +40,8 @@ import org.robolectric.Robolectric
  * Changes (state-based): a change anywhere in MediaStore reads it again, so a new photo joins and a deleted one
  * leaves, the newest too; a refresh reads the permission and the photos again and returns once they are there.
  * Failures (fault injection): a query that throws gives none, not a crash, and the next change reads again.
+ * Edits (state-based): a photo read before whose change time moves, an edit saved over it under its URI, counts one
+ * edit; a new photo, a deleted one, and a read with nothing changed count none.
  * Package visibility (equivalence over the query): on Android 14, where a query naming the owner leaves out the
  * photos of apps Pix cannot see, every app's photo still shows, and Pix's own still tells apart from another's.
  * Delete (state-based, fault injection; equivalence over the owner and Android's version): Pix's own photo goes from
@@ -52,7 +54,10 @@ import org.robolectric.Robolectric
 @OptIn(ExperimentalCoroutinesApi::class)
 class PhonePhotosTest {
 
-    /** One photo's row: its id, when it was taken (ms) or null, when it came (s), which app saved it, and its folder. */
+    /**
+     * One photo's row: its id, when it was taken (ms) or null, when it came (s), which app saved it, its folder, and when
+     * it was last changed (s).
+     */
     data class Row(
         val id: Long,
         val taken: Long?,
@@ -61,6 +66,7 @@ class PhonePhotosTest {
         val bucket: String? = "pix",
         val bucketName: String? = "Pix",
         val path: String? = "Pictures/Pix/",
+        val modified: Long = added,
     )
 
     /**
@@ -112,6 +118,7 @@ class PhonePhotosTest {
                                 MediaStore.MediaColumns._ID -> row.id
                                 MediaStore.MediaColumns.DATE_TAKEN -> row.taken
                                 MediaStore.MediaColumns.DATE_ADDED -> row.added
+                                MediaStore.MediaColumns.DATE_MODIFIED -> row.modified
                                 owner -> row.owner
                                 MediaStore.MediaColumns.BUCKET_ID -> row.bucket
                                 MediaStore.MediaColumns.BUCKET_DISPLAY_NAME -> row.bucketName
@@ -230,6 +237,30 @@ class PhonePhotosTest {
         assertTrue(photos.asksFirst(photo(10)))
         assertFalse(photos.asksFirst(photo(11)))
         assertFalse(photos.asksFirst(photo(12)))
+    }
+
+    @Test
+    fun `a photo edited in place counts an edit, and a new or deleted photo none`() = runTest {
+        store.rows = listOf(Row(10, 1_000, 1), Row(11, 2_000, 2))
+        val photos = photos()
+        assertEquals(0, photos.edits.value)
+
+        // A new photo, then nothing changed.
+        store.rows = store.rows + Row(12, 3_000, 3)
+        changed(12)
+        changed(12)
+        assertEquals(0, photos.edits.value)
+
+        // An app saves an edit over photo 11: its URI stays, its change time moves.
+        store.rows = store.rows.map { if (it.id == 11L) it.copy(modified = 50) else it }
+        changed(11)
+        assertEquals(listOf(photo(10), photo(11), photo(12)), photos.photos.value)
+        assertEquals(1, photos.edits.value)
+
+        // A deleted photo.
+        store.rows = store.rows.filter { it.id != 10L }
+        changed(10)
+        assertEquals(1, photos.edits.value)
     }
 
     @Test

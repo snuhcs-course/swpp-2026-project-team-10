@@ -34,6 +34,7 @@ import com.lastpenguin.pix.account.OpenedInvitation
 import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.account.SentRequest
 import com.lastpenguin.pix.camera.CameraCapabilities
+import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
@@ -337,6 +338,18 @@ class KoreanScreensTest {
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
         idle()
         modules.session.deliver(SessionMessage.FocusSet(0.5f, 0.5f))
+        idle()
+        val root = screen()
+        assertEquals(true, FragmentCameraBinding.bind(root).noticeText.isShown)
+        assertKorean(root, *people)
+    }
+
+    @Test
+    fun camera_inASessionWhileTheSubjectPinches_isInKorean() {
+        val modules = camera()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        idle()
+        modules.session.deliver(SessionMessage.ZoomSet(1.5f, final = false))
         idle()
         val root = screen()
         assertEquals(true, FragmentCameraBinding.bind(root).noticeText.isShown)
@@ -921,6 +934,41 @@ class KoreanScreensTest {
         // The "Connecting…" check runs every 500 ms on the main looper; let one more round see the session.
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
         assertKorean(screen(), *people)
+    }
+
+    @Test
+    @Config(shadows = [ShadowSurfaceViewRenderer::class], instrumentedPackages = ["org.webrtc"])
+    fun subjectView_withALineOfWhatThePhotographerDid_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.SUBJECT))
+        modules.video.deliverFrame()
+        modules.session.deliver(
+            SessionMessage.Capabilities(CameraCapabilities(0.6f, 10f, listOf(1f, 2f), -4..4, 0.5f, true)),
+        )
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+
+        // Every line there is, each in the labels' place, and the one for as long as the photographer pinches.
+        val did = listOf(
+            SessionMessage.PhotographerDid("zoom", zoom = 2f),
+            SessionMessage.PhotographerDid("brightness", exposure = 2),
+            SessionMessage.PhotographerDid("flash", flash = FlashMode.ON),
+            SessionMessage.PhotographerDid("flash", flash = FlashMode.AUTO),
+            SessionMessage.PhotographerDid("flash", flash = FlashMode.OFF),
+            SessionMessage.PhotographerDid("guide.move"),
+            SessionMessage.PhotographerDid("guide"),
+            SessionMessage.Focused(0.5f, 0.5f),
+            SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER),
+        )
+        for (message in did) {
+            modules.session.deliver(message)
+            idle()
+            val root = screen()
+            assertEquals(true, FragmentSubjectBinding.bind(root).toggleLabel.isShown)
+            // The brightness's value is a number with its sign, as on the bar.
+            assertKorean(root, *people, "+1.0")
+        }
     }
 
     @Test

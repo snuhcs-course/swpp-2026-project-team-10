@@ -1,14 +1,18 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.session.PhotographerAction
 import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.toAction
+import com.lastpenguin.pix.session.toMessage
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /*
@@ -92,6 +96,46 @@ class RemoteControlMessagesTest {
             "b": { "x": 0.38, "y": 0.4 } }"""
 
         assertEquals(SessionMessage.Focused(0.38f, 0.4f), decode(focused))
+    }
+
+    @Test
+    fun whatThePhotographerDid_designExamples_decode() {
+        val zoom = """{ "v": 3, "t": "camera.did", "seq": 8, "ts": 1759212355000,
+            "b": { "action": "zoom", "zoom": 2.0 } }"""
+        val moved = """{ "v": 3, "t": "camera.did", "seq": 9, "ts": 1759212355000, "b": { "action": "guide.move" } }"""
+
+        assertEquals(SessionMessage.PhotographerDid("zoom", zoom = 2f), decode(zoom))
+        assertEquals(SessionMessage.PhotographerDid("guide.move"), decode(moved))
+    }
+
+    @Test
+    fun whatThePhotographerDid_goesAsItsNameAndValue_andComesBackTheSame() {
+        val actions = listOf(
+            PhotographerAction.Zoom(2f),
+            PhotographerAction.Brightness(-3),
+            PhotographerAction.Flash(FlashMode.AUTO),
+            PhotographerAction.GuideMove,
+            PhotographerAction.Guide,
+        )
+
+        assertEquals(
+            listOf("zoom", "brightness", "flash", "guide.move", "guide"),
+            actions.map { it.toMessage().action },
+        )
+        for (action in actions) {
+            val received = decode(codec.encode(action.toMessage())) as SessionMessage.PhotographerDid
+            assertEquals(action, received.toAction())
+        }
+    }
+
+    @Test
+    fun anActionThisPhoneDoesNotKnow_isNoAction_andStillDecodes() {
+        val newer = """{ "v": 3, "t": "camera.did", "seq": 8, "ts": 1759212355000,
+            "b": { "action": "timer", "seconds": 3 } }"""
+
+        val received = decode(newer) as SessionMessage.PhotographerDid
+
+        assertNull(received.toAction())
     }
 
     @Test

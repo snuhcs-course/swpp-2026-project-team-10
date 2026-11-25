@@ -29,6 +29,7 @@ import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.SavedGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.PhotoShare
+import com.lastpenguin.pix.session.PhotographerAction
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.ZoomHold
 import com.lastpenguin.pix.telemetry.Telemetry
@@ -245,6 +246,8 @@ class CameraViewModel(
     private val zoomHold: ZoomHold = ZoomHold(),
     /** Tells the subject's phone where a tap focused (`RemoteControlHandler.focusedHere`, FR-7.7). */
     private val onFocused: (x: Float, y: Float) -> Unit = { _, _ -> },
+    /** Tells the subject's phone what was done on this camera (`RemoteControlHandler.didHere`, FR-7.4, #292). */
+    private val onDid: (PhotographerAction) -> Unit = {},
 ) : ViewModel() {
 
     /** Follows how the phone is held while [owner], the camera screen, is in front (FR-1.5, FR-1.15). */
@@ -263,6 +266,9 @@ class CameraViewModel(
 
     // True from a pinch's step that the subject's pinch held back until that pinch's final value (FR-7.6).
     private var zoomHeldBack = false
+
+    /** Whether the gesture on the guide that is running has moved it, for what the subject's phone is told (#292). */
+    private var guideGestureMoved = false
 
     private val _guideSaveNotices = Channel<GuideSaveNotice>(Channel.BUFFERED)
 
@@ -591,8 +597,11 @@ class CameraViewModel(
     fun onZoomChanged(ratio: Float, final: Boolean = true) {
         pendingZoomStep = null
         if (!mayZoom(final)) return
-        requestZoom(ratio, final)
-        if (final) zoomHold.release(Role.PHOTOGRAPHER)
+        val asked = requestZoom(ratio, final)
+        if (!final) return
+        // Told before the zoom is free again, so the subject's phone hears the ratio before the pinch's end (#292).
+        if (asked) _uiState.value.let { onDid(PhotographerAction.Zoom(ratio.coerceIn(it.minZoom, it.maxZoom))) }
+        zoomHold.release(Role.PHOTOGRAPHER)
     }
 
     /**
@@ -623,6 +632,7 @@ class CameraViewModel(
         if (requestZoom(step, final = true)) {
             pendingZoomStep = step
             _toggleLabels.trySend(ToggleLabel.Zoom(step))
+            onDid(PhotographerAction.Zoom(step))
         }
     }
 
@@ -634,7 +644,9 @@ class CameraViewModel(
         ) {
             return false
         }
-        camera.setZoom(ratio, final)
+        // A tap's step and a pinch's last value glide where the camera can show it (#310); a pinch's steps are applied
+        // as they come, so the picture follows the fingers.
+        if (final) camera.glideZoom(ratio) else camera.setZoom(ratio, final = false)
         return true
     }
 
@@ -662,11 +674,16 @@ class CameraViewModel(
         baseExposureIndex()?.let(camera::setExposure)
     }
 
-    /** From the brightness bar or a drag on the preview: each step is applied as it comes, like a pinch zoom (FR-1.11). */
-    fun onExposureChange(index: Int) {
+    /**
+     * From the brightness bar or a drag on the preview: each step is applied as it comes, like a pinch zoom (FR-1.11).
+     * [final] is the drag's end, which the subject's phone is told of (#292).
+     */
+    fun onExposureChange(index: Int, final: Boolean = false) {
         val range = _uiState.value.exposureRange
         if (range.first >= range.last) return
-        camera.setExposure(index.coerceIn(range))
+        val applied = index.coerceIn(range)
+        camera.setExposure(applied)
+        if (final) onDid(PhotographerAction.Brightness(applied))
     }
 
     fun setBrightnessOpen(open: Boolean) {
@@ -677,13 +694,13 @@ class CameraViewModel(
     fun onFlashTap() {
         val state = _uiState.value
         if (!state.hasFlash) return
-        camera.setFlash(
-            when (state.flash) {
-                FlashMode.OFF -> FlashMode.AUTO
-                FlashMode.AUTO -> FlashMode.ON
-                FlashMode.ON -> FlashMode.OFF
-            },
-        )
+        val next = when (state.flash) {
+            FlashMode.OFF -> FlashMode.AUTO
+            FlashMode.AUTO -> FlashMode.ON
+            FlashMode.ON -> FlashMode.OFF
+        }
+        camera.setFlash(next)
+        onDid(PhotographerAction.Flash(next))
     }
 
     /**
@@ -721,6 +738,11 @@ class CameraViewModel(
         guides.update(final) { state ->
             state.copy(cx = state.cx + dx, cy = state.cy + dy, height = state.height * scale)
         }
+        if (dx != 0f || dy != 0f || scale != 1f) guideGestureMoved = true
+        if (!final) return
+        // A gesture that moved the guide is told once, at its end; a touch that moved nothing is not (#292).
+        if (guideGestureMoved && _uiState.value.guide != null) onDid(PhotographerAction.GuideMove)
+        guideGestureMoved = false
     }
 
     /** From the opacity slider; the repository keeps it within 10–90% (FR-3.4). */

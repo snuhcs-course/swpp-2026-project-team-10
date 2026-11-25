@@ -41,6 +41,7 @@ import org.junit.Test
  * was saved; USED), one replacing the guide on the camera, an id the store cannot load (FAILED, the camera's guide
  * kept), a guide whose values cannot place it (FAILED, no crash), a second tap while the first is opening (one load),
  * the sheet closing before it arrives (the camera's guide kept). A result that comes while no sheet collects waits.
+ * A saved guide put on the camera is told once, for the subject's phone (#292), and one that could not open is not.
  * onDeleteSaved: a saved guide (gone from the list) that is also on the camera (it stays there).
  * library (FR-3.11): both kinds saved (every guide by default, each filter's count), a filter (only its kind, newest
  * first, the counts unchanged), a guide saved meanwhile (listed), Add a pose guide opened again (back to every guide).
@@ -99,6 +100,22 @@ class SavedGuidesViewModelTest {
         val model = model()
 
         assertEquals(listOf("g2", "g1"), model.savedGuides.value.map { it.id })
+    }
+
+    @Test
+    fun onUseSaved_tellsThatAGuideWasSet_once_andNotForOneThatCouldNotOpen() = runTest(dispatcher) {
+        saved.save(anchored("g1"), GuideState(guideId = "g1"))
+        var told = 0
+        val model = ReferenceViewModel(UnusedMaker, guides, saved, onGuideSet = { told++ })
+            .also { store.put("telling", it) }
+
+        model.onUseSaved("g1")
+        runCurrent()
+        assertEquals(1, told)
+
+        model.onUseSaved("gone")
+        runCurrent()
+        assertEquals(1, told)
     }
 
     @Test

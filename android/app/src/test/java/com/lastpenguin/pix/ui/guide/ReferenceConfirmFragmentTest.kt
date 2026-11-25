@@ -125,6 +125,15 @@ class ReferenceConfirmFragmentTest {
 
         assertTrue(confirmSteps(modules).isEmpty())
         assertFalse(onScreen { it.sharedHint.isShown })
+
+        // Used, it is told as a guide the photographer set, which the subject's phone says in a line (#292).
+        assertTrue(modules.session.sent.none { it is SessionMessage.PhotographerDid })
+        onScreen { it.useGuideButton.performClick() }
+        idle()
+        assertEquals(
+            listOf(SessionMessage.PhotographerDid("guide")),
+            modules.session.sent.filterIsInstance<SessionMessage.PhotographerDid>(),
+        )
     }
 
     @Test

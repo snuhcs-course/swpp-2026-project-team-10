@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.lastpenguin.pix.PixApplication
 import com.lastpenguin.pix.core.AppContainer
+import com.lastpenguin.pix.session.PhotographerAction
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.partner
 import com.lastpenguin.pix.ui.account.AccountViewModel
@@ -48,6 +49,7 @@ object PixViewModels {
                 phoneTurns = container.phoneTurns,
                 zoomHold = container.remoteControlHandler.zoomHold,
                 onFocused = container.remoteControlHandler::focusedHere,
+                onDid = container.remoteControlHandler::didHere,
             )
         }
         initializer {
@@ -58,6 +60,7 @@ object PixViewModels {
                 container.poseTips,
                 container.guideSyncer,
                 container.confirmSyncer,
+                onGuideSet = { container.remoteControlHandler.didHere(PhotographerAction.Guide) },
             )
         }
         initializer {

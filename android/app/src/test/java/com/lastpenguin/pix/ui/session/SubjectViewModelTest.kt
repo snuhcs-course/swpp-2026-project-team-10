@@ -20,6 +20,7 @@ import com.lastpenguin.pix.session.FakeSessionManager
 import com.lastpenguin.pix.session.GuideReference
 import com.lastpenguin.pix.session.MirrorReference
 import com.lastpenguin.pix.session.PeerInfo
+import com.lastpenguin.pix.session.PhotographerAction
 import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
@@ -64,7 +65,11 @@ import org.junit.Test
  * ended by a drop. The photographer's
  * own focus (`camera.focus`): shown where this phone has that point, on the rear camera's mirror and on the front
  * camera, and a point outside the frame dropped. The bar when the photographer's frame changes: another ratio and
- * another camera take it down, a state of the same frame does not.
+ * another camera take it down, a state of the same frame does not. What the photographer did (`camera.did`, #292):
+ * each action a line, and none for an action this phone does not know or a ratio that is no number; the
+ * photographer's own focus a line at the first tap, not at a tap while it shows or in the quiet time after it (just
+ * before its end / at its end), with its box at every tap; the photographer's pinch holding the zoom (zooming here),
+ * free again, and this phone's own pinch holding it (not the photographer's).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SubjectViewModelTest {
@@ -628,6 +633,89 @@ class SubjectViewModelTest {
             assertTrue(viewModel.onFocusTap(0.25f, 0.4f))
             assertEquals(SessionMessage.FocusSet(0.25f, 0.4f), focuses().last())
         }
+
+    @Test
+    fun `what the photographer did is a line, and an action this phone does not know is none`() = runTest(dispatcher) {
+        val lines = mutableListOf<PhotographerLine>()
+        backgroundScope.launch { viewModel.photographerLines.collect { lines += it } }
+        connectWithControls()
+        runCurrent()
+
+        session.deliver(SessionMessage.PhotographerDid("zoom", zoom = 2f))
+        session.deliver(SessionMessage.PhotographerDid("brightness", exposure = 3))
+        session.deliver(SessionMessage.PhotographerDid("flash", flash = FlashMode.ON))
+        session.deliver(SessionMessage.PhotographerDid("guide.move"))
+        session.deliver(SessionMessage.PhotographerDid("guide"))
+        // From a newer photographer, and a ratio that is none.
+        session.deliver(SessionMessage.PhotographerDid("timer"))
+        session.deliver(SessionMessage.PhotographerDid("zoom", zoom = Float.NaN))
+        runCurrent()
+
+        assertEquals(
+            listOf<PhotographerLine>(
+                PhotographerLine.Did(PhotographerAction.Zoom(2f)),
+                PhotographerLine.Did(PhotographerAction.Brightness(3)),
+                PhotographerLine.Did(PhotographerAction.Flash(FlashMode.ON)),
+                PhotographerLine.Did(PhotographerAction.GuideMove),
+                PhotographerLine.Did(PhotographerAction.Guide),
+            ),
+            lines,
+        )
+    }
+
+    @Test
+    fun `the photographer's own focus is a line once in a while, as its notice is on Camera`() = runTest(dispatcher) {
+        var now = 10_000L
+        val timed = SubjectViewModel(session, mirror, references, FakeRemoteVideo(), clock = { now })
+        val lines = mutableListOf<PhotographerLine>()
+        val boxes = mutableListOf<RemoteFocus>()
+        backgroundScope.launch { timed.photographerLines.collect { lines += it } }
+        backgroundScope.launch { timed.photographerFocus.collect { boxes += it } }
+        connectWithFocus()
+        runCurrent()
+
+        session.deliver(SessionMessage.Focused(0.3f, 0.4f))
+        runCurrent()
+        assertEquals(listOf<PhotographerLine>(PhotographerLine.Focused), lines)
+
+        // While the line shows, and at the last moment of the quiet time after it: the box only.
+        now += 1_000
+        session.deliver(SessionMessage.Focused(0.5f, 0.5f))
+        now = 10_000L + SessionViewModel.FOCUS_NOTICE_MS + SessionViewModel.FOCUS_NOTICE_QUIET_MS - 1
+        session.deliver(SessionMessage.Focused(0.6f, 0.6f))
+        runCurrent()
+        assertEquals(3, boxes.size)
+        assertEquals(1, lines.size)
+
+        now += 1
+        session.deliver(SessionMessage.Focused(0.7f, 0.7f))
+        // A tap outside the frame is neither a box nor a line.
+        now += 10_000
+        session.deliver(SessionMessage.Focused(1.5f, 0.7f))
+        runCurrent()
+        assertEquals(4, boxes.size)
+        assertEquals(List(2) { PhotographerLine.Focused }, lines)
+    }
+
+    @Test
+    fun `the photographer's pinch is zooming here, from its first step to its end`() = runTest(dispatcher) {
+        connect()
+        runCurrent()
+        assertFalse(viewModel.photographerZooming.value)
+
+        session.deliver(SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER))
+        runCurrent()
+        assertTrue(viewModel.photographerZooming.value)
+
+        session.deliver(SessionMessage.ZoomHoldUpdate(null))
+        runCurrent()
+        assertFalse(viewModel.photographerZooming.value)
+
+        // This phone's own pinch holding the zoom is not the photographer zooming.
+        session.deliver(SessionMessage.ZoomHoldUpdate(Role.SUBJECT))
+        runCurrent()
+        assertFalse(viewModel.photographerZooming.value)
+    }
 
     @Test
     fun `the photographer's own focus shows where this phone has that point`() = runTest(dispatcher) {

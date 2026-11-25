@@ -458,6 +458,21 @@ sealed interface SessionMessage {
     @SerialName("camera.focus")
     data class Focused(val x: Float, val y: Float) : SessionMessage
 
+    /**
+     * What the photographer did on their own camera (P → S, #292): the subject's phone says it in a line, as the
+     * photographer's phone says the subject's (FR-7.4). [action] is a name, kept a string so that a phone that does
+     * not know one drops only that line: `zoom` with [zoom], `brightness` with [exposure], `flash` with [flash],
+     * `guide.move`, and `guide` (`PhotographerAction`). The photographer's own focus goes as `camera.focus`.
+     */
+    @Serializable
+    @SerialName("camera.did")
+    data class PhotographerDid(
+        val action: String,
+        val zoom: Float = 0f,
+        val exposure: Int = 0,
+        val flash: FlashMode = FlashMode.OFF,
+    ) : SessionMessage
+
     /** Whether the photographer allows remote control (FR-7.5, Could). */
     @Serializable
     @SerialName("control.permission")

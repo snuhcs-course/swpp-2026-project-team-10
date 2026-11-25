@@ -100,6 +100,8 @@ import org.robolectric.shadows.ShadowToast
  * The subject's tap to focus (FR-7.7): the focus box where they tapped, alone, with its notice, which goes sooner than
  * the others; a tap soon after, the box without the notice; with this phone's own brightness bar up, which goes, or
  * held under a finger, where nothing moves.
+ * The subject's pinch (#292): who is zooming from its first step, for as long as it, replaced by the ratio's notice;
+ * taken back, the line goes after a little; another notice meanwhile keeps its own time, and the line is back after it.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -377,6 +379,99 @@ class CameraFragmentInteractionTest {
             assertEquals(string(R.string.mobile_data_notice), controls.noticeText.text.toString())
         }
         assertTrue(runBlocking { modules.mobileData.wasShown() })
+    }
+
+    private fun idleFor(ms: Long) = shadowOf(Looper.getMainLooper()).idleFor(ms, TimeUnit.MILLISECONDS)
+
+    @Test
+    fun theSubjectsPinch_saysWhoIsZooming_fromItsFirstStep_untilTheRatiosNoticeTakesItsPlace() {
+        val modules = launch(FakeCameraController())
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        // The notice of who watches goes after its time.
+        idleFor(CameraViewModel.NOTICE_MS)
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+
+        modules.session.deliver(SessionMessage.ZoomSet(1.5f, final = false))
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.zoom_held_label, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+
+        // It stays as long as the pinch does, beyond a notice's own time.
+        repeat(4) {
+            idleFor(1_000)
+            modules.session.deliver(SessionMessage.ZoomSet(1.6f + it * 0.1f, final = false))
+            idle()
+        }
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.zoom_held_label, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+
+        modules.session.deliver(SessionMessage.ZoomSet(2f, final = true))
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.remote_zoom_notice, "Joonhyung", "2"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+        // The ratio's notice keeps its own time.
+        idleFor(CameraViewModel.NOTICE_MS - 100)
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.noticeText.visibility) }
+        idleFor(200)
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+    }
+
+    @Test
+    fun anotherNoticeDuringThePinch_keepsItsOwnTime_andThenWhoIsZoomingIsBack() {
+        val modules = launch(FakeCameraController(hasFlash = true))
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        idleFor(CameraViewModel.NOTICE_MS)
+        modules.session.deliver(SessionMessage.ZoomSet(1.5f, final = false))
+        idle()
+
+        // Another notice of the session's, as the last pinch's ratio that came late.
+        modules.session.deliver(SessionMessage.FlashSet(FlashMode.ON))
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.remote_flash_on_notice, "Joonhyung"), controls.noticeText.text.toString())
+        }
+        // The pinch goes on meanwhile.
+        repeat(3) {
+            idleFor(1_000)
+            modules.session.deliver(SessionMessage.ZoomSet(1.6f + it * 0.1f, final = false))
+            idle()
+        }
+        idleFor(200)
+
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.zoom_held_label, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+        // And it still goes when the pinch is taken back.
+        modules.session.deliver(SessionMessage.ZoomSet(1.9f, final = true, cancel = true))
+        idle()
+        idleFor(SessionViewModel.ZOOMING_LINGER_MS + 100)
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+    }
+
+    @Test
+    fun aPinchTakenBack_takesItsLineDown_afterALittle() {
+        val modules = launch(FakeCameraController())
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        idleFor(CameraViewModel.NOTICE_MS)
+        modules.session.deliver(SessionMessage.ZoomSet(1.5f, final = false))
+        idle()
+
+        modules.session.deliver(SessionMessage.ZoomSet(1.5f, final = true, cancel = true))
+        idle()
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.noticeText.visibility) }
+        idleFor(SessionViewModel.ZOOMING_LINGER_MS + 100)
+
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
     }
 
     @Test

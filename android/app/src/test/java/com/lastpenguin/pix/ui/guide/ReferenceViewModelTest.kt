@@ -71,6 +71,37 @@ class ReferenceViewModelTest {
     }
 
     @Test
+    fun aChosenPosesGuideUsed_isNotToldAsAGuideSet_sinceItsConfirmSaysSoItself() = runTest {
+        var told = 0
+        val telling = ReferenceViewModel(maker, guides, onGuideSet = { told++ })
+        store.put("telling", telling)
+        telling.onCandidatePicked(bitmap())
+        runCurrent()
+        maker.finish(Result.success(guide()))
+        runCurrent()
+
+        telling.onUseGuide()
+
+        assertEquals(0, told)
+    }
+
+    @Test
+    fun aGuideForThePhotographerFromTheSubjectsPhone_isNotToldHere() = runTest {
+        var told = 0
+        val saved = SavedGuideStore.InMemory()
+        val subjectModel = ReferenceViewModel(maker, guides, saved, subject = FakeTarget(), onGuideSet = { told++ })
+        store.put("subject-telling", subjectModel)
+        subjectModel.openFor(fromSubject = true)
+        saved.save(guide(), GuideState())
+        runCurrent()
+
+        subjectModel.onUseSaved(saved.saved.value.single().id)
+        runCurrent()
+
+        assertEquals(0, told)
+    }
+
+    @Test
     fun onCandidatePicked_personFound_isReadyToConfirm() = runTest {
         val guide = guide()
 

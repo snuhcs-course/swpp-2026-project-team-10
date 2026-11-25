@@ -38,6 +38,7 @@ import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
 import com.lastpenguin.pix.session.EndReason
+import com.lastpenguin.pix.session.PhotographerAction
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.settings.TutorialScreen
@@ -137,6 +138,9 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private var turningIcons: TurningIcons? = null
     private var photoViewer: PhotoViewer? = null
     private var toggleLabelJob: Job? = null
+
+    /** The text of a label shown without a time of its own ([holdZoomingLabel]), until it is let go. */
+    private var heldLabel: String? = null
     private var pinchModeJob: Job? = null
 
     // Set while a step waits for this screen to be the current destination again (inFront).
@@ -390,6 +394,14 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                     }
                 }
                 launch { viewModel.photographerFocus.collect { showPhotographerFocus(binding, it) } }
+                // What the photographer did on their own camera, said where this screen's labels show (FR-7.4, #292).
+                launch { viewModel.photographerLines.collect { showPhotographerLine(binding, it) } }
+                launch {
+                    // The photographer's pinch is named from its first step to its end; the ratio's line replaces it.
+                    viewModel.photographerZooming.collect { zooming ->
+                        if (zooming) holdZoomingLabel(binding) else letHeldLabelGo(binding)
+                    }
+                }
                 launch {
                     viewModel.toggleLabels.collect { label ->
                         when (label) {
@@ -400,15 +412,20 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                                 R.color.pix_accent,
                             )
 
-                            // The photographer's pinch holds the zoom (FR-7.6, #236).
+                            // The photographer's pinch holds the zoom (FR-7.6, #236). While it runs the line is up
+                            // already and stays; after it, a held-back pinch of this phone still says so for a while.
                             ToggleLabel.ZoomHeld -> {
                                 val name = viewModel.uiState.value.photographerName ?: return@collect
-                                showToggleLabel(
-                                    binding,
-                                    getString(R.string.zoom_held_label, name),
-                                    R.drawable.ic_zoom_small,
-                                    R.color.pix_text,
-                                )
+                                if (viewModel.photographerZooming.value) {
+                                    holdZoomingLabel(binding)
+                                } else {
+                                    showToggleLabel(
+                                        binding,
+                                        getString(R.string.zoom_held_label, name),
+                                        R.drawable.ic_zoom_small,
+                                        R.color.pix_text,
+                                    )
+                                }
                             }
 
                             else -> Unit
@@ -1259,6 +1276,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         text: String,
         @DrawableRes icon: Int,
         @ColorRes tint: Int,
+        durationMs: Long = LABEL_MS,
     ) {
         val chip = binding.toggleLabel
         chip.text = text
@@ -1266,9 +1284,110 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         chip.isVisible = true
         toggleLabelJob?.cancel()
         toggleLabelJob = viewLifecycleOwner.lifecycleScope.launch {
-            delay(LABEL_MS)
-            chip.isVisible = false
+            delay(durationMs)
+            // A pinch of the photographer's that still goes on has its label back, which this one took the place of.
+            if (heldLabel != null) showZoomingLabel(binding) else chip.isVisible = false
         }
+    }
+
+    /**
+     * What the photographer did on their own camera (FR-7.4, #292), in the words Camera has for what the subject did,
+     * since the same thing happened the other way round. The focus's line is as short as Camera's.
+     */
+    private fun showPhotographerLine(binding: FragmentSubjectBinding, line: PhotographerLine) {
+        val ui = viewModel.uiState.value
+        val name = ui.photographerName ?: return
+        val white = R.color.pix_text
+        when (line) {
+            PhotographerLine.Focused -> showToggleLabel(
+                binding,
+                getString(R.string.remote_focus_notice, name),
+                R.drawable.ic_target_small,
+                white,
+                SessionViewModel.FOCUS_NOTICE_MS,
+            )
+
+            is PhotographerLine.Did -> when (val action = line.action) {
+                is PhotographerAction.Zoom -> showToggleLabel(
+                    binding,
+                    getString(R.string.remote_zoom_notice, name, DecimalFormat("0.#").format(action.ratio)),
+                    R.drawable.ic_zoom_small,
+                    white,
+                )
+
+                is PhotographerAction.Brightness -> showToggleLabel(
+                    binding,
+                    getString(
+                        R.string.remote_brightness_notice,
+                        name,
+                        ExposureScale.formatEv(action.index, ui.exposureStep),
+                    ),
+                    R.drawable.ic_brightness,
+                    white,
+                )
+
+                is PhotographerAction.Flash -> when (action.mode) {
+                    FlashMode.OFF -> showToggleLabel(
+                        binding,
+                        getString(R.string.remote_flash_off_notice, name),
+                        R.drawable.ic_flash_off,
+                        white,
+                    )
+
+                    FlashMode.AUTO -> showToggleLabel(
+                        binding,
+                        getString(R.string.remote_flash_auto_notice, name),
+                        R.drawable.ic_flash_auto,
+                        white,
+                    )
+
+                    FlashMode.ON -> showToggleLabel(
+                        binding,
+                        getString(R.string.remote_flash_on_notice, name),
+                        R.drawable.ic_flash_on,
+                        white,
+                    )
+                }
+
+                PhotographerAction.GuideMove -> showToggleLabel(
+                    binding,
+                    getString(R.string.remote_guide_move_notice, name),
+                    R.drawable.ic_guide,
+                    white,
+                )
+
+                PhotographerAction.Guide ->
+                    showToggleLabel(binding, getString(R.string.remote_guide_notice, name), R.drawable.ic_guide, white)
+            }
+        }
+    }
+
+    /**
+     * "… is zooming" for as long as the photographer's pinch (#292): a label without a time of its own, which goes with
+     * [letHeldLabelGo] or when another label takes its place.
+     */
+    private fun holdZoomingLabel(binding: FragmentSubjectBinding) {
+        toggleLabelJob?.cancel()
+        showZoomingLabel(binding)
+    }
+
+    /** Puts "… is zooming" in the label's place and keeps its text as the held one. */
+    private fun showZoomingLabel(binding: FragmentSubjectBinding) {
+        val name = viewModel.uiState.value.photographerName ?: return
+        val text = getString(R.string.zoom_held_label, name)
+        val chip = binding.toggleLabel
+        chip.text = text
+        setLabelIcon(chip, R.drawable.ic_zoom_small, R.color.pix_text)
+        chip.isVisible = true
+        heldLabel = text
+    }
+
+    /** The pinch is over: its label goes, unless another label has taken its place and keeps its own time. */
+    private fun letHeldLabelGo(binding: FragmentSubjectBinding) {
+        val held = heldLabel ?: return
+        heldLabel = null
+        if (toggleLabelJob?.isActive == true || binding.toggleLabel.text.toString() != held) return
+        binding.toggleLabel.isVisible = false
     }
 
     /** Over the guide-edit mode toggle for a few seconds: what a pinch moves now (Design 2.8). */
@@ -1281,7 +1400,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         }
     }
 
-    private companion object {
+    internal companion object {
         const val STALL_NANOS = 2_000_000_000L
         const val STALL_CHECK_MS = 500L
 

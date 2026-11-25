@@ -390,6 +390,41 @@ class KoreanScreensTest {
     }
 
     @Test
+    fun camera_whenTheSubjectsPressStartsAndStopsTheTimer_isInKorean() {
+        val modules = TestAppContainer(
+            camera = FakeCameraController().apply { photo = Uri.parse("content://media/external/images/9") },
+        ).install()
+        shadowOf(ApplicationProvider.getApplicationContext<Application>()).grantPermissions(Manifest.permission.CAMERA)
+        scenario = launchFragmentInContainer<CameraFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        idle()
+        // The timer at 3 s, through the camera menu.
+        scenario!!.onFragment {
+            val controls = FragmentCameraBinding.bind(it.requireView())
+            controls.cameraMenuButton.performClick()
+            controls.menuTimer.performClick()
+            controls.cameraMenuButton.performClick()
+        }
+        idle()
+
+        // The countdown the subject's press starts, and its stop by the subject's next press (FR-7.8).
+        val lines = listOf(
+            SessionMessage.ShutterPress(1) to R.string.remote_shutter_pressed_notice,
+            SessionMessage.ShutterPress(2, cancel = true) to R.string.remote_timer_cancel_notice,
+        )
+        for ((press, line) in lines) {
+            modules.session.deliver(press)
+            idle()
+            val root = screen()
+            val notice = FragmentCameraBinding.bind(root).noticeText
+            assertEquals(true, notice.isShown)
+            assertEquals(root.context.getString(line, "Test Account 2"), notice.text.toString())
+            assertKorean(root, *people)
+        }
+    }
+
+    @Test
     fun camera_whenTheSubjectStartedAiPoses_isInKorean() {
         val modules = camera()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))

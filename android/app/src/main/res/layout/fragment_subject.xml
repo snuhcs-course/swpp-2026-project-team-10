@@ -282,7 +282,8 @@
             tools:visibility="visible" />
 
         <!-- The photographer's timer counting down (FR-1.17), as their Camera screen shows it: the seconds left, large in
-             the middle of the video, and whose photo it is. The number turns with the phone (FR-1.15). -->
+             the middle of the video, and whose photo it is. That this phone's shutter stops it is the tutorial's tip, not a
+             line here (FR-7.8). The number turns with the phone (FR-1.15). -->
         <LinearLayout
             android:id="@+id/countdownPanel"
             android:layout_width="wrap_content"
@@ -387,11 +388,13 @@
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical">
 
-                <!-- Red, as the light over the video. -->
+                <!-- Red, as the light over the video, and only while the video is live: it goes with "Live", and its
+                     margin with it, so the name alone stays centered. -->
                 <ImageView
                     android:id="@+id/cameraCaptionDot"
                     android:layout_width="8dp"
                     android:layout_height="8dp"
+                    android:layout_marginEnd="6dp"
                     android:importantForAccessibility="no"
                     android:src="@drawable/ic_status_dot"
                     app:tint="@color/pix_recording" />
@@ -401,7 +404,6 @@
                     android:id="@+id/cameraCaptionTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
                     android:includeFontPadding="false"
                     android:maxLines="1"
                     android:textAppearance="@style/TextAppearance.Pix.Label.Bold"

@@ -72,7 +72,10 @@ class ChannelRouterTest {
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ShutterAnswer(taken = true, press = 1)))
         // Each press counts: a later one does not replace it.
         assertFalse(router.latestOnly(SessionMessage.ShutterPress(press = 1)))
-        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PoseStart("full_body")))
+        // A start of AI poses is a moment too (#276): kept back, it would open the scene photo's step once the subject
+        // was told that nothing started.
+        assertEquals(Channel.REALTIME, router.channelFor(SessionMessage.PoseStart("full_body")))
+        assertFalse(router.latestOnly(SessionMessage.PoseStart("full_body")))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PoseStartAnswer(started = true)))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PhotographerDid("zoom", zoom = 2f)))
         assertFalse(router.latestOnly(SessionMessage.PhotographerDid("zoom", zoom = 2f)))

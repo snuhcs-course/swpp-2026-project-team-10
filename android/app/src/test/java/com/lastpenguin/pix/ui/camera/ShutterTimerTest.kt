@@ -7,6 +7,7 @@ import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.FakeGuideRepository
+import com.lastpenguin.pix.session.ShutterOutcome
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -35,8 +36,9 @@ import org.junit.Test
  * nothing told. A camera not ready at the shutter (nothing starts) and at the countdown's end (no photo, the camera's
  * notice). While it counts down: the camera switch, a ratio, the ratios, the menu, the flash, and the viewer are
  * refused. The menu and the ratios: each opening closes the other; the countdown's start closes both. The flash: each
- * tap with its notice. The subject's shutter (FR-7.8, #314): with the timer on, the photo at once and no countdown;
- * while it counts down, no photo, and the countdown goes on to its own.
+ * tap with its notice. The subject's shutter (FR-7.8, #314): the timer off (the photo at once) and on (the countdown,
+ * its photo at its end, 1 ms before / at it); a cancel while it counts down, whoever started it, and with no countdown
+ * (nothing); a press for a photo that meets a countdown (left to its own photo); a camera not ready, timer on or off.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ShutterTimerTest {
@@ -192,29 +194,83 @@ class ShutterTimerTest {
         assertEquals(listOf(3, 2, 0), told)
     }
 
+    // ---- The subject's shutter (FR-7.8, #314) ------------------------------------------------------------------------
+
     @Test
-    fun theSubjectsShutter_withTheTimerOn_takesThePhotoAtOnce_withoutACountdown() = runTest {
+    fun theSubjectsShutter_withTheTimerOff_takesThePhotoAtOnce() = runTest {
+        runCurrent()
+
+        val outcome = model.onSubjectShutter(cancel = false)
+        runCurrent()
+
+        assertEquals(ShutterOutcome.TAKEN, outcome)
+        assertEquals(1, photos)
+        assertNull(model.uiState.value.countdown)
+    }
+
+    @Test
+    fun theSubjectsShutter_withTheTimerOn_startsTheCountdown_whoseEndTakesThePhoto_notBefore() = runTest {
+        val blinks = blinks()
         runCurrent()
         setTimer(ShutterTimer.THREE)
 
-        val taken = model.onSubjectShutter()
+        val outcome = model.onSubjectShutter(cancel = false)
         runCurrent()
 
-        assertTrue(taken)
+        assertEquals(ShutterOutcome.TIMER_STARTED, outcome)
+        assertEquals(3, model.uiState.value.countdown)
+        advanceTimeBy(3 * CameraViewModel.COUNTDOWN_STEP_MS - 1)
+        runCurrent()
+        assertEquals("1 ms before its end", 0, photos)
+        advanceTimeBy(1)
+        runCurrent()
         assertEquals(1, photos)
+        assertEquals(1, blinks())
+        assertEquals(listOf(3, 2, 1, 0), told)
+    }
+
+    @Test
+    fun theSubjectsCancel_whileItCountsDown_stopsIt_withoutAPhoto_whoeverStartedIt() = runTest {
+        runCurrent()
+        setTimer(ShutterTimer.THREE)
+        // This phone's own shutter started it.
+        model.onShutter()
+        advanceTimeBy(1_500)
+        runCurrent()
+
+        assertEquals(ShutterOutcome.TIMER_STOPPED, model.onSubjectShutter(cancel = true))
+        advanceTimeBy(10_000)
+        runCurrent()
+
+        assertEquals(0, photos)
         assertNull(model.uiState.value.countdown)
+        assertEquals(listOf(3, 2, 0), told)
+    }
+
+    @Test
+    fun theSubjectsCancel_withNoCountdown_startsNoneAndTakesNoPhoto() = runTest {
+        runCurrent()
+        setTimer(ShutterTimer.THREE)
+
+        // The countdown ended, or was stopped here, before the subject's press arrived.
+        assertEquals(ShutterOutcome.TIMER_KEPT, model.onSubjectShutter(cancel = true))
+        runCurrent()
+
+        assertNull(model.uiState.value.countdown)
+        assertEquals(0, photos)
         assertTrue(told.isEmpty())
     }
 
     @Test
-    fun theSubjectsShutter_whileItCountsDown_takesNoPhoto_andTheCountdownGoesOnToItsOwn() = runTest {
+    fun theSubjectsPressForAPhoto_whileItCountsDown_leavesTheCountdownToItsOwnPhoto() = runTest {
         runCurrent()
         setTimer(ShutterTimer.THREE)
         model.onShutter()
         advanceTimeBy(1_500)
         runCurrent()
 
-        assertFalse(model.onSubjectShutter())
+        // Pressed before the subject's phone showed the countdown: it asked for a photo, and one is on its way.
+        assertEquals(ShutterOutcome.TIMER_KEPT, model.onSubjectShutter(cancel = false))
         runCurrent()
         assertEquals(0, photos)
         assertEquals(2, model.uiState.value.countdown)
@@ -223,6 +279,20 @@ class ShutterTimerTest {
         runCurrent()
         assertEquals(1, photos)
         assertEquals(listOf(3, 2, 1, 0), told)
+    }
+
+    @Test
+    fun theSubjectsShutter_onACameraNotReady_isRefused_withTheTimerOnOrOff() = runTest {
+        runCurrent()
+        camera.setStatus(CameraStatus.STARTING)
+        runCurrent()
+
+        assertEquals(ShutterOutcome.REFUSED, model.onSubjectShutter(cancel = false))
+        setTimer(ShutterTimer.THREE)
+        assertEquals(ShutterOutcome.REFUSED, model.onSubjectShutter(cancel = false))
+
+        assertNull(model.uiState.value.countdown)
+        assertEquals(0, photos)
     }
 
     @Test

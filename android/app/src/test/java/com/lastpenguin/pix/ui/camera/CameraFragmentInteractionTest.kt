@@ -112,8 +112,9 @@ import org.robolectric.shadows.ShadowDialog
  * The subject's shutter (#314, FR-7.8): a photo taken here with its notice; nothing while a pose's scene photo is
  * framed, neither a photo nor the scene; nothing while the camera is not ready; nothing once this screen is left, and
  * a photo again when it is back; nothing with a sheet or the photos over the camera, which stays started under them;
- * with this phone's timer on, the photo at once and no countdown; while the timer counts down, no photo, and the
- * countdown goes on to its own.
+ * with this phone's timer on, the countdown with who pressed, and its photo at its end; the subject's second press,
+ * which cancels it with who cancelled; a cancel of a countdown this phone's shutter started; a press for a photo that
+ * meets a countdown, left to its own photo without a refusal.
  * The subject starts AI poses (#276, FR-6.15): the scene photo's step begun here for their situation, with its notice;
  * refused for a selfie without a front camera, while a scene photo is already framed (the step unchanged), with a
  * sheet over the camera, and while this phone's timer counts down (the countdown going on to its photo); without the
@@ -559,33 +560,92 @@ class CameraFragmentInteractionTest {
     }
 
     @Test
-    fun withTheTimerOn_theSubjectsShutterTakesThePhotoAtOnce_withoutACountdown() {
+    fun withTheTimerOn_theSubjectsShutterStartsTheCountdown_saysWhoPressed_andItsEndTakesThePhoto() {
         val (modules, camera) = inASessionWithACameraThatSaves()
         chooseThreeSeconds()
+        idleFor(CameraViewModel.NOTICE_MS)
 
         modules.session.deliver(SessionMessage.ShutterPress(1))
         idle()
 
-        // The timer is this phone's own shutter's: the subject's press is the photo, now.
+        // The photographer's timer serves the subject's press too (FR-7.8): no photo yet, and no refusal.
+        assertTrue(camera.photoTurns.isEmpty())
+        assertEquals(
+            listOf(SessionMessage.ShutterAnswer(taken = false, press = 1, timer = true)),
+            shutterAnswers(modules),
+        )
+        assertEquals(SessionMessage.Countdown(3), modules.session.sent.last { it is SessionMessage.Countdown })
+        onScreen { controls, _ ->
+            assertEquals(View.VISIBLE, controls.countdownPanel.visibility)
+            assertEquals("3", controls.countdownNumber.text.toString())
+            assertEquals(
+                string(R.string.remote_shutter_pressed_notice, "Joonhyung"),
+                controls.noticeText.text.toString(),
+            )
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+
+        idleFor(3_100)
         assertEquals(1, camera.photoTurns.size)
-        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = true, press = 1)), shutterAnswers(modules))
-        assertTrue(modules.session.sent.none { it is SessionMessage.Countdown })
         onScreen { controls, _ -> assertEquals(View.GONE, controls.countdownPanel.visibility) }
     }
 
     @Test
-    fun whileTheTimerCountsDown_theSubjectsPressIsNotTaken_andTheCountdownGoesOnToItsPhoto() {
+    fun theSubjectsSecondPress_cancelsTheCountdown_andSaysWhoCancelled() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+        chooseThreeSeconds()
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idleFor(1_000)
+
+        modules.session.deliver(SessionMessage.ShutterPress(2, cancel = true))
+        idle()
+
+        assertEquals(
+            SessionMessage.ShutterAnswer(taken = false, press = 2, timer = true),
+            shutterAnswers(modules).last(),
+        )
+        onScreen { controls, _ ->
+            assertEquals(View.GONE, controls.countdownPanel.visibility)
+            assertEquals(
+                string(R.string.remote_timer_cancel_notice, "Joonhyung"),
+                controls.noticeText.text.toString(),
+            )
+        }
+        idleFor(5_000)
+        assertTrue(camera.photoTurns.isEmpty())
+    }
+
+    @Test
+    fun theSubjectsCancel_alsoStopsACountdownThePhotographerStarted() {
         val (modules, camera) = inASessionWithACameraThatSaves()
         chooseThreeSeconds()
         onScreen { controls, _ -> controls.shutterButton.performClick() }
         idleFor(1_000)
 
+        modules.session.deliver(SessionMessage.ShutterPress(1, cancel = true))
+        idle()
+
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.countdownPanel.visibility) }
+        idleFor(5_000)
+        assertTrue(camera.photoTurns.isEmpty())
+    }
+
+    @Test
+    fun aPressForAPhoto_thatMeetsARunningCountdown_leavesItToItsOwnPhoto_withoutARefusal() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+        chooseThreeSeconds()
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idleFor(1_000)
+
+        // Pressed before the subject's phone showed the countdown.
         modules.session.deliver(SessionMessage.ShutterPress(1))
         idle()
 
-        // Neither a photo nor the countdown's end: only this phone's shutter cancels it (FR-1.17).
         assertTrue(camera.photoTurns.isEmpty())
-        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), shutterAnswers(modules))
+        assertEquals(
+            listOf(SessionMessage.ShutterAnswer(taken = false, press = 1, timer = true)),
+            shutterAnswers(modules),
+        )
         onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.countdownPanel.visibility) }
 
         idleFor(2_100)

@@ -71,6 +71,7 @@ import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.PoseStartStep
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.ShutterOutcome
 import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.NoticeAction
@@ -409,7 +410,7 @@ class CameraFragment :
                 // While this screen is in front it takes the photos the subject's shutter asks for (FR-7.8, #314):
                 // only here is the camera bound, and the shutter the camera's own.
                 launch {
-                    val taker = { takeForSubject(controls) }
+                    val taker = { cancel: Boolean -> takeForSubject(controls, cancel) }
                     // And it begins the scene photo for the situation the subject picked (FR-6.15, #276).
                     val starter = { situation: Situation, answer: (PoseStartStep) -> Unit ->
                         startPosesForSubject(situation, answer)
@@ -556,6 +557,12 @@ class CameraFragment :
                             is SessionNotice.RemoteFocus -> getString(R.string.remote_focus_notice, notice.name)
 
                             is SessionNotice.RemoteShutter -> getString(R.string.remote_shutter_notice, notice.name)
+
+                            is SessionNotice.RemoteShutterPress ->
+                                getString(R.string.remote_shutter_pressed_notice, notice.name)
+
+                            is SessionNotice.RemoteTimerCancel ->
+                                getString(R.string.remote_timer_cancel_notice, notice.name)
 
                             is SessionNotice.RemotePoseStart ->
                                 getString(R.string.remote_pose_start_notice, notice.name)
@@ -2115,16 +2122,16 @@ class CameraFragment :
     }
 
     /**
-     * The subject's shutter (FR-7.8, #314): this screen's own shutter's photo, taken for them at once, without this
-     * phone's timer. False when it took no photo: the camera is not in front ([cameraInFront]); a pose's scene photo is
-     * being framed or held, which is the photographer's own step and never taken from the other phone; this phone's
-     * timer counts down (FR-1.17); or the camera is not ready or still takes the photo before.
+     * The subject's shutter (FR-7.8, #314): this screen's own shutter, pressed for them, with this phone's timer when
+     * it is on (FR-1.17), or, with [cancel], the stop of its countdown. Refused when the camera is not in front
+     * ([cameraInFront]); while a pose's scene photo is being framed or held, which is the photographer's own step and
+     * never taken from the other phone; or when the camera is not ready or still takes the photo before.
      */
-    private fun takeForSubject(controls: FragmentCameraBinding): Boolean {
-        if (!cameraInFront() || isScenePhotoActive()) return false
-        if (!viewModel.onSubjectShutter()) return false
-        blinkPreview(controls.previewScrim)
-        return true
+    private fun takeForSubject(controls: FragmentCameraBinding, cancel: Boolean): ShutterOutcome {
+        if (!cameraInFront() || isScenePhotoActive()) return ShutterOutcome.REFUSED
+        val outcome = viewModel.onSubjectShutter(cancel)
+        if (outcome == ShutterOutcome.TAKEN) blinkPreview(controls.previewScrim)
+        return outcome
     }
 
     /**

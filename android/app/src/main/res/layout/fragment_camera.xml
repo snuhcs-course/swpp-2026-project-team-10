@@ -555,8 +555,9 @@
             tools:visibility="visible" />
 
         <!-- The timer's countdown (FR-1.17): the seconds left, large in the middle of the image, so the people in the photo
-             can read it, and how to stop it. The number turns with the phone (FR-1.15) in a square, so it fits either
-             way. It passes touches through. -->
+             can read it. That the shutter stops it is the shutter's name meanwhile and the tutorial's tip, not a line
+             here. The number turns with the phone (FR-1.15) in a square, so it fits either way. It passes touches
+             through. -->
         <LinearLayout
             android:id="@+id/countdownPanel"
             android:layout_width="wrap_content"
@@ -578,12 +579,6 @@
                 android:textSize="120dp"
                 tools:ignore="SpUsage"
                 tools:text="3" />
-
-            <TextView
-                android:id="@+id/countdownHint"
-                style="@style/Widget.Pix.Chip.Small"
-                android:text="@string/countdown_cancel_hint"
-                android:textSize="13sp" />
         </LinearLayout>
 
         <LinearLayout

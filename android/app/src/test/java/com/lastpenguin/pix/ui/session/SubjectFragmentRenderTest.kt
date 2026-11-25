@@ -122,8 +122,9 @@ import org.robolectric.shadows.ShadowDialog
  * the focus's for its shorter one; the photographer's pinch named for as long as it, replaced by the ratio's line, gone
  * when it ends without one; another label meanwhile keeps its own time, and the line is back after it.
  * This phone's shutter (FR-7.8, #314; state-based): dimmed before the session, connected without a frame, while the
- * link reconnects, during the photographer's step, and while the photographer's timer counts down, free again at its
- * end; with the video showing a press asks once and holds the shutter;
+ * link reconnects, and during the photographer's step; while the photographer's timer counts down it cancels, said
+ * in its name and in the tutorial's tip, not under the number, with no refusal for the timer's answer; with the video showing a press asks once
+ * and holds the shutter;
  * answered taken (free, no line), not taken (free, a line for a label's time), and not answered (the line after the
  * wait).
  * This phone's start of AI poses (FR-6.15, #276): the answer said where the lines show, begun (who takes the scene
@@ -666,9 +667,9 @@ class SubjectFragmentRenderTest {
     private fun presses(modules: TestAppContainer) = modules.session.sent.count { it is SessionMessage.ShutterPress }
 
     /** The answer to the press sent last, which names that press. */
-    private fun answer(modules: TestAppContainer, taken: Boolean) {
+    private fun answer(modules: TestAppContainer, taken: Boolean, timer: Boolean = false) {
         val press = modules.session.sent.filterIsInstance<SessionMessage.ShutterPress>().last().press
-        modules.session.deliver(SessionMessage.ShutterAnswer(taken, press))
+        modules.session.deliver(SessionMessage.ShutterAnswer(taken, press, timer))
     }
 
     /** Connected, with the photographer's video showing: the video's state is looked at every 500 ms. */
@@ -772,23 +773,43 @@ class SubjectFragmentRenderTest {
     }
 
     @Test
-    fun whileThePhotographersTimerCountsDown_theShutterIsDimmed_andTakesNoPress() {
+    fun whileTheTimerCountsDown_theShutterCancelsIt_andIsNamedSo_withNoLineOfItsOwn() {
         val modules = launch()
         connectWithVideo(modules)
 
         modules.session.deliver(SessionMessage.Countdown(3))
         idle()
         onScreen { binding, _ ->
-            assertFalse(binding.shutterButton.isEnabled)
+            // Either phone's shutter stops the countdown (FR-7.8). The tutorial's tip says so, not a line here:
+            // under the number is whose photo it is, and nothing else.
+            assertTrue(binding.shutterButton.isEnabled)
+            assertEquals(
+                string(R.string.shutter_cancel_timer),
+                binding.shutterButton.contentDescription.toString(),
+            )
+            assertEquals(2, binding.countdownPanel.childCount)
             binding.shutterButton.performClick()
         }
         idle()
-        assertEquals(0, presses(modules))
+        assertEquals(
+            listOf(true),
+            modules.session.sent.filterIsInstance<SessionMessage.ShutterPress>().map { it.cancel },
+        )
 
-        // Its end, with its photo or cancelled, frees the shutter.
+        // Stopped: the press is answered as the timer's, and the countdown goes with its 0.
+        answer(modules, taken = false, timer = true)
         modules.session.deliver(SessionMessage.Countdown(0))
         idle()
-        onScreen { binding, _ -> assertTrue(binding.shutterButton.isEnabled) }
+        onScreen { binding, _ ->
+            assertEquals(View.GONE, binding.countdownPanel.visibility)
+            assertTrue(binding.shutterButton.isEnabled)
+            assertEquals(
+                string(R.string.subject_shutter, "Dongje"),
+                binding.shutterButton.contentDescription.toString(),
+            )
+            // No "Can't take a photo right now": nothing was asked to be taken.
+            assertFalse(binding.toggleLabel.isShown)
+        }
     }
 
     // ---- This phone starts AI poses (FR-6.15, #276) --------------------------------------------------------------
@@ -1668,6 +1689,8 @@ class SubjectFragmentRenderTest {
             assertEquals(View.VISIBLE, binding.cameraCaption.visibility)
             assertTrue(binding.cameraCaptionTitle.isShown)
             assertFalse(binding.cameraCaptionStatus.isShown)
+            // The red dot says "live", as the light over the video does: it goes with "Live".
+            assertFalse(binding.cameraCaptionDot.isShown)
             assertFalse(binding.shutterButton.isEnabled)
             val step = IntArray(2).also { binding.pickPoseButton.getLocationInWindow(it) }
             val shutter = IntArray(2).also { binding.shutterButton.getLocationInWindow(it) }

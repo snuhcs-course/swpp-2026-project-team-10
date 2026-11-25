@@ -32,6 +32,7 @@ import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionPlace
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.ShutterOutcome
 import com.lastpenguin.pix.session.TipSyncer
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.camera.CameraViewModel
@@ -62,6 +63,12 @@ sealed interface SessionNotice {
 
     /** The subject's shutter took a photo: "Joonhyung took a photo" (FR-7.8, #314). */
     data class RemoteShutter(val name: String) : SessionNotice
+
+    /** The subject's shutter started this phone's timer: "Joonhyung pressed the shutter" (FR-7.8, FR-1.17). */
+    data class RemoteShutterPress(val name: String) : SessionNotice
+
+    /** The subject's shutter stopped the timer's countdown: "Joonhyung cancelled the timer" (FR-7.8, FR-1.17). */
+    data class RemoteTimerCancel(val name: String) : SessionNotice
 
     /** The subject started AI poses, and this phone now takes the scene photo: "Joonhyung started AI poses" (#276). */
     data class RemotePoseStart(val name: String) : SessionNotice
@@ -178,6 +185,9 @@ class SessionViewModel(
     /** How many times this phone asked for AI poses, the number of its last request; and the request that waits. */
     private var poseRequests = 0
     private var poseRequestWaiting: Int? = null
+
+    /** True once the photographer's phone said that its user is asked to agree, for the request that waits. */
+    private var poseRequestAsked = false
 
     /** Runs while a request waits for the photographer's phone to say anything ([POSE_START_WAIT_MS]). */
     private var poseStartWait: Job? = null
@@ -549,6 +559,11 @@ class SessionViewModel(
 
                                 is RemoteAction.Shutter -> _notices.tryEmit(SessionNotice.RemoteShutter(name))
 
+                                is RemoteAction.TimerStart ->
+                                    _notices.tryEmit(SessionNotice.RemoteShutterPress(name))
+
+                                is RemoteAction.TimerStop -> _notices.tryEmit(SessionNotice.RemoteTimerCancel(name))
+
                                 is RemoteAction.PoseStart -> _notices.tryEmit(SessionNotice.RemotePoseStart(name))
 
                                 is RemoteAction.Focus -> {
@@ -678,10 +693,10 @@ class SessionViewModel(
     }
 
     /**
-     * The Camera screen, while it is in front, takes the photos the subject's shutter asks for and says whether it
-     * took one (FR-7.8, #314); null once it is not, and a press is then answered as not taken.
+     * The Camera screen, while it is in front, takes up the presses of the subject's shutter and says what it did
+     * with each (FR-7.8, #314); null once it is not, and a press is then answered as not taken.
      */
-    fun setRemoteShutter(taker: (() -> Boolean)?) {
+    fun setRemoteShutter(taker: ((cancel: Boolean) -> ShutterOutcome)?) {
         remoteControl.shutter = taker
     }
 
@@ -709,6 +724,12 @@ class SessionViewModel(
             _poseStartAnswers.trySend(PoseStartStep.REFUSED)
             return
         }
+        if (poseRequestWaiting != null) {
+            // One request at a time: a second one would wait behind the first on the photographer's phone, which
+            // begins the first and refuses the second, and this phone would say the refusal. The first's answer comes.
+            if (poseRequestAsked) _poseStartAnswers.trySend(PoseStartStep.ASKING)
+            return
+        }
         // Numbered, so only its own answers count: an earlier request's, come late, is not this one's.
         val request = ++poseRequests
         poseRequestWaiting = request
@@ -731,10 +752,12 @@ class SessionViewModel(
         poseStartWait = null
         if (answer.asking) {
             // The photographer reads the AI notice: the request waits for their answer, however long that takes.
+            poseRequestAsked = true
             _poseStartAnswers.trySend(PoseStartStep.ASKING)
             return
         }
         poseRequestWaiting = null
+        poseRequestAsked = false
         _poseStartAnswers.trySend(if (answer.started) PoseStartStep.STARTED else PoseStartStep.REFUSED)
     }
 
@@ -746,11 +769,12 @@ class SessionViewModel(
         poseStartWait?.cancel()
         poseStartWait = null
         poseRequestWaiting = null
+        poseRequestAsked = false
         while (_poseStartAnswers.tryReceive().isSuccess) Unit
     }
 
     /** [taker]'s screen is no longer in front; a screen that came after it keeps its own. */
-    fun dropRemoteShutter(taker: () -> Boolean) {
+    fun dropRemoteShutter(taker: (cancel: Boolean) -> ShutterOutcome) {
         if (remoteControl.shutter === taker) remoteControl.shutter = null
     }
 

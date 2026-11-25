@@ -37,6 +37,7 @@ import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionPlace
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.SharedTip
+import com.lastpenguin.pix.session.ShutterOutcome
 import com.lastpenguin.pix.session.TipSyncer
 import com.lastpenguin.pix.session.fakeGuide
 import com.lastpenguin.pix.session.protocol.SessionMessage
@@ -856,7 +857,7 @@ class SessionViewModelTest {
         var presses = 0
         model.setRemoteShutter {
             presses++
-            true
+            ShutterOutcome.TAKEN
         }
         runCurrent()
         notices.clear()
@@ -873,7 +874,7 @@ class SessionViewModelTest {
     fun onceTheCameraScreenIsGone_aPressIsNotTaken_andIsNoNotice() = runTest(dispatcher) {
         val notices = asPhotographerOf("Joonhyung")
         backgroundScope.launch { model.notices.collect { notices += it } }
-        model.setRemoteShutter { true }
+        model.setRemoteShutter { ShutterOutcome.TAKEN }
         model.setRemoteShutter(null)
         runCurrent()
         notices.clear()
@@ -883,6 +884,25 @@ class SessionViewModelTest {
 
         assertTrue(notices.isEmpty())
         assertEquals(SessionMessage.ShutterAnswer(taken = false, press = 1), session.sent.last())
+    }
+
+    @Test
+    fun theSubjectsPress_thatStartsOrStopsTheTimer_saysWhoPressed_andWhoCancelled() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        model.setRemoteShutter { cancel -> if (cancel) ShutterOutcome.TIMER_STOPPED else ShutterOutcome.TIMER_STARTED }
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.ShutterPress(1))
+        runCurrent()
+        session.deliver(SessionMessage.ShutterPress(2, cancel = true))
+        runCurrent()
+
+        assertEquals(
+            listOf(SessionNotice.RemoteShutterPress("Joonhyung"), SessionNotice.RemoteTimerCancel("Joonhyung")),
+            notices,
+        )
     }
 
     // ---- The subject starts AI poses (FR-6.15, #276) --------------------------------------------------------------
@@ -1005,23 +1025,68 @@ class SessionViewModelTest {
     }
 
     @Test
-    fun anAnswerToAnEarlierRequest_isNotTheNewOnes() = runTest(dispatcher) {
+    fun whileARequestWaits_anotherIsNotSent_andTheFirstsAnswerIsTheOneSaid() = runTest(dispatcher) {
         connected()
         val answers = poseStartAnswers()
         runCurrent()
         model.askForPoses(Situation.DEFAULT)
         runCurrent()
         val first = asked().request
+
+        // The sheet again, and another tile, before the photographer's phone answered: one request at a time.
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+        assertEquals(1, session.sent.count { it is SessionMessage.PoseStart })
+        assertTrue(answers.isEmpty())
+
+        answerPoses(started = true, request = first)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.STARTED), answers)
+
+        // Decided: the next tile asks again.
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+        assertEquals(2, session.sent.count { it is SessionMessage.PoseStart })
+    }
+
+    @Test
+    fun whileThePhotographerIsAsked_anotherTileSaysSoAgain_andAsksNothing() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+        answerPoses(started = false, asking = true)
+        runCurrent()
+
         model.askForPoses(Situation.LANDMARK)
         runCurrent()
 
-        answerPoses(started = false, request = first)
+        assertEquals(1, session.sent.count { it is SessionMessage.PoseStart })
+        assertEquals(listOf(PoseStartStep.ASKING, PoseStartStep.ASKING), answers)
+    }
+
+    @Test
+    fun anAnswerToARequestGivenUp_isNotTheNextOnes() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
         runCurrent()
-        assertTrue(answers.isEmpty())
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+        val first = asked().request
+        advanceTimeBy(SessionViewModel.POSE_START_WAIT_MS)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED), answers)
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+
+        answerPoses(started = true, request = first)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED), answers)
 
         answerPoses(started = true)
         runCurrent()
-        assertEquals(listOf(PoseStartStep.STARTED), answers)
+        assertEquals(listOf(PoseStartStep.REFUSED, PoseStartStep.STARTED), answers)
     }
 
     @Test

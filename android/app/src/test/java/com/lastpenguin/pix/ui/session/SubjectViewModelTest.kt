@@ -76,8 +76,9 @@ import org.junit.Test
  * This phone's shutter (FR-7.8, #314; state-based, boundary): a press asks once and holds the shutter; a second press
  * meanwhile asks nothing; the answer frees it, taken (no line) or not (a line); no answer frees it after
  * SHUTTER_WAIT_MS with a line (1 ms before / at it); a press before the session is connected asks nothing; a drop
- * frees a waiting press without a line; an answer to a press given up before, which answers no later press; a press
- * while the photographer's countdown runs (nothing asked) and after its 0.
+ * frees a waiting press without a line; an answer to a press given up before, which answers no later press. With
+ * the photographer's timer (FR-1.17): a press while the countdown shows asks to cancel it; a press the timer took up
+ * is no refusal; a cancel refused or not answered says nothing.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SubjectViewModelTest {
@@ -1114,22 +1115,64 @@ class SubjectViewModelTest {
     }
 
     @Test
-    fun `the shutter waits while the photographer's countdown runs`() = runTest(dispatcher) {
+    fun `a press while the photographer's countdown shows asks to cancel it, and says nothing`() =
+        runTest(dispatcher) {
+            connect()
+            val refusals = refusals()
+            runCurrent()
+            session.deliver(SessionMessage.Countdown(3))
+            runCurrent()
+
+            assertTrue(viewModel.onShutter())
+            assertEquals(true, session.sent.filterIsInstance<SessionMessage.ShutterPress>().last().cancel)
+            assertTrue(viewModel.uiState.value.shutterWaiting)
+
+            session.deliver(SessionMessage.ShutterAnswer(taken = false, press = pressed(), timer = true))
+            runCurrent()
+            assertFalse(viewModel.uiState.value.shutterWaiting)
+            assertTrue(refusals.isEmpty())
+        }
+
+    @Test
+    fun `a press without a countdown asks for a photo, and one the timer took up is no refusal`() =
+        runTest(dispatcher) {
+            connect()
+            val refusals = refusals()
+            runCurrent()
+
+            assertTrue(viewModel.onShutter())
+            assertEquals(false, session.sent.filterIsInstance<SessionMessage.ShutterPress>().last().cancel)
+
+            // The photographer's timer is on: the countdown comes instead of the photo.
+            session.deliver(SessionMessage.ShutterAnswer(taken = false, press = pressed(), timer = true))
+            runCurrent()
+            assertFalse(viewModel.uiState.value.shutterWaiting)
+            assertTrue(refusals.isEmpty())
+        }
+
+    @Test
+    fun `a cancel that is refused or not answered says nothing`() = runTest(dispatcher) {
         connect()
         val refusals = refusals()
         runCurrent()
         session.deliver(SessionMessage.Countdown(3))
         runCurrent()
 
-        assertFalse(viewModel.onShutter())
-        assertEquals(0, presses())
-        assertFalse(viewModel.uiState.value.shutterWaiting)
-        assertTrue(refusals.isEmpty())
-
-        session.deliver(SessionMessage.Countdown(0))
+        // The photographer left Camera, which stopped the countdown itself.
+        viewModel.onShutter()
+        session.deliver(SessionMessage.ShutterAnswer(taken = false, press = pressed()))
         runCurrent()
-        assertTrue(viewModel.onShutter())
-        assertEquals(1, presses())
+        assertFalse(viewModel.uiState.value.shutterWaiting)
+
+        session.deliver(SessionMessage.Countdown(2))
+        runCurrent()
+        viewModel.onShutter()
+        advanceTimeBy(SubjectViewModel.SHUTTER_WAIT_MS)
+        runCurrent()
+        assertFalse(viewModel.uiState.value.shutterWaiting)
+
+        // "Can't take a photo right now" is for a press that asked for one.
+        assertTrue(refusals.isEmpty())
     }
 
     @Test

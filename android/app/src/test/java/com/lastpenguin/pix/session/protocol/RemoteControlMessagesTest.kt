@@ -20,7 +20,8 @@ import org.junit.Test
  * a round trip keeps every field; `final` left out means a step; `guide.state` from a phone without `by` means the
  * photographer, and the echo of a `guide.move` carries `by: SUBJECT`; `camera.zoom.hold` naming a holder, null, or no
  * holder at all, the last two meaning a free zoom, and a `camera.zoom.set` with `cancel`, which is false when left out (#236).
- * The subject's shutter (#314): the press with its number, and its answer, taken or not, naming that number.
+ * The subject's shutter (#314): the press with its number, and its answer, taken or not, naming that number; a press
+ * that cancels the photographer's timer, the answer of a press the timer took, and both fields left out.
  * The subject's start of AI poses (#276): the situation's name, and the answer, begun or not.
  * The photographer's countdown (`camera.timer`, FR-1.17): the Design's example decodes, and a round trip keeps it.
  */
@@ -162,6 +163,21 @@ class RemoteControlMessagesTest {
     }
 
     @Test
+    fun theSubjectsShutter_withThePhotographersTimer_designExamples_decode() {
+        val cancel = """{ "v": 3, "t": "camera.shutter", "seq": 11, "ts": 1759212357000,
+            "b": { "press": 9, "cancel": true } }"""
+        val timer = """{ "v": 3, "t": "camera.shutter.answer", "seq": 6, "ts": 1759212357100,
+            "b": { "taken": false, "press": 9, "timer": true } }"""
+
+        assertEquals(SessionMessage.ShutterPress(press = 9, cancel = true), decode(cancel))
+        assertEquals(SessionMessage.ShutterAnswer(taken = false, press = 9, timer = true), decode(timer))
+        // A phone of before the timer sends neither field: a press for a photo, and an answer about one.
+        val before = """{ "v": 3, "t": "camera.shutter.answer", "seq": 2, "ts": 1759212355100,
+            "b": { "taken": false, "press": 1 } }"""
+        assertEquals(SessionMessage.ShutterAnswer(taken = false, press = 1, timer = false), decode(before))
+    }
+
+    @Test
     fun theSubjectsStartOfPoses_andItsAnswer_designExamples_decode() {
         val start = """{ "v": 3, "t": "pose.start", "seq": 12, "ts": 1759212355000,
             "b": { "situation": "full_body" } }"""
@@ -185,6 +201,8 @@ class RemoteControlMessagesTest {
             SessionMessage.ShutterPress(press = 7),
             SessionMessage.ShutterAnswer(taken = true, press = 7),
             SessionMessage.ShutterAnswer(taken = false, press = 8),
+            SessionMessage.ShutterPress(press = 9, cancel = true),
+            SessionMessage.ShutterAnswer(taken = false, press = 9, timer = true),
             SessionMessage.PoseStart("selfie"),
             SessionMessage.PoseStartAnswer(started = true),
             SessionMessage.PoseStartAnswer(started = false),

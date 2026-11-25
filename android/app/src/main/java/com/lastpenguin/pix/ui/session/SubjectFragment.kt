@@ -989,7 +989,7 @@ class SubjectFragment :
      * The line right above the shutter, once connected (#314; in the shutter's place before it, #271): whose camera
      * this is and that it is live, or, from the photographer's shutter until the photo is saved here, that it is coming
      * (FR-6.14). While a step's button shows, the video's own text says what the photographer does, so the line is
-     * the name alone. The open tip takes the line's place until a touch closes it: at the largest font the two do not
+     * the name alone, without the red dot. The open tip takes the line's place until a touch closes it: at the largest font the two do not
      * fit above the shutter together.
      */
     private fun renderCaption(binding: FragmentSubjectBinding, ui: SubjectUiState) {
@@ -997,6 +997,8 @@ class SubjectFragment :
         val receiving = ui.receivingPhoto
         val live = !receiving && !binding.pickPoseButton.isVisible
         binding.cameraCaptionName.isVisible = !receiving
+        // The red dot says "live", as the light over the video does: not beside the name of a camera that is off.
+        binding.cameraCaptionDot.isVisible = live
         binding.cameraCaptionSpinner.isVisible = receiving
         binding.cameraCaptionStatus.isVisible = receiving || live
         binding.cameraCaptionStatus.setText(
@@ -1013,9 +1015,10 @@ class SubjectFragment :
     private fun fitCaption(binding: FragmentSubjectBinding, name: String?, live: Boolean) {
         val title = binding.cameraCaptionTitle
         val overlays = binding.bottomOverlays
-        val gap = (title.layoutParams as ViewGroup.MarginLayoutParams).marginStart
+        val dot = binding.cameraCaptionDot
+        val gap = (dot.layoutParams as ViewGroup.MarginLayoutParams).marginEnd
         val room = overlays.width - overlays.paddingLeft - overlays.paddingRight -
-            binding.cameraCaptionDot.layoutParams.width - gap
+            if (live) dot.layoutParams.width + gap else 0
         val full =
             if (name == null) getString(R.string.subject_title_placeholder) else getString(R.string.subject_title, name)
         val status = if (live) {
@@ -1045,15 +1048,18 @@ class SubjectFragment :
 
     /**
      * This phone's shutter (FR-7.8, #314): dimmed while the photographer's video does not show, as while the link
-     * reconnects or their camera is off for a pose's step, while a press waits for its answer, and while the
-     * photographer's timer counts down to its own photo (FR-1.17).
+     * reconnects or their camera is off for a pose's step, and while a press waits for its answer. While the
+     * photographer's timer counts down it stops the countdown, as Camera's own does, and is named so (FR-1.17); the
+     * tutorial's tip on it says so, and no line on the screen.
      */
     private fun renderShutter(binding: FragmentSubjectBinding, ui: SubjectUiState) {
-        binding.shutterButton.isEnabled =
-            ui.connected && videoShowing.value && !ui.shutterWaiting && ui.countdown == null
+        binding.shutterButton.isEnabled = ui.connected && videoShowing.value && !ui.shutterWaiting
         val name = ui.photographerName
-        binding.shutterButton.contentDescription =
-            if (name == null) getString(R.string.shutter) else getString(R.string.subject_shutter, name)
+        binding.shutterButton.contentDescription = when {
+            ui.countdown != null -> getString(R.string.shutter_cancel_timer)
+            name == null -> getString(R.string.shutter)
+            else -> getString(R.string.subject_shutter, name)
+        }
     }
 
     /**

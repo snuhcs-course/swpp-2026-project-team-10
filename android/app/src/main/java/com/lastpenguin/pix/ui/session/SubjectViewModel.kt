@@ -347,6 +347,9 @@ class SubjectViewModel(
     // How many times this phone's shutter asked for a photo: the number of the press that waits, if one does.
     private var shutterPresses = 0
 
+    // True when the press that waits asked to stop the photographer's countdown, not for a photo (FR-1.17).
+    private var shutterCancels = false
+
     // Takes down a number whose next second never came (showCountdown).
     private var countdownExpiry: Job? = null
 
@@ -449,7 +452,11 @@ class SubjectViewModel(
                 if (message is SessionMessage.ShutterAnswer) {
                     // Only the press that still waits is answered: one given up already has said so, and its answer,
                     // come late, is not the next press's.
-                    if (message.press == shutterPresses && endShutterWait() && !message.taken) {
+                    // A refusal is said for a press that asked for a photo and got neither it nor the timer.
+                    val cancel = shutterCancels
+                    if (message.press == shutterPresses && endShutterWait() &&
+                        !message.taken && !message.timer && !cancel
+                    ) {
                         _shutterRefusals.trySend(Unit)
                     }
                     return@collect
@@ -863,23 +870,28 @@ class SubjectViewModel(
 
     /**
      * This phone's shutter (FR-7.8, #314): asks the photographer's phone for a photo, at once, and holds the shutter
-     * until its answer or [SHUTTER_WAIT_MS]. False when nothing was asked: not connected, a press still waits, or the
-     * photographer's timer counts down, whose photo is on its way (FR-1.17).
+     * until its answer or [SHUTTER_WAIT_MS]. While the photographer's countdown shows, the press asks to stop it
+     * instead (FR-1.17), as a tap on Camera's shutter does. False when nothing was asked: not connected, or a press
+     * still waits.
      */
     fun onShutter(): Boolean {
         val ui = _uiState.value
-        if (!ui.connected || ui.shutterWaiting || ui.countdown != null) return false
+        if (!ui.connected || ui.shutterWaiting) return false
+        // What the press means goes with it: it may arrive after the countdown ended, and must not take a photo then.
+        val cancel = ui.countdown != null
         // Numbered, so only its own answer ends its wait: one that comes after the wait is for no later press.
         val press = ++shutterPresses
-        session.send(SessionMessage.ShutterPress(press))
-        Timings.mark("shutter.sent")
+        shutterCancels = cancel
+        session.send(SessionMessage.ShutterPress(press, cancel))
+        Timings.mark("shutter.sent", if (cancel) "cancel" else null)
         _uiState.update { it.copy(shutterWaiting = true) }
         shutterWait = viewModelScope.launch {
             delay(SHUTTER_WAIT_MS)
-            // No word of it in time: as far as this phone knows, no photo was taken.
+            // No word of it in time: as far as this phone knows, no photo was taken. A cancel says nothing: the
+            // countdown shows, or goes, by the photographer's own seconds.
             shutterWait = null
             _uiState.update { it.copy(shutterWaiting = false) }
-            _shutterRefusals.trySend(Unit)
+            if (!cancel) _shutterRefusals.trySend(Unit)
         }
         return true
     }

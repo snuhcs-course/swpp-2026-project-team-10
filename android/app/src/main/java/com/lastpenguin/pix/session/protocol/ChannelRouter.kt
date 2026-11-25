@@ -32,6 +32,10 @@ class ChannelRouter {
         // photo once the subject no longer waits for one. Sent at once or not at all, a lost one only asks again.
         is SessionMessage.ShutterPress -> Channel.REALTIME
 
+        // So is a start of AI poses (#276): kept back, it would open the scene photo's step on the photographer's
+        // phone once the subject's phone gave it up and said that nothing started.
+        is SessionMessage.PoseStart -> Channel.REALTIME
+
         else -> Channel.RELIABLE
     }
 

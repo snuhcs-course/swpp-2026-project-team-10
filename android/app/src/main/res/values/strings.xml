@@ -133,7 +133,6 @@
     <string name="level_off">Horizon bar off</string>
     <string name="shutter_timer">Shutter, %1$d s timer</string>
     <string name="shutter_cancel_timer">Cancel the timer</string>
-    <string name="countdown_cancel_hint">Tap the shutter to cancel</string>
     <string name="aspect_ratio_description">Aspect ratio %1$s</string>
     <string name="aspect_ratios">Aspect ratios</string>
     <string name="aspect_3_4" translatable="false">3:4</string>
@@ -168,6 +167,8 @@
     <string name="remote_brightness_notice">%1$s set brightness to %2$s</string>
     <string name="remote_focus_notice">%1$s set the focus</string>
     <string name="remote_shutter_notice">%1$s took a photo</string>
+    <string name="remote_shutter_pressed_notice">%1$s pressed the shutter</string>
+    <string name="remote_timer_cancel_notice">%1$s cancelled the timer</string>
     <string name="remote_pose_start_notice">%1$s started AI poses</string>
     <string name="remote_flash_on_notice">%1$s turned the flash on</string>
     <string name="remote_flash_off_notice">%1$s turned the flash off</string>
@@ -624,7 +625,7 @@
     <string name="tutorial_menu">Flash, timer, grid, and Settings</string>
     <string name="tutorial_together">Share your camera live with another phone</string>
     <string name="tutorial_guide">Add a photo or AI pose guide</string>
-    <string name="tutorial_shutter">Only the photo is saved, never the guide</string>
+    <string name="tutorial_shutter">Only the photo is saved, never the guide. Tap again to cancel a timer</string>
     <string name="tutorial_switch">Change to the front camera</string>
     <string name="tutorial_upload">Pix traces the person in your photo</string>
     <string name="tutorial_generate">Pick a situation, and AI makes four poses for it</string>
@@ -642,5 +643,5 @@
     <string name="tutorial_friend_focus">Tap to focus, then set the brightness beside it</string>
     <string name="tutorial_friend_move">Move the guide yourself</string>
     <string name="tutorial_friend_guide">Choose a guide from this phone</string>
-    <string name="tutorial_friend_shutter">Take the photo yourself</string>
+    <string name="tutorial_friend_shutter">Take the photo, or cancel a timer</string>
 </resources>

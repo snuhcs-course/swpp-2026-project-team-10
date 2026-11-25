@@ -31,6 +31,23 @@ import kotlinx.coroutines.launch
  */
 enum class PoseStartStep { ASKING, STARTED, REFUSED }
 
+/**
+ * What the Camera screen did with a press of the subject's shutter (FR-7.8): took the photo; started the
+ * photographer's timer, whose end takes it (FR-1.17); stopped the timer's countdown; left the timer as it was, for a
+ * press for a photo that met a countdown or a cancel that found none; or refused the press.
+ */
+enum class ShutterOutcome {
+    TAKEN,
+    TIMER_STARTED,
+    TIMER_STOPPED,
+    TIMER_KEPT,
+    REFUSED,
+    ;
+
+    /** True when the press was the timer's, so no photo was taken at once and none was refused. */
+    val timers: Boolean get() = this == TIMER_STARTED || this == TIMER_STOPPED || this == TIMER_KEPT
+}
+
 /** A remote action the photographer's phone applied, for the notice "Joonhyung set zoom to 2×" (FR-7.4). */
 sealed interface RemoteAction {
     data class Zoom(val ratio: Float) : RemoteAction
@@ -48,6 +65,12 @@ sealed interface RemoteAction {
 
     /** The subject's shutter took a photo (FR-7.8, #314). */
     data object Shutter : RemoteAction
+
+    /** The subject's shutter started the photographer's timer, whose end takes the photo (FR-7.8, FR-1.17). */
+    data object TimerStart : RemoteAction
+
+    /** The subject's shutter stopped the timer's countdown (FR-7.8, FR-1.17). */
+    data object TimerStop : RemoteAction
 
     /** The subject started AI poses, and the scene photo's step began here (FR-6.15, #276). */
     data object PoseStart : RemoteAction
@@ -99,7 +122,8 @@ sealed interface RemoteAction {
  * guide cannot be edited on either phone, and a gesture never crosses guide identities.
  *
  * **Shutter (It 5, FR-7.8, #314).** `camera.shutter` is the subject's press. The photo is the Camera screen's to take
- * ([shutter]), as at its own shutter, and every press is answered with `camera.shutter.answer`.
+ * ([shutter]), as at its own shutter, with its timer when that is on, and every press is answered with
+ * `camera.shutter.answer`.
  *
  * **AI poses (It 5, FR-6.15, #276).** `pose.start` is the situation the subject picked. The Camera screen begins the
  * scene photo for it ([poseStarter]), as if its own user had picked it, and the request is answered with
@@ -116,10 +140,11 @@ class RemoteControlHandler(
     val zoomHold: ZoomHold = ZoomHold(),
 ) {
     /**
-     * Takes a photo for the subject's shutter (FR-7.8, #314) and says whether it took one. The Camera screen sets it
-     * while it is in front, since only there is the camera bound and the shutter the camera's own; null otherwise.
+     * Takes up a press of the subject's shutter (FR-7.8, #314), a press for a photo or one to cancel the timer's
+     * countdown, and says what it did. The Camera screen sets it while it is in front, since only there is the camera
+     * bound and the shutter the camera's own; null otherwise.
      */
-    var shutter: (() -> Boolean)? = null
+    var shutter: ((cancel: Boolean) -> ShutterOutcome)? = null
 
     /**
      * Begins a pose's scene photo for the situation the subject picked (FR-6.15, #276), and tells its second argument
@@ -257,17 +282,19 @@ class RemoteControlHandler(
      * `pose.start`: the Camera screen begins the scene photo for the subject's situation, if it is in front and can
      * (FR-6.15, #276). Every request is answered, by its number: a refusal at once, and a start when it began. That
      * waits for the photographer when the AI notice is up, which the subject's phone is told at once, so that it does
-     * not give the request up. An answer that comes once this session is over tells no one.
+     * not give the request up. An answer that comes once this session is over tells no one; one that comes after a
+     * drop of the same session is told, or the subject's phone would wait for it without end.
      */
     private fun handlePoseStart(request: SessionMessage.PoseStart) {
         val situation = Situation.named(request.situation)
         val starter = poseStarter
-        // The session this request came in, which may be over when the photographer answers the notice.
-        val asked = scope
+        // The session this request came in, which may be over when the photographer answers the notice. By its id,
+        // not by this handler's run: a drop stops the handler and the link's return starts it anew, in one session.
+        val asked = sessionId()
         var decided = false
         val answer = { step: PoseStartStep ->
-            // One last answer, and none once this session is over.
-            if (!decided && asked != null && scope === asked) {
+            // One last answer, and none once this session is over. While the link reconnects, the session keeps it.
+            if (!decided && asked != null && sessionId() == asked) {
                 decided = step != PoseStartStep.ASKING
                 val started = step == PoseStartStep.STARTED
                 Timings.mark("poses.remote", step.name.lowercase())
@@ -280,17 +307,31 @@ class RemoteControlHandler(
         if (situation == null || starter == null) answer(PoseStartStep.REFUSED) else starter(situation, answer)
     }
 
+    /** The id of the session that runs or reconnects; null outside one. */
+    private fun sessionId(): String? = when (val state = session.state.value) {
+        is SessionState.Connected -> state.sessionId
+        is SessionState.Reconnecting -> state.sessionId
+        else -> null
+    }
+
     /**
-     * `camera.shutter`: the Camera screen takes the photo, if it is in front and can, and the press is answered either
-     * way, so the subject's shutter is free again. Nothing is kept for later: a press is one moment, which is why it
-     * comes on the realtime channel, at once or not at all.
+     * `camera.shutter`: the Camera screen takes the photo, if it is in front and can, or its timer takes the press
+     * up (FR-1.17), and the press is answered either way, so the subject's shutter is free again. Nothing is kept for
+     * later: a press is one moment, which is why it comes on the realtime channel, at once or not at all.
      */
     private fun handleShutter(request: SessionMessage.ShutterPress) {
-        val taken = shutter?.invoke() ?: false
-        Timings.mark("shutter.remote", if (taken) "taken" else "refused")
+        val outcome = shutter?.invoke(request.cancel) ?: ShutterOutcome.REFUSED
+        Timings.mark("shutter.remote", outcome.name.lowercase())
         // Named by its press, so an answer that comes late is not taken for the next press's.
-        session.send(SessionMessage.ShutterAnswer(taken, request.press))
-        if (taken) _actions.tryEmit(RemoteAction.Shutter)
+        session.send(
+            SessionMessage.ShutterAnswer(outcome == ShutterOutcome.TAKEN, request.press, timer = outcome.timers),
+        )
+        when (outcome) {
+            ShutterOutcome.TAKEN -> _actions.tryEmit(RemoteAction.Shutter)
+            ShutterOutcome.TIMER_STARTED -> _actions.tryEmit(RemoteAction.TimerStart)
+            ShutterOutcome.TIMER_STOPPED -> _actions.tryEmit(RemoteAction.TimerStop)
+            ShutterOutcome.TIMER_KEPT, ShutterOutcome.REFUSED -> Unit
+        }
     }
 
     /** `camera.zoom.set`: clamp, camera.setZoom, then reply with `camera.state`. */

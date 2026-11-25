@@ -32,15 +32,19 @@ import org.junit.Test
  * to the subject while the session runs, and to no one before it starts or after it stops; the subject's flash while
  * the countdown runs (answered unchanged) and after its 0 (applied).
  * The subject's shutter (#314): taken by the Camera screen (answered, one action); refused by it; no Camera screen in
- * front; two presses in a row, each answered.
+ * front; two presses in a row, each answered; taken up by the photographer's timer (its start), a cancel (its stop),
+ * and one the timer leaves as it is (no action), each answered as the timer's.
  * The subject's start of AI poses (#276): begun by the Camera screen (answered, one action); not begun by it; no Camera
  * screen in front; a situation this phone does not know; each answer naming its request; the photographer asked for
- * their agreement, said at once, then the one answer; and one that comes after the session ended.
+ * their agreement, said at once, then the one answer; one answered after the session ended or in another session
+ * (no one told), and after a reconnection of the same session or during it (told).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemoteControlHandlerTest {
 
-    private val session = FakeSessionManager()
+    /** The handler runs in a session only: this one, as the photographer. */
+    private val connected = SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER)
+    private val session = FakeSessionManager().apply { setState(connected) }
     private val camera = FakeCameraController(exposureRange = -4..4, hasFlash = true)
     private val guides = InMemoryGuideRepository()
     private var now = 0L
@@ -612,7 +616,7 @@ class RemoteControlHandlerTest {
         var presses = 0
         handler.shutter = {
             presses++
-            true
+            ShutterOutcome.TAKEN
         }
         backgroundScope.launch { handler.actions.collect { actions += it } }
         handler.start(this)
@@ -631,7 +635,7 @@ class RemoteControlHandlerTest {
     @Test
     fun `a press the Camera screen takes no photo for is answered so, and is no action`() = runTest {
         // The scene photo is being framed, or the camera still takes the photo before.
-        handler.shutter = { false }
+        handler.shutter = { ShutterOutcome.REFUSED }
         backgroundScope.launch { handler.actions.collect { actions += it } }
         handler.start(this)
         advanceTimeBy(200)
@@ -663,7 +667,7 @@ class RemoteControlHandlerTest {
     @Test
     fun `two presses in a row are each asked of the Camera screen and each answered`() = runTest {
         // The camera takes the first and is busy for the second, as with two taps on its own shutter.
-        val outcomes = ArrayDeque(listOf(true, false))
+        val outcomes = ArrayDeque(listOf(ShutterOutcome.TAKEN, ShutterOutcome.REFUSED))
         handler.shutter = { outcomes.removeFirst() }
         handler.start(this)
         advanceTimeBy(200)
@@ -681,6 +685,66 @@ class RemoteControlHandlerTest {
             ),
             answers(),
         )
+        handler.stop()
+    }
+
+    @Test
+    fun `a press the photographer's timer takes up is answered as the timer's, and reported as its start`() = runTest {
+        val asked = mutableListOf<Boolean>()
+        handler.shutter = { cancel ->
+            asked += cancel
+            ShutterOutcome.TIMER_STARTED
+        }
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.ShutterPress(press = 1))
+        runCurrent()
+
+        // No photo yet, and no refusal: the countdown's end takes it.
+        assertEquals(listOf(false), asked)
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1, timer = true)), answers())
+        assertEquals(listOf<RemoteAction>(RemoteAction.TimerStart), actions)
+        handler.stop()
+    }
+
+    @Test
+    fun `a press that cancels is asked as a cancel, answered as the timer's, and reported as its stop`() = runTest {
+        val asked = mutableListOf<Boolean>()
+        handler.shutter = { cancel ->
+            asked += cancel
+            ShutterOutcome.TIMER_STOPPED
+        }
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.ShutterPress(press = 2, cancel = true))
+        runCurrent()
+
+        assertEquals(listOf(true), asked)
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 2, timer = true)), answers())
+        assertEquals(listOf<RemoteAction>(RemoteAction.TimerStop), actions)
+        handler.stop()
+    }
+
+    @Test
+    fun `a press the timer leaves as it is is answered as the timer's, and is no action`() = runTest {
+        // A press for a photo that met a running countdown, or a cancel that found none.
+        handler.shutter = { ShutterOutcome.TIMER_KEPT }
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.ShutterPress(press = 3, cancel = true))
+        runCurrent()
+
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 3, timer = true)), answers())
+        assertTrue(actions.isEmpty())
         handler.stop()
     }
 
@@ -795,10 +859,84 @@ class RemoteControlHandlerTest {
         runCurrent()
 
         handler.stop()
+        session.setState(SessionState.Ended(EndReason.PEER_LEFT))
         checkNotNull(later)(PoseStartStep.STARTED)
         runCurrent()
 
         assertTrue(startAnswers().isEmpty())
+    }
+
+    @Test
+    fun `an agreement answered after a reconnection is still told, by its request`() = runTest {
+        var later: ((PoseStartStep) -> Unit)? = null
+        handler.poseStarter = { _, answer ->
+            answer(PoseStartStep.ASKING)
+            later = answer
+        }
+        // Each run of the handler has a scope of its own, as SessionViewModel gives it.
+        handler.start(backgroundScope)
+        advanceTimeBy(200)
+        runCurrent()
+        handler.handle(SessionMessage.PoseStart("default", request = 3))
+        runCurrent()
+
+        // The link drops while the photographer reads the notice, and comes back: the same session, run anew.
+        handler.stop()
+        session.setState(SessionState.Reconnecting("s1", 0L, peer = connected.peer, role = Role.PHOTOGRAPHER))
+        session.setState(connected.copy(drops = 1))
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        checkNotNull(later)(PoseStartStep.STARTED)
+        runCurrent()
+
+        assertEquals(SessionMessage.PoseStartAnswer(started = true, request = 3), startAnswers().last())
+        handler.stop()
+    }
+
+    @Test
+    fun `an agreement answered while the link reconnects is told too`() = runTest {
+        var later: ((PoseStartStep) -> Unit)? = null
+        handler.poseStarter = { _, answer ->
+            answer(PoseStartStep.ASKING)
+            later = answer
+        }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        handler.handle(SessionMessage.PoseStart("default", request = 3))
+        runCurrent()
+
+        handler.stop()
+        session.setState(SessionState.Reconnecting("s1", 0L, peer = connected.peer, role = Role.PHOTOGRAPHER))
+        // The session keeps the answer for the link's return, as any reliable message.
+        checkNotNull(later)(PoseStartStep.REFUSED)
+        runCurrent()
+
+        assertEquals(SessionMessage.PoseStartAnswer(started = false, request = 3), startAnswers().last())
+    }
+
+    @Test
+    fun `an agreement answered in another session tells no one`() = runTest {
+        var later: ((PoseStartStep) -> Unit)? = null
+        handler.poseStarter = { _, answer -> later = answer }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        handler.handle(SessionMessage.PoseStart("default"))
+        runCurrent()
+
+        handler.stop()
+        session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        session.setState(SessionState.Connected("s2", PeerInfo("Sungmin"), Role.PHOTOGRAPHER))
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        checkNotNull(later)(PoseStartStep.STARTED)
+        runCurrent()
+
+        assertTrue(startAnswers().isEmpty())
+        handler.stop()
     }
 
     @Test

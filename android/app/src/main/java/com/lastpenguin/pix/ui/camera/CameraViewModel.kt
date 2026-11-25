@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.content.IntentSender
@@ -572,9 +572,12 @@ class CameraViewModel(
             // The viewer closes as a session starts or ends, so it never turns from one's photos to the other's.
             val sameKind = (it.sessionPhotos == null) == (session == null)
             val open = it.photosOpen && sameKind && next.opensPhotos
+            // An album gone, its last photo deleted, takes its photo with it: the Albums tab shows, not that photo's
+            // place among all the phone's.
+            val albumGone = it.album != null && next.album == null
             next.copy(
                 photosOpen = open,
-                pickedPhoto = it.pickedPhoto.takeIf { open && next.viewerPhotos.isNotEmpty() },
+                pickedPhoto = it.pickedPhoto.takeIf { open && !albumGone && next.viewerPhotos.isNotEmpty() },
                 album = next.album.takeIf { open },
                 galleryTab = if (open) next.galleryTab else GalleryTab.PHOTOS,
             )

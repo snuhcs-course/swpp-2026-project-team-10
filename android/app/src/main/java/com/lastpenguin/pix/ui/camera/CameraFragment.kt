@@ -373,6 +373,9 @@ class CameraFragment :
         controls.shutterButton.setOnClickListener {
             // While the scene photo for poses is framed, the shutter takes that photo and saves nothing.
             if (generationViewModel.uiState.value.phase == GenerationUiState.Phase.FRAMING) {
+                // While the scene photo's frame is being taken, after its countdown, the shutter waits: another tap
+                // would start a second countdown over the photo's check.
+                if (generationViewModel.uiState.value.shooting) return@setOnClickListener
                 // The ratios close, as at the camera's own shutter: a shutter that no touch came with, as with
                 // TalkBack, would leave them open for Back from the review (#231). The timer counts down for the scene
                 // photo too (FR-1.17), which is taken only if the scene is still framed at its end.

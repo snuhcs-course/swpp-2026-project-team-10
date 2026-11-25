@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park
 package com.lastpenguin.pix.camera
 
 import android.app.PendingIntent
@@ -40,6 +40,8 @@ import org.robolectric.Robolectric
  * Changes (state-based): a change anywhere in MediaStore reads it again, so a new photo joins and a deleted one
  * leaves, the newest too; a refresh reads the permission and the photos again and returns once they are there.
  * Failures (fault injection): a query that throws gives none, not a crash, and the next change reads again.
+ * Package visibility (equivalence over the query): on Android 14, where a query naming the owner leaves out the
+ * photos of apps Pix cannot see, every app's photo still shows, and Pix's own still tells apart from another's.
  * Delete (state-based, fault injection; equivalence over the owner and Android's version): Pix's own photo goes from
  * MediaStore after Pix asks, which then tells of the change; a photo already gone counts as deleted; one MediaStore
  * refuses for no reason of ownership is not, with no crash. Another app's photo: from Android 11 Pix does not ask, and
@@ -61,12 +63,17 @@ class PhonePhotosTest {
         val path: String? = "Pictures/Pix/",
     )
 
-    /** Answers each query with [rows], and records what was asked and deleted. */
+    /**
+     * Answers each query with [rows], or, asked by owner, with that owner's rows, and records what was asked and
+     * deleted. With [hidesUnseenOwners], as Android 14's MediaStore does, a query that names the owner leaves out the
+     * rows of every app but Pix, which Pix cannot see.
+     */
     class FakeMediaStore : ContentProvider() {
-        class Query(val uri: Uri, val selection: String?, val args: List<String>)
+        class Query(val uri: Uri, val projection: List<String>, val selection: String?, val args: List<String>)
 
         var rows: List<Row> = emptyList()
         var fails = false
+        var hidesUnseenOwners = false
 
         /** Refuses every delete for a reason that is not the photo's owner, as a provider gone wrong does. */
         var refusesDelete = false
@@ -89,18 +96,31 @@ class PhonePhotosTest {
             sortOrder: String?,
         ): Cursor {
             if (fails) throw IllegalStateException("MediaStore is gone")
-            queries += Query(uri, selection, args.orEmpty().toList())
-            val columns = arrayOf(
-                MediaStore.MediaColumns._ID,
-                MediaStore.MediaColumns.DATE_TAKEN,
-                MediaStore.MediaColumns.DATE_ADDED,
-                MediaStore.MediaColumns.OWNER_PACKAGE_NAME,
-                MediaStore.MediaColumns.BUCKET_ID,
-                MediaStore.MediaColumns.BUCKET_DISPLAY_NAME,
-                MediaStore.MediaColumns.RELATIVE_PATH,
-            )
-            return MatrixCursor(columns).apply {
-                rows.forEach { addRow(arrayOf(it.id, it.taken, it.added, it.owner, it.bucket, it.bucketName, it.path)) }
+            val columns = projection.orEmpty().toList()
+            queries += Query(uri, columns, selection, args.orEmpty().toList())
+            val owner = MediaStore.MediaColumns.OWNER_PACKAGE_NAME
+            val byOwner = selection.orEmpty().contains("$owner = ?")
+            val namesOwner = byOwner || owner in columns
+            val answered = rows
+                .filter { !byOwner || it.owner == args!!.first() }
+                .filter { !(namesOwner && hidesUnseenOwners) || it.owner == PIX }
+            return MatrixCursor(columns.toTypedArray()).apply {
+                answered.forEach { row ->
+                    addRow(
+                        columns.map { column ->
+                            when (column) {
+                                MediaStore.MediaColumns._ID -> row.id
+                                MediaStore.MediaColumns.DATE_TAKEN -> row.taken
+                                MediaStore.MediaColumns.DATE_ADDED -> row.added
+                                owner -> row.owner
+                                MediaStore.MediaColumns.BUCKET_ID -> row.bucket
+                                MediaStore.MediaColumns.BUCKET_DISPLAY_NAME -> row.bucketName
+                                MediaStore.MediaColumns.RELATIVE_PATH -> row.path
+                                else -> null
+                            }
+                        }.toTypedArray(),
+                    )
+                }
             }
         }
 
@@ -187,6 +207,29 @@ class PhonePhotosTest {
         assertFalse(query.selection, query.selection!!.contains(MediaStore.MediaColumns.RELATIVE_PATH))
         // Only a published photo: one still pending has no bytes to show yet.
         assertTrue(query.selection, query.selection!!.contains("${MediaStore.MediaColumns.IS_PENDING} = 0"))
+    }
+
+    @Test
+    fun `on Android 14 every app's photo shows, though a query naming the owner would hide them`() = runTest {
+        store.hidesUnseenOwners = true
+        store.rows = listOf(
+            Row(10, 1_000, 1),
+            Row(11, 2_000, 2, owner = "com.example.camera"),
+            Row(12, 3_000, 3, owner = null),
+        )
+
+        val photos = photos()
+
+        assertEquals(listOf(photo(10), photo(11), photo(12)), photos.photos.value)
+        // The photos' query names no owner; Pix's own are asked for apart, by Pix's package.
+        val read = store.queries.last()
+        assertFalse(read.projection.toString(), MediaStore.MediaColumns.OWNER_PACKAGE_NAME in read.projection)
+        assertFalse(read.selection, read.selection!!.contains(MediaStore.MediaColumns.OWNER_PACKAGE_NAME))
+        assertTrue(store.queries.any { it.args == listOf(PIX) })
+        // Pix asks before deleting its own, and leaves another's to Android's question.
+        assertTrue(photos.asksFirst(photo(10)))
+        assertFalse(photos.asksFirst(photo(11)))
+        assertFalse(photos.asksFirst(photo(12)))
     }
 
     @Test

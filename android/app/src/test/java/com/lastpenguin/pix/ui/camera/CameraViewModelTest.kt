@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.app.PendingIntent
@@ -560,12 +560,17 @@ class CameraViewModelTest {
             assertEquals(GalleryTab.PHOTOS, shooting.uiState.value.galleryTab)
             assertNull(shooting.uiState.value.album)
 
-            // An album whose photos are all deleted goes, and the albums show again.
+            // An album whose last photo is deleted from its page goes, with that photo: the albums show again, not the
+            // photo's place among all the phone's.
             shooting.chooseGalleryTab(GalleryTab.ALBUMS)
             shooting.openAlbum("s")
+            shooting.pickPhoto(photo(11))
+            assertEquals(photo(11), shooting.uiState.value.pickedPhoto)
             shooting.deletePhoto(photo(11))
             runCurrent()
             assertNull(shooting.uiState.value.album)
+            assertNull(shooting.uiState.value.pickedPhoto)
+            assertTrue(shooting.uiState.value.photosOpen)
             assertTrue(shooting.uiState.value.albumsShown)
             assertEquals(listOf("c"), shooting.uiState.value.photoAlbums.map { it.id })
         }

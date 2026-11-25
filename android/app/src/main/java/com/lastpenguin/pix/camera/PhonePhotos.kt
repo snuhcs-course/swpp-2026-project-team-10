@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park
 package com.lastpenguin.pix.camera
 
 import android.Manifest
@@ -225,13 +225,15 @@ class PhonePhotos(
     private class Found(val photos: List<Uri>, val albums: List<PhoneAlbum>, val others: Set<Uri>)
 
     private fun read(): Found = try {
+        val own = ownIds()
+        // Read without the owner: from Android 14 a query that asks for it, in its columns or its selection, leaves
+        // out every photo whose app Pix cannot see (package visibility), even with the photo permission.
         resolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             arrayOf(
                 MediaStore.MediaColumns._ID,
                 MediaStore.MediaColumns.DATE_TAKEN,
                 MediaStore.MediaColumns.DATE_ADDED,
-                MediaStore.MediaColumns.OWNER_PACKAGE_NAME,
                 MediaStore.MediaColumns.BUCKET_ID,
                 MediaStore.MediaColumns.BUCKET_DISPLAY_NAME,
                 MediaStore.MediaColumns.RELATIVE_PATH,
@@ -245,7 +247,6 @@ class PhonePhotos(
             val id = rows.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
             val taken = rows.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_TAKEN)
             val added = rows.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
-            val owner = rows.getColumnIndexOrThrow(MediaStore.MediaColumns.OWNER_PACKAGE_NAME)
             val bucket = rows.getColumnIndexOrThrow(MediaStore.MediaColumns.BUCKET_ID)
             val bucketName = rows.getColumnIndexOrThrow(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME)
             val path = rows.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
@@ -257,7 +258,7 @@ class PhonePhotos(
                 val folder = rows.getString(bucket)?.let {
                     Folder(it, rows.getString(bucketName), rows.getString(path))
                 }
-                read += Read(uri, rows.getLong(id), at, rows.getString(owner) == ownPackage, folder)
+                read += Read(uri, rows.getLong(id), at, rows.getLong(id) in own, folder)
             }
             read.sortWith(compareBy(Read::at, Read::id))
             Found(
@@ -270,6 +271,27 @@ class PhonePhotos(
         // A provider that refuses or is gone leaves the placeholder, not a crash; the next change reads again.
         Log.w(TAG, "The photos could not be read", error)
         Found(emptyList(), emptyList(), emptySet())
+    }
+
+    /**
+     * The ids of the photos Pix saved, which Pix deletes after its own question; another app's go to Android's. Asked
+     * apart, by Pix's own package, which Pix always sees, so the photos' own query names no owner. None when the
+     * provider refuses: every photo is then another's, and Android asks before any delete.
+     */
+    private fun ownIds(): Set<Long> = try {
+        resolver.query(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            arrayOf(MediaStore.MediaColumns._ID),
+            "${MediaStore.MediaColumns.OWNER_PACKAGE_NAME} = ?",
+            arrayOf(ownPackage),
+            null,
+        )?.use { rows ->
+            val id = rows.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+            buildSet { while (rows.moveToNext()) add(rows.getLong(id)) }
+        }.orEmpty()
+    } catch (error: Exception) {
+        Log.w(TAG, "Pix's own photos could not be told apart", error)
+        emptySet()
     }
 
     /**

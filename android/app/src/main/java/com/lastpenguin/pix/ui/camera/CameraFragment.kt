@@ -17,12 +17,12 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
@@ -31,6 +31,7 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.RequiresApi
 import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.camera.view.PreviewView
 import androidx.core.animation.doOnEnd
@@ -54,6 +55,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraFacing
@@ -64,11 +67,13 @@ import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.GuideState
-import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.Motion
+import com.lastpenguin.pix.ui.NoticeAction
+import com.lastpenguin.pix.ui.NoticeAnchor
+import com.lastpenguin.pix.ui.NoticeLength
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.fadeTo
 import com.lastpenguin.pix.ui.generation.GenerationUiState
@@ -82,7 +87,10 @@ import com.lastpenguin.pix.ui.settings.TutorialFragment
 import com.lastpenguin.pix.ui.settings.followLook
 import com.lastpenguin.pix.ui.settings.renderLatency
 import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
+import com.lastpenguin.pix.ui.showNotice
+import com.lastpenguin.pix.ui.showNoticeOnScreen
 import java.text.DecimalFormat
+import java.util.EnumMap
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
@@ -93,7 +101,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /** Camera screen. Guide gestures belong to #6; the scene photo for poses belongs to #7; live session UI belongs to #8. */
-class CameraFragment : Fragment(R.layout.fragment_camera) {
+class CameraFragment :
+    Fragment(R.layout.fragment_camera),
+    NoticeAnchor {
 
     private val viewModel: CameraViewModel by viewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
@@ -105,6 +115,10 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var menuBack: OnBackPressedCallback? = null
     private var photosBack: OnBackPressedCallback? = null
     private var photoViewer: PhotoViewer? = null
+    private var endSessionDialog: AlertDialog? = null
+
+    /** Remove guide's notice, while its Undo can still put the guide back (#298). */
+    private var undoNotice: Snackbar? = null
     private var permissionRequested = false
     private val zoomFormat = DecimalFormat("0.0")
     private var pinchZoom: PinchZoomController? = null
@@ -117,8 +131,11 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     private var previewLogged = false
     private var noticeJob: Job? = null
 
-    /** The text of a notice shown without a time of its own ([holdNotice]), until it is let go. */
-    private var heldNotice: String? = null
+    /** The notices shown without a time of their own ([holdNotice]), each until it is let go. */
+    private val heldNotices = EnumMap<HeldNotice, String>(HeldNotice::class.java)
+
+    /** The held notice that shows: the first of [HeldNotice] that is held. */
+    private val heldNotice: String? get() = HeldNotice.entries.firstNotNullOfOrNull { heldNotices[it] }
 
     /** The notice that the subject left or dropped, while it shows; a photo not sent waits for it (#238). */
     private var peerGoneNotice: Job? = null
@@ -266,6 +283,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // The flash button shows only while the scene photo is taken, and turns the phone's light on and off (FR-4.1).
         controls.flashButton.setOnClickListener { generationViewModel.toggleLight() }
         setupMenu(controls)
+        // The bar's pill keeps its line beside the bar's icons at every font size (#298).
+        capPillText(controls.shootTogetherButton)
+        capPillText(controls.endSessionButton)
         // The ratios open under the top bar (FR-1.13); a touch anywhere else closes them (setupTip), and so does Back.
         controls.aspectButton.setOnClickListener {
             viewModel.setAspectsOpen(!viewModel.uiState.value.aspectsOpen)
@@ -373,7 +393,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
             viewModel.setGuideEditing(!viewModel.uiState.value.guideEditing)
             showPinchMode(controls, viewModel.uiState.value.guideEditing)
         }
-        controls.endSessionButton.setOnClickListener { sessionViewModel.leave() }
+        controls.endSessionButton.setOnClickListener { confirmEndSession() }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -398,8 +418,17 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                     }
                 }
                 launch {
+                    viewModel.guideRemoved.collect {
+                        undoNotice = showNoticeOnScreen(
+                            getString(R.string.guide_removed_from_camera),
+                            NoticeLength.UNDO,
+                            NoticeAction(R.string.undo) { viewModel.onUndoRemoveGuide() },
+                        )
+                    }
+                }
+                launch {
                     viewModel.photoNotDeleted.collect {
-                        Toast.makeText(requireContext(), R.string.photo_not_deleted, Toast.LENGTH_SHORT).show()
+                        showNotice(R.string.photo_not_deleted)
                     }
                 }
                 // The guide in the settings' color and thickness (FR-3.10).
@@ -450,6 +479,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                         val live = connected != null || state is SessionState.Reconnecting
                         renderLiveDot(controls, connected)
                         if (connected != null) takeDownPeerGoneNotice(controls)
+                        // Nothing is left to end once the subject has gone.
+                        if (!live) dismissEndSession()
                         // The scene photo's top bar has only Back, the light, the ratio, its title, and Use.
                         controls.endSessionButton.isVisible = live && !isScenePhotoActive()
                         controls.shootTogetherButton.isVisible = !live && !isScenePhotoActive()
@@ -516,9 +547,20 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                     // The subject's pinch is named from its first step to its end (#292); the ratio's notice replaces it.
                     sessionViewModel.subjectZooming.collect { name ->
                         if (name != null) {
-                            holdNotice(controls, getString(R.string.zoom_held_label, name))
+                            holdNotice(controls, HeldNotice.ZOOMING, getString(R.string.zoom_held_label, name))
                         } else {
-                            letHeldNoticeGo(controls)
+                            letHeldNoticeGo(controls, HeldNotice.ZOOMING)
+                        }
+                    }
+                }
+                launch {
+                    // A dropped link is named for as long as the session tries to restore it (#293); "… disconnected"
+                    // replaces it when the session gives up.
+                    sessionViewModel.reconnectingWith.collect { name ->
+                        if (name != null) {
+                            holdNotice(controls, HeldNotice.RECONNECTING, getString(R.string.peer_reconnecting, name))
+                        } else {
+                            letHeldNoticeGo(controls, HeldNotice.RECONNECTING)
                         }
                     }
                 }
@@ -547,12 +589,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                     viewModel.guideSaveNotices.collect { notice ->
                         val text = when (notice) {
                             GuideSaveNotice.SAVED -> getString(R.string.guide_saved_notice)
-
-                            GuideSaveNotice.SAVED_OLDEST_REMOVED ->
-                                getString(R.string.guide_saved_oldest_removed_notice, SavedGuideStore.MAX_SAVED)
-
                             GuideSaveNotice.REMOVED -> getString(R.string.guide_removed_notice)
-
                             GuideSaveNotice.FAILED -> getString(R.string.guide_save_failed_notice)
                         }
                         showToggleLabel(controls, text, guideSaveIcon(notice), guideSaveTint(notice))
@@ -638,6 +675,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
     }
 
     override fun onDestroyView() {
+        dismissEndSession()
+        dismissUndo()
         photoViewer?.stop()
         photoViewer = null
         photosBack = null
@@ -956,6 +995,8 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
     private fun render(state: CameraUiState) {
         val controls = binding ?: return
+        // Undo has nothing to put back once a guide is on the camera, the removed one or another (#298).
+        if (state.guide != null) dismissUndo()
         val granted = hasCameraPermission()
         val ready = granted && state.cameraStatus == CameraStatus.READY
         val unavailable = state.cameraStatus == CameraStatus.UNAVAILABLE
@@ -988,11 +1029,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.hideGuideButton.contentDescription =
             getString(if (hidden) R.string.show_guide else R.string.hide_guide)
         controls.hideGuideButton.isEnabled = guideEditable
-        // Save guide (FR-3.8): filled once saved; another tap takes it out of the saved guides again.
+        // Save guide (FR-3.8): a ♥, filled red once a favorite (#297); another tap takes it out of Favorites again.
         setIconOnce(
             controls.saveGuideButton,
-            if (state.guideSaved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
+            if (state.guideSaved) R.drawable.ic_heart_filled else R.drawable.ic_heart,
         )
+        controls.saveGuideButton.iconTint = requireContext().getColorStateList(saveGuideTint(state.guideSaved))
         controls.saveGuideButton.contentDescription =
             getString(if (state.guideSaved) R.string.guide_saved else R.string.save_guide)
         controls.saveGuideButton.isEnabled = guideEditable && !state.savingGuide
@@ -1533,6 +1575,17 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
     }
 
+    /**
+     * The top bar's pill, *Shoot together* or *End session*, whose label grows with the phone's font only up to
+     * [PILL_MAX_FONT_SCALE]: larger, it would reach the ratio and the camera menu's icons, at 200 % (#298, #272).
+     */
+    private fun capPillText(pill: TextView) {
+        val scale = resources.configuration.fontScale
+        if (scale > PILL_MAX_FONT_SCALE) {
+            pill.setTextSize(TypedValue.COMPLEX_UNIT_PX, pill.textSize / scale * PILL_MAX_FONT_SCALE)
+        }
+    }
+
     /** What a choice in the camera menu changed, in its notice (FR-1.17). */
     private fun menuNoticeText(notice: MenuNotice): String = when (notice) {
         is MenuNotice.Flash -> getString(flashDescription(notice.mode))
@@ -1981,6 +2034,33 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         }
     }
 
+    /** Asks before ending the session, as Subject view's Leave and Back do (#298): the subject's view closes for good. */
+    private fun confirmEndSession() {
+        if (endSessionDialog?.isShowing == true) return
+        endSessionDialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.end_session_title)
+            .setPositiveButton(R.string.end_session) { _, _ ->
+                val state = sessionViewModel.state.value
+                if (state is SessionState.Connected || state is SessionState.Reconnecting) sessionViewModel.leave()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun dismissEndSession() {
+        endSessionDialog?.dismiss()
+        endSessionDialog = null
+    }
+
+    private fun dismissUndo() {
+        undoNotice?.dismiss()
+        undoNotice = null
+    }
+
+    /** Notices sit above the zoom row, clear of the shutter and the controls under the image (#298). */
+    override val noticeAnchor: View?
+        get() = binding?.let { if (it.zoomRow.isShown) it.zoomRow else it.bottomPanel }
+
     /** Over the guide-edit mode toggle for [CameraViewModel.NOTICE_MS]: what a pinch moves now (Design 2.8). */
     private fun showPinchMode(controls: FragmentCameraBinding, guide: Boolean) {
         showPinchModeLabel(controls.pinchModeLabel, guide)
@@ -2002,29 +2082,36 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         noticeJob?.cancel()
         return viewLifecycleOwner.lifecycleScope.launch {
             delay(durationMs)
-            // A pinch of the subject's that still goes on has its line back, which this notice took the place of.
+            // What still goes on, a wait for the link or the subject's pinch, has its line back, which this notice
+            // took the place of.
             val held = heldNotice
             if (held != null) controls.noticeText.text = held else controls.noticeText.isVisible = false
         }.also { noticeJob = it }
     }
 
     /**
-     * A notice that stays while what it says goes on, as while the subject pinches (#292): it has no time of its own,
-     * and goes with [letHeldNoticeGo] or when another notice takes its place.
+     * A notice that stays while what it says goes on, as while the subject pinches (#292) or the link is tried again
+     * (#293): it has no time of its own, and goes with [letHeldNoticeGo] or when another notice takes its place. One
+     * that comes later in [HeldNotice] waits under an earlier one.
      */
-    private fun holdNotice(controls: FragmentCameraBinding, text: String) {
+    private fun holdNotice(controls: FragmentCameraBinding, kind: HeldNotice, text: String) {
+        heldNotices[kind] = text
+        if (HeldNotice.entries.first { it in heldNotices } != kind) return
         controls.noticeText.text = text
         controls.noticeText.isVisible = true
         noticeJob?.cancel()
-        heldNotice = text
     }
 
-    /** What the held notice said is over: it goes, unless another notice has taken its place and keeps its own time. */
-    private fun letHeldNoticeGo(controls: FragmentCameraBinding) {
-        val held = heldNotice ?: return
-        heldNotice = null
-        if (noticeJob?.isActive == true || controls.noticeText.text.toString() != held) return
-        controls.noticeText.isVisible = false
+    /**
+     * What a held notice said is over: it goes, and one that waited under it shows, unless another notice has taken its
+     * place and keeps its own time.
+     */
+    private fun letHeldNoticeGo(controls: FragmentCameraBinding, kind: HeldNotice) {
+        val shown = heldNotice
+        heldNotices.remove(kind) ?: return
+        if (noticeJob?.isActive == true || controls.noticeText.text.toString() != shown) return
+        val next = heldNotice
+        if (next != null) controls.noticeText.text = next else controls.noticeText.isVisible = false
     }
 
     /** The subject is back before the notice that it left ended, so the notice no longer holds. */
@@ -2047,6 +2134,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         viewModel.openPhotos()
     }
 
+    /** What a notice without a time of its own says, the one that shows first when several are held. */
+    private enum class HeldNotice { RECONNECTING, ZOOMING }
+
     companion object {
         private const val PERMISSION_REQUESTED = "camera.permissionRequested"
         private const val STILL_TIMEOUT_MS = 2_000L
@@ -2060,6 +2150,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
 
         /** The controls that wait while the timer counts down, dimmed this much (FR-1.17). */
         private const val COUNTDOWN_DIM = 0.35f
+
+        /** The largest font scale the top bar's pill follows (capPillText). */
+        private const val PILL_MAX_FONT_SCALE = 1.3f
 
         /** The pose flow's step while the scene photo is framed, and while the photo taken is held (FlowProgressView, #210). */
         private const val SCENE_STEP = 1

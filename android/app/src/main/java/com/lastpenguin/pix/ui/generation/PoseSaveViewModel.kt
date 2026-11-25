@@ -1,16 +1,14 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lastpenguin.pix.guide.GuideSource
-import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.generation.PoseLibrary
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.NoPersonFoundException
 import com.lastpenguin.pix.guide.ReferenceGuide
-import com.lastpenguin.pix.guide.ReferenceGuideMaker
 import com.lastpenguin.pix.guide.SavedGuideStore
-import com.lastpenguin.pix.guide.intoFrameHeldAt
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -26,7 +24,7 @@ import kotlinx.coroutines.launch
 /** A candidate of Pick a pose by its set and its pose: pose ids repeat in every set. */
 data class PoseKey(val setId: String, val poseId: String)
 
-/** A candidate's ♥ (FR-4.14): its guide being made and saved, or saved in the library as [guideId]. */
+/** A candidate's ♥ (FR-4.14): being marked, or a favorite in the library as [guideId]. */
 sealed interface Heart {
     data object Saving : Heart
 
@@ -35,10 +33,10 @@ sealed interface Heart {
 
 /** What a ♥ did (FR-4.14), shown as a short notice on Pick a pose. */
 enum class PoseSaveNotice {
+    /** The pose is a favorite now. */
     SAVED,
 
-    /** Saved, and the oldest saved guide was deleted to keep [SavedGuideStore.MAX_SAVED]. */
-    SAVED_OLDEST_REMOVED,
+    /** The pose is history again, still in the library (#297). */
     REMOVED,
 
     /** No person was found in the candidate, so nothing was saved. */
@@ -54,25 +52,23 @@ fun Map<PoseKey, Heart>.inSet(setId: String?): Map<String, Heart> =
     entries.filter { it.key.setId == setId }.associate { it.key.poseId to it.value }
 
 /**
- * The ♥ on both phones' Pick a pose (FR-4.14, Design 2.6.3): cuts the person out of a candidate on this phone, as *Use
- * this pose* does, and saves the guide to this phone's library as a generated pose; a tap on a filled heart deletes it
- * again. Shared by the activity, so a save goes on after the screen is left, and nothing of it is sent to the other
- * phone. A heart is filled while the library has its guide: one deleted there, or as the oldest, is empty again. A
- * candidate of a scene photo held sideways or upside down is saved turned back into the camera's portrait frame, as
- * *Use this pose* puts it on the camera, so the library opens it there too (Design 2.6.2, #206).
- * Owner: the library (#171).
+ * The ♥ on both phones' Pick a pose (FR-4.14, Design 2.6.3): marks the candidate's guide a favorite in this phone's
+ * library, and a tap on a filled heart makes it history again (#297). The guide is the one [library] keeps for the
+ * candidate, cut out once on this phone, as *Use this pose* uses it, so nothing is kept twice. Shared by the activity,
+ * so a ♥ goes on after the screen is left, and nothing of it is sent to the other phone. A heart is filled while the
+ * library has its guide as a favorite: one deleted there, or no longer a favorite, is empty again. The guide of a scene
+ * photo held sideways or upside down is kept turned back into the camera's portrait frame, as *Use this pose* puts it
+ * on the camera, so the library opens it there too (Design 2.6.2, #206), with the set's situation (#270).
+ * Owner: the library (#171, #297).
  */
-class PoseSaveViewModel(private val maker: ReferenceGuideMaker, private val store: SavedGuideStore) : ViewModel() {
+class PoseSaveViewModel(private val library: PoseLibrary, private val store: SavedGuideStore) : ViewModel() {
 
     private val marked = MutableStateFlow<Map<PoseKey, Heart>>(emptyMap())
 
-    /** The guides the hearts saved, for *Use this pose*: only the latest set's are kept. */
-    private val made = mutableMapOf<PoseKey, ReferenceGuide>()
-
     /** Each candidate's heart; a candidate without one has an empty heart. */
     val hearts: StateFlow<Map<PoseKey, Heart>> = combine(marked, store.saved) { hearts, saved ->
-        val kept = saved.mapTo(HashSet()) { it.id }
-        hearts.filterValues { it !is Heart.Saved || it.guideId in kept }
+        val favorites = saved.filter { it.favorite }.mapTo(HashSet()) { it.id }
+        hearts.filterValues { it !is Heart.Saved || it.guideId in favorites }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     private val _results = Channel<PoseSaveResult>(Channel.BUFFERED)
@@ -81,47 +77,46 @@ class PoseSaveViewModel(private val maker: ReferenceGuideMaker, private val stor
     val results: Flow<PoseSaveResult> = _results.receiveAsFlow()
 
     /**
-     * The ♥ on the candidate [key], whose image is [image], of a scene photo held at [turn] (`PhoneTurns`): saves it, or
-     * deletes it once saved; ignored while saving.
+     * The ♥ on the candidate [key], whose image is [image], of a scene photo held at [turn] (`PhoneTurns`) for
+     * [situation]: marks it a favorite, or history again once it is one; ignored while marking.
      */
-    fun toggle(key: PoseKey, image: Bitmap, turn: Int = 0) {
+    fun toggle(key: PoseKey, image: Bitmap, turn: Int = 0, situation: Situation? = null) {
         when (val heart = heartOf(key)) {
             Heart.Saving -> Unit
-            is Heart.Saved -> remove(key, heart.guideId)
-            null -> save(key, image, turn)
+            is Heart.Saved -> unmark(key, heart.guideId)
+            null -> mark(key, image, turn, situation)
         }
     }
 
     /**
-     * The guide the ♥ on [key] saved, while the library still has it: *Use this pose* goes on with it, so the person is
-     * not cut out again and *Save guide* finds it saved. It is the guide as cut from the candidate, which Reference
-     * confirm shows on it and *Use this pose* turns back as the library has it.
+     * The guide the library keeps for [key], whose image is [image], waited for while it is cut out: *Use this pose*
+     * goes on with it, so the person is not cut out again and *Save guide* finds it kept. It is the guide as cut from
+     * the candidate, which Reference confirm shows on it and *Use this pose* turns back as the library has it.
      */
-    fun savedGuide(key: PoseKey): ReferenceGuide? {
-        val heart = heartOf(key) as? Heart.Saved ?: return null
-        return made[key]?.takeIf { it.id == heart.guideId }
-    }
+    suspend fun keptGuide(
+        key: PoseKey,
+        image: Bitmap,
+        turn: Int = 0,
+        situation: Situation? = null,
+    ): Result<ReferenceGuide> =
+        library.keep(key.setId, key.poseId, image, turn, situation).await().map { it.cut }
 
     /** [key]'s heart now, as [hearts] has it a moment later: a second tap must see the first one's. */
     private fun heartOf(key: PoseKey): Heart? {
         val heart = marked.value[key]
-        return if (heart is Heart.Saved && store.saved.value.none { it.id == heart.guideId }) null else heart
+        val gone = heart is Heart.Saved && store.saved.value.none { it.id == heart.guideId && it.favorite }
+        return if (gone) null else heart
     }
 
-    private fun save(key: PoseKey, image: Bitmap, turn: Int) {
-        // A new set's candidates cannot reach the earlier ones', so their guides are let go.
-        made.keys.removeAll { it.setId != key.setId }
+    private fun mark(key: PoseKey, image: Bitmap, turn: Int, situation: Situation?) {
         marked.update { hearts -> hearts.filterKeys { it.setId == key.setId } + (key to Heart.Saving) }
         viewModelScope.launch {
             val notice = try {
-                val guide = maker.make(image, GuideSource.GENERATED).getOrThrow()
-                // Whether the oldest was deleted comes from the save itself: two hearts saved at once with 99 kept
-                // both see room beforehand, yet the second one's save deletes the oldest.
-                // As it goes on the camera: a later *Use* in the library lays it where it lay on the preview.
-                val saved = store.save(guide.intoFrameHeldAt(turn), GuideState(guideId = guide.id)).getOrThrow()
-                made[key] = guide
-                marked.update { it + (key to Heart.Saved(guide.id)) }
-                if (saved.removedOldest) PoseSaveNotice.SAVED_OLDEST_REMOVED else PoseSaveNotice.SAVED
+                val kept = library.keep(key.setId, key.poseId, image, turn, situation).await().getOrThrow()
+                check(kept.stored) { "The library could not keep the pose" }
+                store.setFavorite(kept.saved.id, true).getOrThrow()
+                marked.update { it + (key to Heart.Saved(kept.saved.id)) }
+                PoseSaveNotice.SAVED
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -132,12 +127,18 @@ class PoseSaveViewModel(private val maker: ReferenceGuideMaker, private val stor
         }
     }
 
-    private fun remove(key: PoseKey, guideId: String) {
-        marked.update { it - key }
-        made.remove(key)
+    /** Empties the heart at once; one the storage could not change is filled again, and says it failed. */
+    private fun unmark(key: PoseKey, guideId: String) {
+        marked.update { it + (key to Heart.Saving) }
         viewModelScope.launch {
-            store.delete(guideId)
-            _results.send(PoseSaveResult(key.setId, PoseSaveNotice.REMOVED))
+            val notice = if (store.setFavorite(guideId, false).isSuccess) {
+                marked.update { it - key }
+                PoseSaveNotice.REMOVED
+            } else {
+                marked.update { it + (key to Heart.Saved(guideId)) }
+                PoseSaveNotice.FAILED
+            }
+            _results.send(PoseSaveResult(key.setId, notice))
         }
     }
 }

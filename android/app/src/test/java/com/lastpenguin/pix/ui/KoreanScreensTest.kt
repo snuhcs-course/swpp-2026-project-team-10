@@ -40,6 +40,7 @@ import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
 import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationError
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.TipSource
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
@@ -366,6 +367,22 @@ class KoreanScreensTest {
     }
 
     @Test
+    fun camera_whileTheLinkReconnects_isInKorean() {
+        val modules = camera()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        idle()
+        modules.session.setState(
+            SessionState.Reconnecting("s1", 0L, peer = PeerInfo("Test Account 2"), role = Role.PHOTOGRAPHER),
+        )
+        idle()
+        val root = screen()
+        val notice = FragmentCameraBinding.bind(root).noticeText
+        assertEquals(true, notice.isShown)
+        assertEquals(root.context.getString(R.string.peer_reconnecting, "Test Account 2"), notice.text.toString())
+        assertKorean(root, *people)
+    }
+
+    @Test
     fun camera_inASessionWhileTheSubjectPinches_isInKorean() {
         val modules = camera()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
@@ -405,6 +422,32 @@ class KoreanScreensTest {
             modules.saved.save(guide().copy(id = "guide-2", source = GuideSource.GENERATED), GuideState())
         }
         scenario = launchPrepared<LibraryFragment>(R.id.libraryFragment) {}.first
+        assertKorean(screen())
+    }
+
+    @Test
+    fun library_withSituationsAndAMemo_isInKorean() {
+        val modules = TestAppContainer().install()
+        runBlocking {
+            modules.saved.save(guide(), GuideState(guideId = "guide-1"))
+            modules.saved.setMemo("guide-1", "해변에서 엄마와 함께 찍은 사진")
+            val pose = guide().copy(id = "guide-2", source = GuideSource.GENERATED, situation = Situation.FULL_BODY)
+            modules.saved.save(pose, GuideState())
+        }
+        scenario = launchPrepared<LibraryFragment>(R.id.libraryFragment) {}.first
+        assertKorean(screen())
+    }
+
+    @Test
+    fun library_selectingWithAFavorite_isInKorean() {
+        val modules = TestAppContainer().install()
+        runBlocking {
+            modules.saved.save(guide(), GuideState(guideId = "guide-1"), favorite = false)
+            modules.saved.save(guide().copy(id = "guide-2", source = GuideSource.GENERATED), GuideState())
+        }
+        scenario = launchPrepared<LibraryFragment>(R.id.libraryFragment) {
+            it.viewModel<ReferenceViewModel>().onStartSelecting("guide-1")
+        }.first
         assertKorean(screen())
     }
 

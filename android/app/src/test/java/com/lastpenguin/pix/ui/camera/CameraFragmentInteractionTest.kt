@@ -39,6 +39,7 @@ import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.IcePath
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.RtcSessionManager
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.session.shoot
@@ -46,6 +47,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
@@ -68,14 +70,13 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowChoreographer
 import org.robolectric.shadows.ShadowDialog
-import org.robolectric.shadows.ShadowToast
 
 /*
  * The Camera screen's interactions, beyond the render paths of CameraFragmentRenderTest (R&S 6.2, 6.3; FR-1.4, FR-1.5,
  * FR-1.7, FR-3.9, FR-4.1, FR-6.8, FR-7.1–7.4): the permission flow (denied, kept across a recreation, the request's
  * answer binding the camera; Open settings and Try again); the clicks that navigate (Add a guide, Shoot together, Use
  * this photo, which opens nothing for a photo without a person) and system back during the scene photo step; End
- * session; the gallery button: outside a session the album's newest, which opens Pix's album in Pix's viewer at the
+ * session, which asks first (#298): confirmed, cancelled, and the question gone once the subject left; the gallery button: outside a session the album's newest, which opens Pix's album in Pix's viewer at the
  * newest, a swipe to an older one and a tap on the strip of thumbnails, and system Back, and a photo just taken there
  * at once; a photo deleted there, once asked, leaves it and the thumbnail, and one that cannot be deleted stays with a
  * notice; in a session as the
@@ -89,7 +90,8 @@ import org.robolectric.shadows.ShadowToast
  * *Hide at the side* and its tap on a hidden one, another guide; hidden while enlarged, the small strip, and small when
  * it is back); the sliders, a pinch, a tap to focus, and the ratio button with its ratios (opened by the button, closed
  * by a choice, the button, a touch elsewhere, and Back; the ratio the camera has changing nothing); the preview's
- * stream state; *Save guide* (FR-3.8): a guide not saved, then saved, and a second tap that removes it; its icon kept
+ * stream state; *Save guide* (FR-3.8): a guide not saved (an empty ♥), then saved (filled red), and a second tap that
+ * empties it; its icon kept
  * while other state changes. Design 2.8's controls: the brightness bar beside the focus box after a tap to focus (its
  * place, a drag up and down, kept up while held, gone after the idle time), on the right and, near the image's right
  * edge, on the left; the focus box staying while the bar is up, held or not, both whole until the idle time and both
@@ -102,6 +104,9 @@ import org.robolectric.shadows.ShadowToast
  * held under a finger, where nothing moves.
  * The subject's pinch (#292): who is zooming from its first step, for as long as it, replaced by the ratio's notice;
  * taken back, the line goes after a little; another notice meanwhile keeps its own time, and the line is back after it.
+ * A dropped link (#293, FR-6.12): who the phone reconnects with, for the whole wait, gone when the link is back;
+ * replaced by "… disconnected" when the wait ends, and not back after it; another notice meanwhile keeps its own time,
+ * and the line is back after it; a drop during the subject's pinch, where the pinch's end must not take the line down.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -474,6 +479,110 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
     }
 
+    /** The photographer's drop as the session says it: with the subject's name and this phone's role (#293). */
+    private val dropped =
+        SessionState.Reconnecting("s1", 0L, peer = PeerInfo("Joonhyung"), role = Role.PHOTOGRAPHER)
+
+    @Test
+    fun aDroppedLink_saysWhoThePhoneReconnectsWith_forTheWholeWait_untilTheLinkIsBack() {
+        val modules = launch(FakeCameraController())
+        val connected = SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER)
+        modules.session.setState(connected)
+        idle()
+        idleFor(CameraViewModel.NOTICE_MS)
+
+        modules.session.setState(dropped)
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.peer_reconnecting, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+        // Far beyond a notice's own time: it stays as long as the session tries.
+        idleFor(RtcSessionManager.RECONNECT_BUDGET_MS - 1_000)
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.peer_reconnecting, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+
+        modules.session.setState(connected)
+        idle()
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+    }
+
+    @Test
+    fun aLinkThatStaysDown_saysDisconnected_inPlaceOfTheReconnectingLine() {
+        val modules = launch(FakeCameraController())
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        idleFor(CameraViewModel.NOTICE_MS)
+        modules.session.setState(dropped)
+        idle()
+
+        // The session gives the wait up as it does: the subject is gone, then the room waits again.
+        modules.session.deliver(SessionMessage.Leave(EndReason.CONNECTION_LOST))
+        modules.session.setState(SessionState.Waiting("482915"))
+        idle()
+
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.peer_disconnected, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+        idleFor(CameraViewModel.PEER_GONE_NOTICE_MS + 100)
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+    }
+
+    @Test
+    fun anotherNoticeDuringTheWait_keepsItsOwnTime_andThenTheReconnectingLineIsBack() {
+        val modules = launch()
+        onScreen { _, fragment -> fragment.requireActivity().viewModel<SessionViewModel>().startRoom() }
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        idleFor(CameraViewModel.NOTICE_MS)
+        modules.session.setState(dropped)
+        idle()
+
+        // A photo taken meanwhile that cannot be read is not sent, and says so.
+        modules.photos.shoot(Uri.parse("content://media/external/images/media/1"), takenAt = 1)
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.session_photo_not_sent, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+        idleFor(CameraViewModel.NOTICE_MS + 100)
+
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.peer_reconnecting, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+    }
+
+    @Test
+    fun aDropDuringTheSubjectsPinch_keepsTheReconnectingLine_whenThePinchEndsWithIt() {
+        val modules = launch(FakeCameraController())
+        val connected = SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER)
+        modules.session.setState(connected)
+        idle()
+        idleFor(CameraViewModel.NOTICE_MS)
+        modules.session.deliver(SessionMessage.ZoomSet(1.5f, final = false))
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.zoom_held_label, "Joonhyung"), controls.noticeText.text.toString())
+        }
+
+        // The drop ends the pinch too, whose line going must not take this one down.
+        modules.session.setState(dropped)
+        idle()
+        idleFor(SessionViewModel.ZOOMING_LINGER_MS + 100)
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.peer_reconnecting, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+
+        modules.session.setState(connected)
+        idle()
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+    }
+
     @Test
     fun endSession_leaves_andTheSubjectsActionsAreNotices() {
         val camera = FakeCameraController(exposureRange = -4..4, hasFlash = true)
@@ -531,7 +640,53 @@ class CameraFragmentInteractionTest {
         idle()
         onScreen { controls, _ -> controls.endSessionButton.performClick() }
         idle()
+        assertEquals(emptyList<EndReason>(), modules.session.leaves)
+        endSessionQuestion().getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idle()
         assertEquals(listOf(EndReason.LEFT), modules.session.leaves)
+    }
+
+    @Test
+    fun endSession_cancelled_keepsTheSession() {
+        val modules = launch()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+
+        onScreen { controls, _ -> controls.endSessionButton.performClick() }
+        idle()
+        val question = endSessionQuestion()
+        assertEquals(
+            string(R.string.end_session_title),
+            question.findViewById<TextView>(androidx.appcompat.R.id.alertTitle)?.text.toString(),
+        )
+        question.getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
+        idle()
+
+        assertFalse(question.isShowing)
+        assertEquals(emptyList<EndReason>(), modules.session.leaves)
+        onScreen { controls, _ -> assertTrue(controls.endSessionButton.isVisible) }
+    }
+
+    @Test
+    fun endSessionQuestion_goesWhenTheSubjectLeavesFirst() {
+        val modules = launch()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        onScreen { controls, _ -> controls.endSessionButton.performClick() }
+        idle()
+        val question = endSessionQuestion()
+
+        modules.session.setState(SessionState.Waiting("123456"))
+        idle()
+
+        assertFalse(question.isShowing)
+        assertEquals(emptyList<EndReason>(), modules.session.leaves)
+    }
+
+    private fun endSessionQuestion(): AlertDialog {
+        val dialog = ShadowDialog.getLatestDialog() as AlertDialog
+        assertTrue(dialog.isShowing)
+        return dialog
     }
 
     // ---- The gallery button and capture failures ------------------------------------------
@@ -643,7 +798,7 @@ class CameraFragmentInteractionTest {
         idle()
         (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_POSITIVE).performClick()
         settleReads()
-        assertEquals(string(R.string.photo_not_deleted), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.photo_not_deleted), shownNotice())
         onScreen { controls, _ -> assertEquals(2, photoViewerOn(controls.root).stripCount()) }
 
         modules.deleteFails = false
@@ -971,12 +1126,14 @@ class CameraFragmentInteractionTest {
     // ---- Save guide --------------------------------------------------------------------
 
     @Test
-    fun saveGuide_fillsTheBookmarkAndSaysWhereItIs_andASecondTapRemovesIt() {
+    fun saveGuide_fillsTheHeartRedAndSaysWhereItIs_andASecondTapEmptiesIt() {
         val modules = launch()
         modules.guides.setGuide(guide())
         idle()
         onScreen { controls, _ ->
             assertEquals(string(R.string.save_guide), controls.saveGuideButton.contentDescription.toString())
+            assertEquals(R.drawable.ic_heart, shadowOf(controls.saveGuideButton.plainIcon).createdFromResId)
+            assertEquals(app.getColor(R.color.pix_text), controls.saveGuideButton.iconTint.defaultColor)
         }
 
         onScreen { controls, _ -> controls.saveGuideButton.performClick() }
@@ -985,6 +1142,9 @@ class CameraFragmentInteractionTest {
         assertEquals(listOf("guide-1"), modules.saved.saved.value.map { it.id })
         onScreen { controls, _ ->
             assertEquals(string(R.string.guide_saved), controls.saveGuideButton.contentDescription.toString())
+            // A ♥ filled red, as on Pick a pose and in the library (#297).
+            assertEquals(R.drawable.ic_heart_filled, shadowOf(controls.saveGuideButton.plainIcon).createdFromResId)
+            assertEquals(app.getColor(R.color.pix_heart), controls.saveGuideButton.iconTint.defaultColor)
             assertTrue(controls.toggleLabel.isShown)
             assertEquals(string(R.string.guide_saved_notice), controls.toggleLabel.text.toString())
         }
@@ -992,10 +1152,13 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ -> controls.saveGuideButton.performClick() }
         idle()
 
-        assertTrue(modules.saved.saved.value.isEmpty())
+        // History again, still in the library (#297).
+        assertEquals(listOf("guide-1" to false), modules.saved.saved.value.map { it.id to it.favorite })
         onScreen { controls, _ ->
             assertEquals(string(R.string.guide_removed_notice), controls.toggleLabel.text.toString())
             assertEquals(string(R.string.save_guide), controls.saveGuideButton.contentDescription.toString())
+            assertEquals(R.drawable.ic_heart, shadowOf(controls.saveGuideButton.plainIcon).createdFromResId)
+            assertEquals(app.getColor(R.color.pix_text), controls.saveGuideButton.iconTint.defaultColor)
         }
         shadowOf(Looper.getMainLooper()).idleFor(CameraViewModel.NOTICE_MS + 100, TimeUnit.MILLISECONDS)
         onScreen { controls, _ -> assertFalse(controls.toggleLabel.isShown) }

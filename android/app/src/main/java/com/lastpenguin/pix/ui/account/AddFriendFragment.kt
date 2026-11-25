@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-21, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.os.Bundle
@@ -6,7 +6,6 @@ import android.text.InputFilter
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import android.widget.Toast
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
@@ -21,7 +20,9 @@ import com.lastpenguin.pix.R
 import com.lastpenguin.pix.account.Relation
 import com.lastpenguin.pix.account.keepPixIdCharacters
 import com.lastpenguin.pix.databinding.FragmentAddFriendBinding
+import com.lastpenguin.pix.ui.NoticeLength
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.showNotice
 import kotlinx.coroutines.launch
 
 /**
@@ -54,12 +55,7 @@ class AddFriendFragment : Fragment(R.layout.fragment_add_friend) {
                 launch {
                     viewModel.events.collect { event ->
                         if (event is FriendsEvent.Failed) {
-                            Toast.makeText(
-                                requireContext(),
-                                requireContext().accountMessage(event.error),
-                                Toast.LENGTH_LONG,
-                            )
-                                .show()
+                            showNotice(requireContext().accountMessage(event.error), NoticeLength.LONG)
                         }
                     }
                 }

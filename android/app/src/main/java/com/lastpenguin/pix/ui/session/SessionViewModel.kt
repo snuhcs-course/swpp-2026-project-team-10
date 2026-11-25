@@ -86,7 +86,7 @@ sealed interface SessionNotice {
  */
 data class RemoteFocus(val x: Float, val y: Float)
 
-/** The subject's toast about a photo from the photographer (FR-6.14), on whichever screen of the session is in front. */
+/** The subject's notice about a photo from the photographer (FR-6.14), on whichever screen of the session is in front. */
 sealed interface PhotoNotice {
     data object Saved : PhotoNotice
 
@@ -155,6 +155,15 @@ class SessionViewModel(
      * longer, the time its last value may take to be applied.
      */
     val subjectZooming: StateFlow<String?> = _subjectZooming.asStateFlow()
+
+    private val _reconnectingWith = MutableStateFlow<String?>(null)
+
+    /**
+     * Photographer: the subject's name while the link that dropped is tried again (FR-6.12, #293), for Camera's line
+     * "Reconnecting with …". It has no time of its own: null again once the link is back or the session gave the
+     * wait up, which [SessionNotice.PeerGone] then says.
+     */
+    val reconnectingWith: StateFlow<String?> = _reconnectingWith.asStateFlow()
 
     private val _remoteFocus = MutableSharedFlow<RemoteFocus>(extraBufferCapacity = 16)
 
@@ -244,6 +253,7 @@ class SessionViewModel(
 
     /** Whether the last state was Connected, so another Connected of the same connection says nothing new. */
     private var wasConnected = false
+
     private var connectedJob: Job? = null
 
     /** When this session's last "set the focus" notice began, by [clock]; null before the first. */
@@ -409,6 +419,10 @@ class SessionViewModel(
         if (state !is SessionState.Connected && !reconnecting) _mobileDataPending.value = false
         val connected = state as? SessionState.Connected
         if (connected != null) peerName = connected.peer.displayName
+        // From the state alone, never from what an earlier Connected said: a state flow may never show this reader
+        // that Connected, and the name kept from it could then be another session's (#293).
+        val dropped = state as? SessionState.Reconnecting
+        _reconnectingWith.value = dropped?.peer?.displayName.takeIf { dropped?.role == Role.PHOTOGRAPHER }
         val inSession = state is SessionState.Connecting || connected != null || reconnecting
 
         // Frames start while the peer connection is still being set up, so the first video arrives sooner, and go on

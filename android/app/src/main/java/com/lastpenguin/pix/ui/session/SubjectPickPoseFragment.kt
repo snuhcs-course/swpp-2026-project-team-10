@@ -1,10 +1,9 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
 import android.os.Bundle
 import android.view.View
-import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -33,6 +32,7 @@ import com.lastpenguin.pix.ui.generation.inSet
 import com.lastpenguin.pix.ui.generation.setupPosePager
 import com.lastpenguin.pix.ui.generation.showPosePages
 import com.lastpenguin.pix.ui.generation.showPoseSaveNotice
+import com.lastpenguin.pix.ui.showNotice
 import kotlinx.coroutines.launch
 
 /**
@@ -73,14 +73,14 @@ class SubjectPickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
                         val ui = viewModel.uiState.value
                         if (end.setId != ui.setId) return@collect
                         poseSetEndNotice(requireContext(), end, ui.photographerName)?.let {
-                            Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show()
+                            showNotice(it)
                         }
                         backToSubject()
                     }
                 }
                 launch {
                     viewModel.pickFailed.collect {
-                        Toast.makeText(requireContext(), R.string.pose_pick_failed, Toast.LENGTH_SHORT).show()
+                        showNotice(R.string.pose_pick_failed)
                     }
                 }
                 launch {
@@ -99,7 +99,7 @@ class SubjectPickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         val ui = viewModel.uiState.value
         val setId = ui.setId ?: return
         val image = (slot.event as? CandidateEvent.Ready)?.image ?: return
-        saves.toggle(PoseKey(setId, slot.pose.id), image, ui.sceneTurn)
+        saves.toggle(PoseKey(setId, slot.pose.id), image, ui.sceneTurn, ui.situation)
     }
 
     private fun render(binding: FragmentPickPoseBinding, pages: PosePageAdapter, ui: SubjectPickUiState) {

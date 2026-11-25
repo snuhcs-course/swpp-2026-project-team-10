@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.account
 
 import android.Manifest
@@ -10,7 +10,6 @@ import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.IdRes
 import androidx.core.content.ContextCompat
@@ -35,9 +34,11 @@ import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.databinding.FragmentFriendsBinding
 import com.lastpenguin.pix.databinding.ItemFriendBinding
 import com.lastpenguin.pix.databinding.ItemFriendRequestBinding
+import com.lastpenguin.pix.ui.NoticeLength
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.session.InviteResult
 import com.lastpenguin.pix.ui.session.SessionViewModel
+import com.lastpenguin.pix.ui.showNotice
 import kotlinx.coroutines.launch
 
 /**
@@ -105,7 +106,7 @@ class FriendsFragment : Fragment(R.layout.fragment_friends) {
                             FriendsEvent.SignedOutByServer -> getString(R.string.signed_out_expired)
                             is FriendsEvent.Failed -> requireContext().accountMessage(event.error)
                         }
-                        Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+                        showNotice(message, NoticeLength.LONG)
                     }
                 }
             }
@@ -123,7 +124,7 @@ class FriendsFragment : Fragment(R.layout.fragment_friends) {
                 } else {
                     requireContext().accountMessage(result.error)
                 }
-                Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+                showNotice(message, NoticeLength.LONG)
             }
         }
     }
@@ -158,7 +159,7 @@ class FriendsFragment : Fragment(R.layout.fragment_friends) {
         clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.pix_id_label), pixId))
         // Android 13 and later confirm a copy themselves.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            Toast.makeText(requireContext(), R.string.pix_id_copied, Toast.LENGTH_SHORT).show()
+            showNotice(R.string.pix_id_copied)
         }
     }
 

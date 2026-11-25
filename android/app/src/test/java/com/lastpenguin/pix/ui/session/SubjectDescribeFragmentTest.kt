@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.drawable.BitmapDrawable
@@ -30,6 +30,7 @@ import com.lastpenguin.pix.session.sceneBegin
 import com.lastpenguin.pix.session.sceneChunk
 import com.lastpenguin.pix.session.sceneEnd
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.generation.ScenePhotoFragment
@@ -51,7 +52,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
-import org.robolectric.shadows.ShadowToast
 
 /*
  * The subject's Generate poses (R&S 6.6, FR-6.15, Design 2.6.5) on the real Fragment, with the photographer's
@@ -383,7 +383,7 @@ class SubjectDescribeFragmentTest {
         step(modules, DescriptionStep.STARTED)
 
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
-        assertEquals(0, ShadowToast.shownToastCount())
+        assertNull(shownNotice())
     }
 
     @Test
@@ -394,7 +394,7 @@ class SubjectDescribeFragmentTest {
         step(modules, DescriptionStep.CLOSED)
 
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
-        assertEquals(string(R.string.peer_closed_describe, "Dongje"), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.peer_closed_describe, "Dongje"), shownNotice())
     }
 
     @Test
@@ -410,7 +410,7 @@ class SubjectDescribeFragmentTest {
         val nav = launch()
 
         assertEquals(R.id.subjectDescribeFragment, nav.currentDestination?.id)
-        assertEquals(0, ShadowToast.shownToastCount())
+        assertNull(shownNotice())
     }
 
     @Test
@@ -422,7 +422,7 @@ class SubjectDescribeFragmentTest {
 
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(DescriptionSyncer.GO_TIMEOUT_MS + 100))
 
-        assertEquals(string(R.string.describe_go_failed), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.describe_go_failed), shownNotice())
         onScreen { binding ->
             assertTrue(binding.generateButton.isEnabled)
             binding.generateButton.performClick()

@@ -26,12 +26,12 @@
     </style>
 
     <!-- The shutter's countdown over the image (FR-1.17): large enough to read from where the people in the photo stand,
-         with a shadow so it shows on a bright scene. -->
+         with a shadow so it shows on a bright scene. Its size is the view's, in dp (#298): a larger font would not fit
+         the number's square. -->
     <style name="TextAppearance.Pix.Countdown" parent="TextAppearance.Material3.DisplayLarge">
         <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
         <item name="android:fontFamily">@font/pix_extrabold</item>
         <item name="fontFamily">@font/pix_extrabold</item>
-        <item name="android:textSize">120sp</item>
         <item name="android:letterSpacing">0</item>
         <item name="android:textColor">@color/pix_text</item>
         <item name="android:shadowColor">@color/camera_dim</item>
@@ -314,7 +314,8 @@
         <item name="rippleColor">@color/pix_ripple_strong</item>
     </style>
 
-    <!-- An icon button over a photo, such as the ♥ on Pick a pose: the round shape in glass, so it shows on any photo. -->
+    <!-- An icon button over a photo or the camera's image, such as the ♥ on Pick a pose and the tip, Save guide, and
+         guide-edit buttons beside the zoom readout: the round shape in glass, so it shows on any scene (#298). -->
     <style name="Widget.Pix.Button.Icon.OnPhoto">
         <item name="backgroundTint">@color/pix_glass</item>
         <item name="strokeColor">@color/pix_glass_stroke</item>
@@ -396,13 +397,14 @@
         <item name="tint">@color/camera_menu_option</item>
     </style>
 
-    <!-- The item's label, 11 sp in the medium face, smaller only where a large font would not fit it on its line. -->
+    <!-- The item's label, 11 sp in the medium face, shrinking toward 8 dp only where a large font would not fit it on
+         its line (#298). -->
     <style name="Widget.Pix.CameraMenuOption.Label" parent="">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">16dp</item>
         <item name="android:layout_marginTop">6dp</item>
         <item name="android:autoSizeMaxTextSize">11sp</item>
-        <item name="android:autoSizeMinTextSize">9sp</item>
+        <item name="android:autoSizeMinTextSize">8dp</item>
         <item name="android:autoSizeTextType">uniform</item>
         <item name="android:duplicateParentState">true</item>
         <item name="android:gravity">center</item>
@@ -415,10 +417,11 @@
         <item name="android:textColor">@color/camera_menu_option</item>
     </style>
 
-    <!-- One half of a two-way switch, such as Cutout / Outline; selection is View.isSelected. -->
+    <!-- One part of a switch, such as the library's filters or Thin / Normal / Thick; selection is View.isSelected.
+         48 dp tall, the touch target of NFR-16 (#298). -->
     <style name="Widget.Pix.Button.Segment" parent="Widget.Material3.Button.TextButton">
         <item name="android:minWidth">0dp</item>
-        <item name="android:minHeight">40dp</item>
+        <item name="android:minHeight">48dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <item name="android:paddingStart">12dp</item>
@@ -430,9 +433,12 @@
         <item name="android:textAppearance">@style/TextAppearance.Pix.Label.Bold</item>
     </style>
 
-    <!-- The switch in a section's header, such as All / With <name> over the descriptions used before (FR-4.11). -->
+    <!-- The switch in a section's header, such as All / With <name> over the descriptions used before (FR-4.11): a 32 dp
+         shape in a 48 dp touch area (#298), on bg_segment_track_small, whose track is inset to match. -->
     <style name="Widget.Pix.Button.Segment.Small">
-        <item name="android:minHeight">32dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:insetTop">8dp</item>
+        <item name="android:insetBottom">8dp</item>
         <item name="cornerRadius">14dp</item>
     </style>
 
@@ -652,5 +658,33 @@
 
     <style name="Widget.Pix.Button.Dialog.Positive">
         <item name="android:textColor">@color/pix_accent</item>
+    </style>
+
+    <!-- A short notice (#298): a Snackbar, not a Toast, placed by ui/Notices.kt. An info card's 16 dp corners on
+         pix_surface_3, so it stands out from the ground and from the glass over the camera's image, with its action,
+         such as Undo, in the accent, as every act is. -->
+    <style name="Widget.Pix.Snackbar" parent="Widget.Material3.Snackbar">
+        <item name="backgroundTint">@color/pix_surface_3</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.Pix.Notice</item>
+        <item name="android:layout_margin">12dp</item>
+    </style>
+
+    <!-- Up to four lines, so a notice says all a Toast did. -->
+    <style name="Widget.Pix.Snackbar.TextView" parent="Widget.Material3.Snackbar.TextView">
+        <item name="android:textColor">@color/pix_text</item>
+        <item name="android:maxLines">4</item>
+    </style>
+
+    <!-- Start and end set again, as for Widget.Pix.Button.Dialog. -->
+    <style name="Widget.Pix.Snackbar.Action" parent="Widget.Material3.Button.TextButton.Snackbar">
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:textColor">@color/pix_accent</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
+    </style>
+
+    <style name="ShapeAppearance.Pix.Notice" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">16dp</item>
     </style>
 </resources>

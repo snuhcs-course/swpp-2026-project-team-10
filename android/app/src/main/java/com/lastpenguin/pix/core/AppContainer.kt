@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -42,6 +42,7 @@ import com.lastpenguin.pix.generation.GenerationConsent
 import com.lastpenguin.pix.generation.MlKitPersonSignals
 import com.lastpenguin.pix.generation.PersonDetector
 import com.lastpenguin.pix.generation.PoseGenerator
+import com.lastpenguin.pix.generation.PoseLibrary
 import com.lastpenguin.pix.generation.PoseTipper
 import com.lastpenguin.pix.generation.PoseTips
 import com.lastpenguin.pix.generation.PromptHistory
@@ -136,6 +137,8 @@ class AppContainer(
     val referenceGuideMaker: ReferenceGuideMaker,
     /** Guides kept to use again, in the app's private files only (FR-3.8, AD-16, NFR-13). */
     val savedGuideStore: SavedGuideStore,
+    /** Each candidate kept in [savedGuideStore] as history, and what the ♥ marks (FR-4.14, #297). */
+    val poseLibrary: PoseLibrary,
     // ---- Pose generation (#7) ---------------------------------------------------
     val poseGenerator: PoseGenerator,
     /** Looks for a person in the scene photo before anything is sent (FR-4.13). */
@@ -291,6 +294,7 @@ class AppContainer(
             val poseSyncer = PoseSyncer(rtcSessionManager, JpegPoseCandidateCodec())
             // As the subject, each set the photographer starts is this phone's history too (FR-4.11), whichever
             // screen is in front, once the server accepted its description.
+            val savedGuideStore = FileSavedGuideStore(File(appContext.filesDir, "guides"), appScope)
             val promptHistory = DataStorePromptHistory(appContext, appScope)
             promptHistory.followSubjectSets(descriptionSyncer.started, poseSyncer.mirror, poseSyncer.verdicts, appScope)
             val poseTips = PoseTips(poseTipper, guideRepository.guide, appScope, screenLanguage)
@@ -310,7 +314,8 @@ class AppContainer(
                 mirrorGuideRepository = mirrorGuideRepository,
                 mirrorReference = mirrorReference,
                 referenceGuideMaker = referenceGuideMaker,
-                savedGuideStore = FileSavedGuideStore(File(appContext.filesDir, "guides"), appScope),
+                savedGuideStore = savedGuideStore,
+                poseLibrary = PoseLibrary(referenceGuideMaker, savedGuideStore, appScope),
                 poseGenerator = RemotePoseGenerator(pixApi),
                 personDetector = RuleBasedPersonDetector(MlKitPersonSignals()),
                 poseTipper = poseTipper,

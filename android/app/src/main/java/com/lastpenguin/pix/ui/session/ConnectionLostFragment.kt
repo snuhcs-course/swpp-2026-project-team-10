@@ -1,9 +1,8 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
 import android.view.View
-import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
@@ -15,6 +14,7 @@ import com.lastpenguin.pix.databinding.FragmentFailureBinding
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.showNotice
 import kotlinx.coroutines.launch
 
 /**
@@ -36,7 +36,7 @@ class ConnectionLostFragment : Fragment(R.layout.fragment_failure) {
         binding.primaryButton.setText(R.string.reconnect)
         binding.primaryButton.setOnClickListener {
             if (sessionViewModel.lastCode == null) {
-                Toast.makeText(requireContext(), R.string.session_ended, Toast.LENGTH_SHORT).show()
+                showNotice(R.string.session_ended)
                 backToCamera()
                 return@setOnClickListener
             }
@@ -67,7 +67,7 @@ class ConnectionLostFragment : Fragment(R.layout.fragment_failure) {
 
             is SessionState.Ended -> when (state.reason) {
                 EndReason.NOT_FOUND, EndReason.EXPIRED -> {
-                    Toast.makeText(requireContext(), R.string.session_ended, Toast.LENGTH_SHORT).show()
+                    showNotice(R.string.session_ended)
                     backToCamera()
                 }
 

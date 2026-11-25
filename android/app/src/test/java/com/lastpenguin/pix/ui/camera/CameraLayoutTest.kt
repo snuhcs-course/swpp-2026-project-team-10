@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Dongje Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -79,14 +79,18 @@ import org.robolectric.annotation.GraphicsMode
 /** How much of a 4:3 image's bottom the scene photo's panel may cover on the S22 when its hint takes two lines, in dp (#231). */
 private const val SCENE_PANEL_OVER_IMAGE_DP = 16
 
+/** The large font scales the layout holds at: Android's own steps up to its largest, 200 % (#298). */
+private val LARGE_FONTS = listOf(1.3f, 1.5f, 2f)
+
 /*
  * The camera screens' layout on the Galaxy S22's app area, 360 x 705 dp (R&S 6.2, 6.6; Testing Documentation 2.1.6).
  * Ratios: 4:3, 16:9, and 1:1, each with the preview right below the top bar, the shutter's row in one place, and the
  * zoom row at the bottom of the image; 16:9 with every control of that row above the image's bottom edge. States of
  * the top bar: no guide, a guide with a pose tip, a session, and the flash and the timer on beside the camera menu's
- * button (FR-1.17), at font scale 1 and 1.3, none overlapping. The camera switch in the top bar (FR-1.14), and the
- * gallery button as far right of the shutter as Guide is left of it. The camera menu under the top bar, each item taking
- * taps on 48 dp, with its labels whole at font scale 1.3 (FR-1.17; in Korean: KoreanScreensTest). A guide's
+ * button (FR-1.17), at font scale 1, 1.3, 1.5, and 2 (#298), none overlapping. The camera switch in the top bar
+ * (FR-1.14), and the gallery button as far right of the shutter as Guide is left of it. The camera menu under the top
+ * bar, each item taking taps on 48 dp, with its labels whole at font scale 1.3, 1.5, and 2 (FR-1.17; in Korean:
+ * KoreanScreensTest). A guide's
  * panel in the space below a 4:3 image. The frame held while the ratio changes, moved with the scene into the new
  * ratio's area as the camera rebinds (Iter3-A12; until then it kept its place and the old ratio's area until the new
  * one streamed); a held 1:1 frame dimmed once. The ratios under the top bar, in their shapes, each taking taps on 48 dp.
@@ -94,9 +98,11 @@ private const val SCENE_PANEL_OVER_IMAGE_DP = 16
  * area, the row's height, and every control's, at least 48 dp (NFR-16). Subject view's video placed the same way;
  * its session photo's thumbnail (Iter4-A2) on Guide's icon line, shown before any photo, Guide where Camera's is and
  * the thumbnail as far from the right edge, and the button beside it where Camera's shutter is, clear of both, with each of its labels at
- * font scale 1 and 1.3; in that place without a step, whose camera it is and "Live" (#271), on the icons' line and
+ * font scale 1, 1.3, 1.5, and 2; in that place without a step, whose camera it is and "Live" (#271), on the icons' line and
  * clear of both, with a short name, a Galaxy's own name, and a longer one cut short, and while a photo comes, at both
- * font scales. The session photos' viewer over the whole screen,
+ * font scales. At font scale 1.3, 1.5, and 2, every text on both screens whole: none cut short or taller than its view (#298),
+ * with the camera menu open and the timer counting down too (FR-1.17).
+ * The session photos' viewer over the whole screen,
  * on Subject view and on Camera.
  * The scene photo just taken, held while it is checked (R&S 6.3, #296): a 3:4 photo exactly over the preview, under
  * the flow's bar. The step's title, while framing and while the photo is held, on Back's line (#204, #210).
@@ -350,8 +356,8 @@ class CameraLayoutTest {
     }
 
     @Test
-    fun scenePhoto_theBarFits_withTheLightTheRatioAndTheTitle_alsoAtFontScale130() {
-        for (scale in listOf(1f, 1.3f)) {
+    fun scenePhoto_theBarFits_withTheLightTheRatioAndTheTitle_alsoAtLargeFonts() {
+        for (scale in listOf(1f) + LARGE_FONTS) {
             val screen = camera(fontScale = scale)
             screen.activity.viewModel<GenerationViewModel>().beginScene()
             idle()
@@ -529,15 +535,18 @@ class CameraLayoutTest {
     }
 
     @Test
-    fun theCameraMenu_isUnderTheTopBar_eachItemTakingTapsOn48Dp_withItsLabelWhole_atFontScale1_3() {
-        val screen = camera(fontScale = 1.3f)
+    fun theCameraMenu_isUnderTheTopBar_eachItemTakingTapsOn48Dp_withItsLabelWhole_atLargeFonts() {
+        for (scale in LARGE_FONTS) assertMenuFits(camera(fontScale = scale), "font $scale")
+    }
+
+    private fun assertMenuFits(screen: Camera, font: String) {
         screen.controls.cameraMenuButton.performClick()
         idle()
 
         val menu = screen.controls.cameraMenu
         val bar = screen.controls.topBar.box()
-        assertTrue(menu.isShown)
-        assertTrue("${menu.box()} under $bar", menu.box().top >= bar.bottom - TOP_BAR_OVERHANG_DP.toInt())
+        assertTrue(font, menu.isShown)
+        assertTrue("$font: ${menu.box()} under $bar", menu.box().top >= bar.bottom - TOP_BAR_OVERHANG_DP.toInt())
         val items = listOf(
             screen.controls.menuFlash,
             screen.controls.menuTimer,
@@ -548,13 +557,16 @@ class CameraLayoutTest {
         for (item in items) {
             val box = item.box()
             val name = item.resources.getResourceEntryName(item.id)
-            assertTrue("$name $box", box.width() >= 48 && box.height() >= 48)
-            assertTrue("$name in the menu", menu.box().contains(box))
+            assertTrue("$font: $name $box", box.width() >= 48 && box.height() >= 48)
+            assertTrue("$font: $name in the menu", menu.box().contains(box))
             val label = (item as ViewGroup).getChildAt(1) as TextView
-            assertEquals("$name on one line", 1, label.lineCount)
-            assertTrue("$name's label whole", label.paint.measureText(label.text.toString()) <= label.width + 0.5f)
+            assertEquals("$font: $name on one line", 1, label.lineCount)
+            assertTrue(
+                "$font: $name's label whole",
+                label.paint.measureText(label.text.toString()) <= label.width + 0.5f,
+            )
         }
-        assertTrue(items.zipWithNext().all { (a, b) -> a.box().right <= b.box().left })
+        assertTrue(font, items.zipWithNext().all { (a, b) -> a.box().right <= b.box().left })
     }
 
     @Test
@@ -740,14 +752,16 @@ class CameraLayoutTest {
     }
 
     @Test
-    fun theTopBar_fitsWithoutOverlap_atFontScale1_3() {
-        val screen = camera(fontScale = 1.3f)
-        screen.guideWithTip()
-        screen.assertTopBarFits("a guide with a tip, font 1.3")
-        screen.session()
-        screen.assertTopBarFits("a session, font 1.3")
-        screen.flashAndTimerOn()
-        screen.assertTopBarFits("the flash and the timer on, in a session, font 1.3")
+    fun theTopBar_fitsWithoutOverlap_atLargeFonts() {
+        for (scale in LARGE_FONTS) {
+            val screen = camera(fontScale = scale)
+            screen.guideWithTip()
+            screen.assertTopBarFits("a guide with a tip, font $scale")
+            screen.session()
+            screen.assertTopBarFits("a session, font $scale")
+            screen.flashAndTimerOn()
+            screen.assertTopBarFits("the flash and the timer on, in a session, font $scale")
+        }
     }
 
     /** The flash on and the timer at 10 s through the camera menu (FR-1.17), which then closes. */
@@ -828,8 +842,9 @@ class CameraLayoutTest {
     fun everyControl_takesTapsOnAtLeast48dp() = camera().assertEveryControlAtLeast48("font scale 1")
 
     @Test
-    fun everyControl_takesTapsOnAtLeast48dp_atFontScale1_3() =
-        camera(fontScale = 1.3f).assertEveryControlAtLeast48("font scale 1.3")
+    fun everyControl_takesTapsOnAtLeast48dp_atLargeFonts() {
+        for (scale in LARGE_FONTS) camera(fontScale = scale).assertEveryControlAtLeast48("font scale $scale")
+    }
 
     // ---- Subject view -----------------------------------------------------------------------
 
@@ -895,7 +910,7 @@ class CameraLayoutTest {
         )
         assertEquals(camerasGuide.centerY(), guideIcon.centerY())
         assertEquals(camerasGuide.width(), guideIcon.width())
-        assertCaptionInTheShuttersPlace(binding, shutter)
+        assertCaptionInTheShuttersPlace(binding, shutter, "font $fontScale")
         binding.pickPoseButton.visibility = View.VISIBLE
         val labels = listOf(
             R.string.pick_pose_title,
@@ -909,7 +924,7 @@ class CameraLayoutTest {
             val thumbnail = binding.galleryButton.box()
             val guide = binding.guideButton.box()
             val pick = binding.pickPoseButton.box()
-            val text = binding.pickPoseLabel.text
+            val text = "font $fontScale, ${binding.pickPoseLabel.text}"
             assertEquals("$text: on Guide's icon line", binding.guideButtonIcon.box().centerY(), thumbnail.centerY())
             // Pick a pose in the shutter's place, clear of Guide and of the thumbnail.
             assertTrue(
@@ -932,7 +947,7 @@ class CameraLayoutTest {
      * Guide's icon and the thumbnail, clear of both. A name that fits stays whole; a long one, such as a Galaxy's own
      * name, is made smaller and then cut short, so "'s camera" stays; a photo on its way changes the second line.
      */
-    private fun assertCaptionInTheShuttersPlace(binding: FragmentSubjectBinding, shutter: Rect) {
+    private fun assertCaptionInTheShuttersPlace(binding: FragmentSubjectBinding, shutter: Rect, font: String) {
         val modules = checkNotNull(subjectModules)
         val names = listOf("Dongje", "길동의 Galaxy S23 Ultra", "Test Account With A Very Long Name")
         val suffix = binding.root.context.getString(R.string.subject_title, "")
@@ -946,7 +961,7 @@ class CameraLayoutTest {
                 binding.cameraCaptionSpinner.visibility = if (receiving) View.VISIBLE else View.GONE
                 binding.cameraCaptionDot.visibility = if (receiving) View.GONE else View.VISIBLE
                 idle()
-                val what = "$name, receiving $receiving"
+                val what = "$font, $name, receiving $receiving"
                 assertTrue("$what: the slot shows", binding.cameraCaption.isShown)
                 val caption = binding.cameraCaption.box()
                 val icon = binding.guideButtonIcon.box()
@@ -980,8 +995,9 @@ class CameraLayoutTest {
         assertThumbnailBesideGuide(fontScale = 1f)
 
     @Test
-    fun subjectView_theBottomRow_isCamerasRow_atFontScale1_3() =
-        assertThumbnailBesideGuide(fontScale = 1.3f)
+    fun subjectView_theBottomRow_isCamerasRow_atLargeFonts() {
+        for (scale in LARGE_FONTS) assertThumbnailBesideGuide(fontScale = scale)
+    }
 
     /**
      * The photo viewer, shown: over the whole screen, Back at the top left and Share and Delete at the top right, their
@@ -1098,6 +1114,75 @@ class CameraLayoutTest {
         assertTheTipFitsOnSubjectView(subjectWithTip(), "font scale 1")
 
     @Test
-    fun subjectView_theTipButtonIsClearOfTheReadout_andItsCardOpensAboveTheCaption_atFontScale1_3() =
-        assertTheTipFitsOnSubjectView(subjectWithTip(fontScale = 1.3f), "font scale 1.3")
+    fun subjectView_theTipButtonIsClearOfTheReadout_andItsCardOpensAboveTheCaption_atLargeFonts() {
+        for (scale in LARGE_FONTS) assertTheTipFitsOnSubjectView(subjectWithTip(fontScale = scale), "font scale $scale")
+    }
+
+    // ---- Large fonts (#298) -----------------------------------------------------------------
+
+    /**
+     * Why the text of [view] does not fit, or null when it does, as KoreanScreensTest's check: ellipsized, its last
+     * lines dropped, or taller than the view. A view that ellipsizes on purpose holds a name, which may be cut.
+     */
+    private fun cutOff(view: TextView): String? {
+        val layout = view.layout ?: return null
+        if (view.text.isEmpty() || view.width == 0 || view.height == 0) return null
+        val height = view.height - view.compoundPaddingTop - view.compoundPaddingBottom
+        return when {
+            view.ellipsize != null -> null
+            (0 until layout.lineCount).any { layout.getEllipsisCount(it) > 0 } -> "ellipsized"
+            layout.getLineEnd(layout.lineCount - 1) < view.text.trimEnd().length -> "cut short"
+            layout.height > height + 1 -> "taller than its view (${layout.height} > $height px)"
+            else -> null
+        }
+    }
+
+    /** Every shown text under [root] whole, as "name: why" for each that is not. */
+    private fun cutTexts(root: View, state: String): List<String> {
+        val cut = mutableListOf<String>()
+        fun walk(view: View) {
+            if (!view.isShown) return
+            if (view is TextView) {
+                cutOff(view)?.let {
+                    val name = if (view.id == View.NO_ID) "?" else view.resources.getResourceEntryName(view.id)
+                    cut += "$state, $name \"${view.text}\": $it"
+                }
+            }
+            if (view is ViewGroup) for (i in 0 until view.childCount) walk(view.getChildAt(i))
+        }
+        walk(root)
+        return cut
+    }
+
+    @Test
+    fun everyText_isWhole_onBothScreens_atLargeFonts() {
+        val cut = mutableListOf<String>()
+        for (scale in LARGE_FONTS) {
+            val screen = camera(fontScale = scale)
+            cut += cutTexts(screen.controls.root, "Camera, font $scale")
+            screen.guideWithTip()
+            screen.session()
+            cut += cutTexts(screen.controls.root, "Camera with a guide and a session, font $scale")
+            // The camera menu open, then the timer's countdown (FR-1.17).
+            screen.controls.cameraMenuButton.performClick()
+            idle()
+            cut += cutTexts(screen.controls.root, "Camera with the menu open, font $scale")
+            screen.controls.menuTimer.performClick()
+            screen.controls.cameraMenuButton.performClick()
+            idle()
+            screen.controls.shutterButton.performClick()
+            idle()
+            cut += cutTexts(screen.controls.root, "Camera counting down, font $scale")
+            val binding = subjectView(fontScale = scale)
+            cut += cutTexts(binding.root, "Subject view, font $scale")
+            binding.pickPoseButton.visibility = View.VISIBLE
+            idle()
+            cut += cutTexts(binding.root, "Subject view with Pick a pose, font $scale")
+            binding.cameraMenuButton.performClick()
+            subjectModules!!.session.deliver(SessionMessage.Countdown(3))
+            idle()
+            cut += cutTexts(binding.root, "Subject view with the menu open and the countdown, font $scale")
+        }
+        assertEquals(emptyList<String>(), cut)
+    }
 }

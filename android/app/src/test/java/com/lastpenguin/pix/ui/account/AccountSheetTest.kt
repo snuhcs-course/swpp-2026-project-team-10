@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.content.DialogInterface
@@ -15,6 +15,7 @@ import com.lastpenguin.pix.account.AccountError
 import com.lastpenguin.pix.account.AccountException
 import com.lastpenguin.pix.databinding.SheetAccountBinding
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import org.junit.After
@@ -25,7 +26,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
-import org.robolectric.shadows.ShadowToast
 
 /*
  * Account on the real bottom sheet (R&S 6.4; FR-5.12, FR-5.14, FR-5.18), with the account fakes behind the
@@ -123,7 +123,7 @@ class AccountSheetTest {
 
         assertTrue(modules.auth.calls.contains("setDisplayName:New Name"))
         onSheet { assertEquals("New Name", it.nameText.text.toString()) }
-        assertEquals(string(R.string.name_saved), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.name_saved), shownNotice())
     }
 
     @Test
@@ -152,7 +152,7 @@ class AccountSheetTest {
         idle()
 
         assertTrue(modules.auth.calls.contains("addPassword"))
-        assertEquals(string(R.string.password_added), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.password_added), shownNotice())
         onSheet { assertEquals(View.GONE, it.addPasswordOption.visibility) }
     }
 
@@ -164,7 +164,7 @@ class AccountSheetTest {
         idle()
 
         assertTrue(modules.auth.calls.contains("addGoogle:google-token"))
-        assertEquals(string(R.string.google_added), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.google_added), shownNotice())
         onSheet { assertEquals(View.GONE, it.addGoogleOption.visibility) }
     }
 
@@ -192,7 +192,7 @@ class AccountSheetTest {
         idle()
 
         assertTrue(modules.auth.calls.contains("signOut"))
-        assertEquals(string(R.string.signed_out), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.signed_out), shownNotice())
         assertFalse(sheet.isAdded)
     }
 
@@ -224,7 +224,7 @@ class AccountSheetTest {
         idle()
 
         assertEquals(listOf("deleteAccount"), modules.auth.calls)
-        assertEquals(string(R.string.account_deleted), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.account_deleted), shownNotice())
         assertFalse(sheet.isAdded)
     }
 

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.content.ContentResolver
@@ -29,15 +29,17 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 /** What the Camera screen tells the subject's phone about its photos (FR-6.14), the photographer's side of [PhotoSyncer]. */
 interface PhotoShare {
@@ -95,7 +97,7 @@ class ContentPhotoReader(private val resolver: ContentResolver) : PhotoReader {
  * reach the album says so in [sendFailed], and the next one goes on. [drop] ends it all with the session.
  *
  * Subject ([startAsReceiver]): writes the chunks to one file in [partDir], not to memory, saves it to [album] at
- * `photo.end`, and answers `photo.saved`. [received] says how each ended, for the subject's toast, [shutters] when each
+ * `photo.end`, and answers `photo.saved`. [received] says how each ended, for the subject's notice, [shutters] when each
  * was taken, for Subject view's blink (Iter3-A12), and [receiving] whether one is on its way, for its sign (#271).
  *
  * Both: [sessionPhotos] are the session's photos on this phone, taken or received, for the thumbnail and the viewer
@@ -211,7 +213,7 @@ class PhotoSyncer(
 
     /**
      * The subject waits for each photo from its `photo.shutter` on (#271): one that will not come after all, before its
-     * `photo.begin`, is said by its [shot], or Subject view would say a photo is on its way until its 30 s end.
+     * `photo.begin`, is said by its [shot], or Subject view would say a photo is on its way until its wait ends ([STALL_MS]).
      */
     private fun dropped(shot: String) {
         if (currentSession() != null) session.send(SessionMessage.PhotoDropped(shot))
@@ -299,9 +301,8 @@ class PhotoSyncer(
         val encoder = Base64.getEncoder()
         val buffer = ByteArray(CHUNK_BYTES)
         for (index in 0 until chunks) {
-            val room = withTimeoutOrNull(STALL_MS) {
-                progress.first { it == null || it.saved != null || index - it.next < WINDOW_CHUNKS }
-            } ?: return false
+            val room = awaitProgress { it == null || it.saved != null || index - it.next < WINDOW_CHUNKS }
+                ?: return false
             room.saved?.let { return it }
             val read = stream.readChunk(buffer)
             if (read <= 0) return false
@@ -310,8 +311,41 @@ class PhotoSyncer(
             if (!session.sendBulk(SessionMessage.PhotoChunk(photoId, index, data))) return false
         }
         if (!session.sendBulk(SessionMessage.PhotoEnd(photoId, crc.value))) return false
-        val answer = withTimeoutOrNull(STALL_MS) { progress.first { it == null || it.saved != null } }
+        val answer = awaitProgress { it == null || it.saved != null }
         return answer?.saved == true
+    }
+
+    /** The photo's progress once it is [reached]; null when it ended, or the subject said nothing for a stall's time. */
+    private suspend fun awaitProgress(reached: (Progress?) -> Boolean): Progress? {
+        // Most chunks find room at once: no wait, and nothing set up for one.
+        val now = progress.value
+        if (reached(now)) return now
+        return merge(progress.filter(reached), stalls().map { null }).first()
+    }
+
+    /**
+     * What a stall's time follows of the link: whether it is [down] and tried again, which the session does for its
+     * own time (Design 2.6.7), and how often it came [back]. The count tells of a drop even when no reader saw its
+     * `Reconnecting`: a state flow shows only its latest value, and the states around such a drop differ in it alone.
+     */
+    private data class Link(val down: Boolean, val back: Int)
+
+    private val link: Flow<Link>
+        get() = session.state
+            .map { Link(it is SessionState.Reconnecting, (it as? SessionState.Connected)?.drops ?: 0) }
+            .distinctUntilChanged()
+
+    /**
+     * Emits once the link has been up for [STALL_MS] in a row. The time a drop takes does not count, and the time
+     * starts over once the link is back: the session decides how long a drop may last, and a photo that waited
+     * through one is not given up for it (#293).
+     */
+    private fun stalls(): Flow<Unit> = channelFlow {
+        link.collectLatest { link ->
+            if (link.down) return@collectLatest
+            delay(STALL_MS)
+            send(Unit)
+        }
     }
 
     /** Fills [buffer] unless the stream ends first; a read may return less than asked. Returns how much came. */
@@ -439,8 +473,12 @@ class PhotoSyncer(
                 }
             }
             launch {
-                // A wait with no photo message for this long is over: that photo is not coming.
-                combine(awaited, photoMessagesSeen) { waits, _ -> waits.any }.collectLatest { waiting ->
+                // A wait with no photo message for this long is over: that photo is not coming. The time a drop
+                // takes does not count, as for the sender ([stalls]): each change of the link starts the time again,
+                // as each photo message does.
+                combine(awaited, photoMessagesSeen, link) { waits, _, link ->
+                    waits.any && !link.down
+                }.collectLatest { waiting ->
                     if (!waiting) return@collectLatest
                     delay(STALL_MS)
                     awaited.update { it.cleared() }
@@ -572,7 +610,10 @@ class PhotoSyncer(
         const val WINDOW_CHUNKS = 32
         const val ACK_EVERY = 16
 
-        /** No word from the subject for this long gives the photo up. Longer than a reconnect's 10 s. */
+        /**
+         * No word from the other phone for this long, with the link up, gives the photo up. A drop's time is the
+         * session's to limit and is not counted here ([stalls]).
+         */
         const val STALL_MS = 30_000L
 
         /** How many ended shots the subject keeps against a late `photo.shutter`, more than a burst of photos. */

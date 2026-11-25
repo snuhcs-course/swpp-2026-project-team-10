@@ -45,6 +45,7 @@ import com.lastpenguin.pix.ui.camera.GuideSaveNotice
 import com.lastpenguin.pix.ui.camera.ReferenceCorner
 import com.lastpenguin.pix.ui.camera.ReferenceDrop
 import com.lastpenguin.pix.ui.camera.ToggleLabel
+import com.lastpenguin.pix.ui.camera.isFavorite
 import com.lastpenguin.pix.ui.camera.toggleSaved
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -142,7 +143,7 @@ data class SubjectUiState(
      * back small.
      */
     val referenceHidden: Boolean = false,
-    /** Whether the guide on the video is among this phone's saved guides (FR-6.16): *Save guide* is filled then. */
+    /** Whether the guide on the video is a favorite in this phone's library (FR-6.16, #297): *Save guide* is filled. */
     val guideSaved: Boolean = false,
     val savingGuide: Boolean = false,
     /**
@@ -476,7 +477,7 @@ class SubjectViewModel(
         viewModelScope.launch {
             // A guide keeps its id on both phones and when it is saved, so the id tells whether it is saved here.
             combine(mirror.guide, savedGuides.saved) { guide, saved ->
-                guide != null && saved.any { it.id == guide.id }
+                isFavorite(saved, guide)
             }
                 .collect { saved -> _uiState.update { it.copy(guideSaved = saved) } }
         }
@@ -547,9 +548,8 @@ class SubjectViewModel(
     /**
      * *Save guide* (FR-6.16): keeps the guide on the video on this phone, to use again from *Add a pose guide*, as the
      * photographer's phone keeps it: the mask as received, the reference copy the thumbnail shows, the `anchor` and
-     * `source` its image carried, and the mirror's state (Design 2.6.5). Not saved twice: another tap takes it out of
-     * the saved guides again. When [SavedGuideStore.MAX_SAVED] are saved, the store deletes the oldest and the notice
-     * says so.
+     * `source` its image carried, and the mirror's state (Design 2.6.5), as a favorite; another tap makes it history
+     * again, still in the library (#297).
      */
     fun onSaveGuide() {
         val ui = _uiState.value

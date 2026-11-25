@@ -1,6 +1,7 @@
-// AI-generated with Claude Code, 2026-11-23, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.session
 
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -29,8 +30,8 @@ import org.junit.Test
  * Photographer, after a drop in the same session (#268): the guide the subject got (state only); one changed meanwhile
  * (in full, whatever the first `hello` named); an image or a reference photo whose encoding the drop cut off (sent
  * once the link is back).
- * Subject, receiving: the image with its state, anchor, and source; a state before its image; a broken image or
- * reference; a reference before its image, and one of another guide; clear.
+ * Subject, receiving: the image with its state, anchor, source, and situation (#270); a state before its image; a
+ * broken image or reference; a reference before its image, and one of another guide; clear.
  * Subject, the session's end and the next session (#268, state-based): the guide and its reference leave the mirror
  * and stay held for `hello`; the next session draws nothing until a state names the held guide, then draws it with no
  * new image; a state that names another guide waits for that image; a clear drops the held guide.
@@ -133,7 +134,9 @@ class GuideSyncerTest {
     @Test
     fun `the image carries the guide's anchor and source, for the subject's Save guide`() = runTest {
         val box = NormalizedRect(0.3f, 0.2f, 0.7f, 0.9f)
-        guides.setGuide(fakeGuide("g1").copy(anchor = box, source = GuideSource.GENERATED))
+        guides.setGuide(
+            fakeGuide("g1").copy(anchor = box, source = GuideSource.GENERATED, situation = Situation.HALF_BODY),
+        )
         connected()
 
         syncer().startAsSender(backgroundScope)
@@ -142,6 +145,7 @@ class GuideSyncerTest {
         val begin = session.sent.first() as SessionMessage.GuideImageBegin
         assertEquals(box, begin.anchor)
         assertEquals(GuideSource.GENERATED, begin.source)
+        assertEquals("half_body", begin.situation)
     }
 
     @Test
@@ -493,7 +497,7 @@ class GuideSyncerTest {
             val box = NormalizedRect(0.3f, 0.2f, 0.7f, 0.9f)
             val image = image("g1")
 
-            session.deliver(image.begin(box, GuideSource.GENERATED))
+            session.deliver(image.begin(box, GuideSource.GENERATED, Situation.FULL_BODY))
             for (i in image.chunks.indices) session.deliver(image.chunk(i))
             session.deliver(image.end())
             session.deliver(SessionMessage.GuideStateUpdate(GuideState("g1", cx = 0.8f, height = 0.4f), final = true))
@@ -501,6 +505,7 @@ class GuideSyncerTest {
 
             assertEquals(box, mirror.guide.value?.anchor)
             assertEquals(GuideSource.GENERATED, mirror.guide.value?.source)
+            assertEquals(Situation.FULL_BODY, mirror.guide.value?.situation)
             assertEquals(0.8f, mirror.state.value.cx, 0f)
             assertEquals(0.4f, mirror.state.value.height, 0f)
         }

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.content.ClipboardManager
@@ -27,6 +27,7 @@ import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionEntry
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import org.junit.After
@@ -36,7 +37,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
-import org.robolectric.shadows.ShadowToast
 
 /*
  * Share my camera (Friends until #188) on the real Fragment (R&S 6.4, 6.7; FR-5.4, FR-5.7, FR-5.9, FR-5.16, FR-8.1),
@@ -221,12 +221,12 @@ class FriendsFragmentTest {
 
         modules.auth.expire()
         idle()
-        assertEquals(string(R.string.signed_out_expired), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.signed_out_expired), shownNotice())
 
         modules.auth.signInAs(account)
         modules.friends.failure = AccountException(AccountError.UNAVAILABLE)
         onScreen { ItemFriendRequestBinding.bind(it.requestsList.getChildAt(0)).acceptButton.performClick() }
         idle()
-        assertEquals(string(R.string.unavailable_error), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.unavailable_error), shownNotice())
     }
 }

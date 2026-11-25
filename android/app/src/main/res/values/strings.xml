@@ -4,6 +4,8 @@
 
     <!-- Common -->
     <string name="cancel">Cancel</string>
+    <!-- A notice's action that takes back what was just done (#298). -->
+    <string name="undo">Undo</string>
     <string name="back">Back</string>
     <string name="back_to_camera">Back to camera</string>
     <string name="try_again">Try again</string>
@@ -47,30 +49,52 @@
     <!-- Saved guides (FR-3.8): the button on the guide's panel and its notices. -->
     <string name="save_guide">Save guide</string>
     <string name="guide_saved">Guide saved</string>
-    <string name="guide_saved_notice">Guide saved to My library.</string>
-    <string name="guide_saved_oldest_removed_notice">Guide saved. The oldest saved guide was removed to keep %1$d.</string>
-    <string name="guide_removed_notice">Removed from My library.</string>
+    <string name="guide_saved_notice">Guide added to Favorites in My library.</string>
+    <string name="guide_removed_notice">Removed from Favorites. It stays in My library.</string>
     <string name="guide_shown_label">Guide shown</string>
     <string name="pinch_mode_guide">Guide</string>
     <string name="pinch_mode_camera">Camera</string>
     <string name="pinch_mode_guide_description">Pinch moves the guide</string>
     <string name="pinch_mode_camera_description">Pinch zooms the camera</string>
     <string name="guide_save_failed_notice">Couldn\'t save the guide. Check the phone\'s storage.</string>
-    <string name="delete_saved_guide">Delete saved guide</string>
-    <string name="delete_saved_guide_title">Delete this saved guide?</string>
-    <string name="delete_saved_guide_message">It is removed from this phone. A guide on the camera stays there.</string>
+    <string name="delete_saved_guide_message">They are removed from this phone. A guide on the camera stays there.</string>
     <string name="delete">Delete</string>
     <string name="saved_guide_open_failed">Couldn\'t open the saved guide.</string>
     <!-- The library (FR-3.11, R&S 6.2): every saved guide, filtered by kind. -->
     <string name="library_title">Library</string>
     <string name="library_title_description">Library, saved guides: %1$d</string>
     <string name="library_all">All %1$d</string>
-    <string name="library_photos">Photos %1$d</string>
-    <string name="library_generated">AI poses %1$d</string>
+    <string name="library_favorites">Favorites %1$d</string>
+    <string name="library_more">More options</string>
+    <string name="library_select">Select</string>
+    <string name="library_select_all">Select all</string>
+    <string name="library_close_selection">Stop selecting</string>
+    <plurals name="library_selected">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
+    <plurals name="delete_guides_title">
+        <item quantity="one">Delete %1$d guide?</item>
+        <item quantity="other">Delete %1$d guides?</item>
+    </plurals>
+    <string name="library_guide_selected">Selected</string>
+    <string name="library_guide_not_selected">Not selected</string>
+    <string name="library_guide_favorite_description">%1$s, in Favorites</string>
+    <string name="poses_kept_notice">The poses are in My library.</string>
+    <string name="poses_kept_view">View</string>
     <string name="library_empty">No saved guides yet</string>
-    <string name="library_empty_body">Save a guide on the camera, or add a photo.</string>
-    <string name="library_empty_filter">No guides of this kind yet</string>
-    <string name="add_photo">Add photo</string>
+    <string name="library_empty_body">The poses you make and the photo guides you use are kept here.</string>
+    <string name="library_empty_favorites">No favorites yet</string>
+    <string name="library_empty_favorites_body">Tap a guide\'s ♥ to add it here.</string>
+    <string name="library_situation_chip" translatable="false">%1$s %2$d</string>
+    <string name="library_memo_edit">Edit memo</string>
+    <string name="library_favorite_add">Add to Favorites</string>
+    <string name="library_favorite_remove">Remove from Favorites</string>
+    <string name="library_memo_title">Memo</string>
+    <string name="library_memo_hint">A note on this guide</string>
+    <string name="library_memo_failed">Couldn\'t save the memo.</string>
+    <string name="library_guide_situation_description">%1$s, for %2$s</string>
+    <string name="library_guide_memo_description">%1$s. Memo: %2$s</string>
     <string name="saved_photo_guide_description">Photo guide saved %1$s</string>
     <string name="saved_pose_guide_description">AI pose guide saved %1$s</string>
     <string name="guide_offer_failed">Couldn\'t send the guide</string>
@@ -85,6 +109,8 @@
     <string name="show_reference">Show</string>
     <string name="reference_hidden">Hidden</string>
     <string name="edit_guide">Edit guide</string>
+    <!-- After Remove guide, with Undo for a few seconds (FR-3.6, #298). -->
+    <string name="guide_removed_from_camera">Guide removed</string>
     <!-- Pose tips (FR-4.10): the banner over the bottom of the preview and the button in the top bar. -->
     <string name="tip_preparing">Preparing a tip…</string>
     <string name="tip_failed">Couldn\'t get a tip for this pose</string>
@@ -116,8 +142,10 @@
     <string name="brightness">Brightness</string>
     <string name="live_badge">Live · %1$s connected</string>
     <string name="end_session">End session</string>
+    <string name="end_session_title">End the session?</string>
     <string name="peer_left">%1$s left</string>
     <string name="peer_disconnected">%1$s disconnected</string>
+    <string name="peer_reconnecting">Reconnecting with %1$s…</string>
     <string name="session_photo_saved">Photo saved to your Pix album</string>
     <string name="session_photo_save_failed">Couldn\'t save %1$s\'s photo</string>
     <string name="session_photo_not_sent">Couldn\'t send a photo to %1$s</string>
@@ -255,15 +283,11 @@
     <string name="select_pose">Select</string>
     <!-- Back on Generating poses, and on Pick a pose in a session, asks first, since going back loses the set the AI
          service was asked for: the title, the loss on each screen, and the button that goes back. -->
-    <string name="go_back_title">Go back?</string>
-    <string name="go_back_generating">Going back stops the poses being created. They can\'t be recovered.</string>
-    <string name="go_back_generated">Going back discards these poses. They can\'t be recovered.</string>
-    <string name="go_back">Go back</string>
     <!-- ♥ on Pick a pose (FR-4.14): a candidate kept in this phone's library. -->
-    <string name="save_pose">Save this pose to My library</string>
-    <string name="remove_saved_pose">Remove this pose from My library</string>
-    <string name="pose_saved_notice">Pose saved to My library.</string>
-    <string name="pose_removed_notice">Pose removed from My library.</string>
+    <string name="save_pose">Add this pose to Favorites</string>
+    <string name="remove_saved_pose">Remove this pose from Favorites</string>
+    <string name="pose_saved_notice">Pose added to Favorites in My library.</string>
+    <string name="pose_removed_notice">Pose removed from Favorites. It stays in My library.</string>
     <string name="pose_no_person_notice">Couldn\'t find a person in this pose.</string>
     <!-- Pick a pose on both phones in a session (FR-6.15): the photographer's candidates, first choice wins. -->
     <string name="shared_hint">%1$s sees this too</string>
@@ -604,7 +628,7 @@
     <string name="tutorial_move">Drag to move, pinch to resize</string>
     <string name="tutorial_edit">Turn this on to move the guide</string>
     <string name="tutorial_fade">Fade it or hide it</string>
-    <string name="tutorial_save">Save it to use again</string>
+    <string name="tutorial_save">Add it to Favorites in My library</string>
     <string name="tutorial_remove">Take the guide off</string>
     <string name="tutorial_scene">Poses start from this photo</string>
     <string name="tutorial_describe">Write the pose you want</string>

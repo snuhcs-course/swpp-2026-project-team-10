@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.drawable.BitmapDrawable
@@ -25,6 +25,7 @@ import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.idleUntil
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import kotlinx.coroutines.CoroutineScope
@@ -39,7 +40,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
-import org.robolectric.shadows.ShadowToast
 
 /*
  * The subject's Generating poses (R&S 6.6, FR-6.15, Iter3-A13) on the real Fragment, with the photographer's set
@@ -205,7 +205,7 @@ class SubjectGeneratingFragmentTest {
         step(modules, PoseSetStep.CLOSED)
 
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
-        assertEquals(string(R.string.peer_stopped_poses, "Dongje"), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.peer_stopped_poses, "Dongje"), shownNotice())
     }
 
     @Test
@@ -219,7 +219,7 @@ class SubjectGeneratingFragmentTest {
         step(modules, PoseSetStep.CLOSED)
 
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
-        assertEquals(string(R.string.peer_poses_failed, "Dongje"), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.peer_poses_failed, "Dongje"), shownNotice())
     }
 
     @Test
@@ -234,7 +234,7 @@ class SubjectGeneratingFragmentTest {
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
         assertEquals(
             string(R.string.peer_poses_failed, "Dongje") + "\n" + string(R.string.generation_daily_limit_message),
-            ShadowToast.getTextOfLatestToast(),
+            shownNotice(),
         )
     }
 
@@ -261,6 +261,6 @@ class SubjectGeneratingFragmentTest {
         idle()
 
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
-        assertNull(ShadowToast.getTextOfLatestToast())
+        assertNull(shownNotice())
     }
 }

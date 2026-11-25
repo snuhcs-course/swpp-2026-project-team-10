@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Joonhyung Han
 package com.lastpenguin.pix.ui.guide
 
 import android.content.Context
@@ -7,6 +7,7 @@ import androidx.annotation.DrawableRes
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.SavedGuide
+import com.lastpenguin.pix.ui.generation.title
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.CoroutineScope
@@ -26,14 +27,21 @@ internal val SavedGuide.kindIcon: Int
         GuideSource.GENERATED -> R.drawable.ic_sparkle
     }
 
-/** What TalkBack says for the guide: its kind and when it was saved, as the thumbnail itself shows neither in words. */
+/**
+ * What TalkBack says for the guide: its kind and when it was saved, as the thumbnail itself shows neither in words, then
+ * whether it is a favorite (#297), and its situation and memo, which the library shows under it (#270).
+ */
 internal fun Context.describe(guide: SavedGuide): String {
     val savedAt = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(guide.savedAt))
     val kind = when (guide.source) {
         GuideSource.GALLERY -> R.string.saved_photo_guide_description
         GuideSource.GENERATED -> R.string.saved_pose_guide_description
     }
-    return getString(kind, savedAt)
+    var said = getString(kind, savedAt)
+    if (guide.favorite) said = getString(R.string.library_guide_favorite_description, said)
+    guide.situation?.let { said = getString(R.string.library_guide_situation_description, said, getString(it.title)) }
+    if (guide.memo.isNotEmpty()) said = getString(R.string.library_guide_memo_description, said, guide.memo)
+    return said
 }
 
 /**

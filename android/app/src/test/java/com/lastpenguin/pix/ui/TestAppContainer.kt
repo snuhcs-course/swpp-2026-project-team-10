@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -18,6 +18,7 @@ import com.lastpenguin.pix.generation.GenerationConsent
 import com.lastpenguin.pix.generation.GenerationEvent
 import com.lastpenguin.pix.generation.PlannedPose
 import com.lastpenguin.pix.generation.PoseGenerator
+import com.lastpenguin.pix.generation.PoseLibrary
 import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.PoseTip
 import com.lastpenguin.pix.generation.PoseTipper
@@ -184,6 +185,9 @@ class TestAppContainer(
      */
     private val deleter = PhotoDeleter { uri -> photos.delete(uri, albumDeleter, CoroutineScope(Dispatchers.Main)) }
 
+    /** The candidates kept as history through [maker], so a test finishes each cut it waits for. */
+    val poseLibrary = PoseLibrary(maker, saved, CoroutineScope(Dispatchers.Main))
+
     val container = AppContainer(
         cameraController = camera,
         cameraSettings = settings,
@@ -194,6 +198,7 @@ class TestAppContainer(
         mirrorReference = reference,
         referenceGuideMaker = maker,
         savedGuideStore = saved,
+        poseLibrary = poseLibrary,
         poseGenerator = generator,
         personDetector = persons,
         poseTipper = tipper,

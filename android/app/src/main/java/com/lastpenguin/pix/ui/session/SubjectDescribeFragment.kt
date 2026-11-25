@@ -1,11 +1,10 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.view.View
-import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -33,6 +32,7 @@ import com.lastpenguin.pix.ui.generation.title
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
 import com.lastpenguin.pix.ui.settings.tutorialFor
+import com.lastpenguin.pix.ui.showNotice
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
@@ -98,14 +98,14 @@ class SubjectDescribeFragment : Fragment(R.layout.fragment_describe_pose), Scene
                         val ui = viewModel.uiState.value
                         if (end.descriptionId != ui.descriptionId) return@collect
                         describeEndNotice(requireContext(), end, ui.photographerName)?.let {
-                            Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show()
+                            showNotice(it)
                         }
                         backToSubject()
                     }
                 }
                 launch {
                     viewModel.goFailed.collect {
-                        Toast.makeText(requireContext(), R.string.describe_go_failed, Toast.LENGTH_SHORT).show()
+                        showNotice(R.string.describe_go_failed)
                     }
                 }
                 launch {

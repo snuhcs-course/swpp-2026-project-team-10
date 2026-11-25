@@ -89,7 +89,8 @@ import org.robolectric.shadows.ShadowToast
  * photographer's own focus (the box alone at its place on the mirror; this phone's bar up, which goes, or held under a
  * finger, where nothing moves; while a drag still waits for its tap's answer, which ends that drag); TalkBack's action
  * on the video (the focus at the image's middle and the bar, and nothing in guide-edit mode); a tap and TalkBack's
- * action while the photographer's camera is paused (nothing), and once frames come again; the live view on mobile data (FR-6.13); the Guide button (FR-6.15) disabled until connected, adding or
+ * action while the photographer's camera is paused (nothing), and once frames come again; a tap while their camera
+ * rebinds for a new ratio (nothing), and once a frame of the new shape comes; the live view on mobile data (FR-6.13); the Guide button (FR-6.15) disabled until connected, adding or
  * changing the guide, opening Add a pose guide, and "Couldn't send the guide" for a guide that did not go; Leave, the
  * back button's question, and the session ending by a lost connection (also with Add a pose guide open over it) or
  * the photographer, named or before the name arrived. Save guide (FR-6.16): hidden without a guide, then saving it
@@ -1141,6 +1142,33 @@ class SubjectFragmentRenderTest {
         idle()
         assertEquals(1, focuses(modules).size)
         onScreen { binding, _ -> assertTrue(binding.exposureBar.isShown) }
+    }
+
+    @Test
+    fun whileThePhotographersCameraRebindsForANewRatio_aTapAsksForNothing_untilAFrameOfTheNewShape() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, focuses = true)
+        modules.video.deliverFrame(720, 960)
+        idle()
+
+        // The photographer's new ratio: their camera rebinds and drops a tap until it is ready again.
+        modules.session.deliver(
+            SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, aspect = AspectRatio.R16_9),
+        )
+        idle()
+        tapTheImage()
+        idle()
+        assertTrue(focuses(modules).isEmpty())
+        onScreen { binding, _ ->
+            assertFalse(binding.exposureBar.isShown)
+            assertFalse(binding.focusRing.isShown)
+        }
+
+        modules.video.deliverFrame(720, 1280)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        tapTheImage()
+        idle()
+        assertEquals(1, focuses(modules).size)
     }
 
     @Test

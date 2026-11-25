@@ -417,6 +417,43 @@ class GenerationViewModelTest {
         assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
     }
 
+    // Partitions: the shot is under way from the press until its frame is taken (the ratio waits for it), and ends
+    // with a shot cancelled while it waits.
+    @Test
+    fun aSceneShot_isUnderWayFromThePressUntilItsFrameIsTaken() = runTest {
+        camera.lightApplies = false
+        model.beginScene()
+        model.toggleLight()
+        runCurrent()
+        assertFalse(state.shooting)
+
+        model.takeScene()
+        runCurrent()
+        assertTrue(state.shooting)
+        camera.state.value = camera.state.value.copy(torch = true)
+        advanceTimeBy(GenerationViewModel.LIGHT_SETTLE_MS + 1)
+
+        assertEquals(1, camera.grabs)
+        assertFalse(state.shooting)
+    }
+
+    @Test
+    fun aSceneShotCancelledWhileItWaitsForTheLight_isNoLongerUnderWay() = runTest {
+        camera.lightApplies = false
+        model.beginScene()
+        model.toggleLight()
+        runCurrent()
+        model.takeScene()
+        runCurrent()
+
+        // Back on the scene photo.
+        model.cancel()
+        runCurrent()
+
+        assertEquals(0, camera.grabs)
+        assertFalse(state.shooting)
+    }
+
     @Test
     fun aShotRightAfterTheLightCameOn_waitsForTheRestOfTheExposure() = runTest {
         model.beginScene()

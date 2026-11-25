@@ -1051,14 +1051,13 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
      */
     private fun setupTip(controls: FragmentCameraBinding) {
         (controls.root as TouchWatchingLayout).onTouchEnd = { event ->
-            // The tip button opens and closes the tip itself; closed here first, its tap would only open it again.
-            if (!controls.tipButtonFrame.isUnder(event, controls.root)) viewModel.onAnyTouch()
             // The ratios close at a touch anywhere but on them or their button, which opens and closes them itself.
-            if (!controls.aspectButton.isUnder(event, controls.root) &&
-                !controls.aspectPanel.isUnder(event, controls.root)
-            ) {
-                viewModel.setAspectsOpen(false)
-            }
+            val onRatios = controls.aspectButton.isUnder(event, controls.root) ||
+                controls.aspectPanel.isUnder(event, controls.root)
+            // The tip button opens and closes the tip itself; closed here first, its tap would only open it again. A
+            // new ratio keeps the guide, so choosing one leaves its tip open too.
+            if (!controls.tipButtonFrame.isUnder(event, controls.root) && !onRatios) viewModel.onAnyTouch()
+            if (!onRatios) viewModel.setAspectsOpen(false)
             // The scene photo's panel goes at a touch anywhere, which still does what it does there (#231).
             generationViewModel.dismissSceneHint()
         }
@@ -1395,8 +1394,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         val aspect = aspectLabel(state.aspect)
         controls.aspectButton.text = aspect
         controls.aspectButton.contentDescription = getString(R.string.aspect_ratio_description, aspect)
-        // A rebind waits for a photo being saved, so the ratio cannot change under the shutter.
-        val choosable = ready && !state.isSaving
+        // A rebind waits for a photo being saved, so the ratio cannot change under the shutter; nor while the scene
+        // photo's shutter waits for its frame, which a rebind would take away.
+        val choosable = ready && !state.isSaving && !generationViewModel.uiState.value.shooting
         controls.aspectButton.isEnabled = choosable
         // The ratios under the top bar, the chosen one selected (FR-1.13).
         controls.aspectPanel.isVisible = state.aspectsOpen

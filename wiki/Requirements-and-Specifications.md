@@ -105,6 +105,7 @@
 | 4.9 | 2026-11-25 | While the other person pinches, each phone says who is zooming; *Subject view* says what the photographer did, as Camera says what the subject did; a tap on the zoom readout glides to its step (Iter5-A1, [#292]; Iter5-A10, [#310]; FR-1.3, FR-7.1, FR-7.4, FR-7.7, US-12, 6.5, 6.6, 6.9). |
 | 4.10 | 2026-11-25 | The library's situations and memos: the situation chips, the situation and the memo under each guide, and the pencil that edits the memo; the Library screen drawn again (FR-3.11, 6.2, 6.8; Iter5-P6, [#270]). |
 | 4.11 | 2026-11-25 | The library's history, favorites, and selection: every candidate and every used photo guide kept with no tap and no limit, ♥ and *Save guide* mark favorites, the tabs *All* and *Favorites*, opening on *All*, with no tab per kind and no *Add photo*, a ♥ on each guide, selecting several, ⋮ with *Select* and *Select all*, *Save guide* drawn as a ♥ on Camera and Subject view, and Back on *Generating poses* and *Pick a pose* without asking, with *View* (FR-2.1, FR-3.8, FR-3.11, FR-4.5, FR-4.6, FR-4.14, FR-6.16, US-2, US-3, US-4, 6.2, 6.3, 6.5; Iter5-A6, [#297]). |
+| 4.12 | 2026-11-25 | The pose tip stays open through a ratio change (US-15). |
 
 </details>
 
@@ -644,6 +645,7 @@ Each story lists its scenarios in Given-When-Then form: **Normal** is the expect
 | **Normal** | I am the subject, and Dongje's guide has a tip | I tap the light bulb on *Subject view* | The same tip opens over the video. A touch closes it. |
 | **Edge** | Pix's two measures of the distance differ | The tip arrives | The tip names no move. It says "Move until the person fits the guide's outline, then take it.", then its other sentences. |
 | **Normal** | The tip banner is open | I touch anywhere | It closes. The light-bulb button beside the zoom readout opens it again. |
+| **Edge** | The tip banner is open | I choose another ratio | It stays open, since the guide stays. |
 | **Edge** | My guide is from an uploaded reference or a saved guide | It is on the Camera screen | No tip shows. |
 | **Failure** | A tip cannot be made | The Camera screen opens | "Couldn't get a tip for this pose" shows briefly; the guide works without a tip. |
 

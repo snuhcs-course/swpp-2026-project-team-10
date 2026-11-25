@@ -329,9 +329,11 @@ class CameraViewModel(
         }
         viewModelScope.launch {
             // A new frame keeps the guide's center and height and clamps them again (Design 2.6.2); the repository
-            // reads the new frame, and the final change reaches a connected subject.
+            // reads the new frame, and the final change reaches a connected subject. The rebind drops the focus point,
+            // so the brightness bar and the box beside it go, as on Subject view.
             camera.state.map { it.aspect }.distinctUntilChanged().drop(1).collect {
                 guides.update(final = true) { state -> state }
+                _uiState.update { it.copy(brightnessOpen = false) }
             }
         }
         viewModelScope.launch {

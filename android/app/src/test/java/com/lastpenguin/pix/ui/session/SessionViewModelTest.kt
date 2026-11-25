@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.net.Uri
@@ -93,6 +93,10 @@ import org.junit.runner.RunWith
  * next session, and not again after a reconnect within that time.
  * Who watches the camera (#271): a subject connecting is a notice on the photographer's phone, not again after a drop,
  * again for the next subject once the room waited alone; none on the subject's phone.
+ * The subject's pinch (#292, FR-7.4): named from its first step, through its steps, until its last value is applied,
+ * when the notice with the ratio follows; a pinch that ends without a last value (a cancel) stays named for
+ * ZOOMING_LINGER_MS (just before its end / at its end); a quick step, one final value, names no one; a session that
+ * ends during a pinch names no one.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 // Robolectric for ProcessLifecycleOwner, which the ViewModel observes for the background limit.
@@ -578,6 +582,91 @@ class SessionViewModelTest {
             invitations,
             clock = clock,
         ).also { store.put("focus", it) }
+    }
+
+    private fun asPhotographerOf(name: String): MutableList<SessionNotice> {
+        val notices = mutableListOf<SessionNotice>()
+        session.setState(SessionState.Connected("s_1", PeerInfo(name), Role.PHOTOGRAPHER))
+        return notices
+    }
+
+    @Test
+    fun theSubjectsPinch_isNamedFromItsFirstStep_untilItsLastValueIsApplied() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        runCurrent()
+        notices.clear()
+        assertNull(model.subjectZooming.value)
+
+        session.deliver(SessionMessage.ZoomSet(1.5f, final = false))
+        runCurrent()
+        assertEquals("Joonhyung", model.subjectZooming.value)
+
+        // Longer than a notice's own time, as long as the steps come.
+        repeat(4) {
+            advanceTimeBy(1_000)
+            session.deliver(SessionMessage.ZoomSet(1.6f + it * 0.1f, final = false))
+            runCurrent()
+            assertEquals("Joonhyung", model.subjectZooming.value)
+        }
+        assertTrue(notices.isEmpty())
+
+        session.deliver(SessionMessage.ZoomSet(2f, final = true))
+        runCurrent()
+        assertNull(model.subjectZooming.value)
+        assertEquals(listOf<SessionNotice>(SessionNotice.RemoteZoom("Joonhyung", 2f)), notices)
+    }
+
+    @Test
+    fun aPinchThatEndsWithoutALastValue_staysNamedALittle_thenNoLonger() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        runCurrent()
+        notices.clear()
+        session.deliver(SessionMessage.ZoomSet(1.5f, final = false))
+        runCurrent()
+
+        // The subject's phone took the pinch back: no value is applied, so no notice with a ratio comes.
+        session.deliver(SessionMessage.ZoomSet(1.5f, final = true, cancel = true))
+        runCurrent()
+        assertEquals("Joonhyung", model.subjectZooming.value)
+        advanceTimeBy(SessionViewModel.ZOOMING_LINGER_MS - 1)
+        runCurrent()
+        assertEquals("Joonhyung", model.subjectZooming.value)
+        advanceTimeBy(1)
+        runCurrent()
+        assertNull(model.subjectZooming.value)
+        assertTrue(notices.isEmpty())
+    }
+
+    @Test
+    fun aQuickStep_namesNoOneZooming_onlyItsRatio() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        val zooming = mutableListOf<String?>()
+        backgroundScope.launch { model.subjectZooming.collect { zooming += it } }
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.ZoomSet(2f, final = true))
+        runCurrent()
+
+        assertEquals(listOf<String?>(null), zooming)
+        assertEquals(listOf<SessionNotice>(SessionNotice.RemoteZoom("Joonhyung", 2f)), notices)
+    }
+
+    @Test
+    fun aSessionThatEndsDuringThePinch_namesNoOne() = runTest(dispatcher) {
+        asPhotographerOf("Joonhyung")
+        runCurrent()
+        session.deliver(SessionMessage.ZoomSet(1.5f, final = false))
+        runCurrent()
+        assertEquals("Joonhyung", model.subjectZooming.value)
+
+        session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        runCurrent()
+
+        assertNull(model.subjectZooming.value)
     }
 
     @Test

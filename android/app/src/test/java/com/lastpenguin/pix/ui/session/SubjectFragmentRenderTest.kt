@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -40,6 +40,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.camera.ExposureBarView
+import com.lastpenguin.pix.ui.camera.ExposureScale
 import com.lastpenguin.pix.ui.camera.FocusBrightness
 import com.lastpenguin.pix.ui.camera.REFERENCE_HIDDEN_ALPHA
 import com.lastpenguin.pix.ui.camera.REFERENCE_PEEK_DP
@@ -895,6 +896,83 @@ class SubjectFragmentRenderTest {
         idle()
         assertTrue(focuses(modules).isEmpty())
         onScreen { binding, _ -> assertFalse(binding.exposureBar.isShown) }
+    }
+
+    private fun label(): Pair<String, Boolean> =
+        onScreen { binding, _ -> binding.toggleLabel.text.toString() to binding.toggleLabel.isShown }
+
+    private fun waitMs(ms: Long) = shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(ms))
+
+    @Test
+    fun whatThePhotographerDid_isALineWithTheirName_whereTheLabelsShow_forItsTime() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, hasFlash = true, focuses = true)
+
+        val lines = listOf(
+            SessionMessage.PhotographerDid("zoom", zoom = 2f) to string(R.string.remote_zoom_notice, "Dongje", "2"),
+            SessionMessage.PhotographerDid("brightness", exposure = 2) to
+                string(R.string.remote_brightness_notice, "Dongje", ExposureScale.formatEv(2, 0.5f)),
+            SessionMessage.PhotographerDid("flash", flash = FlashMode.ON) to
+                string(R.string.remote_flash_on_notice, "Dongje"),
+            SessionMessage.PhotographerDid("flash", flash = FlashMode.AUTO) to
+                string(R.string.remote_flash_auto_notice, "Dongje"),
+            SessionMessage.PhotographerDid("flash", flash = FlashMode.OFF) to
+                string(R.string.remote_flash_off_notice, "Dongje"),
+            SessionMessage.PhotographerDid("guide.move") to string(R.string.remote_guide_move_notice, "Dongje"),
+            SessionMessage.PhotographerDid("guide") to string(R.string.remote_guide_notice, "Dongje"),
+            SessionMessage.Focused(0.5f, 0.5f) to string(R.string.remote_focus_notice, "Dongje"),
+        )
+        for ((message, text) in lines) {
+            modules.session.deliver(message)
+            idle()
+            assertEquals(text to true, label())
+        }
+
+        // The last one, the focus, for its shorter time; any other for a label's.
+        waitMs(SessionViewModel.FOCUS_NOTICE_MS + 100)
+        assertFalse(label().second)
+        modules.session.deliver(SessionMessage.PhotographerDid("guide.move"))
+        idle()
+        waitMs(SubjectFragment.LABEL_MS - 100)
+        assertTrue(label().second)
+        waitMs(200)
+        assertFalse(label().second)
+    }
+
+    @Test
+    fun thePhotographersPinch_saysWhoIsZooming_untilItsRatiosLineTakesItsPlace() {
+        val modules = launch()
+        connect(modules)
+        val zooming = string(R.string.zoom_held_label, "Dongje")
+
+        modules.session.deliver(SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER))
+        idle()
+        assertEquals(zooming to true, label())
+        // As long as the pinch, beyond a label's own time.
+        waitMs(SubjectFragment.LABEL_MS + 2_000)
+        assertEquals(zooming to true, label())
+
+        // The pinch's end: the ratio first, then the zoom free again.
+        modules.session.deliver(SessionMessage.PhotographerDid("zoom", zoom = 2f))
+        modules.session.deliver(SessionMessage.ZoomHoldUpdate(null))
+        idle()
+        assertEquals(string(R.string.remote_zoom_notice, "Dongje", "2") to true, label())
+        waitMs(SubjectFragment.LABEL_MS + 100)
+        assertFalse(label().second)
+    }
+
+    @Test
+    fun aPinchOfThePhotographersThatEndsWithoutARatio_takesItsLineDown() {
+        val modules = launch()
+        connect(modules)
+
+        modules.session.deliver(SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER))
+        idle()
+        assertTrue(label().second)
+        modules.session.deliver(SessionMessage.ZoomHoldUpdate(null))
+        idle()
+
+        assertFalse(label().second)
     }
 
     @Test

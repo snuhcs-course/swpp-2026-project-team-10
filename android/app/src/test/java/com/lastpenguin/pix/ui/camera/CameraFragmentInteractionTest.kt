@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -377,6 +377,65 @@ class CameraFragmentInteractionTest {
             assertEquals(string(R.string.mobile_data_notice), controls.noticeText.text.toString())
         }
         assertTrue(runBlocking { modules.mobileData.wasShown() })
+    }
+
+    private fun idleFor(ms: Long) = shadowOf(Looper.getMainLooper()).idleFor(ms, TimeUnit.MILLISECONDS)
+
+    @Test
+    fun theSubjectsPinch_saysWhoIsZooming_fromItsFirstStep_untilTheRatiosNoticeTakesItsPlace() {
+        val modules = launch(FakeCameraController())
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        // The notice of who watches goes after its time.
+        idleFor(CameraViewModel.NOTICE_MS)
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+
+        modules.session.deliver(SessionMessage.ZoomSet(1.5f, final = false))
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.zoom_held_label, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+
+        // It stays as long as the pinch does, beyond a notice's own time.
+        repeat(4) {
+            idleFor(1_000)
+            modules.session.deliver(SessionMessage.ZoomSet(1.6f + it * 0.1f, final = false))
+            idle()
+        }
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.zoom_held_label, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+
+        modules.session.deliver(SessionMessage.ZoomSet(2f, final = true))
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.remote_zoom_notice, "Joonhyung", "2"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+        // The ratio's notice keeps its own time.
+        idleFor(CameraViewModel.NOTICE_MS - 100)
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.noticeText.visibility) }
+        idleFor(200)
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+    }
+
+    @Test
+    fun aPinchTakenBack_takesItsLineDown_afterALittle() {
+        val modules = launch(FakeCameraController())
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        idleFor(CameraViewModel.NOTICE_MS)
+        modules.session.deliver(SessionMessage.ZoomSet(1.5f, final = false))
+        idle()
+
+        modules.session.deliver(SessionMessage.ZoomSet(1.5f, final = true, cancel = true))
+        idle()
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.noticeText.visibility) }
+        idleFor(SessionViewModel.ZOOMING_LINGER_MS + 100)
+
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
     }
 
     @Test

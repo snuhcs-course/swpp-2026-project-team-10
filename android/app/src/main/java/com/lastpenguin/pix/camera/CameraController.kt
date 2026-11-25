@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-17, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.camera
 
 import android.graphics.Bitmap
@@ -115,6 +115,14 @@ interface CameraController {
      * or a single change: during a pinch the lens changes only well past 1× (Design 2.6.5, NFR-19).
      */
     fun setZoom(ratio: Float, final: Boolean = true)
+
+    /**
+     * A single change to [ratio], as a tap on the zoom readout or a pinch's last value (FR-1.3, #310): the picture
+     * glides there in [ZoomGlide.DURATION_MS], frame by frame as a pinch zooms. It is there at once, as [setZoom] with
+     * `final`, where a glide cannot show: another lens has to open for it, the picture is already there, a photo is
+     * being saved, or the phone's animations are off. A newer request of either kind takes over.
+     */
+    fun glideZoom(ratio: Float) = setZoom(ratio, final = true)
 
     /** Focuses and meters at a point of the frame, 0..1 from its top-left corner (FR-1.4). */
     fun setFocusPoint(x: Float, y: Float)

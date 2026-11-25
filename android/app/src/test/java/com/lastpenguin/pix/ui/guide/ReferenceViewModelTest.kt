@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-04, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
@@ -67,6 +67,37 @@ class ReferenceViewModelTest {
     fun teardown() {
         store.clear()
         Dispatchers.resetMain()
+    }
+
+    @Test
+    fun aChosenPosesGuideUsed_isNotToldAsAGuideSet_sinceItsConfirmSaysSoItself() = runTest {
+        var told = 0
+        val telling = ReferenceViewModel(maker, guides, onGuideSet = { told++ })
+        store.put("telling", telling)
+        telling.onCandidatePicked(bitmap())
+        runCurrent()
+        maker.finish(Result.success(guide()))
+        runCurrent()
+
+        telling.onUseGuide()
+
+        assertEquals(0, told)
+    }
+
+    @Test
+    fun aGuideForThePhotographerFromTheSubjectsPhone_isNotToldHere() = runTest {
+        var told = 0
+        val saved = SavedGuideStore.InMemory()
+        val subjectModel = ReferenceViewModel(maker, guides, saved, subject = FakeTarget(), onGuideSet = { told++ })
+        store.put("subject-telling", subjectModel)
+        subjectModel.openFor(fromSubject = true)
+        saved.save(guide(), GuideState())
+        runCurrent()
+
+        subjectModel.onUseSaved(saved.saved.value.single().id)
+        runCurrent()
+
+        assertEquals(0, told)
     }
 
     @Test

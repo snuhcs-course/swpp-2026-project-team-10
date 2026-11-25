@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -20,6 +20,7 @@ import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.ReferenceGuide
+import com.lastpenguin.pix.session.PhotographerAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -50,6 +51,11 @@ import org.junit.Test
  * brightness slider opens only with compensation.
  * Focus: a tap inside the frame on a ready camera that supports it; a camera that is not ready, a camera without a
  * focus point, and a point outside the frame are ignored.
+ * What the photographer did, told for the subject's phone (#292): a pinch (nothing at its steps, its last value
+ * clamped to the camera's range) and a quick step (its step); a drag for the brightness (nothing at its steps, its end
+ * clamped) and each tap on the flash; not the base brightness a tap to focus puts back; a gesture on the guide that
+ * moved it (once, at its end) and one that did not (nothing); a camera without a flash or without brightness
+ * (nothing).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CameraControlsViewModelTest {
@@ -303,6 +309,87 @@ class CameraControlsViewModelTest {
         runCurrent()
         model.onFocusTap(0.5f, 0.5f)
         assertEquals(1, told.size)
+    }
+
+    private fun startTelling(): MutableList<PhotographerAction> {
+        val did = mutableListOf<PhotographerAction>()
+        model = CameraViewModel(camera, guides, settings, onDid = { did += it })
+        store.put("camera", model)
+        return did
+    }
+
+    @Test
+    fun aPinch_isToldOnce_atItsLastValue_andAQuickStepAtItsStep() = runTest(dispatcher) {
+        val did = startTelling()
+        runCurrent()
+
+        model.onZoomChanged(1.4f, final = false)
+        model.onZoomChanged(1.8f, final = false)
+        assertTrue(did.isEmpty())
+        // Its last value, as the camera can show it.
+        model.onZoomChanged(9f, final = true)
+        assertEquals(listOf<PhotographerAction>(PhotographerAction.Zoom(4f)), did)
+
+        did.clear()
+        model.onZoomTap()
+        assertEquals(listOf<PhotographerAction>(PhotographerAction.Zoom(2f)), did)
+    }
+
+    @Test
+    fun aDragForTheBrightness_isToldOnce_atItsEnd_andTheFlashAtEachTap() = runTest(dispatcher) {
+        val did = startTelling()
+        runCurrent()
+
+        model.onExposureChange(3, final = false)
+        model.onExposureChange(5, final = false)
+        assertTrue(did.isEmpty())
+        model.onExposureChange(40, final = true)
+        assertEquals(listOf<PhotographerAction>(PhotographerAction.Brightness(12)), did)
+
+        did.clear()
+        model.onFlashTap()
+        assertEquals(listOf<PhotographerAction>(PhotographerAction.Flash(FlashMode.AUTO)), did)
+    }
+
+    @Test
+    fun theBaseBrightnessAtATapToFocus_isNotTold_asABrightnessTheUserSet() = runTest(dispatcher) {
+        val did = startTelling()
+        runCurrent()
+
+        model.onFocusTap(0.5f, 0.5f)
+
+        assertTrue(did.none { it is PhotographerAction.Brightness })
+    }
+
+    @Test
+    fun aGestureThatMovedTheGuide_isToldOnce_atItsEnd_andOneThatDidNotIsNot() = runTest(dispatcher) {
+        val did = startTelling()
+        runCurrent()
+        guides.setGuide(guide())
+        runCurrent()
+
+        model.onGuideGesture(0.01f, 0f, 1f, final = false)
+        model.onGuideGesture(0.01f, 0f, 1f, final = false)
+        assertTrue(did.isEmpty())
+        model.onGuideGesture(0f, 0f, 1f, final = true)
+        assertEquals(listOf<PhotographerAction>(PhotographerAction.GuideMove), did)
+
+        // A touch on the guide that moved nothing.
+        did.clear()
+        model.onGuideGesture(0f, 0f, 1f, final = true)
+        assertTrue(did.isEmpty())
+    }
+
+    @Test
+    fun aCameraWithoutAFlash_orWithoutBrightness_tellsNothingForThem() = runTest(dispatcher) {
+        val did = startTelling()
+        camera.capabilities.value = capabilities(hasFlash = false, exposureRange = 0..0)
+        runCurrent()
+
+        model.onFlashTap()
+        model.onExposureChange(2, final = true)
+
+        assertTrue(did.isEmpty())
     }
 
     @Test

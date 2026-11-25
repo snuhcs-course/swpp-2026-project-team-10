@@ -107,6 +107,9 @@ import org.robolectric.shadows.ShadowToast
  * The UAT's opinions (#271): the slot where Camera's shutter is empty until connected, then whose camera this is and
  * "Live", given up to a step's button, with no notice saying it as well; *Leave* red; the guide-edit toggle one person icon, unlit with the guide plain and lit with it
  * filled. The grid on by default and off from Settings.
+ * What the photographer did (#292): each action a line with their name where the labels show, for a label's time and
+ * the focus's for its shorter one; the photographer's pinch named for as long as it, replaced by the ratio's line, gone
+ * when it ends without one; another label meanwhile keeps its own time, and the line is back after it.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -958,6 +961,26 @@ class SubjectFragmentRenderTest {
         idle()
         assertEquals(string(R.string.remote_zoom_notice, "Dongje", "2") to true, label())
         waitMs(SubjectFragment.LABEL_MS + 100)
+        assertFalse(label().second)
+    }
+
+    @Test
+    fun anotherLabelDuringThePhotographersPinch_keepsItsOwnTime_andThenWhoIsZoomingIsBack() {
+        val modules = launch()
+        connect(modules, hasFlash = true)
+        val zooming = string(R.string.zoom_held_label, "Dongje")
+        modules.session.deliver(SessionMessage.ZoomHoldUpdate(Role.PHOTOGRAPHER))
+        idle()
+
+        modules.session.deliver(SessionMessage.PhotographerDid("flash", flash = FlashMode.ON))
+        idle()
+        assertEquals(string(R.string.remote_flash_on_notice, "Dongje") to true, label())
+        waitMs(SubjectFragment.LABEL_MS + 100)
+
+        assertEquals(zooming to true, label())
+        // And it still goes when the pinch ends.
+        modules.session.deliver(SessionMessage.ZoomHoldUpdate(null))
+        idle()
         assertFalse(label().second)
     }
 

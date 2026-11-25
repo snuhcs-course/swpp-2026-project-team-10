@@ -1291,7 +1291,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         toggleLabelJob?.cancel()
         toggleLabelJob = viewLifecycleOwner.lifecycleScope.launch {
             delay(durationMs)
-            chip.isVisible = false
+            // A pinch of the photographer's that still goes on has its label back, which this one took the place of.
+            if (heldLabel != null) showZoomingLabel(binding) else chip.isVisible = false
         }
     }
 
@@ -1372,13 +1373,18 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
      * [letHeldLabelGo] or when another label takes its place.
      */
     private fun holdZoomingLabel(binding: FragmentSubjectBinding) {
+        toggleLabelJob?.cancel()
+        showZoomingLabel(binding)
+    }
+
+    /** Puts "… is zooming" in the label's place and keeps its text as the held one. */
+    private fun showZoomingLabel(binding: FragmentSubjectBinding) {
         val name = viewModel.uiState.value.photographerName ?: return
         val text = getString(R.string.zoom_held_label, name)
         val chip = binding.toggleLabel
         chip.text = text
         setLabelIcon(chip, R.drawable.ic_zoom_small, R.color.pix_text)
         chip.isVisible = true
-        toggleLabelJob?.cancel()
         heldLabel = text
     }
 

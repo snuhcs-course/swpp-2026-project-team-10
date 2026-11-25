@@ -120,7 +120,9 @@ interface CameraController {
      * A single change to [ratio], as a tap on the zoom readout or a pinch's last value (FR-1.3, #310): the picture
      * glides there in [ZoomGlide.DURATION_MS], frame by frame as a pinch zooms. It is there at once, as [setZoom] with
      * `final`, where a glide cannot show: another lens has to open for it, the picture is already there, a photo is
-     * being saved, or the phone's animations are off. A newer request of either kind takes over.
+     * being saved, or the phone's animations are off. Either way [zoom] and [state] report [ratio] from this call on,
+     * until the camera is asked for it, so a readout shows the step while the picture is on its way. A newer request
+     * of either kind takes over.
      */
     fun glideZoom(ratio: Float) = setZoom(ratio, final = true)
 

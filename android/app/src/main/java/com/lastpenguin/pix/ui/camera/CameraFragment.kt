@@ -1836,7 +1836,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         noticeJob?.cancel()
         return viewLifecycleOwner.lifecycleScope.launch {
             delay(durationMs)
-            controls.noticeText.isVisible = false
+            // A pinch of the subject's that still goes on has its line back, which this notice took the place of.
+            val held = heldNotice
+            if (held != null) controls.noticeText.text = held else controls.noticeText.isVisible = false
         }.also { noticeJob = it }
     }
 

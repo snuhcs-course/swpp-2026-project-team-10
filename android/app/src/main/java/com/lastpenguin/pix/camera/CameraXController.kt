@@ -141,6 +141,10 @@ class CameraXController(
     // A tap's step on its way (#310): each frame asks for its next ratio as a pinch's step would, and its last as the
     // final value. Null whenever no glide runs.
     private var glide: ZoomGlide? = null
+
+    // The step told as the zoom ahead of the camera (#310), from a single change's request until the camera is asked
+    // for that step itself: the readout shows it at once, whatever the camera reports on the way there. Null otherwise.
+    private var heldZoom: Float? = null
     private var zoomPlan: CameraZoomPlan? = null
     private var primarySelector = CameraSelector.DEFAULT_BACK_CAMERA
     private var ultrawideSelector: CameraSelector? = null
@@ -183,6 +187,10 @@ class CameraXController(
                     current.requestedNative = null
                     current.exposureRestored = false
                     current.restoringExposure = false
+                    // A step that was on its way is where the camera starts again, as the readout already says.
+                    heldZoom?.let { retainedZoom = it }
+                    glide = null
+                    heldZoom = null
                     pendingZoom = null
                     pendingFinal = true
                     current.frames.clear()
@@ -396,8 +404,9 @@ class CameraXController(
             val current = binding ?: return@execute
             val requested = zoomPlan?.clamp(ratio) ?: return@execute
             if (!current.active || current.failed) return@execute
-            // A pinch, or any newer request, takes a glide over where it is.
+            // A pinch, or any newer request, takes a glide over where it is, and the zoom told is the camera's again.
             glide = null
+            heldZoom = null
             requestZoom(requested, final)
         }
     }
@@ -408,13 +417,20 @@ class CameraXController(
             val plan = zoomPlan ?: return@execute
             val target = plan.clamp(ratio) ?: return@execute
             if (!current.active || current.failed) return@execute
-            // From where the picture is, or is about to be: a second tap starts from the first one's glide.
-            val from = glide?.at(System.nanoTime()) ?: pendingZoom ?: retainedZoom
+            // From where the picture is, or is about to be: a second tap starts from the first one's glide, and a
+            // pinch's last value from its last step, which the camera was asked for and may not have applied yet. The
+            // zoom last applied alone can be some steps behind, and a glide from there would jump back first.
+            val asked = current.requestedNative?.let { current.range?.appZoom(it) }
+            val from = glide?.at(System.nanoTime()) ?: pendingZoom ?: asked ?: retainedZoom
             // A glide shows only on the lens that is bound: another lens rebinds the camera behind a held frame, which a
             // glide up to it would only delay. A camera that is opening or saving a photo applies nothing meanwhile.
             val shows = _status.value == CameraStatus.READY && current.capturesInFlight == 0 &&
                 plan.lensFor(target) == current.lens && plan.lensFor(from) == current.lens &&
                 ValueAnimator.areAnimatorsEnabled() && ZoomGlide.worth(from, target)
+            // The step is told at the tap, glide or not: the readout, and the subject's phone, say where the zoom is
+            // going while the picture is on its way there, also behind a lens that opens or a photo being saved.
+            heldZoom = target
+            tellZoom(target)
             if (!shows) {
                 glide = null
                 requestZoom(target, final = true)
@@ -423,9 +439,6 @@ class CameraXController(
             extendTrace()
             markZoom("zoom.glide", "$from to $target")
             glide = ZoomGlide(from, target, System.nanoTime())
-            // The step is told at the tap: the readout, and the subject's phone, say where the zoom is going while the
-            // picture is on its way there.
-            tellZoom(target)
             scheduleDrain()
         }
     }
@@ -505,6 +518,8 @@ class CameraXController(
             return
         }
         pendingZoom = null
+        // The zoom asked for is the one this lens is given now, so what the camera reports from here on is told again.
+        heldZoom = null
         val native = range.nativeZoom(requested)
         if (state.zoomRatio == native) {
             retainedZoom = range.appZoom(state.zoomRatio)
@@ -517,6 +532,8 @@ class CameraXController(
     }
 
     private fun applyZoom(current: Binding, requested: Float) {
+        // The camera is asked for the step itself: what it reports from here on is told again.
+        if (requested == heldZoom) heldZoom = null
         val camera = current.camera ?: return
         val range = current.range ?: return
         val restoring = current.restoringZoom
@@ -780,6 +797,8 @@ class CameraXController(
         chosenFacing = facing
         _facing.value = facing
         retainedZoom = 1f
+        glide = null
+        heldZoom = null
         pendingZoom = null
         pendingFinal = true
         retainedExposure = 0
@@ -917,9 +936,10 @@ class CameraXController(
 
     private fun publishZoom(current: Binding, state: ZoomState) {
         val applied = current.range?.appZoom(state.zoomRatio) ?: return
-        // While a tap's step glides, the zoom told stays its step, not each ratio on the way (#310): the number would
-        // run ahead of the picture, which the camera shows some frames after each request.
-        tellZoom(glide?.to ?: applied)
+        // While a single change is on its way, the zoom told stays its step, not each ratio before it (#310): the
+        // number would run ahead of the picture, which the camera shows some frames after each request, or fall back
+        // to a ratio on the way once the glide's time is over.
+        tellZoom(heldZoom ?: applied)
     }
 
     private fun tellZoom(zoom: Float) {
@@ -1029,6 +1049,7 @@ class CameraXController(
             ultrawideSelector = null
             pendingZoom = null
             pendingFinal = true
+            heldZoom = null
         }
         current.lifecycleObserver?.let { current.owner.lifecycle.removeObserver(it) }
         current.zoomObserver?.let { current.camera?.cameraInfo?.zoomState?.removeObserver(it) }

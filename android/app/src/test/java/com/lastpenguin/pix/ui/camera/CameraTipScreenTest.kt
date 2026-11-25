@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Dongje Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
+import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.generation.TipSource
 import com.lastpenguin.pix.guide.GuideSource
@@ -37,7 +38,8 @@ import org.robolectric.annotation.GraphicsMode
  * The pose tip on the Camera screen (R&S 6.2, FR-4.10; Testing Documentation 2.1.6), on the real Fragment with the
  * test modules' PoseTips. The banner: preparing, then the tip in place, closed by a touch that still reaches the
  * button it lands on, opened again by the tip button, gone with a failure after its notice. The guide: a generated one
- * with a tip, hidden and shown again, one from the gallery. The scene photo step hides the banner and the button.
+ * with a tip, hidden and shown again, one from the gallery. The scene photo step hides the banner and the button. A
+ * ratio chosen with taps on its button and its panel leaves the tip open, since the guide stays.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -137,6 +139,28 @@ class CameraTipScreenTest {
         }
         idle()
         onScreen { controls, _ -> assertTrue(controls.tipBanner.isShown) }
+    }
+
+    @Test
+    fun aRatioChosenWithTaps_leavesTheTipOpen() {
+        launch()
+        generatedGuideOnCamera()
+        modules.tipper.requests.single().tip(TIP)
+        idle()
+
+        onScreen { controls, _ -> tapThroughTheRoot(controls, controls.aspectButton) }
+        idle()
+        onScreen { controls, _ -> tapThroughTheRoot(controls, controls.aspect11Option) }
+        idle()
+        modules.camera.state.value = modules.camera.state.value.copy(aspect = AspectRatio.R1_1)
+        idle()
+
+        assertEquals(listOf(AspectRatio.R1_1), modules.camera.aspectRequests)
+        onScreen { controls, _ ->
+            assertTrue(controls.tipBanner.isShown)
+            assertEquals(TIP, controls.tipText.text.toString())
+            assertTrue(controls.tipButtonFrame.isShown)
+        }
     }
 
     @Test

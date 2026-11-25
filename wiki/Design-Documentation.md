@@ -130,6 +130,7 @@
 | 4.13 | 2026-11-25 | Reconnection tries for 30 s, not 10 s; Camera says who it reconnects with for the whole wait (`SessionViewModel.reconnectingWith`), read from `Reconnecting`'s new `peer` and `role`; a photo's 30 s without word no longer count a drop, which `Connected`'s new `drops` tells of (Iter5-A2, [#293]; 1.1.3, 1.1.4, 2.3, 2.4, 2.6.7, 2.8). |
 | 4.14 | 2026-11-25 | Impeccable's findings: notices as Snackbars through `ui/Notices.kt`, *Undo* after *Remove guide* with the tip kept aside in `PoseTips`, *Leave* and *End session* asked first, and the camera screens at large fonts (2.6.2, 2.6.3, 2.6.7, 2.8; Iter5-A7, [#298]). |
 | 4.15 | 2026-11-25 | The self-timer and the camera menu (Iter5-P8, [#272]): `ShutterTimer` and the countdown in `CameraViewModel`, cancelled by a second tap or the screen stopping; the menu's button with *Flash*, *Timer*, *Grid*, *Horizon*, and *Settings* in place of the flash and the gear on both phones; `camera.timer` and the countdown on Subject view; *Still open* without the timer; Settings without its *Camera* section: the grid and the horizon bar only in the menu, toggled in one edit, and no base brightness, so each tap to focus goes back to 0 EV; *End session* and the subject's *Flash* waiting during the countdown; one 32 dp pill for the top bar's buttons, and `reveal` for the menu and the ratios (2.1, 2.2, 2.3, 2.5.1, 2.6.2, 2.6.5, 2.6.8, 2.8). |
+| 4.16 | 2026-11-25 | Ratio-change fixes: the ratio controls keep an open pose tip, a new ratio closes the brightness bar, Subject view sends no tap while its video reshapes, and no ratio while the scene photo's shutter waits (2.5.1, 2.8). |
 
 </details>
 
@@ -1901,7 +1902,7 @@ When `hasFlash` is false, the photographer answers with the unchanged state.
 { "v": 3, "t": "camera.focus.set", "seq": 1, "ts": 1759212355000, "b": { "x": 0.62, "y": 0.4 } }
 ```
 
-The subject's tap on the live video (FR-7.7): `x` and `y` are fractions of the photographer's frame, 0 to 1, as the photographer's preview shows it. The subject's video of the rear camera is a mirror, so the subject sends 1 − x of what it sees; the front camera's video is mirrored on both phones. The photographer calls `setFocusPoint` and sets its brightness back to 0 EV (2.6.5). The point has no echo, since focus has no lasting state. The answer is the `camera.state` with that brightness, `by: SUBJECT` and `focused: true`. A point outside 0 to 1 is dropped.
+The subject's tap on the live video (FR-7.7): `x` and `y` are fractions of the photographer's frame, 0 to 1, as the photographer's preview shows it. The subject's video of the rear camera is a mirror, so the subject sends 1 − x of what it sees; the front camera's video is mirrored on both phones. The photographer calls `setFocusPoint` and sets its brightness back to 0 EV (2.6.5). The point has no echo, since focus has no lasting state. The answer is the `camera.state` with that brightness, `by: SUBJECT` and `focused: true`. A point outside 0 to 1 is dropped. So is a tap while the camera is not ready. Subject view therefore sends no tap while its video reshapes for a new ratio, until a frame of the new shape shows.
 
 </details>
 
@@ -3451,7 +3452,7 @@ erDiagram
 - The chip shows for 3 s (`CameraViewModel.NOTICE_MS`), and a new label replaces it at once. It is a live region for TalkBack. The hint chip steps aside for it, and opening the ratios takes it down (FR-1.13).
 - The guide-edit mode toggle shows `pinchModeLabel` above it for 3 s: *Guide* in the guide's color while drags and pinches move the guide, *Camera* in white while a pinch zooms. TalkBack reads "Pinch moves the guide" or "Pinch zooms the camera".
 - Subject view shows the same labels for its zoom step, its *Save guide*, and its toggle.
-- The pose tip's button closes an open tip, as any touch does (FR-4.10). The screen-wide touch skips the button, so one tap does not close and reopen the tip.
+- The pose tip's button closes an open tip, as any touch does (FR-4.10). The screen-wide touch skips the button, so one tap does not close and reopen the tip. It also skips the ratio button and the ratios: a new ratio keeps the guide, so its tip stays open.
 - Brightness is `ExposureBarView`: a 48 × 128 dp touch area, a 1.5 dp accent line with a 2.5 dp outline, and a sun at the applied exposure index (FR-1.11).
 - A tap to focus brings the bar up beside the focus box: on its right, or its left near the image's right edge, always inside the image. Without point focus, it comes up at the tap.
 - Up without a tap point, as after the screen is made again, the bar stands at the middle of the image's right edge, clear of the horizon bar.
@@ -3462,6 +3463,8 @@ erDiagram
 - TalkBack reads the bar as a slider with scroll actions. The bar fades after 3 s without a touch (`FocusBrightness.IDLE_MS`). It stays while dragged or in TalkBack's focus; the idle time restarts when the focus leaves.
 - The focus box (`bg_focus_ring`) is a 64 dp square of a 1 dp accent line, with a short tick at the middle of each side. Subject view has the same box and bar for the photographer's camera, in place of its brightness button and slider (2.6.5, [#273]). `FocusBrightness` places and times both on either screen.
 - Beside the bar, the box stays as long as the bar does, and the two fade out together in 200 ms, whatever closes the bar (`FocusBrightness`). On a camera without brightness, the box fades by itself after about a second. Before, it went after a second while the bar stayed and still changed the brightness ([#207]).
+- A new ratio closes the bar on both screens. The rebind drops the focus point, so the box would mark a focus that is gone.
+- The ratio cannot change while the scene photo's shutter waits for its frame (`GenerationUiState.shooting`). A rebind then would leave no frame to take.
 
 **Language** (FR-10.2)
 

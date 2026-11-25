@@ -46,7 +46,7 @@ import org.junit.Test
  * Aspect ratio (chosen from the ratios under the top bar since Iter3-A12; before, each tap moved to the next): each
  * ratio chosen goes to the camera, is saved, and closes the ratios; the ratio the camera has only closes them; a choice
  * while a photo is saved is ignored, and the shutter closes the ratios; a saved ratio is restored at start, and none
- * leaves the default; a ratio change re-clamps a guide and sends a final change.
+ * leaves the default; a ratio change re-clamps a guide and sends a final change, and closes an open brightness bar.
  * Exposure: an index inside the range, beyond each end (clamped), and a camera without compensation (ignored); the
  * brightness slider opens only with compensation.
  * Focus: a tap inside the frame on a ready camera that supports it; a camera that is not ready, a camera without a
@@ -193,6 +193,19 @@ class CameraControlsViewModelTest {
         assertEquals(0.7f, guides.state.value.height, EPSILON)
         assertEquals(2, changes.size)
         assertTrue(changes.all { it.final })
+    }
+
+    @Test
+    fun ratioChange_withTheBrightnessBarOpen_closesIt() = runTest(dispatcher) {
+        start()
+        runCurrent()
+        model.setBrightnessOpen(true)
+
+        // The rebind drops the focus point the bar stands beside.
+        model.onAspectChosen(AspectRatio.R1_1)
+        runCurrent()
+
+        assertFalse(model.uiState.value.brightnessOpen)
     }
 
     @Test

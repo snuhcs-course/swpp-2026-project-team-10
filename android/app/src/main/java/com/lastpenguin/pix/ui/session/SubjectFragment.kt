@@ -1125,6 +1125,9 @@ class SubjectFragment :
         // Not over a video that is not coming: the photographer's camera is paused or not yet seen, and would drop the
         // request, so a box here would show a focus that was never set.
         if (!videoShowing.value) return false
+        // Nor while the photographer's camera rebinds for a new ratio: it drops a tap until it is ready, which the
+        // first frame of the new shape says, and the frame on screen is not the one the tap would be placed in.
+        if (reshaping) return false
         val ui = viewModel.uiState.value
         val frame = videoFrame(binding, ui)
         if (frame.width <= 0f || x !in frame.left..frame.right || y !in frame.top..frame.bottom) return false

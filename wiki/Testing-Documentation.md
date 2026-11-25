@@ -138,6 +138,7 @@
 | 4.15 | 2026-11-25 | Reconnection for 30 s, with Camera's line during the wait (Iter5-A2, [#293]): its owner and tests, the moved boundary, NFR-11's target, and changed and added steps on IT-4 and IT-16 (1.1, 2.1.5, 2.1.6, 2.2.3, Appendix A). |
 | 4.16 | 2026-11-25 | Impeccable's findings built (Iter5-A7, [#298]): their owner and tests, notices read through `shownNotice`, the layout at font scales 1.5 and 2, what changes in IT-5, IT-20, IT-33, and IT-34, and Impeccable's result (1.1, 2.1.8, 4.4, Appendix A). |
 | 4.17 | 2026-11-25 | The self-timer and the camera menu (Iter5-P8, [#272]): their tests, a boundary of 2.1.6, and IT-42; Settings without its *Camera* section: a partition of 2.1.6, IT-21's grid steps in the menu, and IT-21, IT-34, and IT-41 without the gear or the base brightness (1.1, 2.1.5, 2.1.6, Appendix A). |
+| 4.18 | 2026-11-25 | The ratio-change fixes: their owner and tests, and added steps on IT-7 and IT-30 (1.1, 2.1.5, Appendix A). |
 
 </details>
 
@@ -240,6 +241,7 @@ One member writes and maintains each component's tests, following the module own
 | The library's history, favorites, and selection (Iter5-A6, [#297]) | Repositories, Managers, ViewModels, Views | `guide/` (`FileSavedGuideStoreTest`), `ui/generation/` (`PoseSaveViewModelTest`, `GenerationScreensTest`), `ui/camera/` (`SaveGuideViewModelTest`), `ui/session/` (`SubjectViewModelTest`), `ui/guide/` (`LibraryPageTest`, `SavedGuidesViewModelTest`, `ReferenceViewModelTest`, `LibraryFragmentTest`, `PoseGuideTurnTest`), `ui/` (`KoreanScreensTest`); IT-26, IT-27, and IT-35 on phones | 한준형 |
 | The library's situations and memos (Iter5-P6, [#270]) | Repositories, Models, ViewModels, Views, the session protocol | `guide/` (`FileSavedGuideStoreTest`), `ui/guide/` (`LibraryPageTest`, `SavedGuidesViewModelTest`, `ReferenceViewModelTest`, `LibraryFragmentTest`), `ui/generation/` (`PoseSaveViewModelTest`, `GenerationViewModelTest`), `session/` (`PoseSyncerTest`, `GuideSyncerTest`), `ui/` (`KoreanScreensTest`); IT-26 on phones | 한준형 |
 | The cutout, and pose generation started by the subject (Iter5-P11, P12) | Managers, ViewModels, Views, the session protocol | `guide/`, `ui/guide/`, `session/`, `ui/session/`, `generation/` | 한준형 |
+| The ratio-change fixes: the pose tip stays open, the focus box and the brightness bar go, the subject's tap waits for the new frame, and no ratio while the scene photo is taken | ViewModels, Views | `ui/camera/` (`CameraTipScreenTest`, `CameraControlsViewModelTest`), `ui/session/SubjectFragmentRenderTest`, `ui/generation/GenerationViewModelTest`; IT-7 and IT-30 on phones | 한준형 |
 | AI module tests: the outline and the person check (Iter5-P16, P17) | The phone's segmentation and person check; the server's person check | 3.1, 3.2 | 박재완 (the outline), 한준형 (the person check) |
 | Integration tests, Iteration 2 flows | Across components (two phones, public server) | 2.1.5; Design 2.9 (Iter2-P21) | 한준형 |
 | Integration tests, Iteration 3 flows | Across components (two phones, public server) | 2.1.5; Design 2.9 | 박재완 |
@@ -485,7 +487,7 @@ The codec and message tests use the JSON examples of Design 2.5 verbatim, so a f
 | IT-27 | Saved poses (Iter3-A9) | Two phones, AWS server; the subject joins at the end | Each ♥ fills once its pose is cut out and stays on its candidate; a second tap removes it. Saved poses survive a restart. Each phone keeps its own ♥. *Changed in Iter5-A6 ([#297]): every candidate is kept with no tap; a ♥ marks a favorite, and a second tap makes it history again, still in the library.* | FR-4.14, FR-3.8, FR-3.11, FR-6.15 · Iteration 3 | [steps](#it-27-procedure) |
 | IT-28 | Screenshot cut (Iter3-A10) | One phone; its own screenshots of Instagram posts, a story, a grid, and a camera photo | Each post plays the cut once, about 2 s, ending with its photo and its person's outline; `seg.start`–`seg.end` within 2 s. | FR-2.10, FR-3.1, FR-3.8, FR-3.9, NFR-3 · Iteration 3 | [steps](#it-28-procedure) |
 | IT-29 | Screenshots from other apps (Iter3-A11) | One phone; its own screenshots of Google Images, Naver image search, and Instagram stories | Each is cut to the photo alone, without page headers, margins, scrollbars, or story controls. The outline is the photo's person. | FR-2.10, FR-3.8, FR-3.9 · Iteration 3 | [steps](#it-29-procedure) |
-| IT-30 | Changes on screen (Iter3-A12) | Two phones, public server; Android 10 or 11 for the camera switch; *Remove animations* last | Ratio, camera, photo, and reconnection changes animate on both phones instead of jumping, with no longer waits. With *Remove animations* every change is immediate. | FR-1.5, FR-1.6, FR-1.13, FR-1.14, FR-3.7, NFR-11, NFR-17 · Iteration 3 | [steps](#it-30-procedure) |
+| IT-30 | Changes on screen (Iter3-A12) | Two phones, public server; Android 10 or 11 for the camera switch; *Remove animations* last | Ratio, camera, photo, and reconnection changes animate on both phones instead of jumping, with no longer waits. With *Remove animations* every change is immediate. *Added 2026-11-25 (the ratio-change fixes): a new ratio keeps an open pose tip, takes down the focus box and the brightness bar, and ignores the subject's tap until the new frame shows.* | FR-1.5, FR-1.6, FR-1.13, FR-1.14, FR-3.7, NFR-11, NFR-17 · Iteration 3 | [steps](#it-30-procedure) |
 | IT-31 | Transitions between screens (Iter3-A14) | One phone; a second for Subject view; *Remove animations* last | Screens fade to and from Camera and Subject view and slide between others. A tap during a transition acts at once. With *Remove animations* every change is immediate. | R&S 6.9, FR-10.4, NFR-16 · Iteration 3 | [steps](#it-31-procedure) |
 | IT-32 | The guide and the pose flow (Iter3-A13) | Two phones in a session, AWS server; *Remove animations* last | Guides fade at the same place on both phones, and a drag moves at once. Both phones show the same button text and slots. With *Remove animations* everything is immediate. | FR-3.1, FR-3.6, FR-4.4, FR-4.8, FR-4.14, FR-6.15, R&S 6.9 · Iteration 3 | [steps](#it-32-procedure) |
 | IT-33 | Who takes the photo (Iter3-A17) | Two phones, AWS server; the subject signed out, then a Pix friend | Each phone shows only its own ways to connect. Live view within 10 s in each role and sign-in state. A dismissed invitation stays listed, and *Accept* connects within 10 s. *Added in Iter5-P7 ([#271]): once connected, each phone says whose camera it shows, by the account's name, and *Leave* is red.* | FR-5.2, FR-6.17, FR-8.1–8.3, FR-10.5, US-9, US-13, R&S 6.7, 6.9 · Iteration 3 | [steps](#it-33-procedure) |
@@ -1334,6 +1336,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 7. *Added in Iter5-P10:* tap the field, tap *Thumbs up*, and tap *Generate*. Go back to *Generate poses* and look at "Used before".
 8. *Added in Iter5-P10:* tap the scene photo. Pinch it, tap it twice quickly, and close it with a tap. Open it again and close it with a drag down, then with Back.
 9. *Added in Iter5-A5 ([#296]):* take a scene photo of a person and watch from the shutter to *Generate poses*, with the phone's animations on and then off. Type a description, tap Back, and take another photo. In steps 1 to 3 and 6, no *Use* is tapped after the shutter.
+10. *Added 2026-11-25 (the ratio-change fixes):* turn the light on, press the shutter, and tap the ratio at once.
 
 **Expected result**
 
@@ -1346,6 +1349,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 - *Added in Iter5-P10:* a set from an option alone (step 7): four candidates with a thumb up, in NFR-4's times. "Used before" does not list "Thumbs up", whose chip is right above.
 - *Added in Iter5-P10:* the large photo (step 8): the whole photo over the screen with Back at the top left. The pinch and the double tap zoom it. The tap, the drag down, and Back each close it, and *Generate poses* is as it was.
 - *Added in Iter5-A5:* straight from the shutter (step 9): the image stops where the preview showed it, with no button but Back, and *Generate poses* opens by itself: the photo holds for a moment, then shrinks into its place at the top left, slow to start and to settle, and can be followed by eye; with animations off it is there at once. The flow's bar reads 1 of 4, then 2 of 4. Back shows the camera again for another photo, with nothing sent, and the next *Generate poses* has the description typed before.
+- *Added 2026-11-25:* the ratio during the shot (step 10): the ratio is dimmed and takes no tap until the photo is taken, and the photo goes on to *Generate poses*, never "Couldn't take the photo".
 
 ### IT-8 procedure
 
@@ -1816,6 +1820,9 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 2. Switch to the front camera and back, and take three photos.
 3. Turn Wi-Fi off on one phone for about 3 s.
 4. Turn *Remove animations* on, change the ratio, and take a photo.
+5. *Added 2026-11-25 (the ratio-change fixes):* with *Remove animations* off, put a generated pose's guide on the camera with its tip open, and choose another ratio.
+6. *Added 2026-11-25:* tap the preview to focus, and choose another ratio within 3 s.
+7. *Added 2026-11-25:* choose another ratio on the photographer's phone, and tap the subject's video at once, then again once the new frame shows.
 
 **Expected result**
 
@@ -1825,6 +1832,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 - Each photo blinks the photographer's preview, the thumbnail grows in, and the subject's video blinks at the shutter, before "Photo saved to your Pix album".
 - The subject's video dims under "Reconnecting…" and clears when it is back.
 - Nothing waits longer than before. With *Remove animations*, every change is immediate.
+- *Added 2026-11-25:* the pose tip stays open through the ratio change (step 5). The focus box and the brightness bar fade out with the change (step 6). The subject's first tap shows no box and moves nothing; the second focuses the photographer's camera, with the box on both phones (step 7).
 
 ### IT-31 procedure
 

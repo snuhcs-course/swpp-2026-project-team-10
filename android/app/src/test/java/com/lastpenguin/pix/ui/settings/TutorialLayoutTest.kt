@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.settings
 
 import android.Manifest
@@ -413,9 +413,9 @@ class TutorialLayoutTest {
     fun generatePoses_fitsInKorean() = assertFits(3, ::describe)
 
     @Test
-    fun subjectView_fits() = assertFits(4, ::subjectView)
+    fun subjectView_fits() = assertFits(5, ::subjectView)
 
     @Test
     @Config(qualifiers = "ko-w360dp-h705dp-xxhdpi")
-    fun subjectView_fitsInKorean() = assertFits(4, ::subjectView)
+    fun subjectView_fitsInKorean() = assertFits(5, ::subjectView)
 }

@@ -66,6 +66,10 @@ class ChannelRouterTest {
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.FlashSet(FlashMode.AUTO)))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.FocusSet(0.6f, 0.4f)))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.Focused(0.4f, 0.4f)))
+        // A press that is lost would look like a button that does nothing, so it goes with the final values (#314).
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ShutterPress))
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ShutterAnswer(taken = true)))
+        assertFalse(router.latestOnly(SessionMessage.ShutterPress))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PhotographerDid("zoom", zoom = 2f)))
         assertFalse(router.latestOnly(SessionMessage.PhotographerDid("zoom", zoom = 2f)))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ControlPermission(false)))

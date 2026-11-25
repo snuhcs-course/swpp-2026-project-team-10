@@ -10,6 +10,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.ViewCompat
@@ -107,13 +108,18 @@ import org.robolectric.shadows.ShadowDialog
  * poses opened once per description and then by the same button, opened once Add a pose guide closes when it came
  * under the sheet, a set held here shown before it, and a close after Back, which says so. A tap on the readout while
  * the photographer's pinch holds the zoom: nothing sent, and the label names the photographer (FR-7.6, #236).
- * The UAT's opinions (#271): the slot where Camera's shutter is empty until connected, then whose camera this is and
- * "Live", given up to a step's button, with no notice saying it as well; *Leave* red; the guide-edit toggle one person icon, unlit with the guide plain and lit with it
+ * The UAT's opinions (#271): the line above the shutter (#314; in the shutter's place until then) empty until
+ * connected, then whose camera this is and "Live" on one line, the name alone while a step's button shows beside the
+ * thumbnail, with no notice saying it as well; *Leave* red; the guide-edit toggle one person icon, unlit with the guide plain and lit with it
  * filled. The grid on by default and off from Settings. The tip, Save guide, and guide-edit buttons on glass, the
  * toggle's tinted while on (#298).
  * What the photographer did (#292): each action a line with their name where the labels show, for a label's time and
  * the focus's for its shorter one; the photographer's pinch named for as long as it, replaced by the ratio's line, gone
  * when it ends without one; another label meanwhile keeps its own time, and the line is back after it.
+ * This phone's shutter (FR-7.8, #314; state-based): dimmed before the session, connected without a frame, while the
+ * link reconnects, and during the photographer's step; with the video showing a press asks once and holds the shutter;
+ * answered taken (free, no line), not taken (free, a line for a label's time), and not answered (the line after the
+ * wait).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -614,7 +620,7 @@ class SubjectFragmentRenderTest {
     @Test
     // At the Galaxy S22's width, where the name fits whole; CameraLayoutTest checks a name that does not.
     @Config(qualifiers = "w360dp-h705dp-xxhdpi")
-    fun theShuttersSlot_isEmptyUntilConnected_thenSaysWhoseCameraItIsAndThatItIsLive() {
+    fun theLineAboveTheShutter_isEmptyUntilConnected_thenSaysWhoseCameraItIsAndThatItIsLive() {
         val modules = launch()
         onScreen { binding, _ -> assertEquals(View.GONE, binding.cameraCaption.visibility) }
 
@@ -627,16 +633,127 @@ class SubjectFragmentRenderTest {
                 binding.cameraCaptionTitle.text.toString(),
             )
             assertEquals(string(R.string.subject_live), binding.cameraCaptionStatus.text.toString())
+            assertTrue(binding.cameraCaptionStatus.isShown)
             assertTrue(binding.cameraCaptionDot.isShown)
             assertFalse(binding.cameraCaptionSpinner.isShown)
-            // The slot names the camera for the whole session, so no notice says it as well.
+            // One line, the name and "Live" with a dot between them, whole above the shutter (#314).
+            assertEquals(LinearLayout.HORIZONTAL, binding.cameraCaption.orientation)
+            assertTrue(binding.cameraCaptionSeparator.isShown)
+            val caption = IntArray(2).also { binding.cameraCaption.getLocationInWindow(it) }
+            val shutter = IntArray(2).also { binding.shutterButton.getLocationInWindow(it) }
+            assertTrue(caption[1] + binding.cameraCaption.height <= shutter[1])
+            // The line names the camera for the whole session, so no notice says it as well.
             assertFalse(binding.toggleLabel.isShown)
         }
 
-        // The link drops: the video says so, and the slot is empty again until it is back.
+        // The link drops: the video says so, and the line is gone until it is back.
         modules.session.setState(SessionState.Reconnecting("s1", 0L))
         idle()
         onScreen { binding, _ -> assertEquals(View.GONE, binding.cameraCaption.visibility) }
+    }
+
+    // ---- This phone's shutter (FR-7.8, #314) ---------------------------------------------------------------------
+
+    private fun presses(modules: TestAppContainer) = modules.session.sent.count { it is SessionMessage.ShutterPress }
+
+    /** Connected, with the photographer's video showing: the video's state is looked at every 500 ms. */
+    private fun connectWithVideo(modules: TestAppContainer, name: String = "Dongje") {
+        connect(modules, name = name)
+        waitMs(600)
+    }
+
+    @Test
+    fun theShutter_isDimmedUntilThePhotographersVideoShows() {
+        val modules = launch()
+        onScreen { binding, _ ->
+            assertTrue(binding.shutterButton.isShown)
+            assertFalse(binding.shutterButton.isEnabled)
+        }
+
+        // Connected, and no frame yet: "Connecting…" over a dark video.
+        connect(modules, firstFrame = false)
+        waitMs(600)
+        onScreen { binding, _ -> assertFalse(binding.shutterButton.isEnabled) }
+
+        modules.video.deliverFrame()
+        waitMs(600)
+        onScreen { binding, _ ->
+            assertTrue(binding.shutterButton.isEnabled)
+            assertEquals(
+                string(R.string.subject_shutter, "Dongje"),
+                binding.shutterButton.contentDescription.toString(),
+            )
+        }
+    }
+
+    @Test
+    fun aPressOfTheShutter_asksThePhotographersPhoneOnce_andIsHeldUntilTheAnswer() {
+        val modules = launch()
+        connectWithVideo(modules)
+
+        onScreen { binding, _ -> binding.shutterButton.performClick() }
+        idle()
+        assertEquals(1, presses(modules))
+        // Held: a second tap asks nothing.
+        onScreen { binding, _ ->
+            assertFalse(binding.shutterButton.isEnabled)
+            binding.shutterButton.performClick()
+        }
+        idle()
+        assertEquals(1, presses(modules))
+
+        modules.session.deliver(SessionMessage.ShutterAnswer(taken = true))
+        idle()
+        onScreen { binding, _ ->
+            assertTrue(binding.shutterButton.isEnabled)
+            // The photo says itself: the blink, "Receiving photo…", and the saved photo. No line of its own.
+            assertFalse(binding.toggleLabel.isShown)
+        }
+    }
+
+    @Test
+    fun aPressThatTookNoPhoto_isSaidWhereTheLinesShow_andFreesTheShutter() {
+        val modules = launch()
+        connectWithVideo(modules)
+        onScreen { binding, _ -> binding.shutterButton.performClick() }
+        idle()
+
+        modules.session.deliver(SessionMessage.ShutterAnswer(taken = false))
+        idle()
+
+        assertEquals(string(R.string.subject_shutter_refused) to true, label())
+        onScreen { binding, _ -> assertTrue(binding.shutterButton.isEnabled) }
+        waitMs(SubjectFragment.LABEL_MS + 100)
+        assertFalse(label().second)
+    }
+
+    @Test
+    fun aPressWithoutAnAnswer_isSaidAfterItsWait_andFreesTheShutter() {
+        val modules = launch()
+        connectWithVideo(modules)
+        onScreen { binding, _ -> binding.shutterButton.performClick() }
+        idle()
+
+        waitMs(SubjectViewModel.SHUTTER_WAIT_MS + 100)
+
+        assertEquals(string(R.string.subject_shutter_refused) to true, label())
+        onScreen { binding, _ -> assertTrue(binding.shutterButton.isEnabled) }
+    }
+
+    @Test
+    fun whileTheLinkReconnects_theShutterIsDimmed_andTakesNoPress() {
+        val modules = launch()
+        connectWithVideo(modules)
+
+        modules.session.setState(SessionState.Reconnecting("s1", 0L))
+        waitMs(600)
+
+        onScreen { binding, _ ->
+            assertFalse(binding.shutterButton.isEnabled)
+            binding.shutterButton.performClick()
+        }
+        idle()
+        assertEquals(0, presses(modules))
     }
 
     @Test
@@ -1368,8 +1485,17 @@ class SubjectFragmentRenderTest {
             assertEquals(string(R.string.peer_creating_poses, "Dongje"), binding.connectingText.text.toString())
             assertEquals(View.VISIBLE, binding.pickPoseButton.visibility)
             assertEquals(string(R.string.generating_title), binding.pickPoseLabel.text.toString())
-            // The step's button takes the slot where the camera's name is (#271).
-            assertEquals(View.GONE, binding.cameraCaption.visibility)
+            // The step's button has its own place, beside the thumbnail (#314), so the camera's name stays; "Live"
+            // goes, since the video's text says what the photographer does, and so does the shutter's use.
+            assertEquals(View.VISIBLE, binding.cameraCaption.visibility)
+            assertTrue(binding.cameraCaptionTitle.isShown)
+            assertFalse(binding.cameraCaptionStatus.isShown)
+            assertFalse(binding.shutterButton.isEnabled)
+            val step = IntArray(2).also { binding.pickPoseButton.getLocationInWindow(it) }
+            val shutter = IntArray(2).also { binding.shutterButton.getLocationInWindow(it) }
+            val thumbnail = IntArray(2).also { binding.galleryThumbnail.getLocationInWindow(it) }
+            assertTrue(shutter[0] + binding.shutterButton.width <= step[0])
+            assertTrue(step[0] < thumbnail[0])
         }
 
         // Back keeps it closed, though Subject view renders again; its button opens it again.

@@ -93,6 +93,7 @@ import java.util.EnumMap
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -384,6 +385,17 @@ class CameraFragment :
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // While this screen is in front it takes the photos the subject's shutter asks for (FR-7.8, #314):
+                // only here is the camera bound, and the shutter the camera's own.
+                launch {
+                    val taker = { takeForSubject(controls) }
+                    sessionViewModel.setRemoteShutter(taker)
+                    try {
+                        awaitCancellation()
+                    } finally {
+                        sessionViewModel.dropRemoteShutter(taker)
+                    }
+                }
                 launch { viewModel.uiState.collect(::render) }
                 launch {
                     viewModel.phoneTurn.collect { turn ->
@@ -505,6 +517,8 @@ class CameraFragment :
                             is SessionNotice.RemoteGuide -> getString(R.string.remote_guide_notice, notice.name)
 
                             is SessionNotice.RemoteFocus -> getString(R.string.remote_focus_notice, notice.name)
+
+                            is SessionNotice.RemoteShutter -> getString(R.string.remote_shutter_notice, notice.name)
 
                             is SessionNotice.Watching -> getString(R.string.peer_watching_notice, notice.name)
                         }
@@ -1879,6 +1893,18 @@ class CameraFragment :
     /** Notices sit above the zoom row, clear of the shutter and the controls under the image (#298). */
     override val noticeAnchor: View?
         get() = binding?.let { if (it.zoomRow.isShown) it.zoomRow else it.bottomPanel }
+
+    /**
+     * The subject's shutter (FR-7.8, #314): this screen's own shutter, pressed for them at once. False when it took no
+     * photo: a pose's scene photo is being framed or held, which is the photographer's own step and never taken from
+     * the other phone, or the camera is not ready or still takes the photo before.
+     */
+    private fun takeForSubject(controls: FragmentCameraBinding): Boolean {
+        if (isScenePhotoActive()) return false
+        if (!viewModel.onShutter()) return false
+        blinkPreview(controls.previewScrim)
+        return true
+    }
 
     /** Over the guide-edit mode toggle for [CameraViewModel.NOTICE_MS]: what a pinch moves now (Design 2.8). */
     private fun showPinchMode(controls: FragmentCameraBinding, guide: Boolean) {

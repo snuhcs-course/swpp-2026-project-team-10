@@ -144,6 +144,7 @@
     <string name="peer_watching_notice">%1$s님이 내 카메라를 보고 있어요</string>
     <string name="remote_brightness_notice">%1$s님이 밝기를 %2$s에 맞췄어요</string>
     <string name="remote_focus_notice">%1$s님이 초점을 맞췄어요</string>
+    <string name="remote_shutter_notice">%1$s님이 사진을 찍었어요</string>
     <string name="remote_flash_on_notice">%1$s님이 플래시를 켰어요</string>
     <string name="remote_flash_off_notice">%1$s님이 플래시를 껐어요</string>
     <string name="remote_flash_auto_notice">%1$s님이 플래시를 자동으로 바꿨어요</string>
@@ -456,6 +457,8 @@
     <string name="subject_title_placeholder">상대 카메라</string>
     <string name="subject_live">실시간으로 보는 중</string>
     <string name="subject_receiving_photo">사진 받는 중…</string>
+    <string name="subject_shutter">%1$s님의 카메라로 사진 찍기</string>
+    <string name="subject_shutter_refused">지금은 사진을 찍을 수 없어요</string>
     <string name="leave">나가기</string>
     <string name="leave_session_title">카메라 공유에서 나갈까요?</string>
     <string name="focus_and_brightness_action">초점을 맞추고 밝기 조절</string>
@@ -588,4 +591,5 @@
     <string name="tutorial_friend_focus">화면을 눌러 초점을 맞추고 옆에서 밝기를 조절해요</string>
     <string name="tutorial_friend_move">가이드를 직접 옮겨요</string>
     <string name="tutorial_friend_guide">내 폰에서 가이드를 골라요</string>
+    <string name="tutorial_friend_shutter">사진을 직접 찍어요</string>
 </resources>

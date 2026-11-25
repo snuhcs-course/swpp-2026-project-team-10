@@ -70,6 +70,10 @@ import org.junit.Test
  * photographer's own focus a line at the first tap, not at a tap while it shows or in the quiet time after it (just
  * before its end / at its end), with its box at every tap; the photographer's pinch holding the zoom (zooming here),
  * free again, and this phone's own pinch holding it (not the photographer's).
+ * This phone's shutter (FR-7.8, #314; state-based, boundary): a press asks once and holds the shutter; a second press
+ * meanwhile asks nothing; the answer frees it, taken (no line) or not (a line); no answer frees it after
+ * SHUTTER_WAIT_MS with a line (1 ms before / at it); a press before the session is connected asks nothing; a drop
+ * frees a waiting press without a line.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SubjectViewModelTest {
@@ -878,6 +882,106 @@ class SubjectViewModelTest {
             assertFalse(viewModel.uiState.value.brightnessOpen)
             assertFalse(viewModel.onFocusTap(0.5f, 0.5f))
         }
+
+    // ---- This phone's shutter (FR-7.8, #314) ---------------------------------------------------------------------
+
+    private fun presses(): Int = session.sent.count { it is SessionMessage.ShutterPress }
+
+    private fun TestScope.refusals(): MutableList<Unit> {
+        val refusals = mutableListOf<Unit>()
+        backgroundScope.launch { viewModel.shutterRefusals.collect { refusals += it } }
+        return refusals
+    }
+
+    @Test
+    fun `a press of the shutter asks the photographer's phone once, and holds the shutter until the answer`() =
+        runTest(dispatcher) {
+            connect()
+            val refusals = refusals()
+            runCurrent()
+
+            assertTrue(viewModel.onShutter())
+            assertEquals(1, presses())
+            assertTrue(viewModel.uiState.value.shutterWaiting)
+
+            // A second press while the first waits asks nothing.
+            assertFalse(viewModel.onShutter())
+            assertEquals(1, presses())
+
+            session.deliver(SessionMessage.ShutterAnswer(taken = true))
+            runCurrent()
+            assertFalse(viewModel.uiState.value.shutterWaiting)
+            assertTrue(refusals.isEmpty())
+
+            // Free again: the next press asks.
+            assertTrue(viewModel.onShutter())
+            assertEquals(2, presses())
+        }
+
+    @Test
+    fun `a press the photographer's phone took no photo for frees the shutter and is said`() = runTest(dispatcher) {
+        connect()
+        val refusals = refusals()
+        runCurrent()
+        viewModel.onShutter()
+
+        session.deliver(SessionMessage.ShutterAnswer(taken = false))
+        runCurrent()
+
+        assertFalse(viewModel.uiState.value.shutterWaiting)
+        assertEquals(1, refusals.size)
+    }
+
+    @Test
+    fun `a press without an answer is given up after its wait, and not before`() = runTest(dispatcher) {
+        connect()
+        val refusals = refusals()
+        runCurrent()
+        viewModel.onShutter()
+
+        advanceTimeBy(SubjectViewModel.SHUTTER_WAIT_MS - 1)
+        runCurrent()
+        assertTrue(viewModel.uiState.value.shutterWaiting)
+        assertTrue(refusals.isEmpty())
+
+        advanceTimeBy(1)
+        runCurrent()
+        assertFalse(viewModel.uiState.value.shutterWaiting)
+        assertEquals(1, refusals.size)
+
+        // An answer that comes after all changes nothing more.
+        session.deliver(SessionMessage.ShutterAnswer(taken = false))
+        runCurrent()
+        assertEquals(1, refusals.size)
+    }
+
+    @Test
+    fun `a press before the session is connected asks nothing`() = runTest(dispatcher) {
+        runCurrent()
+
+        assertFalse(viewModel.onShutter())
+
+        assertEquals(0, presses())
+        assertFalse(viewModel.uiState.value.shutterWaiting)
+    }
+
+    @Test
+    fun `a drop frees a press that waits, without a line`() = runTest(dispatcher) {
+        connect()
+        val refusals = refusals()
+        runCurrent()
+        viewModel.onShutter()
+
+        session.setState(SessionState.Reconnecting("s_1", 0L))
+        runCurrent()
+        assertFalse(viewModel.uiState.value.shutterWaiting)
+        advanceTimeBy(SubjectViewModel.SHUTTER_WAIT_MS + 1)
+        runCurrent()
+
+        // Subject view says that it reconnects; the shutter is dimmed meanwhile.
+        assertTrue(refusals.isEmpty())
+        assertFalse(viewModel.onShutter())
+    }
 
     @Test
     fun `brightness and flash are hidden, and do nothing, without a range or a flash`() = runTest(dispatcher) {

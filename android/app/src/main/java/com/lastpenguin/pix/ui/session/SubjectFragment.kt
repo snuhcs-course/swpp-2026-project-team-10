@@ -11,6 +11,7 @@ import android.text.TextUtils
 import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.annotation.ColorRes
@@ -206,10 +207,10 @@ class SubjectFragment :
         }
         // The zoom row stays above the tip as it opens and closes.
         binding.bottomOverlays.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeZoomRow(binding) }
-        // The camera's name is fitted to the slot's width, known only after layout.
-        binding.cameraCaptionTitle.addOnLayoutChangeListener { title, left, _, right, _, oldLeft, _, oldRight, _ ->
+        // The camera's name is fitted to the width above the shutter, known only after layout.
+        binding.bottomOverlays.addOnLayoutChangeListener { overlays, left, _, right, _, oldLeft, _, oldRight, _ ->
             if (right - left != oldRight - oldLeft) {
-                title.post { if (view != null) renderCaption(binding, viewModel.uiState.value) }
+                overlays.post { if (view != null) renderCaption(binding, viewModel.uiState.value) }
             }
         }
         binding.root.addOnLayoutChangeListener(placeVideo)
@@ -269,6 +270,9 @@ class SubjectFragment :
         binding.guideButton.setOnClickListener { findNavController().navigate(R.id.action_subject_to_addGuide) }
         binding.saveGuideButton.setOnClickListener { viewModel.onSaveGuide() }
         setupTip(binding)
+        // This phone's shutter (FR-7.8, #314): the photographer's phone takes the photo and tells of it as of any
+        // other, so the blink, "Receiving photo…", and the saved photo follow as they do for the photographer's own.
+        binding.shutterButton.setOnClickListener { viewModel.onShutter() }
         binding.pickPoseButton.setOnClickListener {
             val ui = viewModel.uiState.value
             when {
@@ -354,6 +358,7 @@ class SubjectFragment :
                         photoViewer.render(ui.photos, ui.photosOpen)
                         renderPoses(binding, ui)
                         renderCaption(binding, ui)
+                        renderShutter(binding, ui)
                         renderCameraControls(binding, ui)
                         val ratio = zoomFormat.format(ui.zoom)
                         binding.zoomReadout.text = getString(R.string.zoom_ratio, ratio)
@@ -404,6 +409,17 @@ class SubjectFragment :
                 launch { viewModel.photographerFocus.collect { showPhotographerFocus(binding, it) } }
                 // What the photographer did on their own camera, said where this screen's labels show (FR-7.4, #292).
                 launch { viewModel.photographerLines.collect { showPhotographerLine(binding, it) } }
+                launch {
+                    // A press that took no photo is said where the other lines are (FR-7.8, #314).
+                    viewModel.shutterRefusals.collect {
+                        showToggleLabel(
+                            binding,
+                            getString(R.string.subject_shutter_refused),
+                            R.drawable.ic_alert_small,
+                            R.color.pix_text,
+                        )
+                    }
+                }
                 launch {
                     // The photographer's pinch is named from its first step to its end; the ratio's line replaces it.
                     viewModel.photographerZooming.collect { zooming ->
@@ -640,6 +656,7 @@ class SubjectFragment :
         binding.liveDot.isVisible = streaming && !stalled
         // Not while a pose step's text or the session photo covers the video, which then is not what the tips show.
         videoShowing.value = streaming && !stalled && poses == null && !viewModel.uiState.value.photosOpen
+        renderShutter(binding, viewModel.uiState.value)
         binding.connectingText.text = when {
             reconnecting -> getString(R.string.reconnecting)
             !connected || (!frames.hasFrame() && poses == null) -> getString(R.string.connecting)
@@ -871,7 +888,19 @@ class SubjectFragment :
         val generating = generating(ui)
         val confirming = confirming(ui)
         val describing = describing(ui)
-        binding.pickPoseButton.isVisible = picking || generating || confirming || describing
+        val step = picking || generating || confirming || describing
+        binding.pickPoseButton.isVisible = step
+        // The right third is the thumbnail's alone, or the step's button's and the thumbnail's, as Camera's camera
+        // switch and thumbnail share theirs (#314).
+        val density = resources.displayMetrics.density
+        binding.galleryButton.translationX = if (step) STEP_BESIDE_THUMBNAIL_DP * density else 0f
+        // The step's name is centered under its icon and may be wider than it, never as far as the shutter: on a
+        // narrow phone it takes two lines sooner.
+        val row = binding.guideRow.width
+        if (row > 0) {
+            val toShutter = row / 3f - (STEP_BESIDE_THUMBNAIL_DP + SHUTTER_HALF_DP + STEP_CLEAR_OF_SHUTTER_DP) * density
+            binding.pickPoseLabel.maxWidth = (2 * toShutter).toInt().coerceAtLeast((MIN_TOUCH_DP * density).toInt())
+        }
         val label = when {
             confirming -> R.string.pose_guide_title
             describing -> R.string.describe_title
@@ -899,36 +928,72 @@ class SubjectFragment :
     }
 
     /**
-     * The slot where Camera's shutter is (#271), once connected and while no step's button takes it: whose camera this
-     * is and that it is live, or, from the photographer's shutter until the photo is saved here, that it is coming
-     * (FR-6.14).
+     * The line right above the shutter, once connected (#314; in the shutter's place before it, #271): whose camera
+     * this is and that it is live, or, from the photographer's shutter until the photo is saved here, that it is coming
+     * (FR-6.14). While a step's button shows, the video's own text says what the photographer does, so the line is
+     * the name alone. The open tip takes the line's place until a touch closes it: at the largest font the two do not
+     * fit above the shutter together.
      */
     private fun renderCaption(binding: FragmentSubjectBinding, ui: SubjectUiState) {
-        binding.cameraCaption.isVisible = ui.connected && !binding.pickPoseButton.isVisible
-        val title = cameraTitle(binding.cameraCaptionTitle, ui.photographerName)
-        if (binding.cameraCaptionTitle.text.toString() != title) binding.cameraCaptionTitle.text = title
-        binding.cameraCaptionDot.isVisible = !ui.receivingPhoto
-        binding.cameraCaptionSpinner.isVisible = ui.receivingPhoto
+        binding.cameraCaption.isVisible = ui.connected && ui.tip?.open != true
+        val receiving = ui.receivingPhoto
+        val live = !receiving && !binding.pickPoseButton.isVisible
+        binding.cameraCaptionName.isVisible = !receiving
+        binding.cameraCaptionSpinner.isVisible = receiving
+        binding.cameraCaptionStatus.isVisible = receiving || live
         binding.cameraCaptionStatus.setText(
-            if (ui.receivingPhoto) R.string.subject_receiving_photo else R.string.subject_live,
+            if (receiving) R.string.subject_receiving_photo else R.string.subject_live,
         )
+        fitCaption(binding, ui.photographerName, live)
     }
 
     /**
-     * "Dongje's camera" for the slot: the name is the photographer's account, or their phone's while signed out, which
-     * can be long, such as "길동의 Galaxy S23 Ultra". The text gets smaller down to its smallest size first; a name
-     * that still does not fit is cut short, so "'s camera" stays.
+     * One line while the name and "Live" fit the width above the shutter; at a font too large for that, the name
+     * stands over "Live". The name is the photographer's account, or their phone's while signed out, which can be
+     * long, such as "길동의 Galaxy S23 Ultra": one that does not fit its line is cut short, so "'s camera" stays.
      */
-    private fun cameraTitle(view: TextView, name: String?): String {
-        if (name == null) return getString(R.string.subject_title_placeholder)
-        val full = getString(R.string.subject_title, name)
-        val width = (view.width - view.totalPaddingLeft - view.totalPaddingRight).toFloat()
-        if (width <= 0f) return full
-        val paint = TextPaint(view.paint).apply { textSize = view.autoSizeMinTextSize.toFloat() }
+    private fun fitCaption(binding: FragmentSubjectBinding, name: String?, live: Boolean) {
+        val title = binding.cameraCaptionTitle
+        val overlays = binding.bottomOverlays
+        val gap = (title.layoutParams as ViewGroup.MarginLayoutParams).marginStart
+        val room = overlays.width - overlays.paddingLeft - overlays.paddingRight -
+            binding.cameraCaptionDot.layoutParams.width - gap
+        val full =
+            if (name == null) getString(R.string.subject_title_placeholder) else getString(R.string.subject_title, name)
+        val status = if (live) {
+            val separator = binding.cameraCaptionSeparator
+            separator.paint.measureText(separator.text.toString()) +
+                binding.cameraCaptionStatus.paint.measureText(getString(R.string.subject_live)) + 2 * gap
+        } else {
+            0f
+        }
+        // Before the first layout the width is not known: the whole name, fitted once it is.
+        val oneLine = room <= 0 || title.paint.measureText(full) + status <= room
+        binding.cameraCaption.orientation = if (oneLine) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+        binding.cameraCaptionSeparator.isVisible = live && oneLine
+        val text = cameraTitle(title, name, full, if (oneLine) room - status else room.toFloat())
+        if (title.text.toString() != text) title.text = text
+    }
+
+    /** [full], or with [name] cut short when it is wider than [width], so "'s camera" stays. */
+    private fun cameraTitle(view: TextView, name: String?, full: String, width: Float): String {
+        if (name == null || width <= 0f) return full
+        val paint = TextPaint(view.paint)
         if (paint.measureText(full) <= width) return full
         val rest = paint.measureText(getString(R.string.subject_title, ""))
         val short = TextUtils.ellipsize(name, paint, (width - rest).coerceAtLeast(0f), TextUtils.TruncateAt.END)
         return getString(R.string.subject_title, short)
+    }
+
+    /**
+     * This phone's shutter (FR-7.8, #314): dimmed while the photographer's video does not show, as while the link
+     * reconnects or their camera is off for a pose's step, and while a press waits for its answer.
+     */
+    private fun renderShutter(binding: FragmentSubjectBinding, ui: SubjectUiState) {
+        binding.shutterButton.isEnabled = ui.connected && videoShowing.value && !ui.shutterWaiting
+        val name = ui.photographerName
+        binding.shutterButton.contentDescription =
+            if (name == null) getString(R.string.shutter) else getString(R.string.subject_shutter, name)
     }
 
     /**
@@ -1420,6 +1485,16 @@ class SubjectFragment :
     }
 
     internal companion object {
+        /** How far the thumbnail and a step's button each stand from the middle of the right third, as on Camera. */
+        const val STEP_BESIDE_THUMBNAIL_DP = 26f
+
+        /** Half the shutter, and what a step's name keeps clear of it. */
+        const val SHUTTER_HALF_DP = 36f
+        const val STEP_CLEAR_OF_SHUTTER_DP = 4f
+
+        /** A control's smallest width (NFR-16), which a step's name may always take. */
+        const val MIN_TOUCH_DP = 48f
+
         const val STALL_NANOS = 2_000_000_000L
         const val STALL_CHECK_MS = 500L
 

@@ -58,6 +58,9 @@ sealed interface SessionNotice {
     /** The subject changed the zoom: "Joonhyung set zoom to 2×" (FR-7.4). */
     data class RemoteZoom(val name: String, val ratio: Float) : SessionNotice
 
+    /** The subject's shutter took a photo: "Joonhyung took a photo" (FR-7.8, #314). */
+    data class RemoteShutter(val name: String) : SessionNotice
+
     /** The subject moved or resized the guide: "Joonhyung moved the guide" (FR-7.2, FR-7.4). */
     data class RemoteGuideMove(val name: String) : SessionNotice
 
@@ -521,6 +524,8 @@ class SessionViewModel(
 
                                 is RemoteAction.Flash -> _notices.tryEmit(SessionNotice.RemoteFlash(name, action.mode))
 
+                                is RemoteAction.Shutter -> _notices.tryEmit(SessionNotice.RemoteShutter(name))
+
                                 is RemoteAction.Focus -> {
                                     _remoteFocus.tryEmit(RemoteFocus(action.x, action.y))
                                     val now = clock()
@@ -645,6 +650,19 @@ class SessionViewModel(
         _mobileDataPending.value = false
         mobileDataSaid = true
         viewModelScope.launch { mobileDataNotice.markShown() }
+    }
+
+    /**
+     * The Camera screen, while it is in front, takes the photos the subject's shutter asks for and says whether it
+     * took one (FR-7.8, #314); null once it is not, and a press is then answered as not taken.
+     */
+    fun setRemoteShutter(taker: (() -> Boolean)?) {
+        remoteControl.shutter = taker
+    }
+
+    /** [taker]'s screen is no longer in front; a screen that came after it keeps its own. */
+    fun dropRemoteShutter(taker: () -> Boolean) {
+        if (remoteControl.shutter === taker) remoteControl.shutter = null
     }
 
     private fun onMessage(message: SessionMessage) {

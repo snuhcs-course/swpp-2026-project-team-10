@@ -38,6 +38,9 @@ sealed interface RemoteAction {
 
     /** The subject's tap set the focus at [x], [y] of the photographer's frame, 0..1 (FR-7.7). */
     data class Focus(val x: Float, val y: Float) : RemoteAction
+
+    /** The subject's shutter took a photo (FR-7.8, #314). */
+    data object Shutter : RemoteAction
 }
 
 /**
@@ -84,6 +87,9 @@ sealed interface RemoteAction {
  * subject's. Requests are applied in arrival order, so the later change wins when both people move the guide
  * (FR-7.6). A move without a visible guide, or for a guide that has since been replaced, is dropped: a hidden
  * guide cannot be edited on either phone, and a gesture never crosses guide identities.
+ *
+ * **Shutter (It 5, FR-7.8, #314).** `camera.shutter` is the subject's press. The photo is the Camera screen's to take
+ * ([shutter]), as at its own shutter, and every press is answered with `camera.shutter.answer`.
  * Owner: Real-time (#10, #57).
  */
 class RemoteControlHandler(
@@ -97,6 +103,12 @@ class RemoteControlHandler(
     /** The photographer's base brightness from Settings, in EV (FR-1.11), which a remote tap to focus sets again. */
     private val baseBrightness: StateFlow<Float> = MutableStateFlow(0f),
 ) {
+    /**
+     * Takes a photo for the subject's shutter (FR-7.8, #314) and says whether it took one. The Camera screen sets it
+     * while it is in front, since only there is the camera bound and the shutter the camera's own; null otherwise.
+     */
+    var shutter: (() -> Boolean)? = null
+
     private val _actions = MutableSharedFlow<RemoteAction>(extraBufferCapacity = 16)
 
     /** Applied remote actions, for the notice on the photographer's screen. */
@@ -202,8 +214,20 @@ class RemoteControlHandler(
             is SessionMessage.FlashSet -> handleFlash(message)
             is SessionMessage.FocusSet -> handleFocus(message)
             is SessionMessage.GuideMove -> handleGuideMove(message)
+            is SessionMessage.ShutterPress -> handleShutter()
             else -> Unit
         }
+    }
+
+    /**
+     * `camera.shutter`: the Camera screen takes the photo, if it is in front and can, and the press is answered either
+     * way, so the subject's shutter is free again. Nothing is kept for later: a press is one moment.
+     */
+    private fun handleShutter() {
+        val taken = shutter?.invoke() ?: false
+        Timings.mark("shutter.remote", if (taken) "taken" else "refused")
+        session.send(SessionMessage.ShutterAnswer(taken))
+        if (taken) _actions.tryEmit(RemoteAction.Shutter)
     }
 
     /** `camera.zoom.set`: clamp, camera.setZoom, then reply with `camera.state`. */

@@ -143,6 +143,11 @@ data class SubjectUiState(
      * back small.
      */
     val referenceHidden: Boolean = false,
+    /**
+     * A press of this phone's shutter waits for the photographer's phone to say whether it took the photo (FR-7.8,
+     * #314): the shutter takes no other press meanwhile.
+     */
+    val shutterWaiting: Boolean = false,
     /** Whether the guide on the video is a favorite in this phone's library (FR-6.16, #297): *Save guide* is filled. */
     val guideSaved: Boolean = false,
     val savingGuide: Boolean = false,
@@ -278,6 +283,14 @@ class SubjectViewModel(
         .map { it == Role.PHOTOGRAPHER }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    private val _shutterRefusals = Channel<Unit>(Channel.CONFLATED)
+
+    /**
+     * A press of this phone's shutter that took no photo (FR-7.8, #314): the photographer's phone said so, or said
+     * nothing in time. Subject view says it in a line; one that no screen read is not said later.
+     */
+    val shutterRefusals: Flow<Unit> = _shutterRefusals.receiveAsFlow()
+
     private val _toggleLabels = Channel<ToggleLabel>(Channel.CONFLATED)
 
     /** One label per zoom step, as on the Camera screen (Design 2.8); the newest replaces one not yet shown. */
@@ -323,6 +336,9 @@ class SubjectViewModel(
 
     // Runs while a tap to focus waits for its answer (SubjectUiState.baseAwaited).
     private var baseWait: Job? = null
+
+    // Runs while a press of the shutter waits for its answer (SubjectUiState.shutterWaiting).
+    private var shutterWait: Job? = null
 
     private val guideSender = StepSender<GuideState>(viewModelScope, SEND_INTERVAL_MS) { state, final ->
         val guideId = state.guideId ?: return@StepSender
@@ -414,6 +430,11 @@ class SubjectViewModel(
                 }
                 if (message is SessionMessage.PhotographerDid) {
                     message.toAction()?.let { _photographerLines.tryEmit(PhotographerLine.Did(it)) }
+                    return@collect
+                }
+                if (message is SessionMessage.ShutterAnswer) {
+                    // Only a press that still waits is answered; one given up already has said so.
+                    if (endShutterWait() && !message.taken) _shutterRefusals.trySend(Unit)
                     return@collect
                 }
                 if (message !is SessionMessage.CameraStateUpdate) return@collect
@@ -819,6 +840,35 @@ class SubjectViewModel(
         _uiState.update { it.copy(baseAwaited = false) }
     }
 
+    /**
+     * This phone's shutter (FR-7.8, #314): asks the photographer's phone for a photo, at once, and holds the shutter
+     * until its answer or [SHUTTER_WAIT_MS]. False when nothing was asked: not connected, or a press still waits.
+     */
+    fun onShutter(): Boolean {
+        val ui = _uiState.value
+        if (!ui.connected || ui.shutterWaiting) return false
+        session.send(SessionMessage.ShutterPress)
+        Timings.mark("shutter.sent")
+        _uiState.update { it.copy(shutterWaiting = true) }
+        shutterWait = viewModelScope.launch {
+            delay(SHUTTER_WAIT_MS)
+            // No word of it in time: as far as this phone knows, no photo was taken.
+            shutterWait = null
+            _uiState.update { it.copy(shutterWaiting = false) }
+            _shutterRefusals.trySend(Unit)
+        }
+        return true
+    }
+
+    /** The press's answer came, or nothing waits for it any longer; true when a press was waiting. */
+    private fun endShutterWait(): Boolean {
+        val waiting = shutterWait ?: return false
+        waiting.cancel()
+        shutterWait = null
+        _uiState.update { it.copy(shutterWaiting = false) }
+        return true
+    }
+
     fun setBrightnessOpen(open: Boolean) {
         _uiState.update { it.copy(brightnessOpen = open && it.hasBrightness) }
     }
@@ -839,6 +889,7 @@ class SubjectViewModel(
 
     private fun endInteractions() {
         endBaseWait()
+        endShutterWait()
         pendingZoomStep = null
         zoomHeldBack = false
         zoomSender.cancel()
@@ -846,7 +897,13 @@ class SubjectViewModel(
         guideSender.cancel()
     }
 
-    private companion object {
+    internal companion object {
+        /**
+         * How long a press of the shutter waits for its answer. The photographer's phone answers at once, so this is
+         * the link's time alone; after it the press counts as not taken.
+         */
+        const val SHUTTER_WAIT_MS = 2_000L
+
         const val SEND_INTERVAL_MS = 50L
 
         /** What the link may add to an answer's way, both directions together (NFR-7's 0.5 s for a remote action). */

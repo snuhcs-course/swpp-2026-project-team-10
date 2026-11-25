@@ -25,6 +25,7 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.Accessibilit
 import androidx.core.view.isVisible
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragmentInContainer
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.MutableLiveData
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -107,6 +108,9 @@ import org.robolectric.shadows.ShadowDialog
  * A dropped link (#293, FR-6.12): who the phone reconnects with, for the whole wait, gone when the link is back;
  * replaced by "… disconnected" when the wait ends, and not back after it; another notice meanwhile keeps its own time,
  * and the line is back after it; a drop during the subject's pinch, where the pinch's end must not take the line down.
+ * The subject's shutter (#314, FR-7.8): a photo taken here with its notice; nothing while a pose's scene photo is
+ * framed, neither a photo nor the scene; nothing while the camera is not ready; nothing once this screen is left, and
+ * a photo again when it is back.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -477,6 +481,86 @@ class CameraFragmentInteractionTest {
         idleFor(SessionViewModel.ZOOMING_LINGER_MS + 100)
 
         onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+    }
+
+    // ---- The subject's shutter (FR-7.8, #314) --------------------------------------------------------------------
+
+    private fun shutterAnswers(modules: TestAppContainer): List<SessionMessage.ShutterAnswer> =
+        modules.session.sent.filterIsInstance<SessionMessage.ShutterAnswer>()
+
+    /** Camera in a session as the photographer, with a camera that saves its photos, and no notice showing. */
+    private fun inASessionWithACameraThatSaves(): Pair<TestAppContainer, FakeCameraController> {
+        val camera = FakeCameraController().apply { photo = Uri.parse("content://media/external/images/9") }
+        val modules = launch(camera)
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        idleFor(CameraViewModel.NOTICE_MS)
+        return modules to camera
+    }
+
+    @Test
+    fun theSubjectsShutter_takesAPhotoHere_andSaysWhoTookIt() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+
+        modules.session.deliver(SessionMessage.ShutterPress)
+        idle()
+
+        assertEquals(1, camera.photoTurns.size)
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = true)), shutterAnswers(modules))
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.remote_shutter_notice, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+    }
+
+    @Test
+    fun whileTheScenePhotoIsFramed_theSubjectsShutterTakesNothing() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+        val generation = generation()
+        generation.beginScene()
+        idle()
+
+        modules.session.deliver(SessionMessage.ShutterPress)
+        idle()
+
+        // Neither a photo nor the pose's scene photo, which is the photographer's own step.
+        assertTrue(camera.photoTurns.isEmpty())
+        assertEquals(GenerationUiState.Phase.FRAMING, generation.uiState.value.phase)
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false)), shutterAnswers(modules))
+    }
+
+    @Test
+    fun whileTheCameraIsNotReady_theSubjectsPressIsNotTaken() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+        camera.setStatus(CameraStatus.STARTING)
+        idle()
+
+        modules.session.deliver(SessionMessage.ShutterPress)
+        idle()
+
+        assertTrue(camera.photoTurns.isEmpty())
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false)), shutterAnswers(modules))
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+    }
+
+    @Test
+    fun onceThisScreenIsLeft_aPressIsNotTaken_andItIsAgainWhenTheScreenIsBack() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+
+        // Another screen covers Camera, as Settings does: its view goes, and the camera with it.
+        scenario!!.moveToState(Lifecycle.State.CREATED)
+        idle()
+        modules.session.deliver(SessionMessage.ShutterPress)
+        idle()
+        assertTrue(camera.photoTurns.isEmpty())
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false)), shutterAnswers(modules))
+
+        scenario!!.moveToState(Lifecycle.State.RESUMED)
+        idle()
+        modules.session.deliver(SessionMessage.ShutterPress)
+        idle()
+        assertEquals(1, camera.photoTurns.size)
+        assertEquals(SessionMessage.ShutterAnswer(taken = true), shutterAnswers(modules).last())
     }
 
     /** The photographer's drop as the session says it: with the subject's name and this phone's role (#293). */

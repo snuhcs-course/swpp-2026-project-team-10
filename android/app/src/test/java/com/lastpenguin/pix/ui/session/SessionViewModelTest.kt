@@ -101,6 +101,8 @@ import org.junit.runner.RunWith
  * link is back; no longer once the wait ends (the room waits again, an invitation's session ends); the subject's
  * phone names no one; a drop whose Connected this reader never saw, named from the state alone and not by an earlier
  * session's name.
+ * The subject's shutter (#314): taken through the Camera screen in front, a notice; with that screen gone, not taken
+ * and no notice.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 // Robolectric for ProcessLifecycleOwner, which the ViewModel observes for the background limit.
@@ -837,6 +839,42 @@ class SessionViewModelTest {
 
         assertNull(model.lastCode)
         assertEquals(SessionEntry.NewRoom to Role.PHOTOGRAPHER, session.starts.last())
+    }
+
+    @Test
+    fun theSubjectsShutter_isTakenByTheCameraScreen_andIsANotice() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        var presses = 0
+        model.setRemoteShutter {
+            presses++
+            true
+        }
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.ShutterPress)
+        runCurrent()
+
+        assertEquals(1, presses)
+        assertEquals(listOf<SessionNotice>(SessionNotice.RemoteShutter("Joonhyung")), notices)
+        assertEquals(SessionMessage.ShutterAnswer(taken = true), session.sent.last())
+    }
+
+    @Test
+    fun onceTheCameraScreenIsGone_aPressIsNotTaken_andIsNoNotice() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        model.setRemoteShutter { true }
+        model.setRemoteShutter(null)
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.ShutterPress)
+        runCurrent()
+
+        assertTrue(notices.isEmpty())
+        assertEquals(SessionMessage.ShutterAnswer(taken = false), session.sent.last())
     }
 
     /** A drop as the session says it: with the other phone's name and this phone's role (#293). */

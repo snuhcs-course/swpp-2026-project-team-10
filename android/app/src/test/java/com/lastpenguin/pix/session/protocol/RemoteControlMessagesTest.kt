@@ -20,6 +20,7 @@ import org.junit.Test
  * a round trip keeps every field; `final` left out means a step; `guide.state` from a phone without `by` means the
  * photographer, and the echo of a `guide.move` carries `by: SUBJECT`; `camera.zoom.hold` naming a holder, null, or no
  * holder at all, the last two meaning a free zoom, and a `camera.zoom.set` with `cancel`, which is false when left out (#236).
+ * The subject's shutter (#314): the press, which has no field, and its answer, taken or not.
  */
 class RemoteControlMessagesTest {
     private val codec = MessageCodec(clock = { 1_759_212_345_678L })
@@ -139,6 +140,19 @@ class RemoteControlMessagesTest {
     }
 
     @Test
+    fun theSubjectsShutter_andItsAnswer_designExamples_decode() {
+        val press = """{ "v": 3, "t": "camera.shutter", "seq": 9, "ts": 1759212355000, "b": {} }"""
+        val taken = """{ "v": 3, "t": "camera.shutter.answer", "seq": 4, "ts": 1759212355100,
+            "b": { "taken": true } }"""
+        val refused = """{ "v": 3, "t": "camera.shutter.answer", "seq": 5, "ts": 1759212355100,
+            "b": { "taken": false } }"""
+
+        assertEquals(SessionMessage.ShutterPress, decode(press))
+        assertEquals(SessionMessage.ShutterAnswer(taken = true), decode(taken))
+        assertEquals(SessionMessage.ShutterAnswer(taken = false), decode(refused))
+    }
+
+    @Test
     fun requests_roundTrip_keepEveryField() {
         val messages = listOf(
             SessionMessage.GuideMove("g", 0.1f, 0.2f, 0.3f, final = true),
@@ -147,6 +161,9 @@ class RemoteControlMessagesTest {
             SessionMessage.FocusSet(0.62f, 0.4f),
             SessionMessage.Focused(0.38f, 0.4f),
             SessionMessage.ControlPermission(true),
+            SessionMessage.ShutterPress,
+            SessionMessage.ShutterAnswer(taken = true),
+            SessionMessage.ShutterAnswer(taken = false),
         )
 
         for (message in messages) assertEquals(message, decode(codec.encode(message)))

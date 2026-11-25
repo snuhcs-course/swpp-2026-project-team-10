@@ -345,6 +345,27 @@ class KoreanScreensTest {
     }
 
     @Test
+    fun camera_whenTheSubjectTookAPhoto_isInKorean() {
+        val modules = TestAppContainer(
+            camera = FakeCameraController().apply { photo = Uri.parse("content://media/external/images/9") },
+        ).install()
+        shadowOf(ApplicationProvider.getApplicationContext<Application>()).grantPermissions(Manifest.permission.CAMERA)
+        scenario = launchFragmentInContainer<CameraFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        idle()
+
+        modules.session.deliver(SessionMessage.ShutterPress)
+        idle()
+
+        val root = screen()
+        val notice = FragmentCameraBinding.bind(root).noticeText
+        assertEquals(true, notice.isShown)
+        assertEquals(root.context.getString(R.string.remote_shutter_notice, "Test Account 2"), notice.text.toString())
+        assertKorean(root, *people)
+    }
+
+    @Test
     fun camera_whileTheLinkReconnects_isInKorean() {
         val modules = camera()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
@@ -985,6 +1006,28 @@ class KoreanScreensTest {
             // The brightness's value is a number with its sign, as on the bar.
             assertKorean(root, *people, "+1.0")
         }
+    }
+
+    @Test
+    @Config(shadows = [ShadowSurfaceViewRenderer::class], instrumentedPackages = ["org.webrtc"])
+    fun subjectView_whenItsShutterTookNoPhoto_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.SUBJECT))
+        modules.video.deliverFrame()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        val binding = FragmentSubjectBinding.bind(screen())
+        assertEquals(true, binding.shutterButton.isEnabled)
+
+        binding.shutterButton.performClick()
+        idle()
+        modules.session.deliver(SessionMessage.ShutterAnswer(taken = false))
+        idle()
+
+        val root = screen()
+        assertEquals(true, FragmentSubjectBinding.bind(root).toggleLabel.isShown)
+        assertKorean(root, *people)
     }
 
     @Test

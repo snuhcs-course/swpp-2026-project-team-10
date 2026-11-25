@@ -29,6 +29,8 @@ import org.junit.Test
  * state after the wait and then forgotten, so a later change to that value is the photographer's. The photographer's
  * own focus (`camera.focus`): told
  * to the subject while the session runs, and to no one before it starts or after it stops.
+ * The subject's shutter (#314): taken by the Camera screen (answered, one action); refused by it; no Camera screen in
+ * front; two presses in a row, each answered.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemoteControlHandlerTest {
@@ -570,6 +572,84 @@ class RemoteControlHandlerTest {
         assertEquals(0.5f, guides.state.value.cx, EPSILON)
         assertTrue(attributions.isEmpty())
         assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    // ---- The subject's shutter (FR-7.8, #314) ---------------------------------------------------------------------
+
+    private fun answers(): List<SessionMessage.ShutterAnswer> =
+        session.sent.filterIsInstance<SessionMessage.ShutterAnswer>()
+
+    @Test
+    fun `the subject's shutter takes a photo through the Camera screen, and is answered and reported once`() = runTest {
+        var presses = 0
+        handler.shutter = {
+            presses++
+            true
+        }
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.ShutterPress)
+        runCurrent()
+
+        assertEquals(1, presses)
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = true)), answers())
+        assertEquals(listOf<RemoteAction>(RemoteAction.Shutter), actions)
+        handler.stop()
+    }
+
+    @Test
+    fun `a press the Camera screen takes no photo for is answered so, and is no action`() = runTest {
+        // The scene photo is being framed, or the camera still takes the photo before.
+        handler.shutter = { false }
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.ShutterPress)
+        runCurrent()
+
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false)), answers())
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
+    fun `a press while the Camera screen is not in front is answered as not taken`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.ShutterPress)
+        runCurrent()
+
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false)), answers())
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
+    fun `two presses in a row are each asked of the Camera screen and each answered`() = runTest {
+        // The camera takes the first and is busy for the second, as with two taps on its own shutter.
+        val outcomes = ArrayDeque(listOf(true, false))
+        handler.shutter = { outcomes.removeFirst() }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.ShutterPress)
+        handler.handle(SessionMessage.ShutterPress)
+        runCurrent()
+
+        assertEquals(
+            listOf(SessionMessage.ShutterAnswer(taken = true), SessionMessage.ShutterAnswer(taken = false)),
+            answers(),
+        )
         handler.stop()
     }
 

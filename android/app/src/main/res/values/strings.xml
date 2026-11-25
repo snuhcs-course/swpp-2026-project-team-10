@@ -153,6 +153,7 @@
     <string name="peer_watching_notice">%1$s is watching your camera</string>
     <string name="remote_brightness_notice">%1$s set brightness to %2$s</string>
     <string name="remote_focus_notice">%1$s set the focus</string>
+    <string name="remote_shutter_notice">%1$s took a photo</string>
     <string name="remote_flash_on_notice">%1$s turned the flash on</string>
     <string name="remote_flash_off_notice">%1$s turned the flash off</string>
     <string name="remote_flash_auto_notice">%1$s set the flash to auto</string>
@@ -489,7 +490,10 @@
     <string name="subject_title_placeholder">Photographer\'s camera</string>
     <!-- Under the camera's name in the slot where Camera's shutter is (#271): the video is live, or a photo is coming. -->
     <string name="subject_live">Live</string>
+    <string name="caption_separator" translatable="false">·</string>
     <string name="subject_receiving_photo">Receiving photo…</string>
+    <string name="subject_shutter">Take a photo with %1$s\'s camera</string>
+    <string name="subject_shutter_refused">Can\'t take a photo right now</string>
     <string name="leave">Leave</string>
     <string name="leave_session_title">Leave the session?</string>
     <string name="focus_and_brightness_action">Focus and set the brightness</string>
@@ -624,4 +628,5 @@
     <string name="tutorial_friend_focus">Tap to focus, then set the brightness beside it</string>
     <string name="tutorial_friend_move">Move the guide yourself</string>
     <string name="tutorial_friend_guide">Choose a guide from this phone</string>
+    <string name="tutorial_friend_shutter">Take the photo yourself</string>
 </resources>

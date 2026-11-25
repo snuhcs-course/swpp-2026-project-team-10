@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -490,7 +490,7 @@ class CameraViewModelTest {
         assertEquals(listOf(Triple("s1", photo, 1_000L)), share.shared)
     }
 
-    /** A session s1 until a test changes it. */
+    /** In a session until a test sets [session] to null; each shot is named after the session it was taken in. */
     private class RecordingShare : PhotoShare {
         var session: String? = "s1"
         val shared = mutableListOf<Triple<String, Uri, Long>>()
@@ -498,12 +498,12 @@ class CameraViewModelTest {
 
         override fun shutter() = session
 
-        override fun taken(sessionId: String, uri: Uri, takenAt: Long) {
-            shared += Triple(sessionId, uri, takenAt)
+        override fun taken(shot: String, uri: Uri, takenAt: Long) {
+            shared += Triple(shot, uri, takenAt)
         }
 
-        override fun notTaken(sessionId: String) {
-            failed += sessionId
+        override fun notTaken(shot: String) {
+            failed += shot
         }
     }
 
@@ -791,45 +791,60 @@ class CameraViewModelTest {
     }
 
     @Test
-    fun `a new guide starts edit mode, and the shutter, hiding, or removing the guide ends it`() = runTest(dispatcher) {
-        runCurrent()
-        assertFalse(model.uiState.value.guideEditing)
-        model.setGuideEditing(true)
-        assertFalse(model.uiState.value.guideEditing)
+    fun `a new guide keeps the camera's gestures, and the shutter, another guide, hiding, or removal ends edit mode`() =
+        runTest(dispatcher) {
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+            model.setGuideEditing(true)
+            assertFalse(model.uiState.value.guideEditing)
 
-        guides.setGuide(guide("g1"))
-        runCurrent()
-        assertTrue(model.uiState.value.guideEditing)
-        model.setGuideEditing(false)
-        assertFalse(model.uiState.value.guideEditing)
-        model.setGuideEditing(true)
-        assertTrue(model.uiState.value.guideEditing)
+            // A guide is added: a pinch still zooms and a tap still focuses, until the toggle says otherwise (#304).
+            guides.setGuide(guide("g1"))
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+            model.setGuideEditing(true)
+            assertTrue(model.uiState.value.guideEditing)
+            model.setGuideEditing(false)
+            assertFalse(model.uiState.value.guideEditing)
+            model.setGuideEditing(true)
+            assertTrue(model.uiState.value.guideEditing)
 
-        model.onShutter()
-        assertFalse(model.uiState.value.guideEditing)
-        camera.capture.complete(Result.success(Uri.parse("content://media/1")))
-        runCurrent()
-        assertFalse(model.uiState.value.guideEditing)
+            // Saving it leaves it the same guide, so the mode stays under the finger.
+            model.onSaveGuide()
+            runCurrent()
+            assertTrue(model.uiState.value.guideSaved)
+            assertTrue(model.uiState.value.guideEditing)
 
-        guides.setGuide(guide("g2"))
-        runCurrent()
-        assertTrue(model.uiState.value.guideEditing)
-        guides.state.value = guides.state.value.copy(visible = false)
-        runCurrent()
-        assertFalse(model.uiState.value.guideEditing)
-        model.setGuideEditing(true)
-        assertFalse(model.uiState.value.guideEditing)
-        guides.state.value = guides.state.value.copy(visible = true)
-        runCurrent()
-        assertFalse(model.uiState.value.guideEditing)
-        model.setGuideEditing(true)
-        assertTrue(model.uiState.value.guideEditing)
+            model.onShutter()
+            assertFalse(model.uiState.value.guideEditing)
+            camera.capture.complete(Result.success(Uri.parse("content://media/1")))
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
 
-        model.setGuideEditing(true)
-        guides.setGuide(null)
-        runCurrent()
-        assertFalse(model.uiState.value.guideEditing)
-    }
+            // Another guide in place of one being edited is a new guide too.
+            model.setGuideEditing(true)
+            assertTrue(model.uiState.value.guideEditing)
+            guides.setGuide(guide("g2"))
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+
+            model.setGuideEditing(true)
+            guides.state.value = guides.state.value.copy(visible = false)
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+            model.setGuideEditing(true)
+            assertFalse(model.uiState.value.guideEditing)
+            guides.state.value = guides.state.value.copy(visible = true)
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+            model.setGuideEditing(true)
+            assertTrue(model.uiState.value.guideEditing)
+
+            model.setGuideEditing(true)
+            guides.setGuide(null)
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+        }
 
     private fun guide(id: String): ReferenceGuide {
         val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)

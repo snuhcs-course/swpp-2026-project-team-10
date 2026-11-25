@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-12, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.graphics.Color
@@ -34,7 +34,6 @@ class HeaderActionTest {
 
     private val actions
         get() = listOf(
-            action(R.layout.fragment_camera, R.id.usePhotoButton),
             action(R.layout.fragment_reference_confirm, R.id.useGuideButton),
             action(R.layout.fragment_pick_pose, R.id.selectButton),
             action(R.layout.fragment_describe_pose, R.id.generateButton),

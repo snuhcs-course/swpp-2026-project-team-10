@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -94,9 +94,12 @@ import org.robolectric.shadows.ShadowToast
  * place, a drag up and down, kept up while held, gone after the idle time), on the right and, near the image's right
  * edge, on the left; the focus box staying while the bar is up, held or not, both whole until the idle time and both
  * gone after it, or, on a camera without brightness, fading by itself; the toggle label for Hide / Show and a zoom step, replaced at once and gone after its time; the
- * pinch mode's label over the guide-edit toggle, Camera then Guide. A tap on the readout while the subject's pinch holds
+ * pinch mode's label over the guide-edit toggle, Guide then Camera, since a new guide starts with the camera's (#304). A tap on the readout while the subject's pinch holds
  * the zoom: no zoom, and the label names the subject (FR-7.6, #236).
  * A photo taken with the phone held sideways, saved as held (FR-1.5, #206).
+ * The subject's tap to focus (FR-7.7): the focus box where they tapped, alone, with its notice, which goes sooner than
+ * the others; a tap soon after, the box without the notice; with this phone's own brightness bar up, which goes, or
+ * held under a finger, where nothing moves.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -210,8 +213,13 @@ class CameraFragmentInteractionTest {
     }
 
     @Test
-    fun scenePhoto_backCancelsOrShootsAgain_andUseThisPhotoOpensGeneratePoses() {
-        launch(FakeCameraController().apply { frame = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888) })
+    fun scenePhoto_backCancelsOrShootsAgain_andAPhotoWithAPersonOpensGeneratePosesByItself() {
+        val modules = launch(
+            FakeCameraController().apply {
+                frame =
+                    Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
+            },
+        )
         val nav = scenario!!.attachNav(R.id.cameraFragment)
         val generation = generation()
 
@@ -221,25 +229,28 @@ class CameraFragmentInteractionTest {
         idle()
         assertEquals(GenerationUiState.Phase.IDLE, generation.uiState.value.phase)
 
+        // Back while the photo is checked: the camera again, and nothing opens.
         generation.beginScene()
         idle()
+        modules.persons.gate = CompletableDeferred()
         onScreen { controls, _ -> controls.shutterButton.performClick() }
         idle()
-        assertEquals(GenerationUiState.Phase.REVIEWING, generation.uiState.value.phase)
+        assertEquals(GenerationUiState.Phase.CHECKING, generation.uiState.value.phase)
+        assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
         onScreen { _, fragment -> fragment.requireActivity().onBackPressedDispatcher.onBackPressed() }
         idle()
         assertEquals(GenerationUiState.Phase.FRAMING, generation.uiState.value.phase)
 
+        // One press of the shutter, with a person in the photo: Generate poses (#296).
+        modules.persons.gate = null
         onScreen { controls, _ -> controls.shutterButton.performClick() }
-        idle()
-        onScreen { controls, _ -> controls.usePhotoButton.performClick() }
         idle()
         assertEquals(R.id.describePoseFragment, nav.currentDestination?.id)
         assertEquals(GenerationUiState.Phase.DESCRIBING, generation.uiState.value.phase)
     }
 
     @Test
-    fun scenePhoto_withoutAPerson_useThisPhotoStaysOnCamera() {
+    fun scenePhoto_withoutAPerson_staysOnCamera_readyToShootAgain() {
         val modules = launch(
             FakeCameraController().apply {
                 frame =
@@ -254,12 +265,12 @@ class CameraFragmentInteractionTest {
         idle()
         onScreen { controls, _ -> controls.shutterButton.performClick() }
         idle()
-        // Even a click that reaches the disabled button opens nothing and sends nothing (FR-4.13).
-        onScreen { controls, _ -> controls.usePhotoButton.performClick() }
-        idle()
 
+        // Nothing opens and nothing is sent (FR-4.13); the shutter is there for another photo.
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
-        assertEquals(GenerationUiState.Phase.REVIEWING, generation.uiState.value.phase)
+        assertEquals(GenerationUiState.Phase.FRAMING, generation.uiState.value.phase)
+        assertTrue(generation.uiState.value.noPerson)
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.captureControls.visibility) }
         assertTrue(modules.generator.runs.isEmpty())
     }
 
@@ -666,7 +677,9 @@ class CameraFragmentInteractionTest {
     @Test
     fun scenePhoto_aTouchAnywhere_takesThePanelAway_andOnlyAnotherStartShowsItAgain() {
         val camera = FakeCameraController(hasFlash = true).apply { frame = ScreenTestSupport.bitmap(300, 400) }
-        launch(camera)
+        val modules = launch(camera)
+        // The check of the photo is held, so Back can shoot again.
+        modules.persons.gate = CompletableDeferred()
         onScreen { _, fragment -> fragment.requireActivity().viewModel<GenerationViewModel>().beginScene() }
         idle()
         onScreen { controls, _ -> assertTrue(controls.sceneGuide.isShown) }
@@ -679,7 +692,7 @@ class CameraFragmentInteractionTest {
         idle()
         onScreen { controls, _ -> assertFalse(controls.sceneGuide.isShown) }
 
-        // Shoot, and Back from the review: the camera again, without the panel.
+        // Shoot, and Back while the photo is checked: the camera again, without the panel.
         onScreen { controls, _ -> controls.shutterButton.performClick() }
         idle()
         onScreen { controls, _ -> controls.sceneBackButton.performClick() }
@@ -695,9 +708,10 @@ class CameraFragmentInteractionTest {
     }
 
     @Test
-    fun scenePhoto_whileFraming_theRatioIsChosenAsOnCamera_andIsNotOnTheReview() {
+    fun scenePhoto_whileFraming_theRatioIsChosenAsOnCamera_andNotWhileThePhotoIsHeld() {
         val camera = FakeCameraController(hasFlash = true).apply { frame = ScreenTestSupport.bitmap(300, 400) }
         val modules = launch(camera)
+        modules.persons.gate = CompletableDeferred()
         onScreen { _, fragment -> fragment.requireActivity().viewModel<GenerationViewModel>().beginScene() }
         idle()
 
@@ -715,7 +729,7 @@ class CameraFragmentInteractionTest {
         assertEquals(AspectRatio.R16_9, runBlocking { modules.settings.aspectRatio() })
         onScreen { controls, _ -> assertFalse(controls.aspectPanel.isShown) }
 
-        // The photo is taken: its ratio is the photo's, so the review has no ratio to choose.
+        // The photo is taken: its ratio is the photo's, so there is no ratio to choose while it is held.
         onScreen { controls, _ ->
             controls.aspectButton.performClick()
             controls.shutterButton.performClick()
@@ -726,8 +740,8 @@ class CameraFragmentInteractionTest {
             assertFalse(controls.aspectPanel.isShown)
         }
 
-        // The ratios were open at a shutter that no touch closed them for, as with TalkBack: Back from the review
-        // shows the camera without them.
+        // The ratios were open at a shutter that no touch closed them for, as with TalkBack: Back while the photo is
+        // checked shows the camera without them.
         onScreen { controls, _ -> controls.sceneBackButton.performClick() }
         idle()
         onScreen { controls, _ ->
@@ -1089,6 +1103,101 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ -> assertFalse(controls.focusRing.isShown) }
     }
 
+    @Test
+    fun theSubjectsTapToFocus_showsTheBoxThereAlone_andItsNoticeBriefly_butNotAtEveryTap() {
+        val camera = FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true)
+        val modules = launch(camera)
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+
+        // The display's frames held, so the box is seen before its animation runs to its end.
+        ShadowChoreographer.setPaused(true)
+        try {
+            modules.session.deliver(SessionMessage.FocusSet(0.25f, 0.5f))
+            idle()
+            onScreen { controls, _ ->
+                val preview = controls.previewView
+                val frame = fitViewfinderFrame(preview.width.toFloat(), preview.height.toFloat())
+                val ring = controls.focusRing
+                assertTrue(ring.isShown)
+                assertEquals(frame.left + frame.width * 0.25f, ring.translationX + ring.layoutParams.width / 2f, 1f)
+                assertEquals(frame.top + frame.height * 0.5f, ring.translationY + ring.layoutParams.height / 2f, 1f)
+                // The bar is for this phone's own tap.
+                assertFalse(controls.exposureBar.isShown)
+                assertTrue(controls.noticeText.isShown)
+                assertEquals(string(R.string.remote_focus_notice, "Joonhyung"), controls.noticeText.text.toString())
+            }
+        } finally {
+            ShadowChoreographer.setPaused(false)
+        }
+        assertEquals(listOf(0.25f to 0.5f), camera.focusPoints)
+
+        // The notice goes sooner than the other notices, and the box by itself.
+        shadowOf(Looper.getMainLooper()).idleFor(SessionViewModel.FOCUS_NOTICE_MS + 100, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ ->
+            assertFalse(controls.noticeText.isShown)
+            assertFalse(controls.focusRing.isShown)
+        }
+
+        // A tap soon after: the box again, the notice not.
+        ShadowChoreographer.setPaused(true)
+        try {
+            modules.session.deliver(SessionMessage.FocusSet(0.75f, 0.25f))
+            idle()
+            onScreen { controls, _ ->
+                assertTrue(controls.focusRing.isShown)
+                assertFalse(controls.noticeText.isShown)
+            }
+        } finally {
+            ShadowChoreographer.setPaused(false)
+        }
+    }
+
+    @Test
+    fun theSubjectsTapToFocus_takesDownThisPhonesBrightnessBar_unlessAFingerIsOnIt() {
+        val camera = FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true)
+        val modules = launch(camera)
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 3f) }
+        idle()
+
+        // Held: nothing moves under the finger.
+        val heldAt = onScreen { controls, _ ->
+            assertBoth(controls, shown = true)
+            touch(controls.exposureBar, MotionEvent.ACTION_DOWN, Pointer(1, 24f, 64f))
+            controls.focusRing.translationX
+        }
+        modules.session.deliver(SessionMessage.FocusSet(0.9f, 0.1f))
+        idle()
+        onScreen { controls, _ ->
+            assertBoth(controls, shown = true)
+            assertEquals(heldAt, controls.focusRing.translationX, 0f)
+            touch(controls.exposureBar, MotionEvent.ACTION_UP, Pointer(1, 24f, 64f))
+        }
+
+        // Let go: the bar goes at the next tap, and the box is where the subject tapped.
+        val viewModel = cameraViewModel()
+        ShadowChoreographer.setPaused(true)
+        try {
+            modules.session.deliver(SessionMessage.FocusSet(0.9f, 0.1f))
+            idle()
+            assertFalse(viewModel.uiState.value.brightnessOpen)
+            onScreen { controls, _ ->
+                val preview = controls.previewView
+                val frame = fitViewfinderFrame(preview.width.toFloat(), preview.height.toFloat())
+                val ring = controls.focusRing
+                assertTrue(ring.isShown)
+                assertEquals(1f, ring.alpha, 0f)
+                assertEquals(frame.left + frame.width * 0.9f, ring.translationX + ring.layoutParams.width / 2f, 1f)
+            }
+        } finally {
+            ShadowChoreographer.setPaused(false)
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(1_500, TimeUnit.MILLISECONDS)
+        onScreen { controls, _ -> assertBoth(controls, shown = false) }
+    }
+
     /** The focus box and the brightness bar, both whole and in view, or both gone. */
     private fun assertBoth(controls: FragmentCameraBinding, shown: Boolean) {
         assertEquals("focus box", shown, controls.focusRing.isShown)
@@ -1204,14 +1313,14 @@ class CameraFragmentInteractionTest {
         idle()
         onScreen { controls, _ -> assertFalse(controls.pinchModeLabel.isShown) }
 
-        // A new guide starts in edit mode, so the first tap gives the pinch back to the camera.
+        // A new guide leaves the pinch to the camera (#304), so the first tap gives it to the guide.
         onScreen { controls, _ -> controls.editGuideButton.performClick() }
         idle()
         onScreen { controls, _ ->
             val label = controls.pinchModeLabel
             assertTrue(label.isShown)
-            assertEquals(string(R.string.pinch_mode_camera), label.text.toString())
-            assertEquals(string(R.string.pinch_mode_camera_description), label.contentDescription.toString())
+            assertEquals(string(R.string.pinch_mode_guide), label.text.toString())
+            assertEquals(string(R.string.pinch_mode_guide_description), label.contentDescription.toString())
             val toggle = IntArray(2).also(controls.editGuideButton::getLocationInWindow)
             val above = IntArray(2).also(label::getLocationInWindow)
             assertTrue(above[1] + label.height <= toggle[1])
@@ -1220,7 +1329,7 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ -> controls.editGuideButton.performClick() }
         idle()
         onScreen { controls, _ ->
-            assertEquals(string(R.string.pinch_mode_guide), controls.pinchModeLabel.text.toString())
+            assertEquals(string(R.string.pinch_mode_camera), controls.pinchModeLabel.text.toString())
         }
         shadowOf(Looper.getMainLooper()).idleFor(CameraViewModel.NOTICE_MS + 100, TimeUnit.MILLISECONDS)
         onScreen { controls, _ -> assertFalse(controls.pinchModeLabel.isShown) }

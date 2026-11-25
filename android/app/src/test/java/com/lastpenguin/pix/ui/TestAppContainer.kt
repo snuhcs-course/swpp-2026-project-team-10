@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui
 
 import android.graphics.Bitmap
@@ -212,7 +212,13 @@ class TestAppContainer(
         descriptionSyncer = descriptions,
         photoSyncer = photos,
         tipSyncer = tipSync,
-        remoteControlHandler = RemoteControlHandler(session, camera, guides, attributeGuideChanges = syncer::attribute),
+        remoteControlHandler = RemoteControlHandler(
+            session,
+            camera,
+            guides,
+            attributeGuideChanges = syncer::attribute,
+            baseBrightness = appSettings.baseBrightness,
+        ),
         mobileDataNotice = mobileData,
         appSettings = appSettings,
         appLanguage = language,
@@ -240,9 +246,9 @@ class TestAppContainer(
      * The photographer's photo [photoId] reaching this phone whole, as `photo.begin`, one chunk, and `photo.end`; the
      * subject's [photos] must be receiving. A few bytes that start as a JPEG are enough, since nothing decodes them.
      */
-    fun deliverPhoto(photoId: String) {
+    fun deliverPhoto(photoId: String, shot: String? = null) {
         val bytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 1, 2, 3)
-        session.deliver(SessionMessage.PhotoBegin(photoId, "jpeg", bytes.size.toLong(), 1, takenAt = 1))
+        session.deliver(SessionMessage.PhotoBegin(photoId, "jpeg", bytes.size.toLong(), 1, takenAt = 1, shot = shot))
         session.deliver(SessionMessage.PhotoChunk(photoId, 0, Base64.getEncoder().encodeToString(bytes)))
         session.deliver(SessionMessage.PhotoEnd(photoId, CRC32().apply { update(bytes) }.value))
     }

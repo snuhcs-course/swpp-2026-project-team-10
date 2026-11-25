@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.animation.ValueAnimator
@@ -224,7 +224,7 @@ class SubjectTransitionTest {
         modules.photos.startAsReceiver(receiving)
         ShadowChoreographer.setPaused(true)
 
-        modules.session.deliver(SessionMessage.PhotoShutter)
+        modules.session.deliver(SessionMessage.PhotoShutter("a"))
         idle()
         assertTrue(screen().videoScrim.isShown)
         play(500)
@@ -232,7 +232,7 @@ class SubjectTransitionTest {
 
         modules.session.setState(SessionState.Reconnecting("s1", 0L))
         play(600)
-        modules.session.deliver(SessionMessage.PhotoShutter)
+        modules.session.deliver(SessionMessage.PhotoShutter("b"))
         play(500)
         assertEquals(0.6f, screen().videoScrim.alpha, 0.01f)
     }
@@ -266,7 +266,7 @@ class SubjectTransitionTest {
 
         // No blink at the shutter.
         modules.photos.startAsReceiver(receiving)
-        modules.session.deliver(SessionMessage.PhotoShutter)
+        modules.session.deliver(SessionMessage.PhotoShutter("a"))
         idle()
         assertEquals(View.GONE, screen().videoScrim.visibility)
     }

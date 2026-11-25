@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -8,10 +8,13 @@ import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.core.view.ViewCompat
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragmentInContainer
+import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.android.material.button.MaterialButton
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -36,8 +39,11 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
+import com.lastpenguin.pix.ui.camera.ExposureBarView
+import com.lastpenguin.pix.ui.camera.FocusBrightness
 import com.lastpenguin.pix.ui.camera.REFERENCE_HIDDEN_ALPHA
 import com.lastpenguin.pix.ui.camera.REFERENCE_PEEK_DP
+import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
 import java.time.Duration
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
@@ -71,8 +77,18 @@ import org.robolectric.shadows.ShadowToast
  * toggle, a hidden guide; the photographer's reference photo with its guide, enlarged, kept while the guide is hidden,
  * gone with a replaced or removed guide, moved to another corner on this phone only, and hidden at the video's side
  * by a flick and shown again by a tap on its handle, on this phone only, and hidden while enlarged (the small strip,
- * and small when it is back; #237), a mirror through each change of its size; the brightness panel and a
- * flash tap; the live view on mobile data (FR-6.13); the Guide button (FR-6.15) disabled until connected, adding or
+ * and small when it is back; #237), a mirror through each change of its size; a flash tap; remote focus with the
+ * brightness beside it (FR-7.7, FR-7.3, #273): a tap inside the image (the focus asked for at the photographer's x, the
+ * box there, the bar beside it), beside the image and in guide-edit mode (nothing), on a camera without point focus
+ * (the bar alone); a drag on the bar (steps, then the final value; both gone after the idle time); a drag on the video
+ * without the bar up (a tap first, nothing sent until the tap's answer, then steps from the brightness it gave); a
+ * drag on the bar itself before the tap's answer (nothing sent, then from the brightness it gave), and one on the
+ * video with the bar already up before that answer (the same, and no second tap); the bar after the screen's view is
+ * made again (gone); the
+ * photographer's own focus (the box alone at its place on the mirror; this phone's bar up, which goes, or held under a
+ * finger, where nothing moves; while a drag still waits for its tap's answer, which ends that drag); TalkBack's action
+ * on the video (the focus at the image's middle and the bar, and nothing in guide-edit mode); a tap and TalkBack's
+ * action while the photographer's camera is paused (nothing), and once frames come again; the live view on mobile data (FR-6.13); the Guide button (FR-6.15) disabled until connected, adding or
  * changing the guide, opening Add a pose guide, and "Couldn't send the guide" for a guide that did not go; Leave, the
  * back button's question, and the session ending by a lost connection (also with Add a pose guide open over it) or
  * the photographer, named or before the name arrived. Save guide (FR-6.16): hidden without a guide, then saving it
@@ -87,6 +103,9 @@ import org.robolectric.shadows.ShadowToast
  * poses opened once per description and then by the same button, opened once Add a pose guide closes when it came
  * under the sheet, a set held here shown before it, and a close after Back, which says so. A tap on the readout while
  * the photographer's pinch holds the zoom: nothing sent, and the label names the photographer (FR-7.6, #236).
+ * The UAT's opinions (#271): the slot where Camera's shutter is empty until connected, then whose camera this is and
+ * "Live", given up to a step's button, with no notice saying it as well; *Leave* red; the guide-edit toggle one person icon, unlit with the guide plain and lit with it
+ * filled. The grid on by default and off from Settings.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -126,12 +145,21 @@ class SubjectFragmentRenderTest {
         exposureRange: IntRange = 0..0,
         hasFlash: Boolean = false,
         firstFrame: Boolean = true,
+        focuses: Boolean = false,
     ) {
         modules.session.setState(SessionState.Connected("s1", PeerInfo(name), Role.SUBJECT))
         if (firstFrame) modules.video.deliverFrame()
         modules.session.deliver(
             SessionMessage.Capabilities(
-                CameraCapabilities(0.6f, 10f, listOf(1f, 2f), exposureRange, 0.5f, hasFlash),
+                CameraCapabilities(
+                    0.6f,
+                    10f,
+                    listOf(1f, 2f),
+                    exposureRange,
+                    0.5f,
+                    hasFlash,
+                    supportsFocusPoint = focuses,
+                ),
             ),
         )
         // The "Connecting…" check runs every 500 ms on the main looper; let one more round see the session.
@@ -151,7 +179,7 @@ class SubjectFragmentRenderTest {
             assertFalse(binding.zoomReadout.isEnabled)
             assertEquals(View.GONE, binding.editGuideButton.visibility)
             assertEquals(View.GONE, binding.flashButton.visibility)
-            assertEquals(View.GONE, binding.brightnessButton.visibility)
+            assertFalse(binding.exposureBar.isShown)
             // The tutorial shows the pinch (FR-10.4); TalkBack hears it from the video, which has no caption under it.
             assertEquals(string(R.string.subject_video_description), binding.liveView.contentDescription.toString())
         }
@@ -219,8 +247,9 @@ class SubjectFragmentRenderTest {
             assertTrue(binding.zoomReadout.isEnabled)
             assertEquals(View.VISIBLE, binding.flashButton.visibility)
             assertTrue(binding.flashButton.isEnabled)
-            assertEquals(View.VISIBLE, binding.brightnessButton.visibility)
-            assertEquals(View.GONE, binding.brightnessPanel.visibility)
+            // The brightness comes up beside a tap on the video, not before it.
+            assertFalse(binding.exposureBar.isShown)
+            assertFalse(binding.focusRing.isShown)
         }
     }
 
@@ -246,7 +275,7 @@ class SubjectFragmentRenderTest {
             assertEquals(string(R.string.flash_auto), binding.flashButton.contentDescription)
             assertEquals(AspectRatio.R16_9.frameAspect, binding.compositionOverlay.frameAspect)
             assertEquals(AspectRatio.R16_9.frameAspect, binding.guideOverlay.frameAspect)
-            assertEquals("+1.0", binding.brightnessValue.text.toString())
+            assertEquals(2, binding.exposureBar.index)
         }
     }
 
@@ -533,18 +562,23 @@ class SubjectFragmentRenderTest {
         onScreen { binding, _ ->
             assertEquals(View.VISIBLE, binding.editGuideButton.visibility)
             assertTrue(binding.editGuideButton.isEnabled)
+            // One person icon, unlit while a pinch zooms, and the guide plain (#271).
             assertFalse(binding.editGuideButton.isChecked)
-            // The toggle shows its mode: the camera while a pinch zooms (E2, #204).
-            assertEquals(R.drawable.ic_camera, shadowOf(binding.editGuideButton.plainIcon).createdFromResId)
+            assertEquals(R.drawable.ic_guide_mode, shadowOf(binding.editGuideButton.plainIcon).createdFromResId)
+            assertEquals(color(R.color.pix_text), binding.editGuideButton.shownIconColor())
             assertFalse(binding.guideOverlay.editable)
+            assertFalse(binding.guideOverlay.filled)
             binding.editGuideButton.performClick()
         }
         idle()
 
         onScreen { binding, _ ->
+            // Lit in the guide color, with the guide's inside tinted, while drags and pinches move it.
             assertTrue(binding.editGuideButton.isChecked)
             assertEquals(R.drawable.ic_guide_mode, shadowOf(binding.editGuideButton.plainIcon).createdFromResId)
+            assertEquals(color(R.color.pix_guide), binding.editGuideButton.shownIconColor())
             assertTrue(binding.guideOverlay.editable)
+            assertTrue(binding.guideOverlay.filled)
         }
 
         // The photographer hides the guide: it cannot be edited here until it is shown again (FR-7.2).
@@ -555,26 +589,524 @@ class SubjectFragmentRenderTest {
             assertFalse(binding.editGuideButton.isEnabled)
             assertFalse(binding.editGuideButton.isChecked)
             assertFalse(binding.guideOverlay.editable)
+            assertFalse(binding.guideOverlay.filled)
+        }
+    }
+
+    // ---- The shutter's slot, the notice, and Leave (#271) --------------------------------------
+
+    private fun color(id: Int): Int = scenarioContext().getColor(id)
+
+    private fun scenarioContext() = onScreen { _, fragment -> fragment.requireContext() }
+
+    /** The toggle's icon color in the state it is in. */
+    private fun MaterialButton.shownIconColor(): Int? =
+        iconTint?.getColorForState(drawableState, 0)
+
+    @Test
+    // At the Galaxy S22's width, where the name fits whole; CameraLayoutTest checks a name that does not.
+    @Config(qualifiers = "w360dp-h705dp-xxhdpi")
+    fun theShuttersSlot_isEmptyUntilConnected_thenSaysWhoseCameraItIsAndThatItIsLive() {
+        val modules = launch()
+        onScreen { binding, _ -> assertEquals(View.GONE, binding.cameraCaption.visibility) }
+
+        connect(modules, name = "Test Account 1")
+
+        onScreen { binding, _ ->
+            assertEquals(View.VISIBLE, binding.cameraCaption.visibility)
+            assertEquals(
+                string(R.string.subject_title, "Test Account 1"),
+                binding.cameraCaptionTitle.text.toString(),
+            )
+            assertEquals(string(R.string.subject_live), binding.cameraCaptionStatus.text.toString())
+            assertTrue(binding.cameraCaptionDot.isShown)
+            assertFalse(binding.cameraCaptionSpinner.isShown)
+            // The slot names the camera for the whole session, so no notice says it as well.
+            assertFalse(binding.toggleLabel.isShown)
+        }
+
+        // The link drops: the video says so, and the slot is empty again until it is back.
+        modules.session.setState(SessionState.Reconnecting("s1", 0L))
+        idle()
+        onScreen { binding, _ -> assertEquals(View.GONE, binding.cameraCaption.visibility) }
+    }
+
+    @Test
+    fun leave_isRed_asEndSessionIsOnCamera() {
+        launch()
+
+        // The danger style's text; its outline is an app attribute, which this test's host does not apply.
+        onScreen { binding, _ -> assertEquals(color(R.color.pix_danger_text), binding.leaveButton.currentTextColor) }
+    }
+
+    @Test
+    fun theGrid_isOnByDefault_andOffFromSettings() {
+        val modules = launch()
+        connect(modules)
+        onScreen { binding, _ -> assertTrue(binding.compositionOverlay.showGrid) }
+
+        runBlocking { modules.appSettings.setShowGrid(false) }
+        idle()
+
+        onScreen { binding, _ ->
+            assertFalse(binding.compositionOverlay.showGrid)
+            // Subject view has no horizon bar.
+            assertEquals(View.VISIBLE, binding.compositionOverlay.visibility)
         }
     }
 
     @Test
-    fun brightnessButton_opensThePanel_andTheFlashTapSendsARequest() {
+    fun theFlashTap_sendsARequest() {
         val modules = launch()
         connect(modules, exposureRange = -4..4, hasFlash = true)
 
+        onScreen { binding, _ -> binding.flashButton.performClick() }
+        idle()
+
+        assertTrue(modules.session.sent.any { it == SessionMessage.FlashSet(FlashMode.AUTO) })
+    }
+
+    // ---- Remote focus, with the brightness beside it (FR-7.7, FR-7.3, #273) -----------------------------------
+
+    private fun touch(view: View, action: Int, x: Float, y: Float, down: Long, at: Long = down) =
+        MotionEvent.obtain(down, at, action, x, y, 0).also { view.dispatchTouchEvent(it) }.recycle()
+
+    private fun tap(view: View, x: Float, y: Float) {
+        val down = SystemClock.uptimeMillis()
+        touch(view, MotionEvent.ACTION_DOWN, x, y, down)
+        touch(view, MotionEvent.ACTION_UP, x, y, down, down + 16)
+    }
+
+    /** How far a finger moves for [steps] of the photographer's 0.5 EV per index (`ExposureBarView.DP_PER_EV`). */
+    private fun wayFor(view: View, steps: Int): Float =
+        steps * 0.5f * ExposureBarView.DP_PER_EV * view.resources.displayMetrics.density
+
+    private fun focuses(modules: TestAppContainer) = modules.session.sent.filterIsInstance<SessionMessage.FocusSet>()
+
+    private fun brightnesses(modules: TestAppContainer) =
+        modules.session.sent.filterIsInstance<SessionMessage.ExposureSet>()
+
+    /** Taps the video a quarter across the image and halfway down it; where that is in the video's area. */
+    private fun tapTheImage(): Pair<Float, Float> = onScreen { binding, _ ->
+        val area = binding.videoContainer
+        val frame = fitViewfinderFrame(area.width.toFloat(), area.height.toFloat())
+        val x = frame.left + frame.width * 0.25f
+        val y = frame.top + frame.height * 0.5f
+        tap(area, x, y)
+        x to y
+    }
+
+    @Test
+    fun aTapOnTheVideo_asksForTheFocusThere_andBringsTheBoxWithTheBrightnessBarBesideIt() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, focuses = true)
+
+        val (x, y) = tapTheImage()
+        idle()
+
+        // The rear camera's video is a mirror here: a quarter from its left is three quarters across the
+        // photographer's frame.
+        val asked = focuses(modules).single()
+        assertEquals(0.75f, asked.x, 0.01f)
+        assertEquals(0.5f, asked.y, 0.01f)
         onScreen { binding, _ ->
-            binding.brightnessButton.performClick()
-            binding.flashButton.performClick()
+            val density = binding.root.resources.displayMetrics.density
+            val ring = binding.focusRing
+            val bar = binding.exposureBar
+            assertTrue(ring.isShown)
+            assertTrue(bar.isShown)
+            assertEquals(x, ring.translationX + ring.layoutParams.width / 2f, 1f)
+            assertEquals(y, ring.translationY + ring.layoutParams.height / 2f, 1f)
+            // As on Camera: on the box's right, its 48 dp touch area reaching 12 dp over the 64 dp box.
+            assertEquals(x + 32f * density - 12f * density, bar.translationX, 1f)
+            assertEquals(y - bar.height / 2f, bar.translationY, 1f)
         }
+    }
+
+    @Test
+    fun aDragOnTheBar_sendsTheBrightness_andTheBarAndTheBoxGoAfterAWhileWithoutATouch() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, focuses = true)
+        tapTheImage()
+        idle()
+        // The tap's answer: the camera is at its base, 0.
+        modules.session.deliver(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, focused = true))
         idle()
 
         onScreen { binding, _ ->
-            assertTrue(binding.brightnessButton.isChecked)
-            assertEquals(View.VISIBLE, binding.brightnessPanel.visibility)
-            assertTrue(binding.brightnessSlider.isEnabled)
+            val bar = binding.exposureBar
+            assertTrue(bar.isShown)
+            val down = SystemClock.uptimeMillis()
+            val x = bar.width / 2f
+            val y = bar.height / 2f
+            touch(bar, MotionEvent.ACTION_DOWN, x, y, down)
+            touch(bar, MotionEvent.ACTION_MOVE, x, y - wayFor(bar, 2), down, down + 16)
+            touch(bar, MotionEvent.ACTION_UP, x, y - wayFor(bar, 2), down, down + 32)
         }
-        assertTrue(modules.session.sent.any { it == SessionMessage.FlashSet(FlashMode.AUTO) })
+        idle()
+
+        val sent = brightnesses(modules)
+        assertEquals(SessionMessage.ExposureSet(2), sent.first())
+        assertEquals(SessionMessage.ExposureSet(2, final = true), sent.last())
+
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(FocusBrightness.IDLE_MS + 500))
+        onScreen { binding, _ ->
+            assertFalse(binding.exposureBar.isShown)
+            assertFalse(binding.focusRing.isShown)
+        }
+    }
+
+    @Test
+    fun aDragOnTheBarBeforeTheTapsAnswer_waitsForIt_andStartsFromTheBrightnessItGave() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, focuses = true)
+        // Left at +1.5 EV by an earlier drag.
+        modules.session.deliver(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 3))
+        idle()
+        tapTheImage()
+        idle()
+
+        val down = SystemClock.uptimeMillis()
+        var y = 0f
+        onScreen { binding, _ ->
+            val bar = binding.exposureBar
+            assertTrue(bar.isShown)
+            y = bar.height / 2f
+            touch(bar, MotionEvent.ACTION_DOWN, bar.width / 2f, y, down)
+            y -= wayFor(bar, 2)
+            touch(bar, MotionEvent.ACTION_MOVE, bar.width / 2f, y, down, down + 16)
+        }
+        idle()
+        assertTrue(brightnesses(modules).isEmpty())
+
+        modules.session.deliver(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 0, focused = true),
+        )
+        idle()
+        onScreen { binding, _ ->
+            val bar = binding.exposureBar
+            y -= 1f
+            touch(bar, MotionEvent.ACTION_MOVE, bar.width / 2f, y, down, down + 32)
+            y -= wayFor(bar, 2)
+            touch(bar, MotionEvent.ACTION_MOVE, bar.width / 2f, y, down, down + 48)
+            touch(bar, MotionEvent.ACTION_UP, bar.width / 2f, y, down, down + 64)
+        }
+        idle()
+        assertEquals(SessionMessage.ExposureSet(2, final = true), brightnesses(modules).last())
+        assertTrue(brightnesses(modules).none { it.index > 2 })
+    }
+
+    @Test
+    fun aDragOnTheVideoWithTheBarUp_beforeTheTapsAnswer_waitsForItToo() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, focuses = true)
+        modules.session.deliver(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 3))
+        idle()
+        tapTheImage()
+        idle()
+        onScreen { binding, _ -> assertTrue(binding.exposureBar.isShown) }
+
+        // A drag on the video, away from the bar, before the tap is answered.
+        val down = SystemClock.uptimeMillis() + 500
+        var y = 0f
+        onScreen { binding, _ ->
+            val area = binding.videoContainer
+            val x = area.width * 0.8f
+            y = area.height * 0.8f
+            touch(area, MotionEvent.ACTION_DOWN, x, y, down)
+            y -= ViewConfiguration.get(area.context).scaledTouchSlop + 2f
+            touch(area, MotionEvent.ACTION_MOVE, x, y, down, down + 16)
+            y -= wayFor(area, 2)
+            touch(area, MotionEvent.ACTION_MOVE, x, y, down, down + 32)
+        }
+        idle()
+        // The bar was up, so the drag is no second tap; and nothing is sent from the brightness before the tap.
+        assertEquals(1, focuses(modules).size)
+        assertTrue(brightnesses(modules).isEmpty())
+
+        modules.session.deliver(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 0, focused = true),
+        )
+        idle()
+        onScreen { binding, _ ->
+            val area = binding.videoContainer
+            val x = area.width * 0.8f
+            y -= 1f
+            touch(area, MotionEvent.ACTION_MOVE, x, y, down, down + 48)
+            y -= wayFor(area, 2)
+            touch(area, MotionEvent.ACTION_MOVE, x, y, down, down + 64)
+            touch(area, MotionEvent.ACTION_UP, x, y, down, down + 80)
+        }
+        idle()
+        assertEquals(SessionMessage.ExposureSet(2, final = true), brightnesses(modules).last())
+        assertTrue(brightnesses(modules).none { it.index > 2 })
+    }
+
+    @Test
+    fun theBar_isGoneAfterTheScreensViewIsMadeAgain() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, focuses = true)
+        tapTheImage()
+        idle()
+        onScreen { binding, _ -> assertTrue(binding.exposureBar.isShown) }
+
+        // As when another screen, such as Settings, was in front: the view goes and is made again.
+        scenario!!.moveToState(Lifecycle.State.CREATED)
+        scenario!!.moveToState(Lifecycle.State.RESUMED)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+
+        onScreen { binding, fragment ->
+            assertFalse(binding.exposureBar.isShown)
+            assertFalse(binding.focusRing.isShown)
+        }
+        // And it stays gone: no bar is left up without its time running.
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(FocusBrightness.IDLE_MS + 500))
+        onScreen { binding, _ -> assertFalse(binding.exposureBar.isShown) }
+    }
+
+    @Test
+    fun aTapBesideTheImage_orInGuideEditMode_asksForNothing() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, focuses = true)
+        // A square image leaves bands of the video's area above and below it.
+        modules.session.deliver(
+            SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, aspect = AspectRatio.R1_1),
+        )
+        idle()
+        onScreen { binding, _ ->
+            val area = binding.videoContainer
+            val frame = fitViewfinderFrame(area.width.toFloat(), area.height.toFloat(), AspectRatio.R1_1.frameAspect)
+            assertTrue("a band above the image", frame.top > 16f)
+            tap(area, area.width / 2f, frame.top / 2f)
+        }
+        idle()
+        assertTrue(focuses(modules).isEmpty())
+        onScreen { binding, _ -> assertFalse(binding.exposureBar.isShown) }
+
+        // Guide-edit mode: the touch is the guide's.
+        modules.mirror.setGuide(guide())
+        idle()
+        onScreen { binding, _ -> binding.editGuideButton.performClick() }
+        idle()
+        onScreen { binding, _ ->
+            val area = binding.videoContainer
+            tap(area, area.width / 2f, area.height / 2f)
+        }
+        idle()
+        assertTrue(focuses(modules).isEmpty())
+        onScreen { binding, _ -> assertFalse(binding.exposureBar.isShown) }
+    }
+
+    @Test
+    fun thePhotographersOwnFocus_showsTheBoxAloneAtItsPlaceOnTheMirror_andTakesDownThisPhonesBar() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, focuses = true)
+
+        // The display's frames held, so the box is seen before its animation runs to its end.
+        ShadowChoreographer.setPaused(true)
+        try {
+            modules.session.deliver(SessionMessage.Focused(0.25f, 0.5f))
+            idle()
+            onScreen { binding, _ ->
+                val area = binding.videoContainer
+                val frame = fitViewfinderFrame(area.width.toFloat(), area.height.toFloat())
+                val ring = binding.focusRing
+                assertTrue(ring.isShown)
+                // A quarter across the photographer's frame is three quarters across its mirror.
+                assertEquals(frame.left + frame.width * 0.75f, ring.translationX + ring.layoutParams.width / 2f, 1f)
+                assertEquals(frame.top + frame.height * 0.5f, ring.translationY + ring.layoutParams.height / 2f, 1f)
+                assertFalse(binding.exposureBar.isShown)
+            }
+        } finally {
+            ShadowChoreographer.setPaused(false)
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1_500))
+        onScreen { binding, _ -> assertFalse(binding.focusRing.isShown) }
+
+        // This phone's own bar up: held, nothing moves under the finger; let go, it goes at the next one.
+        val (x, _) = tapTheImage()
+        idle()
+        val down = SystemClock.uptimeMillis()
+        onScreen { binding, _ -> touch(binding.exposureBar, MotionEvent.ACTION_DOWN, 24f, 64f, down) }
+        modules.session.deliver(SessionMessage.Focused(0.5f, 0.2f))
+        idle()
+        onScreen { binding, _ ->
+            assertTrue(binding.exposureBar.isShown)
+            assertEquals(x, binding.focusRing.translationX + binding.focusRing.layoutParams.width / 2f, 1f)
+            touch(binding.exposureBar, MotionEvent.ACTION_UP, 24f, 64f, down, down + 16)
+        }
+        modules.session.deliver(SessionMessage.Focused(0.5f, 0.2f))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1_500))
+        onScreen { binding, _ ->
+            assertFalse(binding.exposureBar.isShown)
+            assertFalse(binding.focusRing.isShown)
+        }
+    }
+
+    @Test
+    fun aDragStillWaitingForItsTapsAnswer_endsWhenThePhotographerFocusesMeanwhile() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, focuses = true)
+        val down = SystemClock.uptimeMillis()
+        var y = 0f
+        onScreen { binding, _ ->
+            val area = binding.videoContainer
+            y = area.height / 2f
+            touch(area, MotionEvent.ACTION_DOWN, area.width / 2f, y, down)
+            y -= ViewConfiguration.get(area.context).scaledTouchSlop + 2f
+            touch(area, MotionEvent.ACTION_MOVE, area.width / 2f, y, down, down + 16)
+        }
+        idle()
+        assertEquals(1, focuses(modules).size)
+
+        // The photographer's own focus takes the bar down before the tap's answer comes.
+        modules.session.deliver(SessionMessage.Focused(0.5f, 0.2f))
+        idle()
+        modules.session.deliver(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, focused = true))
+        idle()
+        onScreen { binding, _ ->
+            val area = binding.videoContainer
+            y -= 1f
+            touch(area, MotionEvent.ACTION_MOVE, area.width / 2f, y, down, down + 32)
+            y -= wayFor(area, 2)
+            touch(area, MotionEvent.ACTION_MOVE, area.width / 2f, y, down, down + 48)
+            touch(area, MotionEvent.ACTION_UP, area.width / 2f, y, down, down + 64)
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1_500))
+
+        // No brightness from a bar that is not there.
+        assertTrue(brightnesses(modules).isEmpty())
+        onScreen { binding, _ -> assertFalse(binding.exposureBar.isShown) }
+    }
+
+    @Test
+    fun talkBacksActionOnTheVideo_asksForTheFocusAtTheImagesMiddle_andBringsTheBar() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, focuses = true)
+
+        onScreen { binding, _ ->
+            val info = binding.liveView.createAccessibilityNodeInfo()
+            val click = info.actionList.single { it.id == AccessibilityNodeInfo.ACTION_CLICK }
+            assertEquals(string(R.string.focus_and_brightness_action), click.label.toString())
+            assertTrue(binding.liveView.performAccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, null))
+        }
+        idle()
+
+        val asked = focuses(modules).single()
+        assertEquals(0.5f, asked.x, 0.01f)
+        assertEquals(0.5f, asked.y, 0.01f)
+        onScreen { binding, _ ->
+            assertTrue(binding.exposureBar.isShown)
+            assertTrue(binding.focusRing.isShown)
+        }
+
+        // In guide-edit mode the action does nothing, as a tap does.
+        modules.mirror.setGuide(guide())
+        idle()
+        onScreen { binding, _ -> binding.editGuideButton.performClick() }
+        idle()
+        onScreen { binding, _ ->
+            assertFalse(binding.liveView.performAccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, null))
+        }
+        assertEquals(1, focuses(modules).size)
+    }
+
+    @Test
+    fun whileThePhotographersCameraIsPaused_aTapAsksForNothing_untilFramesComeAgain() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, focuses = true)
+
+        // No frame for longer than the 2 s stall limit: the camera is paused, and would drop the request.
+        Thread.sleep(2_100)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        onScreen { binding, _ ->
+            assertEquals(string(R.string.camera_paused), binding.connectingText.text.toString())
+        }
+        tapTheImage()
+        idle()
+        onScreen { binding, _ ->
+            assertFalse(binding.liveView.performAccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, null))
+        }
+        idle()
+        assertTrue(focuses(modules).isEmpty())
+        onScreen { binding, _ ->
+            assertFalse(binding.exposureBar.isShown)
+            assertFalse(binding.focusRing.isShown)
+        }
+
+        modules.video.deliverFrame()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        tapTheImage()
+        idle()
+        assertEquals(1, focuses(modules).size)
+        onScreen { binding, _ -> assertTrue(binding.exposureBar.isShown) }
+    }
+
+    @Test
+    fun onACameraWithoutPointFocus_aTapBringsTheBarWithoutTheBox() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4)
+
+        tapTheImage()
+        idle()
+
+        // The tap still puts the photographer's brightness back to its base.
+        assertEquals(1, focuses(modules).size)
+        onScreen { binding, _ ->
+            assertTrue(binding.exposureBar.isShown)
+            assertFalse(binding.focusRing.isShown)
+        }
+    }
+
+    @Test
+    fun aDragOnTheVideo_tapsFirst_andMovesTheBrightnessFromWhereTheCameraWentBackTo() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, focuses = true)
+        // Left at +1.5 EV by an earlier drag.
+        modules.session.deliver(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 3))
+        idle()
+
+        val down = SystemClock.uptimeMillis()
+        var y = 0f
+        // Up past the touch slop: the drag begins, and taps where it began.
+        onScreen { binding, _ ->
+            val area = binding.videoContainer
+            val slop = ViewConfiguration.get(area.context).scaledTouchSlop
+            y = area.height / 2f
+            touch(area, MotionEvent.ACTION_DOWN, area.width / 2f, y, down)
+            y -= slop + 2f
+            touch(area, MotionEvent.ACTION_MOVE, area.width / 2f, y, down, down + 16)
+        }
+        idle()
+        assertEquals(1, focuses(modules).size)
+        onScreen { binding, _ -> assertTrue(binding.exposureBar.isShown) }
+
+        // The tap is not answered yet, so the finger's way changes nothing.
+        onScreen { binding, _ ->
+            val area = binding.videoContainer
+            y -= wayFor(area, 2)
+            touch(area, MotionEvent.ACTION_MOVE, area.width / 2f, y, down, down + 32)
+        }
+        idle()
+        assertTrue(brightnesses(modules).isEmpty())
+
+        // The answer: the camera is back at its base, 0. The drag goes on from there, by the way after it.
+        modules.session.deliver(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 0, focused = true),
+        )
+        idle()
+        onScreen { binding, _ ->
+            val area = binding.videoContainer
+            assertEquals(0, binding.exposureBar.index)
+            y -= 1f
+            touch(area, MotionEvent.ACTION_MOVE, area.width / 2f, y, down, down + 48)
+            y -= wayFor(area, 2)
+            touch(area, MotionEvent.ACTION_MOVE, area.width / 2f, y, down, down + 64)
+            touch(area, MotionEvent.ACTION_UP, area.width / 2f, y, down, down + 80)
+        }
+        idle()
+        assertEquals(SessionMessage.ExposureSet(2, final = true), brightnesses(modules).last())
+        assertTrue(brightnesses(modules).none { it.index > 2 })
     }
 
     @Test
@@ -705,6 +1237,8 @@ class SubjectFragmentRenderTest {
             assertEquals(string(R.string.peer_creating_poses, "Dongje"), binding.connectingText.text.toString())
             assertEquals(View.VISIBLE, binding.pickPoseButton.visibility)
             assertEquals(string(R.string.generating_title), binding.pickPoseLabel.text.toString())
+            // The step's button takes the slot where the camera's name is (#271).
+            assertEquals(View.GONE, binding.cameraCaption.visibility)
         }
 
         // Back keeps it closed, though Subject view renders again; its button opens it again.

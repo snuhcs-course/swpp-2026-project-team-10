@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import androidx.lifecycle.ViewModelStore
@@ -54,6 +54,8 @@ class GuideControlsViewModelTest {
         guides.setGuide(fakeGuide("g1"))
         guides.update(final = true) { it.copy(cx = 0.3f, cy = 0.6f, height = 1.2f) }
         runCurrent()
+        // A new guide starts with the mode off (#304); the toggle turns it on.
+        model.setGuideEditing(true)
         assertTrue(model.uiState.value.guideEditing)
         val changes = mutableListOf<GuideChange>()
         backgroundScope.launch { guides.changes.collect { changes += it } }

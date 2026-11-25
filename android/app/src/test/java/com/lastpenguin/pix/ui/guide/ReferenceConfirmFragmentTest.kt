@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.animation.ValueAnimator
@@ -49,7 +49,10 @@ import org.robolectric.shadows.ShadowToast
  * Partitions on the reference state: nothing yet, working (the person is being found), ready (the outline shown
  * and Use this guide enabled, which puts the guide on the camera), no person found (to that screen), and a photo
  * that could not be used (a toast and the camera). Back on a generated pose's guide, or another photo from the
- * gallery in its place, stops the ask for its tip. Opened from Subject view: the session ending goes back to Subject
+ * gallery in its place, stops the ask for its tip. Back by where the reference was chosen (#294): a photo from the
+ * camera's Add a pose guide (that sheet again over the camera, without its gallery, the guide on the camera the same
+ * one; the system's Back too), from Subject view's (its sheet over Subject view), from the library (the library), and
+ * a generated pose (one step back, no sheet). Opened from Subject view: the session ending goes back to Subject
  * view, which shows what ended it, and stops finding the person; opened from the camera, it stays. A candidate the
  * subject picked says whose pick it is under the title; this phone's own pick and an uploaded photo say nothing. The
  * title: Guide Outline for both an uploaded photo and a generated pose (#204).
@@ -443,7 +446,7 @@ class ReferenceConfirmFragmentTest {
     }
 
     @Test
-    fun backOnAGeneratedPose_stopsTheAskForItsTip() {
+    fun backOnAGeneratedPose_stopsTheAskForItsTip_andGoesOneStepBack() {
         val modules = launch()
         val request = generatedPose(modules)
 
@@ -451,6 +454,65 @@ class ReferenceConfirmFragmentTest {
         idle()
 
         assertTrue(request.cancelled)
+        // The screen before, here the camera as in a session, and not Add a pose guide: no photo was picked (#294).
+        assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
+    }
+
+    private fun assertOnTheSheetAlone(controller: TestNavHostController, below: Int, fromSubject: Boolean) {
+        assertEquals(R.id.addGuideSheet, controller.currentDestination?.id)
+        val arguments = controller.currentBackStackEntry?.arguments
+        assertEquals(false, arguments?.getBoolean(AddGuideSheet.ARG_OPEN_GALLERY))
+        assertEquals(fromSubject, arguments?.getBoolean(AddGuideSheet.ARG_FROM_SUBJECT))
+        assertEquals(below, controller.previousBackStackEntry?.destination?.id)
+    }
+
+    @Test
+    fun backOnAPhotoFromTheCamerasSheet_opensThatSheetAgain_withoutItsGallery() {
+        val modules = launch()
+        val onCamera = guide()
+        modules.guides.setGuide(onCamera)
+        pickPhoto()
+
+        onScreen { it.backButton.performClick() }
+        idle()
+
+        assertOnTheSheetAlone(nav, below = R.id.cameraFragment, fromSubject = false)
+        assertSame(onCamera, modules.guides.guide.value)
+    }
+
+    @Test
+    fun theSystemsBackOnAPhotoFromTheCamerasSheet_opensThatSheetAgain() {
+        launch()
+        pickPhoto()
+
+        scenario!!.onFragment { it.requireActivity().onBackPressedDispatcher.onBackPressed() }
+        idle()
+
+        assertOnTheSheetAlone(nav, below = R.id.cameraFragment, fromSubject = false)
+    }
+
+    @Test
+    fun backOnAPhotoFromSubjectViewsSheet_opensThatSheetAgainOverSubjectView() {
+        val (_, controller) = launchFromSubject()
+        pickPhoto()
+
+        onScreen { it.backButton.performClick() }
+        idle()
+
+        assertOnTheSheetAlone(controller, below = R.id.subjectFragment, fromSubject = true)
+    }
+
+    @Test
+    fun backOnAPhotoFromTheLibrary_isTheLibrary() {
+        launch()
+        nav.setCurrentDestination(R.id.libraryFragment)
+        nav.navigate(R.id.action_library_to_referenceConfirm)
+        pickPhoto()
+
+        onScreen { it.backButton.performClick() }
+        idle()
+
+        assertEquals(R.id.libraryFragment, nav.currentDestination?.id)
     }
 
     @Test

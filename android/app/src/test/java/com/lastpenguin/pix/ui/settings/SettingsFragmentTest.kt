@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.content.Intent
@@ -30,6 +30,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,10 +40,11 @@ import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowToast
 
 /*
- * Settings on the real screen (FR-10.1–10.4, FR-10.6, FR-10.7, FR-3.10, FR-4.2), with the settings in memory behind the
- * ViewModel.
- * Partitions: the defaults (white, normal, the indicator off, the phone's language, an agreement given, usage data
- * shared, signed out); usage data turned off from its switch and on from its row, and its switch while the stored
+ * Settings on the real screen (FR-10.1–10.4, FR-10.6, FR-10.7, FR-1.9, FR-1.10, FR-3.10, FR-4.2), with the settings in
+ * memory behind the ViewModel.
+ * Partitions: the defaults (white, normal, the grid and the horizon bar on, the indicator off, the phone's language, an
+ * agreement given, usage data shared, signed out); the grid and the horizon bar each turned off from its switch and on
+ * from its row (#271), shown off as kept, and in one card with the base brightness, as every section's rows; usage data turned off from its switch and on from its row, and its switch while the stored
  * answer loads (disabled, saving nothing, also when its restored state changes it) and once it arrives off;
  * the base brightness at 0 EV, slid to +1 EV and saved, and shown as kept; each color and thickness chosen; the indicator turned on from its switch and off from its row; a language chosen and
  * the dialog cancelled; the agreement withdrawn, the row without one (its value 16 dp from the edge, with no chevron),
@@ -90,6 +92,8 @@ class SettingsFragmentTest {
             assertTrue(binding.thicknessNormal.isSelected)
             assertFalse(binding.thicknessThick.isSelected)
             assertEquals(GuideLook(), binding.guidePreview.look)
+            assertTrue(binding.gridSwitch.isChecked)
+            assertTrue(binding.levelSwitch.isChecked)
             assertFalse(binding.latencySwitch.isChecked)
             assertTrue(binding.usageSwitch.isChecked)
             assertEquals(string(R.string.settings_language_phone), binding.languageRow.settingValue.text.toString())
@@ -180,6 +184,56 @@ class SettingsFragmentTest {
             slider.dispatchTouchEvent(event)
             event.recycle()
         }
+    }
+
+    @Test
+    fun theGridAndTheHorizonBar_areEachTurnedOffFromTheirSwitch_andOnFromTheirRow() {
+        val modules = launch()
+
+        onScreen { it.gridSwitch.performClick() }
+        assertFalse(modules.appSettings.showGrid.value)
+        assertTrue(modules.appSettings.showLevel.value)
+        onScreen { it.levelSwitch.performClick() }
+        assertFalse(modules.appSettings.showLevel.value)
+        assertFalse(modules.appSettings.showGrid.value)
+
+        onScreen { it.gridRow.performClick() }
+        assertTrue(modules.appSettings.showGrid.value)
+        onScreen { it.levelRow.performClick() }
+        assertTrue(modules.appSettings.showLevel.value)
+        onScreen {
+            assertTrue(it.gridSwitch.isChecked)
+            assertTrue(it.levelSwitch.isChecked)
+        }
+    }
+
+    @Test
+    fun theCameraSection_isOneCard_withTheBrightnessAndBothSwitches() {
+        launch()
+
+        onScreen { binding ->
+            assertSame(binding.cameraCard, binding.baseBrightnessRow.parent)
+            assertSame(binding.cameraCard, binding.gridRow.parent)
+            assertSame(binding.cameraCard, binding.levelRow.parent)
+        }
+    }
+
+    @Test
+    fun theGridAndTheHorizonBar_keptOff_showOff() {
+        val modules = TestAppContainer()
+        runBlocking {
+            modules.appSettings.setShowGrid(false)
+            modules.appSettings.setShowLevel(false)
+        }
+        launch(modules)
+
+        onScreen {
+            assertFalse(it.gridSwitch.isChecked)
+            assertFalse(it.levelSwitch.isChecked)
+        }
+        // Showing the kept answer saves nothing new.
+        assertFalse(modules.appSettings.showGrid.value)
+        assertFalse(modules.appSettings.showLevel.value)
     }
 
     @Test

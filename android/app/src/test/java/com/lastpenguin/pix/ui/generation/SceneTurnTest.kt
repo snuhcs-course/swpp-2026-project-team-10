@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -142,7 +142,6 @@ class SceneTurnTest {
         shootAt(90)
         val upright = state.scene
 
-        model.useScene()
         model.suggestPoses()
         runCurrent()
         val run = generator.runs.single()
@@ -159,14 +158,12 @@ class SceneTurnTest {
     }
 
     @Test
-    fun backFromASet_toTheReview_showsThePhotoAsFramedAgain() = runTest {
+    fun backFromASet_toGeneratePoses_keepsThePhotoAsFramed_andItsTurn() = runTest {
         shootAt(270)
-        model.useScene()
         model.suggestPoses()
         runCurrent()
 
         model.stopGenerating()
-        model.backToReview()
 
         assertSame(framed, state.framed)
         assertEquals(270, state.sceneTurn)

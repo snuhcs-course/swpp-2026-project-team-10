@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -227,12 +227,12 @@ class SubjectTipScreenTest {
         onScreen { controls, _ -> controls.tipButton.performClick() }
         idle()
 
-        onScreen { controls, _ -> tapThroughTheRoot(controls, controls.brightnessButton) }
+        onScreen { controls, _ -> tapThroughTheRoot(controls, controls.editGuideButton) }
         idle()
 
         onScreen { controls, _ ->
             assertFalse(controls.tipBanner.isShown)
-            assertTrue("the brightness slider opened", controls.brightnessPanel.isShown)
+            assertTrue("guide-edit mode turned on", controls.editGuideButton.isChecked)
             assertTrue("the button stays for another look", controls.tipButtonFrame.isShown)
         }
     }

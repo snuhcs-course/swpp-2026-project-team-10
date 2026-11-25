@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -31,7 +31,8 @@ data class GuideLook(val color: GuideColor = GuideColor.WHITE, val thickness: Gu
 /**
  * A guide's outline at a thickness from the settings. [ReferenceGuide.outline] is the default line; another thickness
  * is traced again from the mask, off the main thread, as the other phone traces a received mask (Design 2.6.1). The last
- * few results are kept, so a screen that shows the same guide again does not trace it again.
+ * few results are kept, so a screen that shows the same guide again does not trace it again. The inside that
+ * guide-edit mode tints is made here too, the same way ([inside]).
  */
 class GuideOutlines(
     private val extractor: OutlineExtractor = OutlineExtractor(),
@@ -53,6 +54,24 @@ class GuideOutlines(
             while (traced.size > KEPT) traced.removeLast()
         }
         return outline
+    }
+
+    private val insides = ArrayDeque<Pair<ReferenceGuide, Bitmap>>()
+
+    /**
+     * The inside of [guide]'s mask, which guide-edit mode tints (#271): a pass over the whole mask, so it is made off the
+     * main thread, never while the guide is drawn, and kept like the outlines. Null when the mask is gone.
+     */
+    suspend fun inside(guide: ReferenceGuide): Bitmap? {
+        synchronized(insides) { insides.firstOrNull { it.first === guide } }?.let { return it.second }
+        val inside = withContext(dispatcher) {
+            guide.mask.takeUnless { it.isRecycled }?.let { guideInside(it.maskPixels()).toMaskBitmap() }
+        } ?: return null
+        synchronized(insides) {
+            insides.addFirst(guide to inside)
+            while (insides.size > KEPT) insides.removeLast()
+        }
+        return inside
     }
 
     companion object {

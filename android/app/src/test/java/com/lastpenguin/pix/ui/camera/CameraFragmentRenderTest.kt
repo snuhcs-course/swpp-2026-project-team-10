@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -33,10 +33,12 @@ import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.TestAppContainer
+import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -50,14 +52,18 @@ import org.robolectric.annotation.GraphicsMode
 /*
  * The Camera screen's render paths (R&S 6.2, Testing Documentation 2.1.6), on the real Fragment under
  * FragmentScenario with a container of fakes. Partitions, one test each: camera permission denied or granted;
- * camera status STARTING, READY; a guide added, hidden, removed by the shutter's end of edit mode; a photo saved or
+ * camera status STARTING, READY; the grid and the horizon bar on by default, and each off from Settings (#271); a
+ * guide added, with the guide-edit toggle unlit and the guide not filled (#304), the toggle tapped on (lit, the guide
+ * filled) and off again (unlit, the same icon, no fill; #271), hidden, removed by the shutter's end of edit mode; the
+ * hint chip with no line for the pinch, and "Guide hidden" for a hidden guide (#306); a photo saved or
  * failed; the flash and brightness controls with and without the capability; the aspect ratio 4:3 and 16:9; the
  * scene photo step framing and reviewing, with Back at the top left of each (out to the camera, and from the review back
  * to framing) and Use at the top right of the review (#199), the flow's bar at its first and second step, the panel
  * with what to frame and the accent shutter while framing only, all gone after the step (#210), its review while the
  * phone looks for a person and without one (FR-4.13), and
  * its light (FR-4.1) turned on and off, and on a camera without a flash;
- * a session connected and a peer leaving or dropping, whose notice stays 10 s and goes once the peer is back (#238),
+ * a session connected, with who watches the camera for 3 s (#271), and a peer leaving or dropping, whose notice stays
+ * 10 s and gives way once the peer is back (#238),
  * and the scene photo step in a session, without End session until it ends, a reconnect included; a guide added from
  * Subject view, with the reference thumbnail its phone sent (#234); the camera switch on a phone with and without a
  * front camera, gone while the
@@ -149,6 +155,35 @@ class CameraFragmentRenderTest {
             assertEquals(View.GONE, controls.flashButton.visibility)
             assertEquals(View.GONE, controls.exposureBar.visibility)
             assertFalse(controls.galleryButton.isEnabled)
+            // The grid and the horizon bar, on until Settings turns them off (FR-1.9, FR-1.10).
+            assertTrue(controls.compositionOverlay.showGrid)
+            assertTrue(controls.compositionOverlay.showLevel)
+        }
+    }
+
+    @Test
+    fun theGridOffInSettings_isNotDrawn_andTheBarStays() {
+        val modules = launch()
+
+        runBlocking { modules.appSettings.setShowGrid(false) }
+        idle()
+
+        onScreen { controls, _ ->
+            assertFalse(controls.compositionOverlay.showGrid)
+            assertTrue(controls.compositionOverlay.showLevel)
+        }
+    }
+
+    @Test
+    fun theBarOffInSettings_isNotDrawn_andTheGridStays() {
+        val modules = launch()
+
+        runBlocking { modules.appSettings.setShowLevel(false) }
+        idle()
+
+        onScreen { controls, _ ->
+            assertTrue(controls.compositionOverlay.showGrid)
+            assertFalse(controls.compositionOverlay.showLevel)
         }
     }
 
@@ -176,7 +211,7 @@ class CameraFragmentRenderTest {
     // ---- Guide -----------------------------------------------------------------
 
     @Test
-    fun newGuide_turnsEditModeOnAndShowsItsControlsAndThumbnail() {
+    fun newGuide_keepsTheCamerasGestures_andShowsItsControlsAndThumbnail() {
         val modules = launch()
 
         modules.guides.setGuide(guide())
@@ -185,11 +220,17 @@ class CameraFragmentRenderTest {
         onScreen { controls, _ ->
             assertEquals(View.VISIBLE, controls.guideControls.visibility)
             assertEquals(View.VISIBLE, controls.editGuideButton.visibility)
-            assertTrue(controls.editGuideButton.isChecked)
-            // The toggle shows the mode it is in: the person's outline while a pinch moves the guide (E2, #204).
+            // A new guide leaves the pinch and the tap to the camera (#304): one person's outline, unlit, and no tint
+            // inside the guide (#271).
+            assertFalse(controls.editGuideButton.isChecked)
             assertEquals(R.drawable.ic_guide_mode, shadowOf(controls.editGuideButton.plainIcon).createdFromResId)
+            assertEquals(
+                activityColor(R.color.pix_text),
+                controls.editGuideButton.iconTint?.getColorForState(controls.editGuideButton.drawableState, 0),
+            )
             assertTrue(controls.editGuideButton.isEnabled)
-            assertTrue(controls.guideOverlay.editable)
+            assertFalse(controls.guideOverlay.editable)
+            assertFalse(controls.guideOverlay.filled)
             // Remove guide in the light red that sets it apart from the panel's other controls (E3, #204).
             assertEquals(
                 activityColor(R.color.pix_danger_text),
@@ -197,7 +238,8 @@ class CameraFragmentRenderTest {
             )
             assertTrue(controls.opacitySlider.isEnabled)
             assertEquals(string(R.string.guide_opacity_percent, 50), controls.opacityValue.text.toString())
-            // How to move it is the tutorial's (FR-10.4): edit mode shows no hint.
+            // No line about the pinch, which zooms as on a camera without a guide (#306).
+            assertEquals("", controls.hintText.text.toString())
             assertEquals(View.INVISIBLE, controls.hintText.visibility)
             assertEquals(string(R.string.guide_change_description), controls.guideButton.contentDescription)
             assertTrue(controls.guideButton.isActivated)
@@ -206,7 +248,7 @@ class CameraFragmentRenderTest {
     }
 
     @Test
-    fun editModeToggle_turnsTheModeOffAndThePinchZoomsAgain() {
+    fun editModeToggle_turnsTheModeOn_andASecondTapGivesThePinchBackToTheCamera() {
         val modules = launch()
         modules.guides.setGuide(guide())
         idle()
@@ -215,12 +257,31 @@ class CameraFragmentRenderTest {
         idle()
 
         onScreen { controls, _ ->
+            // Lit while a pinch moves the guide, whose inside is tinted then (#271). How to move it is the
+            // tutorial's (FR-10.4): edit mode shows no hint.
+            assertTrue(controls.editGuideButton.isChecked)
+            assertEquals(
+                activityColor(R.color.pix_guide),
+                controls.editGuideButton.iconTint?.getColorForState(controls.editGuideButton.drawableState, 0),
+            )
+            assertTrue(controls.guideOverlay.editable)
+            assertTrue(controls.guideOverlay.filled)
+            assertEquals(View.INVISIBLE, controls.hintText.visibility)
+            controls.editGuideButton.performClick()
+        }
+        idle()
+
+        onScreen { controls, _ ->
+            // The same icon, unlit, while a pinch zooms, and no tint inside the guide (#271).
             assertFalse(controls.editGuideButton.isChecked)
-            // The camera while a pinch zooms (E2, #204).
-            assertEquals(R.drawable.ic_camera, shadowOf(controls.editGuideButton.plainIcon).createdFromResId)
+            assertEquals(R.drawable.ic_guide_mode, shadowOf(controls.editGuideButton.plainIcon).createdFromResId)
+            assertEquals(
+                activityColor(R.color.pix_text),
+                controls.editGuideButton.iconTint?.getColorForState(controls.editGuideButton.drawableState, 0),
+            )
             assertFalse(controls.guideOverlay.editable)
-            assertEquals(string(R.string.hint_pinch_zoom), controls.hintText.text.toString())
-            assertEquals(View.VISIBLE, controls.hintText.visibility)
+            assertFalse(controls.guideOverlay.filled)
+            assertEquals(View.INVISIBLE, controls.hintText.visibility)
         }
     }
 
@@ -294,7 +355,7 @@ class CameraFragmentRenderTest {
             // No notice: the thumbnail shows the photo (FR-1.6, #204).
             assertEquals(View.GONE, controls.captureStatus.visibility)
             assertFalse(controls.editGuideButton.isChecked)
-            assertEquals(string(R.string.hint_pinch_zoom), controls.hintText.text.toString())
+            assertEquals(View.INVISIBLE, controls.hintText.visibility)
             assertTrue(controls.galleryButton.isEnabled)
         }
     }
@@ -383,10 +444,12 @@ class CameraFragmentRenderTest {
     // ---- The scene photo for poses ----------------------------------------------
 
     @Test
-    fun scenePhoto_hidesTheGuideAndTheSettingsButTheLightWhileFraming_andShowsReviewAfterTheShutter() {
+    fun scenePhoto_hidesTheGuideAndTheSettingsButTheLightWhileFraming_andHoldsThePhotoWhileItIsChecked() {
         val camera = FakeCameraController(hasFlash = true).apply { frame = bitmap(300, 400) }
         val modules = launch(camera)
         modules.guides.setGuide(guide())
+        // The check of the photo is held, so the moment it takes can be looked at.
+        modules.persons.gate = CompletableDeferred()
         idle()
 
         onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
@@ -396,7 +459,7 @@ class CameraFragmentRenderTest {
             assertEquals(View.VISIBLE, controls.sceneTitle.visibility)
             assertEquals(string(R.string.scene_title), controls.sceneTitle.text.toString())
             assertEquals(View.VISIBLE, controls.sceneBackButton.visibility)
-            assertEquals(View.GONE, controls.usePhotoButton.visibility)
+            assertEquals(View.GONE, controls.sceneStill.visibility)
             // The flash button stays, as the light for the scene photo, and the ratio, which is the photo's (#231);
             // brightness goes.
             assertEquals(View.VISIBLE, controls.flashButton.visibility)
@@ -422,30 +485,26 @@ class CameraFragmentRenderTest {
         idle()
 
         onScreen { controls, _ ->
-            assertEquals(string(R.string.scene_review_title), controls.sceneTitle.text.toString())
-            // What is sent is said under the photo, not over the camera's image.
-            assertEquals(string(R.string.scene_review_body), controls.sceneMessage.text.toString())
-            assertEquals(View.VISIBLE, controls.sceneMessage.visibility)
+            // The photo is held over the preview while the phone looks for a person in it (#296): the step's own
+            // title and place in the flow, no button but Back, and nothing to shoot or set meanwhile.
+            assertEquals(string(R.string.scene_title), controls.sceneTitle.text.toString())
             assertEquals(View.INVISIBLE, controls.hintText.visibility)
             assertEquals(View.GONE, controls.sceneGuide.visibility)
-            assertEquals(2, controls.sceneProgress.step)
-            assertEquals(View.VISIBLE, controls.sceneReview.visibility)
+            assertEquals(1, controls.sceneProgress.step)
+            assertEquals(View.VISIBLE, controls.sceneStill.visibility)
             assertNotNull(controls.sceneStill.drawable)
-            assertEquals(View.VISIBLE, controls.usePhotoButton.visibility)
-            assertTrue(controls.usePhotoButton.isEnabled)
             assertEquals(View.VISIBLE, controls.sceneBackButton.visibility)
             assertEquals(View.INVISIBLE, controls.captureControls.visibility)
             assertEquals(View.INVISIBLE, controls.zoomReadout.visibility)
             assertEquals(View.GONE, controls.captureStatus.visibility)
             assertEquals(View.GONE, controls.cameraSettings.visibility)
-            // Back on the review shoots again.
+            // Back while the photo is checked shoots again.
             controls.sceneBackButton.performClick()
         }
         idle()
 
         onScreen { controls, _ ->
-            assertEquals(View.GONE, controls.sceneReview.visibility)
-            assertEquals(View.GONE, controls.usePhotoButton.visibility)
+            assertEquals(View.GONE, controls.sceneStill.visibility)
             assertEquals(View.VISIBLE, controls.captureControls.visibility)
             // Back while framing leaves the step.
             controls.sceneBackButton.performClick()
@@ -468,7 +527,7 @@ class CameraFragmentRenderTest {
     }
 
     @Test
-    fun scenePhoto_withoutAPerson_saysSoAndCannotBeUsed_untilAnotherIsShot() {
+    fun scenePhoto_withoutAPerson_staysOnTheCamera_whosePanelSaysSo_untilTheNextShot() {
         val modules = launch(FakeCameraController().apply { frame = bitmap(300, 400) })
         modules.persons.found = false
         onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
@@ -476,44 +535,46 @@ class CameraFragmentRenderTest {
         onScreen { controls, _ -> controls.shutterButton.performClick() }
         idle()
 
-        // The phone found no one (FR-4.13): only Back, which shoots again, helps.
-        onScreen { controls, _ ->
-            assertEquals(string(R.string.scene_no_person_title), controls.sceneTitle.text.toString())
-            assertEquals(string(R.string.scene_no_person_body), controls.sceneMessage.text.toString().trim())
-            assertEquals(View.VISIBLE, controls.sceneReview.visibility)
-            assertFalse(controls.usePhotoButton.isEnabled)
-            assertTrue(controls.sceneBackButton.isEnabled)
-            controls.sceneBackButton.performClick()
+        // The phone found no one (FR-4.13, #296): the camera is live again and ready to shoot, and the panel above the
+        // shutter says why, where it said what to frame.
+        onScreen { controls, fragment ->
+            assertEquals(GenerationUiState.Phase.FRAMING, generationViewModel(fragment).uiState.value.phase)
+            assertEquals(string(R.string.scene_title), controls.sceneTitle.text.toString())
+            assertEquals(View.GONE, controls.sceneStill.visibility)
+            assertEquals(View.VISIBLE, controls.captureControls.visibility)
+            assertEquals(View.VISIBLE, controls.sceneGuide.visibility)
+            assertEquals(string(R.string.scene_no_person_title), controls.sceneGuideText.text.toString())
+            assertEquals(string(R.string.scene_no_person_body), controls.sceneGuideNext.text.toString())
         }
-        idle()
 
+        // The next press takes the panel away and checks the new photo.
         modules.persons.found = true
+        modules.persons.gate = CompletableDeferred()
         onScreen { controls, _ -> controls.shutterButton.performClick() }
         idle()
         onScreen { controls, _ ->
-            assertEquals(string(R.string.scene_review_title), controls.sceneTitle.text.toString())
-            assertEquals(string(R.string.scene_review_body), controls.sceneMessage.text.toString())
-            assertTrue(controls.usePhotoButton.isEnabled)
+            assertEquals(View.GONE, controls.sceneGuide.visibility)
+            assertEquals(View.VISIBLE, controls.sceneStill.visibility)
         }
         assertEquals(2, modules.persons.checked.size)
     }
 
     @Test
-    fun scenePhoto_whileThePhoneLooksForAPerson_cannotBeUsedYet() {
+    fun scenePhoto_thePanel_saysWhatToFrameAgain_whenTheStepStartsAgainAfterAPhotoWithoutAPerson() {
         val modules = launch(FakeCameraController().apply { frame = bitmap(300, 400) })
-        val gate = CompletableDeferred<Unit>().also { modules.persons.gate = it }
+        modules.persons.found = false
         onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
         idle()
         onScreen { controls, _ -> controls.shutterButton.performClick() }
         idle()
 
-        onScreen { controls, _ ->
-            assertEquals(string(R.string.scene_review_title), controls.sceneTitle.text.toString())
-            assertFalse(controls.usePhotoButton.isEnabled)
-        }
-        gate.complete(Unit)
+        onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
         idle()
-        onScreen { controls, _ -> assertTrue(controls.usePhotoButton.isEnabled) }
+
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.scene_framing_hint), controls.sceneGuideText.text.toString())
+            assertEquals(string(R.string.scene_guide_next), controls.sceneGuideNext.text.toString())
+        }
     }
 
     @Test
@@ -643,6 +704,7 @@ class CameraFragmentRenderTest {
             assertEquals(string(R.string.live_badge, "Joonhyung"), controls.liveDot.contentDescription.toString())
             assertEquals(View.VISIBLE, controls.endSessionButton.visibility)
             assertEquals(View.GONE, controls.shootTogetherButton.visibility)
+            assertEquals(string(R.string.peer_watching_notice, "Joonhyung"), controls.noticeText.text.toString())
         }
 
         modules.session.deliver(SessionMessage.Leave(EndReason.LEFT))
@@ -652,6 +714,24 @@ class CameraFragmentRenderTest {
             assertEquals(View.VISIBLE, controls.noticeText.visibility)
             assertEquals(string(R.string.peer_left, "Joonhyung"), controls.noticeText.text.toString())
         }
+    }
+
+    @Test
+    fun aSubjectConnecting_saysWhoIsWatching_forANoticesTime() {
+        val modules = launch()
+
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 1"), Role.PHOTOGRAPHER))
+        // The live light's first blink plays here, which moves the clock on a little.
+        idle()
+
+        onScreen { controls, _ ->
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+            assertEquals(string(R.string.peer_watching_notice, "Test Account 1"), controls.noticeText.text.toString())
+        }
+
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(CameraViewModel.NOTICE_MS))
+
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
     }
 
     @Test
@@ -694,7 +774,7 @@ class CameraFragmentRenderTest {
     }
 
     @Test
-    fun thePeerBackBeforeItsNoticeEnds_takesTheNoticeDown() {
+    fun thePeerBackBeforeItsNoticeEnds_replacesTheNotice_withWhoIsWatching() {
         val modules = launch()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
@@ -702,14 +782,17 @@ class CameraFragmentRenderTest {
         modules.session.setState(SessionState.Waiting("ABC123"))
         idle()
 
-        // The subject's Reconnect, seconds after its Connection lost.
+        // The subject's Reconnect, seconds after its Connection lost: its live view starts again (#271).
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
 
         onScreen { controls, _ ->
             assertEquals(View.VISIBLE, controls.liveDot.visibility)
-            assertEquals(View.GONE, controls.noticeText.visibility)
+            assertEquals(string(R.string.peer_watching_notice, "Joonhyung"), controls.noticeText.text.toString())
         }
+        // Its 3 s, not the 10 s of the notice it replaced (#238).
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(CameraViewModel.NOTICE_MS + 1))
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
     }
 
     @Test
@@ -776,12 +859,13 @@ class CameraFragmentRenderTest {
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
 
-        // The review keeps its title beside Use.
+        // The photo held while it is checked keeps the step's bar.
+        modules.persons.gate = CompletableDeferred()
         onScreen { controls, _ -> controls.shutterButton.performClick() }
         idle()
         onScreen { controls, _ ->
-            assertEquals(string(R.string.scene_review_title), controls.sceneTitle.text.toString())
-            assertEquals(View.VISIBLE, controls.usePhotoButton.visibility)
+            assertEquals(string(R.string.scene_title), controls.sceneTitle.text.toString())
+            assertEquals(View.VISIBLE, controls.sceneStill.visibility)
             assertEquals(View.GONE, controls.endSessionButton.visibility)
         }
 

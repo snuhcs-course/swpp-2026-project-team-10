@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.session.protocol
 
 /**
@@ -21,7 +21,7 @@ class ChannelRouter {
         is SessionMessage.ZoomSet -> if (message.final) Channel.RELIABLE else Channel.REALTIME
         is SessionMessage.GuideMove -> if (message.final) Channel.RELIABLE else Channel.REALTIME
         is SessionMessage.ExposureSet -> if (message.final) Channel.RELIABLE else Channel.REALTIME
-        is SessionMessage.Ping, is SessionMessage.Pong, SessionMessage.PhotoShutter -> Channel.REALTIME
+        is SessionMessage.Ping, is SessionMessage.Pong, is SessionMessage.PhotoShutter -> Channel.REALTIME
         else -> Channel.RELIABLE
     }
 

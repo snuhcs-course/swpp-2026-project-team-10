@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.animation.ValueAnimator
@@ -8,11 +8,16 @@ import android.graphics.Color
 import android.graphics.Paint
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.lastpenguin.pix.ui.settings.followLook
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -24,7 +29,8 @@ import org.robolectric.annotation.GraphicsMode
  * The guide in the settings' look (FR-3.10, Design 2.6.1). Partitions: the overlay's color, white (no tint) and another
  * one, with the opacity kept; a restyled outline for the guide on screen, for another guide, and none; the outline at
  * the default thickness (the guide's own), at another (traced again from the mask, wider when thicker), and asked again
- * (kept).
+ * (kept). The inside guide-edit mode tints (#271): the mask's size, kept when asked again, and none from a recycled mask;
+ * `followLook` hands it to the overlay for its guide.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -106,6 +112,43 @@ class GuideLookTest {
         assertSame(thick, outlines.outline(guide, GuideThickness.THICK))
     }
 
+    @Test
+    fun inside_isMadeFromTheMask_andKept() = runBlocking {
+        val guide = guide(mask = person())
+        val outlines = outlines()
+
+        val inside = checkNotNull(outlines.inside(guide))
+
+        assertEquals(guide.mask.width, inside.width)
+        assertEquals(guide.mask.height, inside.height)
+        assertSame(inside, outlines.inside(guide))
+    }
+
+    @Test
+    fun inside_ofARecycledMask_isNone() = runBlocking {
+        val guide = guide(mask = person().apply { recycle() })
+        assertNull(outlines().inside(guide))
+    }
+
+    @Test
+    fun followLook_handsTheOverlayItsGuidesInside() = onMain {
+        val guide = guide(mask = leftHalf(), outline = solid(Color.TRANSPARENT))
+        val view = view(300, 400)
+        view.filled = true
+        view.render(guide, GuideState(guideId = guide.id, opacity = 1f))
+        // Unconfined, as the outlines are made here: the inside is there once the collectors wait.
+        val following = CoroutineScope(Dispatchers.Unconfined).launch {
+            view.followLook(MutableStateFlow(GuideLook()), MutableStateFlow(guide), outlines())
+        }
+        try {
+            // Bounds [80, 60, 220, 340]: the mask's left half covers x = 80..150, its right half x = 150..220.
+            assertTrue(Color.alpha(snapshot(view).getPixel(110, 200)) > 0)
+            assertEquals(0, Color.alpha(snapshot(view).getPixel(190, 200)))
+        } finally {
+            following.cancel()
+        }
+    }
+
     private fun outlines() = GuideOutlines(dispatcher = Dispatchers.Unconfined)
 
     private fun onMain(block: () -> Unit) {
@@ -127,6 +170,12 @@ class GuideLookTest {
     }
 
     private fun solid(color: Int): Bitmap = bitmap(20, 40).apply { eraseColor(color) }
+
+    /** A mask whose left half is the person. */
+    private fun leftHalf(): Bitmap = bitmap(20, 40).apply {
+        val colors = IntArray(20 * 40) { if (it % 20 < 10) Color.BLACK else Color.TRANSPARENT }
+        setPixels(colors, 0, 20, 0, 0, 20, 40)
+    }
 
     private fun bitmap(width: Int, height: Int): Bitmap =
         Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also(bitmaps::add)

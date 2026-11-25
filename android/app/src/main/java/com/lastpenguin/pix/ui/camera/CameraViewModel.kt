@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -17,6 +17,7 @@ import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.PhoneTurns
 import com.lastpenguin.pix.camera.PhotoDeleter
+import com.lastpenguin.pix.camera.baseExposureIndex
 import com.lastpenguin.pix.camera.isAtZoomStep
 import com.lastpenguin.pix.camera.nextZoomStep
 import com.lastpenguin.pix.camera.quickZoomSteps
@@ -174,7 +175,8 @@ data class CameraUiState(
     val guideState: GuideState = GuideState(),
     /**
      * Guide-edit mode (AD-17): while on, every drag and pinch on the preview edits the guide; while off, a pinch
-     * zooms the camera. On when a guide is added, off on the shutter or when the guide goes (Design 2.6.2).
+     * zooms the camera. Off for a new guide, on by its toggle, and off again on the shutter or when the guide is
+     * hidden, replaced, or removed (Design 2.6.2, #304).
      */
     val guideEditing: Boolean = false,
     /** The guide's reference is enlarged from its corner thumbnail (FR-3.9); every new guide starts small. */
@@ -240,6 +242,8 @@ class CameraViewModel(
     private val phoneTurns: PhoneTurns = PhoneTurns.Fixed(),
     /** Who holds the zoom in a session (`RemoteControlHandler.zoomHold`, FR-7.6); free outside one. */
     private val zoomHold: ZoomHold = ZoomHold(),
+    /** Tells the subject's phone where a tap focused (`RemoteControlHandler.focusedHere`, FR-7.7). */
+    private val onFocused: (x: Float, y: Float) -> Unit = { _, _ -> },
 ) : ViewModel() {
 
     /** Follows how the phone is held while [owner], the camera screen, is in front (FR-1.5, FR-1.15). */
@@ -356,8 +360,9 @@ class CameraViewModel(
         viewModelScope.launch {
             guides.guide.collect { guide ->
                 _uiState.update {
-                    // A new guide starts in edit mode so that it can be placed at once; no guide, no mode.
-                    val editing = guide != null && (guide !== it.guide || it.guideEditing)
+                    // A new guide starts with the camera's gestures, which are used more than the guide's (#304): the
+                    // mode holds only for the guide it was turned on for; no guide, no mode.
+                    val editing = guide != null && guide === it.guide && it.guideEditing
                     val expanded = it.referenceExpanded && guide === it.guide
                     // A saved copy keeps the guide's id and its photo, so it stays hidden; another guide's photo
                     // is one the user has not seen, so it shows.
@@ -517,7 +522,7 @@ class CameraViewModel(
         // At the press, like the time: the phone may turn while an earlier photo is still being saved.
         val turn = phoneTurns.turn.value
         // Now, not once it is saved: the photo belongs to the session running at the shutter.
-        val sessionId = photos.shutter()
+        val shot = photos.shutter()
         // The press before, for the order below.
         val earlier = lastShot
         lastShot = viewModelScope.launch {
@@ -555,7 +560,7 @@ class CameraViewModel(
                         saved = result.isSuccess,
                         shutterMs = capturedAt?.let { it - pressedAt },
                         ms = endedAt - pressedAt,
-                        inSession = sessionId != null,
+                        inSession = shot != null,
                     ),
                 )
                 result.fold(
@@ -564,11 +569,11 @@ class CameraViewModel(
                         // session's.
                         newestSaved = uri
                         showNewestPhoto()
-                        sessionId?.let { photos.taken(it, uri, takenAt) }
+                        shot?.let { photos.taken(it, uri, takenAt) }
                     },
                     onFailure = { error ->
                         if (error is CancellationException) throw error
-                        sessionId?.let(photos::notTaken)
+                        shot?.let(photos::notTaken)
                         _uiState.update { it.copy(captureNotice = captureFailureNotice(error)) }
                     },
                 )
@@ -640,19 +645,17 @@ class CameraViewModel(
         val state = _uiState.value
         if (state.cameraStatus != CameraStatus.READY) return
         if (!x.isFinite() || !y.isFinite() || x !in 0f..1f || y !in 0f..1f) return
-        if (state.supportsFocusPoint) camera.setFocusPoint(x, y)
+        if (state.supportsFocusPoint) {
+            camera.setFocusPoint(x, y)
+            onFocused(x, y)
+        }
         // A new tap drops the brightness a drag added after the last one, back to the base (FR-1.11), also on a camera
         // that cannot focus on a point.
         applyBaseBrightness()
     }
 
     /** The exposure index of the base brightness for this camera, or null without exposure compensation. */
-    fun baseExposureIndex(): Int? {
-        val capabilities = camera.capabilities.value ?: return null
-        val range = capabilities.exposureRange
-        if (range.first >= range.last) return null
-        return ExposureScale.indexOf(baseBrightness.value, capabilities.exposureStep, range)
-    }
+    fun baseExposureIndex(): Int? = camera.capabilities.value?.baseExposureIndex(baseBrightness.value)
 
     private fun applyBaseBrightness() {
         baseExposureIndex()?.let(camera::setExposure)

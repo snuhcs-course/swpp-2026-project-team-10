@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Dongje Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Dongje Park and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -53,7 +53,6 @@ class PoseTipScreenTest {
         activity.viewModel<GenerationViewModel>().apply {
             beginScene()
             takeScene()
-            useScene()
             suggestPoses()
         }
         val run = modules.generator.runs.single()

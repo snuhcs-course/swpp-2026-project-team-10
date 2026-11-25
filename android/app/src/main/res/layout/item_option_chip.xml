@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One option of Generate poses (FR-4.15): a tap writes its words into the description, and another takes them out. -->
+<com.google.android.material.chip.Chip xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    style="@style/Widget.Pix.OptionChip"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    tools:text="Peace sign" />

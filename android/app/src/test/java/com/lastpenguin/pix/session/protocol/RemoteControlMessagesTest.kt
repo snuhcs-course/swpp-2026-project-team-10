@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.FlashMode
@@ -87,12 +87,21 @@ class RemoteControlMessagesTest {
     }
 
     @Test
+    fun thePhotographersFocus_designExample_decodes() {
+        val focused = """{ "v": 3, "t": "camera.focus", "seq": 7, "ts": 1759212355000,
+            "b": { "x": 0.38, "y": 0.4 } }"""
+
+        assertEquals(SessionMessage.Focused(0.38f, 0.4f), decode(focused))
+    }
+
+    @Test
     fun requests_roundTrip_keepEveryField() {
         val messages = listOf(
             SessionMessage.GuideMove("g", 0.1f, 0.2f, 0.3f, final = true),
             SessionMessage.ExposureSet(-2),
             SessionMessage.FlashSet(FlashMode.ON),
             SessionMessage.FocusSet(0.62f, 0.4f),
+            SessionMessage.Focused(0.38f, 0.4f),
             SessionMessage.ControlPermission(true),
         )
 

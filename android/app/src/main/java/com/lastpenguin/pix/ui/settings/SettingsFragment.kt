@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.content.ActivityNotFoundException
@@ -39,8 +39,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Settings (FR-10.1, R&S 6.10), from the gear on Camera, and in a session from Subject view's too (#204), which this
- * screen covers, so it goes back to Subject view when the session ends, as the guide screens do. The base brightness, the guide's look, and the latency indicator are kept by
- * [SettingsViewModel]; the language is Android's per-app language, which recreates the screen in it; notifications open
+ * screen covers, so it goes back to Subject view when the session ends, as the guide screens do. The base brightness,
+ * the grid and the horizon bar, the guide's look, and the latency indicator are kept by [SettingsViewModel]; the language is Android's per-app language, which recreates the screen in it; notifications open
  * Android's settings for Pix; the AI consent can be withdrawn here and is asked for again before the next scene photo;
  * *Share usage data* turns crash reports and usage events off or on (FR-10.6, Design 2.8, Telemetry).
  * Owner: Settings (#123).
@@ -68,6 +68,15 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
             if (checked != viewModel.showLatency.value) viewModel.setShowLatency(checked)
         }
         binding.latencyRow.setOnClickListener { binding.latencySwitch.toggle() }
+        // The grid and the horizon bar (FR-1.9, FR-1.10): the render sets the switches too, so only a change is saved.
+        binding.gridSwitch.setOnCheckedChangeListener { _, checked ->
+            if (checked != viewModel.showGrid.value) viewModel.setShowGrid(checked)
+        }
+        binding.gridRow.setOnClickListener { binding.gridSwitch.toggle() }
+        binding.levelSwitch.setOnCheckedChangeListener { _, checked ->
+            if (checked != viewModel.showLevel.value) viewModel.setShowLevel(checked)
+        }
+        binding.levelRow.setOnClickListener { binding.levelSwitch.toggle() }
         binding.usageSwitch.setOnCheckedChangeListener { _, checked ->
             // The render sets the switch too: only a change from the stored answer is saved, never one before it loads.
             val stored = viewModel.shareUsage.value ?: return@setOnCheckedChangeListener
@@ -109,6 +118,8 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.guideLook.collect { renderLook(binding, it) } }
                 launch { viewModel.showLatency.collect { binding.latencySwitch.isChecked = it } }
+                launch { viewModel.showGrid.collect { binding.gridSwitch.isChecked = it } }
+                launch { viewModel.showLevel.collect { binding.levelSwitch.isChecked = it } }
                 launch { viewModel.shareUsage.collect { renderUsage(binding, it) } }
                 launch { viewModel.baseBrightness.collect { renderBrightness(binding, it) } }
                 launch { viewModel.account.collect { renderAccount(binding.accountRow, it) } }

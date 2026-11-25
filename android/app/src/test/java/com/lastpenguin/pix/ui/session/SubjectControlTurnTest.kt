@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.drawable.RotateDrawable
@@ -62,7 +62,7 @@ class SubjectControlTurnTest {
 
     /** The controls that turn what they draw: the buttons' icons and the zoom readout. */
     private fun FragmentSubjectBinding.turningButtons(): List<View> =
-        listOf(flashButton, settingsButton, brightnessButton, tipButton, saveGuideButton, editGuideButton, zoomReadout)
+        listOf(flashButton, settingsButton, tipButton, saveGuideButton, editGuideButton, zoomReadout)
 
     /** Guide and Pick a pose turn with their labels, each as one block; the thumbnail turns whole. */
     private fun FragmentSubjectBinding.turningViews(): List<View> = listOf(

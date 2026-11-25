@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -58,7 +58,7 @@ data class GenerationUiState(
      * one and gets landscape candidates (FR-4.3); kept for *Try again*, *Regenerate*, and Back to Generate poses.
      */
     val scene: Bitmap? = null,
-    /** The scene photo as the camera showed it, for its review on Camera; [scene] itself when held upright. */
+    /** The scene photo as the camera showed it, held on Camera while it is checked; [scene] itself when held upright. */
     val framed: Bitmap? = null,
     /** How the phone was held for the scene photo (`PhoneTurns`); the guide from its candidate is turned back by it. */
     val sceneTurn: Int = 0,
@@ -77,13 +77,19 @@ data class GenerationUiState(
     val descriptionRejected: Boolean = false,
     /** Why the set failed, which Couldn't create poses says (FR-4.7); null unless the phase is FAILED. */
     val failure: GenerationError? = null,
-    /** The phone is looking for a person in the scene photo (FR-4.13); *Use* waits for it. */
+    /** The phone is looking for a person in the scene photo (FR-4.13); Generate poses waits for it. */
     val checkingPerson: Boolean = false,
     /**
-     * No one was found in the scene photo, so no pose can be made of it: by the phone, on the photo's review (FR-4.13),
-     * or by the server for every pose of the set, on Couldn't create poses. Only another photo helps.
+     * No one was found in the scene photo, so no pose can be made of it: by the phone, which says so on the camera,
+     * ready for another photo (FR-4.13, #296), or by the server for every pose of the set, on Couldn't create poses.
+     * Only another photo helps.
      */
     val noPerson: Boolean = false,
+    /**
+     * The scene photo was just taken, and Generate poses has not shown it yet (#296): the camera opens that screen,
+     * which shows the photo shrinking into its place, once ([GenerationViewModel.sceneArrived]).
+     */
+    val sceneArriving: Boolean = false,
     /**
      * In a session, whose field holds the description on Generate poses (Design 2.6.5): this phone's while it types,
      * the subject's while theirs does, then nobody; the other phone's field waits meanwhile.
@@ -103,12 +109,12 @@ data class GenerationUiState(
     val shotFailed: Boolean = false,
     /**
      * The phone's light is turned on for the scene photo, a frame of the preview that a photo's flash would not reach
-     * (FR-4.1). It is on only while the scene is framed, and stays chosen when Back on the review shoots again.
+     * (FR-4.1). It is on only while the scene is framed, and stays chosen when Back on Generate poses shoots again.
      */
     val light: Boolean = false,
     /**
      * The panel that says what to frame is shown (R&S 6.3, #231): from the step's start until a touch anywhere takes it
-     * away. Back on the review keeps it gone; only another start of the step shows it again.
+     * away. Shooting again keeps it gone; only another start of the step shows it again.
      */
     val sceneHint: Boolean = true,
     /**
@@ -119,11 +125,12 @@ data class GenerationUiState(
     val chosenBy: Role? = null,
 ) {
     /**
-     * FRAMING and REVIEWING are the scene photo step on the Camera screen: the live camera, whose shutter takes the
-     * photo, then the photo with *Use*, whose Back shoots again. DESCRIBING is Generate poses. Nothing is sent before
-     * GENERATING.
+     * FRAMING and CHECKING are the scene photo step on the Camera screen: the live camera, whose shutter takes the
+     * photo, then the photo while the phone looks for a person in it (FR-4.13), a moment that ends by itself: with a
+     * person, DESCRIBING, which is Generate poses; without one, FRAMING again, saying so (#296; until Iteration 5 the
+     * photo waited here for *Use*). Nothing is sent before GENERATING.
      */
-    enum class Phase { IDLE, FRAMING, REVIEWING, DESCRIBING, GENERATING, PICKING, FAILED }
+    enum class Phase { IDLE, FRAMING, CHECKING, DESCRIBING, GENERATING, PICKING, FAILED }
 
     val readyCount: Int get() = candidates.values.count { it is CandidateEvent.Ready }
 
@@ -311,7 +318,8 @@ class GenerationViewModel(
     }
 
     /**
-     * The shutter during FRAMING: the camera's current frame becomes the photo to confirm. The frame waits until the
+     * The shutter during FRAMING: the camera's current frame becomes the scene photo, which goes on to Generate poses
+     * once the phone has found a person in it ([checkPerson]). The frame waits until the
      * camera's light is as chosen and has been for [LIGHT_SETTLE_MS], so the frame is lit, or not, as the user chose and
      * the exposure has followed, also when the shutter comes right after the light button; after [LIGHT_WAIT_MS], the
      * frame is taken as it is. A lens without a flash, such as the front camera after a switch, never has the light, so
@@ -319,6 +327,8 @@ class GenerationViewModel(
      */
     fun takeScene() {
         if (_uiState.value.phase != GenerationUiState.Phase.FRAMING || shooting?.isActive == true) return
+        // The message about the photo before goes with the press.
+        _uiState.update { if (it.noPerson) it.copy(noPerson = false) else it }
         shooting = viewModelScope.launch {
             val canLight = camera.capabilities.value?.hasFlash == true
             val wanted = _uiState.value.light && canLight
@@ -349,7 +359,7 @@ class GenerationViewModel(
                         sceneTurn = turn,
                         selfie = selfie,
                         situation = state.situation.forScene(selfie),
-                        phase = GenerationUiState.Phase.REVIEWING,
+                        phase = GenerationUiState.Phase.CHECKING,
                         shotFailed = false,
                         checkingPerson = true,
                     )
@@ -358,13 +368,15 @@ class GenerationViewModel(
                 }
             }
             val scene = _uiState.value.scene
-            if (_uiState.value.phase == GenerationUiState.Phase.REVIEWING && scene != null) checkPerson(scene)
+            if (_uiState.value.phase == GenerationUiState.Phase.CHECKING && scene != null) checkPerson(scene)
         }
     }
 
     /**
-     * Looks for a person in the photo under review (FR-4.13), on the phone; a check that fails lets the photo go on,
-     * since the server checks it again before its image model (Design 2.6.3).
+     * Looks for a person in the photo just taken (FR-4.13), on the phone. With one, Generate poses asks what to pose,
+     * on the subject's phone too (FR-4.8, FR-6.15); still nothing is sent. Without one, the photo is dropped and the
+     * camera is ready again, saying so (#296). A check that fails lets the photo go on, since the server checks it
+     * again before its image model (Design 2.6.3).
      */
     private fun checkPerson(scene: Bitmap) {
         checking?.cancel()
@@ -378,66 +390,62 @@ class GenerationViewModel(
                 true
             }
             Timings.mark("pose.person", if (found) "found" else "none")
-            _uiState.update {
-                // Back while the check ran: the photo it looked at is gone.
-                if (it.phase != GenerationUiState.Phase.REVIEWING || it.scene !== scene) return@update it
-                it.copy(checkingPerson = false, noPerson = !found)
+            // Back while the check ran: the photo it looked at is gone.
+            val checked = _uiState.value
+            if (checked.phase != GenerationUiState.Phase.CHECKING || checked.scene !== scene) return@launch
+            if (found) {
+                _uiState.update {
+                    it.copy(phase = GenerationUiState.Phase.DESCRIBING, checkingPerson = false, sceneArriving = true)
+                }
+                openDescription()
+            } else {
+                // The panel says no one is in the photo where it said what to frame, which it does not say again.
+                _uiState.update { it.framingAgain().copy(noPerson = true, sceneHint = false) }
             }
         }
     }
 
     /**
-     * Back on the photo's review: the photo is dropped and the live camera is shown again, with the light as it was, the
-     * framing hint gone if it was, and the photo's situation, which is the one chosen unless a failed front camera made
-     * it *Auto*.
+     * The live camera again for another scene photo, the photo dropped: with the light as it was, the framing hint gone
+     * if it was, the description kept for the next photo's Generate poses, and the photo's situation, which is the
+     * one chosen unless a failed front camera made it *Auto*.
      */
+    private fun GenerationUiState.framingAgain() = GenerationUiState(
+        phase = GenerationUiState.Phase.FRAMING,
+        light = light,
+        situation = situation,
+        sceneHint = sceneHint,
+        description = description,
+    )
+
+    /** Back while the photo is checked: the photo is dropped and the live camera is shown again. */
     fun retakeScene() {
         checking?.cancel()
+        _uiState.update { if (it.phase == GenerationUiState.Phase.CHECKING) it.framingAgain() else it }
+    }
+
+    /**
+     * A touch anywhere while the scene is framed (#231): the panel that says what to frame goes away, and so does the
+     * one that says no one was in the last photo (#296).
+     */
+    fun dismissSceneHint() {
         _uiState.update {
-            val reviewing = it.phase == GenerationUiState.Phase.REVIEWING
-            if (reviewing) {
-                GenerationUiState(
-                    phase = GenerationUiState.Phase.FRAMING,
-                    light = it.light,
-                    situation = it.situation,
-                    sceneHint = it.sceneHint,
-                )
+            if (it.phase == GenerationUiState.Phase.FRAMING && (it.sceneHint || it.noPerson)) {
+                it.copy(sceneHint = false, noPerson = false)
             } else {
                 it
             }
         }
     }
 
-    /** A touch anywhere while the scene is framed (#231): the panel that says what to frame goes away. */
-    fun dismissSceneHint() {
-        _uiState.update {
-            if (it.phase == GenerationUiState.Phase.FRAMING &&
-                it.sceneHint
-            ) {
-                it.copy(sceneHint = false)
-            } else {
-                it
-            }
-        }
+    /** Generate poses has shown the photo coming from the camera (#296); it does not show that again. */
+    fun sceneArrived() {
+        _uiState.update { if (it.sceneArriving) it.copy(sceneArriving = false) else it }
     }
 
     /** The light button while the scene is framed (FR-4.1). */
     fun toggleLight() {
         _uiState.update { if (it.phase == GenerationUiState.Phase.FRAMING) it.copy(light = !it.light) else it }
-    }
-
-    /**
-     * *Use* on the photo's review: Generate poses asks what to pose (FR-4.8). Still nothing is sent. Not before the
-     * phone has found a person in the photo (FR-4.13). Returns whether Generate poses opens.
-     */
-    fun useScene(): Boolean {
-        val state = _uiState.value
-        val usable = state.phase == GenerationUiState.Phase.REVIEWING && state.scene != null &&
-            !state.checkingPerson && !state.noPerson
-        if (!usable) return false
-        _uiState.update { it.copy(phase = GenerationUiState.Phase.DESCRIBING) }
-        openDescription()
-        return true
     }
 
     /** Generate poses opened: the subject's phone shows it too, with the scene photo and the text kept (FR-6.15). */
@@ -621,20 +629,13 @@ class GenerationViewModel(
     }
 
     /**
-     * Back on Generate poses: the photo's review on Camera again, which already found a person in it; the text waits
-     * for its *Use* (#199). The subject's Generate poses closes.
+     * Back on Generate poses: the camera again, to take another scene photo; the text waits for it (#199, #296). The
+     * hint that says what to frame does not come back. The subject's Generate poses closes.
      */
-    fun backToReview() {
+    fun backToScene() {
         if (_uiState.value.phase != GenerationUiState.Phase.DESCRIBING) return
         endDescription(started = false)
-        _uiState.update {
-            it.copy(
-                phase = GenerationUiState.Phase.REVIEWING,
-                descriptionWriter = null,
-                checkingPerson = false,
-                noPerson = false,
-            )
-        }
+        _uiState.update { it.framingAgain().copy(sceneHint = false) }
     }
 
     /**

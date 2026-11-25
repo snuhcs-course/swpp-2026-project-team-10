@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.settings
 
 import android.os.Looper
@@ -150,7 +150,6 @@ class TutorialOnScreensTest {
             activity.viewModel<GenerationViewModel>().apply {
                 beginScene()
                 takeScene()
-                useScene()
             }
         }
         scenario = launched

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -47,6 +47,7 @@ object PixViewModels {
                 baseBrightness = container.appSettings.baseBrightness,
                 phoneTurns = container.phoneTurns,
                 zoomHold = container.remoteControlHandler.zoomHold,
+                onFocused = container.remoteControlHandler::focusedHere,
             )
         }
         initializer {
@@ -102,6 +103,7 @@ object PixViewModels {
                 container.tipSyncer,
                 sessionPhotos = container.photoSyncer.sessionPhotos,
                 deleter = container.photoDeleter,
+                receivingPhoto = container.photoSyncer.receiving,
                 phoneTurns = container.phoneTurns,
             )
         }

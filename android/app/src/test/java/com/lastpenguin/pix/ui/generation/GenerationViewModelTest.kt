@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -100,34 +100,28 @@ class GenerationViewModelTest {
     }
 
     @Test
-    fun thePhotoIsTakenAndConfirmedBeforeAnythingIsSent() = runTest {
+    fun thePhotoWithAPersonGoesStraightToGeneratePoses_beforeAnythingIsSent() = runTest {
         model.beginScene()
         assertEquals(GenerationUiState(phase = GenerationUiState.Phase.FRAMING), state)
 
+        // One press of the shutter: Generate poses asks what to pose, with no step between (#296); still nothing is
+        // sent (FR-4.8). The photo comes to it from the camera, which the screen shows once.
         model.takeScene()
         runCurrent()
         assertEquals(
             GenerationUiState(
                 scene = camera.frame,
                 framed = camera.frame,
-                phase = GenerationUiState.Phase.REVIEWING,
+                phase = GenerationUiState.Phase.DESCRIBING,
+                sceneArriving = true,
             ),
             state,
         )
+        assertEquals(listOf("open ''"), descriptions.calls)
         assertTrue(generator.runs.isEmpty())
 
-        // Generate poses asks what to pose; still nothing is sent (FR-4.8).
-        model.useScene()
-        assertEquals(
-            GenerationUiState(
-                scene = camera.frame,
-                framed = camera.frame,
-                phase = GenerationUiState.Phase.DESCRIBING,
-            ),
-            state,
-        )
-        runCurrent()
-        assertTrue(generator.runs.isEmpty())
+        model.sceneArrived()
+        assertFalse(state.sceneArriving)
 
         model.generate("벽에 기대서 웃기")
         assertEquals(GenerationUiState.Phase.GENERATING, state.phase)
@@ -138,7 +132,8 @@ class GenerationViewModelTest {
     }
 
     // The framing hint (R&S 6.3, #231): shown when the step starts, gone at a touch, and back only when the step
-    // starts again; Back from the review, which shoots again, keeps it gone, also after a set was generated.
+    // starts again; Back while the photo is checked, and Back from Generate poses, which shoot again, keep it gone,
+    // also after a set was generated.
     @Test
     fun sceneHint_isShownWhenTheStepStarts_andGoneOnceDismissed() = runTest {
         model.beginScene()
@@ -151,12 +146,13 @@ class GenerationViewModelTest {
     }
 
     @Test
-    fun sceneHint_dismissed_staysGoneAfterBackFromTheReview() = runTest {
+    fun sceneHint_dismissed_staysGoneAfterBackWhileThePhotoIsChecked() = runTest {
+        persons.gate = CompletableDeferred()
         model.beginScene()
         model.dismissSceneHint()
         model.takeScene()
         runCurrent()
-        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+        assertEquals(GenerationUiState.Phase.CHECKING, state.phase)
 
         model.retakeScene()
 
@@ -170,7 +166,6 @@ class GenerationViewModelTest {
         model.dismissSceneHint()
         model.takeScene()
         runCurrent()
-        model.useScene()
         model.generate("벽에 기대서 웃기")
         runCurrent()
         val run = generator.runs.single()
@@ -180,10 +175,9 @@ class GenerationViewModelTest {
         runCurrent()
         assertEquals(GenerationUiState.Phase.PICKING, state.phase)
 
-        // Back on Pick a pose, on Generate poses, and on the review: the camera again, with no new start of the step.
+        // Back on Pick a pose and on Generate poses: the camera again, with no new start of the step.
         model.describeAgain()
-        model.backToReview()
-        model.retakeScene()
+        model.backToScene()
 
         assertEquals(GenerationUiState.Phase.FRAMING, state.phase)
         assertFalse(state.sceneHint)
@@ -201,11 +195,12 @@ class GenerationViewModelTest {
 
     @Test
     fun sceneHint_outsideFraming_isNotDismissed() = runTest {
+        persons.gate = CompletableDeferred()
         model.beginScene()
         model.takeScene()
         runCurrent()
 
-        // A touch on the review, such as on Back, is not a touch on the hint's screen.
+        // A touch while the photo is checked, such as on Back, is not a touch on the hint's screen.
         model.dismissSceneHint()
         model.retakeScene()
 
@@ -213,7 +208,8 @@ class GenerationViewModelTest {
     }
 
     @Test
-    fun shootAgainDropsThePhotoAndTakesAnother() = runTest {
+    fun backWhileThePhotoIsChecked_dropsIt_andTheNextShotTakesAnother() = runTest {
+        persons.gate = CompletableDeferred()
         model.beginScene()
         model.takeScene()
         runCurrent()
@@ -223,65 +219,75 @@ class GenerationViewModelTest {
 
         val second = testBitmap()
         camera.frame = second
+        persons.gate = null
         model.takeScene()
         runCurrent()
         assertSame(second, state.scene)
-        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
         assertEquals(2, camera.grabs)
         assertTrue(generator.runs.isEmpty())
     }
 
     @Test
-    fun thePhotoCanBeUsedOnlyOnceThePhoneHasFoundAPersonInIt() = runTest {
+    fun thePhotoGoesOnOnlyOnceThePhoneHasFoundAPersonInIt() = runTest {
         val gate = CompletableDeferred<Unit>().also { persons.gate = it }
         model.beginScene()
         model.takeScene()
         runCurrent()
 
-        // Use this photo waits for the check of this photo (FR-4.13).
-        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+        // Generate poses waits for the check of this photo (FR-4.13), on the subject's phone too.
+        assertEquals(GenerationUiState.Phase.CHECKING, state.phase)
         assertTrue(state.checkingPerson)
         assertSame(camera.frame, persons.checked.single())
-        assertFalse(model.useScene())
-        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+        assertTrue(descriptions.calls.isEmpty())
 
         gate.complete(Unit)
         runCurrent()
-        assertEquals(
-            GenerationUiState(
-                scene = camera.frame,
-                framed = camera.frame,
-                phase = GenerationUiState.Phase.REVIEWING,
-            ),
-            state,
-        )
-        assertTrue(model.useScene())
         assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
+        assertFalse(state.checkingPerson)
+        assertEquals(listOf("open ''"), descriptions.calls)
     }
 
     @Test
-    fun aPhotoWithoutAPersonIsNotUsed_andShootAgainTakesAnother() = runTest {
+    fun aPhotoWithoutAPerson_doesNotGoOn_theCameraStaysAndSaysSo_andTheNextShotCan() = runTest {
         persons.found = false
         model.beginScene()
         model.takeScene()
         runCurrent()
 
-        assertTrue(state.noPerson)
-        assertFalse(state.checkingPerson)
-        assertFalse(model.useScene())
-        runCurrent()
-        // Nothing is sent, and the subject's phone is not shown Generate poses either.
-        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+        // The camera again, ready to shoot, saying that no one is in the photo, which is dropped (#296). Nothing is
+        // sent, and the subject's phone is not shown Generate poses either.
+        assertEquals(
+            GenerationUiState(phase = GenerationUiState.Phase.FRAMING, noPerson = true, sceneHint = false),
+            state,
+        )
         assertTrue(generator.runs.isEmpty())
         assertTrue(descriptions.calls.isEmpty())
 
-        model.retakeScene()
-        assertEquals(GenerationUiState(phase = GenerationUiState.Phase.FRAMING), state)
+        // The next press takes the message away with it.
         persons.found = true
+        persons.gate = CompletableDeferred()
         model.takeScene()
         runCurrent()
         assertFalse(state.noPerson)
-        assertTrue(model.useScene())
+        persons.gate?.complete(Unit)
+        runCurrent()
+        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
+        assertFalse(state.noPerson)
+    }
+
+    @Test
+    fun aTouchOnTheCameraTakesTheNoPersonMessageAway() = runTest {
+        persons.found = false
+        model.beginScene()
+        model.takeScene()
+        runCurrent()
+        assertTrue(state.noPerson)
+
+        model.dismissSceneHint()
+
+        assertFalse(state.noPerson)
+        assertEquals(GenerationUiState.Phase.FRAMING, state.phase)
     }
 
     @Test
@@ -294,7 +300,7 @@ class GenerationViewModelTest {
 
         assertFalse(state.checkingPerson)
         assertFalse(state.noPerson)
-        assertTrue(model.useScene())
+        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
     }
 
     @Test
@@ -329,12 +335,12 @@ class GenerationViewModelTest {
         assertTrue(state.light)
         assertTrue(camera.torchOn)
 
-        // Off for Use this photo?, and on again for Shoot again, which keeps the choice.
+        // Off once the photo is taken, and on again for Back on Generate poses, which shoots again and keeps the choice.
         advanceTimeBy(GenerationViewModel.LIGHT_SETTLE_MS + 1)
         model.takeScene()
         runCurrent()
         assertFalse(camera.torchOn)
-        model.retakeScene()
+        model.backToScene()
         runCurrent()
         assertTrue(state.light)
         assertTrue(camera.torchOn)
@@ -351,7 +357,7 @@ class GenerationViewModelTest {
         runCurrent()
         model.takeScene()
         advanceTimeBy(GenerationViewModel.LIGHT_SETTLE_MS + 1)
-        model.retakeScene()
+        model.backToScene()
         runCurrent()
         assertTrue(camera.torchOn)
 
@@ -376,7 +382,7 @@ class GenerationViewModelTest {
 
         assertFalse(state.light)
         assertFalse(camera.torchOn)
-        model.useScene()
+        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
         model.toggleLight()
         runCurrent()
         assertFalse(state.light)
@@ -398,7 +404,7 @@ class GenerationViewModelTest {
         advanceTimeBy(2)
 
         assertEquals(1, camera.grabs)
-        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
     }
 
     @Test
@@ -415,7 +421,7 @@ class GenerationViewModelTest {
         advanceTimeBy(2)
 
         assertEquals(1, camera.grabs)
-        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
     }
 
     @Test
@@ -438,7 +444,7 @@ class GenerationViewModelTest {
         advanceTimeBy(2)
 
         assertEquals(1, camera.grabs)
-        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
     }
 
     @Test
@@ -454,7 +460,7 @@ class GenerationViewModelTest {
         advanceTimeBy(2)
 
         assertEquals(1, camera.grabs)
-        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
     }
 
     @Test
@@ -470,7 +476,7 @@ class GenerationViewModelTest {
         runCurrent()
 
         assertEquals(1, camera.grabs)
-        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+        assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
     }
 
     @Test
@@ -501,7 +507,8 @@ class GenerationViewModelTest {
             GenerationUiState(
                 scene = camera.frame,
                 framed = camera.frame,
-                phase = GenerationUiState.Phase.REVIEWING,
+                phase = GenerationUiState.Phase.DESCRIBING,
+                sceneArriving = true,
             ),
             state,
         )
@@ -511,26 +518,26 @@ class GenerationViewModelTest {
     fun theShutterAndTheConfirmationWorkOnlyInTheirStep() = runTest {
         // No scene photo was asked for yet.
         model.takeScene()
-        model.useScene()
         model.retakeScene()
+        model.backToScene()
         model.generate("Wave")
         model.suggestPoses()
         runCurrent()
         assertEquals(GenerationUiState(), state)
         assertEquals(0, camera.grabs)
 
-        // Two taps on the shutter take one photo, and there is nothing to confirm or generate before it is there.
+        // Two taps on the shutter take one photo, and there is nothing to generate before it is there.
+        persons.gate = CompletableDeferred()
         model.beginScene()
         model.takeScene()
         model.takeScene()
-        model.useScene()
         model.generate("Wave")
         runCurrent()
         assertEquals(1, camera.grabs)
-        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
+        assertEquals(GenerationUiState.Phase.CHECKING, state.phase)
         assertTrue(generator.runs.isEmpty())
 
-        // The shutter does nothing while the photo is shown, and nothing is generated before Generate poses.
+        // The shutter does nothing while the photo is checked, and nothing is generated before Generate poses.
         model.takeScene()
         model.generate("Wave")
         model.suggestPoses()
@@ -829,31 +836,37 @@ class GenerationViewModelTest {
     }
 
     @Test
-    fun backOnGeneratePoses_returnsToThePhotosReview_withTheTextKeptForTheNextTime() = runTest {
+    fun backOnGeneratePoses_shootsAgain_withTheTextKeptForTheNextPhoto() = runTest {
         describeAPhoto()
         model.onDescriptionChanged("Wave")
-        val scene = state.scene
 
-        model.backToReview()
+        model.backToScene()
         runCurrent()
 
-        assertEquals(GenerationUiState.Phase.REVIEWING, state.phase)
-        assertSame(scene, state.scene)
-        assertFalse(state.checkingPerson || state.noPerson)
+        // The camera, ready for another photo (#296): the photo is gone, and the hint does not come back.
+        assertEquals(
+            GenerationUiState(phase = GenerationUiState.Phase.FRAMING, description = "Wave", sceneHint = false),
+            state,
+        )
         assertEquals("the subject's Generate poses closes", "closed", descriptions.calls.last())
         assertTrue(generator.runs.isEmpty())
 
-        assertTrue(model.useScene())
+        val second = testBitmap()
+        camera.frame = second
+        model.takeScene()
+        runCurrent()
         assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
+        assertSame(second, state.scene)
         assertEquals("Wave", state.description)
+        assertEquals("open 'Wave'", descriptions.calls.last())
     }
 
     @Test
-    fun backToReview_worksOnlyOnGeneratePoses() = runTest {
+    fun backToScene_worksOnlyOnGeneratePoses() = runTest {
         pickFromWave()
         val picking = state
 
-        model.backToReview()
+        model.backToScene()
 
         assertEquals(picking, state)
     }
@@ -1455,7 +1468,7 @@ class GenerationViewModelTest {
         model.takeScene()
         runCurrent()
 
-        model.retakeScene()
+        model.backToScene()
 
         assertEquals(GenerationUiState.Phase.FRAMING, state.phase)
         assertEquals(Situation.DEFAULT, state.situation)
@@ -1468,7 +1481,7 @@ class GenerationViewModelTest {
         model.takeScene()
         runCurrent()
 
-        model.retakeScene()
+        model.backToScene()
 
         assertEquals(GenerationUiState.Phase.FRAMING, state.phase)
         assertEquals(Situation.HALF_BODY, state.situation)
@@ -2074,13 +2087,12 @@ class GenerationViewModelTest {
         assertTrue(model.onDescriptionFocus(true))
     }
 
-    /** A situation's tile on *Add a pose guide*, the shutter, and *Use*: Generate poses is shown. */
+    /** A situation's tile on *Add a pose guide* and the shutter: Generate poses is shown, and its photo has arrived. */
     private fun TestScope.describeAPhoto() {
         model.beginScene()
         model.takeScene()
         runCurrent()
-        model.useScene()
-        runCurrent()
+        model.sceneArrived()
     }
 
     /** The same, then *Skip, suggest poses for me*. */

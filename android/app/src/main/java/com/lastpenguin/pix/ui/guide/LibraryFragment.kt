@@ -1,10 +1,9 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
-import android.widget.Toast
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -17,7 +16,9 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentLibraryBinding
 import com.lastpenguin.pix.guide.SavedGuide
+import com.lastpenguin.pix.ui.NoticeLength
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.showNotice
 import java.text.NumberFormat
 import kotlinx.coroutines.launch
 
@@ -67,11 +68,7 @@ class LibraryFragment : Fragment(R.layout.fragment_library) {
                             SavedGuideResult.USED -> backToShooting(viewModel)
 
                             SavedGuideResult.FAILED ->
-                                Toast.makeText(
-                                    requireContext(),
-                                    R.string.saved_guide_open_failed,
-                                    Toast.LENGTH_LONG,
-                                ).show()
+                                showNotice(R.string.saved_guide_open_failed, NoticeLength.LONG)
                         }
                     }
                 }

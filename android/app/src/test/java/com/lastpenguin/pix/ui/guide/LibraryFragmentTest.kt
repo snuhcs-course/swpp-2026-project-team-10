@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.app.Activity
@@ -26,6 +26,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.idleUntil
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
@@ -43,7 +44,6 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
-import org.robolectric.shadows.ShadowToast
 
 /*
  * The library (FR-3.11, R&S 6.2), on the real screen. Partitions: nothing saved (the empty state, no filters); guides
@@ -215,7 +215,7 @@ class LibraryFragmentTest {
         cell(0).thumbnail.performClick()
         idle()
 
-        assertEquals(string(R.string.saved_guide_open_failed), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.saved_guide_open_failed), shownNotice())
         assertEquals(R.id.libraryFragment, nav.currentDestination?.id)
         assertNull(modules.guides.guide.value)
     }

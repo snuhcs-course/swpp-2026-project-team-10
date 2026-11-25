@@ -1,9 +1,8 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han, Jaewan Park, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han, Jaewan Park, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
 import android.view.View
-import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -26,6 +25,7 @@ import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
+import com.lastpenguin.pix.ui.showNotice
 import kotlinx.coroutines.launch
 
 /**
@@ -293,7 +293,7 @@ internal fun Fragment.showPoseSaveNotice(notice: PoseSaveNotice) {
 
         PoseSaveNotice.FAILED -> context.getString(R.string.guide_save_failed_notice)
     }
-    Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+    showNotice(text)
 }
 
 private const val HANDED_ON = "handedOn"

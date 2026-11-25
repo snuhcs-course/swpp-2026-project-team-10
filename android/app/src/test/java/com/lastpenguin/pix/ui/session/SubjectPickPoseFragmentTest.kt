@@ -45,7 +45,6 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import org.robolectric.shadows.ShadowToast
 
 /*
  * The subject's Pick a pose (R&S 6.6, FR-6.15, Design 2.6.5) on the real Fragment, with the photographer's set
@@ -330,8 +329,7 @@ class SubjectPickPoseFragmentTest {
                 it.id to it.source
             },
         )
-        // Still a Toast: showPoseSaveNotice moves to the notices once #308 is merged, since it changes that function.
-        assertEquals(string(R.string.pose_saved_notice), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.pose_saved_notice), shownNotice())
         // Neither a pick nor anything else: the ♥ stays on this phone, and the first Select still decides.
         assertEquals(sent, modules.session.sent.size)
     }

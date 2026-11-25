@@ -125,6 +125,7 @@
 | 4.8 | 2026-11-24 | Camera's hint chip shows only "Guide hidden"; the line about the pinch went (2.6.8; Iter5-A9, [#306]). |
 | 4.9 | 2026-11-25 | Back on *Reference confirm* and *No person found* returns to where the reference was chosen: *Add a pose guide* is opened again, since a sheet cannot stay under a screen (2.6.2; Iter5-A3, [#294]). |
 | 4.10 | 2026-11-25 | Who is zooming, on both phones, and what the photographer did, on the subject's: `camera.did`, `SessionViewModel.subjectZooming`, `SubjectViewModel.photographerLines` (Iter5-A1, [#292]). A single change of the zoom glides: `CameraController.glideZoom`, `ZoomGlide` (Iter5-A10, [#310]) (2.2, 2.5.1, 2.6.5, 2.8). |
+| 4.11 | 2026-11-25 | Impeccable's findings: notices as Snackbars through `ui/Notices.kt`, *Undo* after *Remove guide* with the tip kept aside in `PoseTips`, *Leave* and *End session* asked first, and the camera screens at large fonts (2.6.2, 2.6.3, 2.6.7, 2.8; Iter5-A7, [#298]). |
 
 </details>
 
@@ -2690,7 +2691,7 @@ guide size on screen:   hPx = height · H · s,   wPx = hPx · aspect
 
 **Camera zoom and the guide-edit mode (AD-17).** With guide-edit mode off, a pinch on the preview zooms; with it on, every drag and pinch edits the guide. A new guide starts with the mode off: people zoom and focus more often than they move the guide, so those gestures work at once ([#304]). The toggle turns it on, and the shutter, another guide, hiding, or removing turns it off. On Subject view it starts off too and chooses between `camera.zoom.set` and `guide.move` (2.6.5). The zoom row holds the readout, the pose tip's button (Camera only), and the mode's toggle. The toggle is one person icon, lit in the guide color while the mode is on. Then `GuideOverlayView.filled` tints the inside of the guide in the guide color at 25 % (`camera_guide_fill`), whatever the line's color. The tint is the mask's inside at the outline's level (`guideInside`), made once per guide off the main thread (`GuideOutlines.inside`), never while drawing, and drawn under the outline ([#271]). A tap on the readout steps through `quickZoomSteps` (FR-1.3): the camera's minimum when below 1×, then 1× and 2× where available. `nextZoomStep` takes the first step above the zoom (2 % tolerance), else the first; a tap before the last step is applied goes on from that step. On Subject view a late echo of an earlier step is ignored. The readout's tap area is at least 48 dp wide around a 28 dp pill, with Zoom in / Zoom out accessibility actions. The top bar's ratio button opens 3:4, 9:16, and 1:1 in a row (Iter3-A12, FR-1.13). Brightness is a bar beside the focus box (`ExposureBarView`; 2.8, *Camera labels and brightness*; [#182]). A lens switch keeps the pinch's target through `STARTING`.
 
-**Screen layout (It 3, Iter3-A2).** `previewArea` puts the image at full width below the top bar: 1:1 inside the 4:3 area with the outside dimmed, not clipped, and 16:9 down under the controls. The controls keep one size and place for every ratio, and the panels above them sit below a 4:3 or 1:1 image and over a 16:9 one. `placeZoomRow` draws the zoom row 8 dp above the image's bottom or the first panel, whichever is higher. Every control takes taps on at least 48 × 48 dp (NFR-16): the top bar's buttons reach 4 dp over the image (`TOP_BAR_OVERHANG_DP`), and everything in the bar centers on the 48 dp above that part, the scene photo's title included (`@dimen/top_bar_overhang`, [#204]); the zoom row sits 6 dp above it (`ZOOM_ROW_MARGIN_DP`). While a session streams, `LiveDotView` blinks a red dot at the frame's top right on both phones (FR-6.6, FR-6.8). Subject view follows the same layout (2.6.5). The screens: R&S 6.2.
+**Screen layout (It 3, Iter3-A2).** `previewArea` puts the image at full width below the top bar: 1:1 inside the 4:3 area with the outside dimmed, not clipped, and 16:9 down under the controls. The controls keep one size and place for every ratio, and the panels above them sit below a 4:3 or 1:1 image and over a 16:9 one. `placeZoomRow` draws the zoom row 8 dp above the image's bottom or the first panel, whichever is higher. Every control takes taps on at least 48 × 48 dp (NFR-16): the top bar's buttons reach 4 dp over the image (`TOP_BAR_OVERHANG_DP`), and everything in the bar centers on the 48 dp above that part, the scene photo's title included (`@dimen/top_bar_overhang`, [#204]); the zoom row sits 6 dp above it (`ZOOM_ROW_MARGIN_DP`). While a session streams, `LiveDotView` blinks a red dot at the frame's top right on both phones (FR-6.6, FR-6.8). Subject view follows the same layout (2.6.5). At large fonts ([#298]), Camera's bottom row stays 88 dp around the shutter and grows below it for a *Guide* label taller than 16 dp, as Subject view's does, so *Guide*'s icon stays on one line on both; the scene photo's title and Subject view's camera name shrink to 11 and 12 dp, not sp, so each keeps its line at 200 %. The screens: R&S 6.2.
 
 **Changes on screen (It 3, Iter3-A12, [#179]).** Camera changes animate in 300 ms or less (`ui/Motion.kt`: move 250 ms, turn 300 ms, fade 200 ms, dim 150 ms). With Android's animations off, each shows its end at once.
 
@@ -2789,7 +2790,7 @@ The server reaches every model through OpenRouter with one key (`OPENROUTER_API_
 
 **Image model.** Candidates come from OpenRouter's Image API (`POST https://openrouter.ai/api/v1/images`), with one format, key, and bill for every vendor. Each request asks for `1K` and the closest `aspect_ratio` of 3:4, 9:16, and 1:1 (AD-10), which the listed models all accept (2026-10-30). A model may round the ratio, such as 896 × 1200 for 3:4, so each screen fits a candidate in its own shape. Nothing is cut, since the guide uses the whole candidate. The scene's thumbnails are 72 dp high. The server converts PNG or WebP to JPEG (quality 90) and turns OpenRouter's `403` into `422 REJECTED`.
 
-**Pose tips (It 3, FR-4.10; rebuilt in It 4, [#213]).** When *Reference confirm* finds the person in a chosen candidate, `PoseTips` calls `POST /pose-tips` with the scene, the candidate (at most 768 px), and the pose. The request takes about 2.8 s (median of 100, 90 % within 3.5 s), hidden behind that screen.
+**Pose tips (It 3, FR-4.10; rebuilt in It 4, [#213]).** When *Reference confirm* finds the person in a chosen candidate, `PoseTips` calls `POST /pose-tips` with the scene, the candidate (at most 768 px), and the pose. The request takes about 2.8 s (median of 100, 90 % within 3.5 s), hidden behind that screen. A guide removed from Camera keeps its tip aside until another guide goes on, so *Undo* (2.8), which puts back the same instance, brings the tip too; a saved copy is another instance and gets none ([#298]).
 
 The model only describes; the server decides and writes.
 
@@ -3005,7 +3006,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - A refused rejoin (`NOT_FOUND`, `FORBIDDEN`) ends a reconnecting session with "The session has ended". A running session goes on phone to phone.
 - **Photos (FR-6.14).** A photo in flight waits through a drop: the subject keeps its partial file, and `sendBulk` resumes once connected. `PhotoSyncer` runs for the whole session. After 10 s the photographer says "Couldn't send" (2.6.5).
 - **Server deploys and restarts.** To a phone these look like a dropped socket. Sessions and room codes continue, since they live in the session store (AD-18, 2.7; 2.8, Deployment). The photographer restarts ICE once (`peer.rejoined`).
-- **Cellular notice (FR-6.13).** The first time a session's selected pair uses a cellular interface (`SessionManager.path`), the app says "The live view uses mobile data." Camera shows it as a notice, Subject view as a toast. It waits in `SessionViewModel.mobileDataPending` until shown, and only then is recorded in DataStore (`MobileDataNotice`). A session that ends first drops it.
+- **Cellular notice (FR-6.13).** The first time a session's selected pair uses a cellular interface (`SessionManager.path`), the app says "The live view uses mobile data." Camera shows it among its notices, Subject view as a Snackbar (2.8). It waits in `SessionViewModel.mobileDataPending` until shown, and only then is recorded in DataStore (`MobileDataNotice`). A session that ends first drops it.
 - **Measurement.** `Timings` marks `ice.connected`, `ice.disconnected`, `ice.restarted`, and the pair type (`host`, `srflx`, `relay`) for NFR-5 and NFR-10. It marks `session.reconnecting`, `signaling.rejoined`, and `session.reconnected <ms>` for NFR-11. `ice.pair` logs each pair, such as `local=relay/tcp remote=srflx network=cellular` (`LinkStatsParser`).
 
 #### 2.6.8 Settings (Iteration 3)
@@ -3178,6 +3179,9 @@ erDiagram
 - One activity with a Navigation graph; each wireframe screen is a destination. `PixNavHostFragment` gives every move between screens its transition (2.1).
 - A flow's screens share an activity-scoped ViewModel: account, friends, generation, incoming invitations, pose saving, reference, session, and settings. Camera, Subject view, the subject's shared-step screens, and *Invitation* have their own.
 - A ViewModel takes user events and exposes its UI state as a `StateFlow`. One-shot results and notices come from buffered `Channel`s, so they wait while the screen is stopped.
+- Short notices are Snackbars through `ui/Notices.kt` (`showNotice`), never Toasts, so a notice can offer an action and takes Pix's look (`Widget.Pix.Snackbar`; [#298]). It goes on the activity's content after any navigation in the same turn, so one shown just before Back stays on the screen that follows. A screen that is a `NoticeAnchor`, Camera or Subject view, has it above its zoom row, clear of the shutter; a sheet that stays open shows it in its own window (`showNoticeInDialog`). It lasts 2 s or 3.5 s, as a Toast did, and 5 s with *Undo*.
+- *Remove guide* keeps the guide and its `GuideState` in `CameraViewModel` until another guide goes on. *Undo* sets the same instance again with that state, so it stays saved, its tip comes back (2.6.3), and `GuideSyncer` sends it again, since `guide.clear` reset `peerHas`. Camera takes the notice down once a guide is on it ([#298]).
+- *Leave* and *End session* ask first, as system Back on Subject view did. Each question is held by its screen and closed with it; Camera's also closes when the subject leaves first, and its *End session* then ends nothing ([#298]).
 - `AppContainer` creates every module, so a fake can stand in for one that is not ready.
 - Colors are tokens in `colors.xml`, in two sets (Iter4-P5, [#202]): the page tokens (`pix_*`), and the tokens on the image (`camera_*`, `guide_preview_*`), for what is drawn over the camera's image or a photo and for the camera screens' bars and shutter. No layout, drawable, color list, style, or theme writes a color as a value; an icon is white and takes its color from the tint where it is used. *Why:* a theme then changes values, not screens. Light mode, which would have given the page tokens a second value, was dropped on 11/20 ([#212]).
 - `Theme.Pix` is a DayNight theme that takes the mode Pix sets, not the phone's: `PixApplication` always sets dark, since light mode was dropped ([#212]).
@@ -3230,7 +3234,7 @@ erDiagram
 **Error handling**
 
 - Module interfaces return `Result` with typed errors (`NoPersonFoundException`, `GenerationError`, `EndReason`). ViewModels map each to exactly one failure screen.
-- One exception: an unreadable reference photo, or a segmentation model not ready within 60 s, shows the toast "Couldn't use this photo. Try another one." It returns to Camera, or to Subject view for the subject's guide.
+- One exception: an unreadable reference photo, or a segmentation model not ready within 60 s, shows the notice "Couldn't use this photo. Try another one." It returns to Camera, or to Subject view for the subject's guide.
 
 **Timeouts**
 
@@ -3399,7 +3403,7 @@ erDiagram
 - Toggles say in words what they did. One chip with an icon at the top of the image (`toggleLabel`) shows *Hide* / *Show* ("Guide hidden", "Guide shown"), a tap on the zoom readout (the step, such as "2×"), a zoom held back while the other phone zooms ("Jaewan is zooming", FR-7.6), and *Save guide*'s notices.
 - The chip shows for 3 s (`CameraViewModel.NOTICE_MS`), and a new label replaces it at once. It is a live region for TalkBack. The hint chip steps aside for it, and opening the ratios takes it down (FR-1.13).
 - The guide-edit mode toggle shows `pinchModeLabel` above it for 3 s: *Guide* in the guide's color while drags and pinches move the guide, *Camera* in white while a pinch zooms. TalkBack reads "Pinch moves the guide" or "Pinch zooms the camera".
-- Subject view shows the same labels for its zoom step, its *Save guide* (no toast), and its toggle.
+- Subject view shows the same labels for its zoom step, its *Save guide*, and its toggle.
 - The pose tip's button closes an open tip, as any touch does (FR-4.10). The screen-wide touch skips the button, so one tap does not close and reopen the tip.
 - Brightness is `ExposureBarView`: a 48 × 128 dp touch area, a 1.5 dp accent line with a 2.5 dp outline, and a sun at the applied exposure index (FR-1.11).
 - A tap to focus brings the bar up beside the focus box: on its right, or its left near the image's right edge, always inside the image. Without point focus, it comes up at the tap.
@@ -3713,6 +3717,7 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#292]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/292
 [#294]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/294
 [#296]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/296
+[#298]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/298
 [#304]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/304
 [#306]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/306
 [#310]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/310

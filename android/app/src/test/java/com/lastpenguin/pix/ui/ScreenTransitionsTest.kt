@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.animation.AnimatorInflater
@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Looper
 import android.view.View
+import androidx.activity.ComponentDialog
 import androidx.annotation.IdRes
 import androidx.navigation.NavController
 import androidx.navigation.Navigator
@@ -17,13 +18,18 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.MainActivity
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentFailureBinding
+import com.lastpenguin.pix.guide.NoPersonFoundException
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.camera.CameraFragment
+import com.lastpenguin.pix.ui.guide.AddGuideSheet
+import com.lastpenguin.pix.ui.guide.ReferenceViewModel
 import com.lastpenguin.pix.ui.settings.SettingsFragment
 import java.time.Duration
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -45,7 +51,8 @@ import org.robolectric.shadows.ShadowChoreographer
  * and, going back, the last coming from the left; a sheet leaves the screen under it as it is.
  * Back: the system's Back, a screen's own Back, and *Back to camera* from two screens deep, which pops both at once; a
  * move that closes the screen shown (popUpTo) goes back with the screen beneath it, not the one it closed; a link's
- * screen comes and goes as any other. A tap during a transition acts at once. Each transition lasts 300 ms or less,
+ * screen comes and goes as any other; Back on No person found closes that screen and opens a sheet in one move, over
+ * Camera, with the sheet's photo picker (#294). A tap during a transition acts at once. Each transition lasts 300 ms or less,
  * and with the phone's animations off each screen is at its end at once.
  */
 @RunWith(AndroidJUnit4::class)
@@ -53,6 +60,7 @@ import org.robolectric.shadows.ShadowChoreographer
 @Config(qualifiers = "w360dp-h705dp-xxhdpi")
 class ScreenTransitionsTest {
     private var controller: ActivityController<MainActivity>? = null
+    private lateinit var modules: TestAppContainer
 
     @After
     fun tearDown() {
@@ -62,7 +70,7 @@ class ScreenTransitionsTest {
     }
 
     private fun start(): ActivityController<MainActivity> {
-        TestAppContainer().also { it.auth.signInAs(it.auth.account) }.install()
+        modules = TestAppContainer().also { it.auth.signInAs(it.auth.account) }.install()
         return Robolectric.buildActivity(MainActivity::class.java).setup().also {
             controller = it
             idle()
@@ -286,6 +294,32 @@ class ScreenTransitionsTest {
 
         assertSame(camera, pix.navHost.childFragmentManager.primaryNavigationFragment!!.view)
         assertIn(camera)
+    }
+
+    @Test
+    fun backFromNoPersonFound_closesIt_andOpensTheSheetOverCameraWithItsGallery() {
+        val pix = start().get()
+        pix.go(R.id.action_camera_to_addGuide)
+        // A photo picked from the sheet, which closes for Reference confirm; no person is found in it.
+        pix.viewModel<ReferenceViewModel>().onPhotoPicked(Uri.parse("content://photos/1"))
+        pix.go(R.id.action_addGuide_to_referenceConfirm)
+        modules.maker.finish(Result.failure(NoPersonFoundException()))
+        idle()
+        assertEquals(R.id.noPersonFoundFragment, pix.nav.currentDestination?.id)
+
+        pix.back()
+
+        // One move on the real navigators (#294): the screen goes, Camera is the screen again, and the sheet, a
+        // dialog, is over it with the system's photo picker asked for.
+        assertEquals(R.id.addGuideSheet, pix.nav.currentDestination?.id)
+        assertTrue(pix.navHost.childFragmentManager.primaryNavigationFragment is CameraFragment)
+        val sheet = pix.navHost.childFragmentManager.fragments.filterIsInstance<AddGuideSheet>().single()
+        assertTrue(sheet.requireDialog().isShowing)
+        assertNotNull(shadowOf(pix).nextStartedActivityForResult)
+        // The sheet is as the Guide button opens it: its own Back, the dialog's, closes it alone.
+        (sheet.requireDialog() as ComponentDialog).onBackPressedDispatcher.onBackPressed()
+        idle()
+        assertEquals(R.id.cameraFragment, pix.nav.currentDestination?.id)
     }
 
     @Test

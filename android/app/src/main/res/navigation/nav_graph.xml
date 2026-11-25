@@ -74,6 +74,11 @@
             android:name="fromSubject"
             android:defaultValue="false"
             app:argType="boolean" />
+        <!-- True from Back on No person found: the sheet opens its gallery at once (#294). -->
+        <argument
+            android:name="openGallery"
+            android:defaultValue="false"
+            app:argType="boolean" />
         <action
             android:id="@+id/action_addGuide_to_referenceConfirm"
             app:destination="@id/referenceConfirmFragment"
@@ -106,15 +111,23 @@
             app:destination="@id/noPersonFoundFragment"
             app:popUpTo="@id/referenceConfirmFragment"
             app:popUpToInclusive="true" />
+        <!-- Back on a photo picked from Add a pose guide: that sheet again, which closed when the photo was picked
+             (#294). Its arguments are set in code. -->
+        <action
+            android:id="@+id/action_referenceConfirm_to_addGuide"
+            app:destination="@id/addGuideSheet"
+            app:popUpTo="@id/referenceConfirmFragment"
+            app:popUpToInclusive="true" />
     </fragment>
 
     <fragment
         android:id="@+id/noPersonFoundFragment"
         android:name="com.lastpenguin.pix.ui.guide.NoPersonFoundFragment"
         android:label="No person found">
+        <!-- Back on a photo picked from Add a pose guide: that sheet again, with its gallery (#294). -->
         <action
-            android:id="@+id/action_noPersonFound_to_referenceConfirm"
-            app:destination="@id/referenceConfirmFragment"
+            android:id="@+id/action_noPersonFound_to_addGuide"
+            app:destination="@id/addGuideSheet"
             app:popUpTo="@id/noPersonFoundFragment"
             app:popUpToInclusive="true" />
     </fragment>

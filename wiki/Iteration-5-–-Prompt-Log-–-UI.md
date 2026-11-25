@@ -19,6 +19,15 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 
 - [Dongje, 11-24] "The plain camera does not show the line 'Pinch to zoom', but with a guide up it shows. The tutorial tells it too, and everyone knows a camera's zoom in and out, so the line can go. It is a small task, so start building at once." (The agent changed the three screen tests that expected the line, saw them fail, and took the line out of Camera's hint chip, which now says only "Guide hidden". It removed the string in both languages and the chip from two frames of the flow 1 wireframe. R&S 4.7, Design 4.8, Testing 4.9.)
 
+## *No person found*: Back returns to *Add a pose guide* ([#294])
+
+- [Dongje, 11-25] "Look at issue #294 and tell me what I have to review, what is to be built, and in what order." (The agent read the issue and the code. The sheet closes when a photo is picked, so Back from *No person found* showed the camera alone. It put up three points, each with a recommendation: the same Back on *Reference confirm*, a line that tells the way once the button is gone, and the generated pose's path left as it is.)
+- [Dongje, 11-25] "Go with the recommendations for 1 to 3, and assign it to me." (The agent drew the screen from the real layout, before and after, with a table of where Back goes.)
+- [Dongje, 11-25] "1. Can the gallery come up over the sheet too? 2. With an AI pose, is the user not asked to shoot again when no person is found? Is there one more block after that? Check and show me the screens." (The gallery can: the sheet opens its picker once. The pose flow has three blocks: the phone on the scene photo, the server on the same photo, and the phone on the generated image after *Select*, which is this issue's screen. The agent showed the three screens.)
+- [Dongje, 11-25] "1. Put the gallery over the sheet. But Back on the confirm screen opens the sheet alone, and from the library it goes to the library. 2. Keep 1 and 2 as they are; would it be awkward to remove only the button on 3, with the line kept?" (The agent answered that it is acceptable, and asked which line "kept" means.)
+- [Dongje, 11-25] "The AI pose's path keeps 'Pick a photo where one person is clearly visible.' as it is, and the other paths get 'Go back'. Show it as a picture again, then start building." (Second draft, then built test-first: `backToChoosing` for both screens, `openGallery` on the sheet, the line by `ReferenceViewModel.fromPhoto`, and a test on the real navigation. R&S 4.8, Design 4.9, Testing 4.10, the flow 1 wireframe.)
+
+[#294]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/294
 [#301]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/301
 [#304]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/304
 [#306]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/306

@@ -68,7 +68,6 @@
     <string name="library_more">More options</string>
     <string name="library_select">Select</string>
     <string name="library_select_all">Select all</string>
-    <string name="library_delete_all">Delete all</string>
     <string name="library_close_selection">Stop selecting</string>
     <plurals name="library_selected">
         <item quantity="one">%1$d selected</item>

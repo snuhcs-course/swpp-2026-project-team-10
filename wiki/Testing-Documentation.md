@@ -1698,7 +1698,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 12. In a session with a *Full body* scene photo, ♥ a pose on the subject's phone; *Select* another on the photographer's phone and tap *Save guide* on Subject view. Open the library on the subject's phone. Repeat steps 8 to 10 in Korean, with TalkBack on for one cell.
 13. *Added in Iter5-A6 ([#297]):* generate a set of four poses and tap Back on *Pick a pose* without a ♥. Use a guide from a gallery photo. Open the library and tap *Favorites*.
 14. Long press a guide, tap two more, tap one of them again, then *Delete*, *Cancel*, and *Delete* again. Long press, tap *Select all*, and tap ✕.
-15. Tap ⋮ › *Select*, then Back. Choose *Photos*, tap ⋮ › *Delete all*, and confirm. Kill Pix and open the library again.
+15. Tap ⋮ › *Select*, then Back. Choose *Photos*, tap ⋮ › *Select all*, then *Delete*, and confirm. Kill Pix and open the library again.
 
 **Expected result**
 
@@ -1709,7 +1709,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 - Back from *Reference confirm* returns to the library.
 - From Subject view, the guide shows on both phones.
 - *Added in Iter4-A6 (step 7):* each closed picker returns to the screen that opened it, *Add a pose guide* or the library, and the guide on the camera is unchanged (FR-2.7).
-- *Added in Iter5-A6 (steps 13 to 15):* the four poses and the photo guide are listed with no tap, and *Favorites* lists only the guides marked by ♥ or *Save guide*, each with a heart, those saved before the update included. The long press selects as a gallery app does: the header counts the selected, a tap selects or unselects without opening a guide, *Delete* asks with the count and removes them in one step, *Select all* selects every guide listed, and ✕ or Back stops selecting without leaving. *Delete all* removes only the photos listed. The deletions hold after the restart, and nothing else went.
+- *Added in Iter5-A6 (steps 13 to 15):* the four poses and the photo guide are listed with no tap, and *Favorites* lists only the guides marked by ♥ or *Save guide*, each with a heart, those saved before the update included. The long press selects as a gallery app does: the header counts the selected, a tap selects or unselects without opening a guide, *Delete* asks with the count and removes them in one step, *Select all* selects every guide listed, and ✕ or Back stops selecting without leaving. ⋮ › *Select all* selects only the photos listed, and *Delete* removes only them. The deletions hold after the restart, and nothing else went.
 - *Added in Iter5-P6 (steps 8 to 12):* each pose shows its situation under it; a photo guide shows none. The chips read *Landmark 1* and *Selfie 1*, in the sheet's order. A chip shows its guides only, within the kind's filter, and the same chip again shows all. The memo is cut at 40 characters and shows under its guide after the restart; *Cancel* keeps the old memo. A cleared memo is gone. Once the selfie pose is deleted, its chip is gone. On the subject's phone both poses show *Full body*. In Korean the chips and the words fit, and TalkBack reads the kind, the date, the situation, and the memo.
 
 ### IT-27 procedure

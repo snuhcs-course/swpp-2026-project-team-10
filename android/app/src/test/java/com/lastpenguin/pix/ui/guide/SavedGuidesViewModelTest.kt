@@ -48,7 +48,7 @@ import org.junit.Test
  * replaces the first), Add a pose guide opened again (no situation chosen).
  * onSaveMemo (#270): a memo (listed), a store that cannot write it (memoFailures says so once).
  * Selection (#297, state-based): a long press (that guide), taps (in and out), Select all (every guide listed), stop
- * (none, and a tap then selects nothing), Delete (the selected at once, selecting ends), Add a pose guide opened again
+ * (none, and a tap then selects nothing), Select all under ⋮ while not selecting (selecting, with every guide listed), Delete (the selected at once, selecting ends), Add a pose guide opened again
  * (not selecting).
  * thumbnail: one shown twice (read from the store once), one the store cannot read (null, read again next time), a
  * deleted guide's (not kept).
@@ -341,6 +341,10 @@ class SavedGuidesViewModelTest {
         model.onToggleSelected("a")
         runCurrent()
         assertNull(model.library.value.selection)
+        // Select all under ⋮: selecting starts with every guide listed.
+        model.onSelectAll()
+        runCurrent()
+        assertEquals(setOf("a", "b", "c"), model.library.value.selection)
     }
 
     @Test

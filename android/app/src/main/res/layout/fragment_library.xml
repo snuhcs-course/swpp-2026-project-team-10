@@ -45,7 +45,7 @@
             android:layout_height="0dp"
             android:layout_weight="1" />
 
-        <!-- Select and Delete all (#297); hidden while selecting and while nothing is listed. -->
+        <!-- Select and Select all (#297); hidden while selecting and while nothing is listed. -->
         <ImageButton
             android:id="@+id/moreButton"
             android:layout_width="48dp"

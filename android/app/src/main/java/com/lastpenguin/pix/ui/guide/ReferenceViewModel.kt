@@ -387,9 +387,8 @@ class ReferenceViewModel(
         librarySelection.value = if (id in selected) selected - id else selected + id
     }
 
-    /** *Select all* while selecting: every guide listed. */
+    /** *Select all*, while selecting or under ⋮ (#297): every guide listed, selecting from then on. */
     fun onSelectAll() {
-        if (librarySelection.value == null) return
         librarySelection.value = library.value.guides.mapTo(HashSet()) { it.id }
     }
 

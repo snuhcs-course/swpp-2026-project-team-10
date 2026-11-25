@@ -39,7 +39,7 @@ import kotlinx.coroutines.launch
  * as a saved guide does on the sheet, or, opened from Subject view, offers it to the photographer (FR-6.16). A long
  * press, or *Select* under ⋮, selects guides as a gallery app does (#297): a tap then selects one or no longer does,
  * the header says how many with *Select all*, and *Delete* takes *Add photo*'s place and asks first; ✕ or Back stops
- * selecting. *Delete all* under ⋮ deletes every guide listed, after asking. *Add photo* goes to Reference confirm,
+ * selecting. *Select all* under ⋮ starts selecting with every guide listed. *Add photo* goes to Reference confirm,
  * whose back returns here. Opened from Subject view, it covers Subject view, so it watches the session itself
  * (`leaveWhenTheSessionEnds`).
  * Owner: the library (#170); situations and memos (#270); favorites and selection (#297).
@@ -170,14 +170,14 @@ class LibraryFragment : Fragment(R.layout.fragment_library) {
         binding.deleteSelectedButton.isEnabled = !selection.isNullOrEmpty()
     }
 
-    /** ⋮ (#297): *Select*, as a long press does, and *Delete all*, of every guide listed, after asking. */
+    /** ⋮ (#297): *Select*, as a long press does, and *Select all*, which selects every guide listed. */
     private fun showMore(anchor: View) {
         PopupMenu(requireContext(), anchor).apply {
             menuInflater.inflate(R.menu.library_more, menu)
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     R.id.selectGuides -> viewModel.onStartSelecting()
-                    R.id.deleteAllGuides -> confirmDelete(viewModel.library.value.guides.mapTo(HashSet()) { it.id })
+                    R.id.selectAllGuides -> viewModel.onSelectAll()
                 }
                 true
             }

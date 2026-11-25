@@ -66,8 +66,8 @@ import org.robolectric.shadows.ShadowToast
  * which TalkBack names *Select* (selecting with that guide: the count, its mark, Select all, Delete for Add photo, no
  * pencil), a tap while selecting (selects another, never uses it; on a selected one, takes it out), Select all,
  * none selected (Delete off), Delete (asks with the count: Cancel keeps them, Delete removes them and stops selecting),
- * ✕ and Back (stop selecting, the library stays); ⋮ with Select (selecting with none) and Delete all (every guide the
- * filter lists, after asking).
+ * ✕ and Back (stop selecting, the library stays); ⋮ with Select (selecting with none) and Select all (selecting with
+ * every guide the filter lists, which Delete then removes after asking).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -446,7 +446,7 @@ class LibraryFragmentTest {
     }
 
     @Test
-    fun more_selectStartsSelecting_andDeleteAllDeletesEveryGuideTheFilterLists_afterAsking() {
+    fun more_selectStartsSelecting_andSelectAllSelectsEveryGuideTheFilterLists() {
         val modules = launch(withThree())
 
         onScreen { it.moreButton.performClick() }
@@ -460,7 +460,10 @@ class LibraryFragmentTest {
         idleUntil { itemCount() == 2 }
         onScreen { it.moreButton.performClick() }
         idle()
-        clickMenuItem(R.id.deleteAllGuides)
+        clickMenuItem(R.id.selectAllGuides)
+        assertEquals("2 selected", onScreen { it.titleText.text.toString() })
+        onScreen { it.deleteSelectedButton.performClick() }
+        idle()
         val ask = ShadowDialog.getLatestDialog() as AlertDialog
         assertEquals(
             "Delete 2 guides?",

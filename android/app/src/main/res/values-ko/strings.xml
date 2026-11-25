@@ -66,7 +66,6 @@
     <string name="library_more">더보기</string>
     <string name="library_select">선택</string>
     <string name="library_select_all">모두 선택</string>
-    <string name="library_delete_all">모두 삭제</string>
     <string name="library_close_selection">선택 그만하기</string>
     <plurals name="library_selected">
         <item quantity="other">%1$d개 선택됨</item>

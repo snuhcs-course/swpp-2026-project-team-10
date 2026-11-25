@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -118,8 +118,15 @@ internal suspend fun toggleSaved(store: SavedGuideStore, guide: ReferenceGuide, 
         val kept = store.saved.value.firstOrNull { it.id == guide.id }
         when {
             kept?.favorite == true -> store.setFavorite(guide.id, false).map { GuideSaveNotice.REMOVED }
+
             kept != null -> store.setFavorite(guide.id, true).map { GuideSaveNotice.SAVED }
-            else -> store.save(guide, state, favorite = true).map { GuideSaveNotice.SAVED }
+
+            // A photo guide's history entry may be written meanwhile (`keepPhotoGuide`), and `save` keeps an entry as
+            // it is: mark it a favorite then, or the heart would say saved while the library has it as history.
+            else -> store.save(guide, state, favorite = true).mapCatching { saved ->
+                if (!saved.favorite) store.setFavorite(saved.id, true).getOrThrow()
+                GuideSaveNotice.SAVED
+            }
         }.getOrDefault(GuideSaveNotice.FAILED)
     } catch (error: CancellationException) {
         throw error

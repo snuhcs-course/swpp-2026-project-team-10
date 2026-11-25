@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -28,6 +28,10 @@ import com.lastpenguin.pix.generation.SUGGESTED
 import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.planned
 import com.lastpenguin.pix.generation.testBitmap
+import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.guide.NoPersonFoundException
+import com.lastpenguin.pix.guide.ReferenceGuide
+import com.lastpenguin.pix.guide.SavedGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.DescriptionRequest
 import com.lastpenguin.pix.session.DescriptionShare
@@ -1662,8 +1666,9 @@ class GenerationViewModelTest {
     }
 
     // Partitions (#297): each ready candidate kept in the library through PoseLibrary, a failed one not; Back from
-    // Pick a pose and from Generating poses with a candidate (posesKept once), Back from Generating poses before any
-    // candidate (nothing said), and no library (nothing kept, nothing said).
+    // Pick a pose and from Generating poses with a candidate (posesKept once the library wrote it), Back from Generating
+    // poses before any candidate (nothing said), candidates none of which was kept, for no person or a storage that
+    // cannot write (nothing said), and no library (nothing kept, nothing said).
 
     private fun keepingModel(maker: TestAppContainer.ScriptedGuideMaker, saved: SavedGuideStore): GenerationViewModel {
         val library = PoseLibrary(maker, saved, CoroutineScope(dispatcher))
@@ -1697,8 +1702,9 @@ class GenerationViewModelTest {
     }
 
     @Test
-    fun backFromGeneratingPoses_saysSoOnlyOnceACandidateCame() = runTest {
-        model = keepingModel(TestAppContainer.ScriptedGuideMaker(), SavedGuideStore.InMemory())
+    fun backFromGeneratingPoses_saysSoOnlyOnceACandidateWasKept() = runTest {
+        val maker = TestAppContainer.ScriptedGuideMaker()
+        model = keepingModel(maker, SavedGuideStore.InMemory())
         val kept = mutableListOf<Unit>()
         backgroundScope.launch { model.posesKept.collect { kept += it } }
         generateFromAPhoto()
@@ -1715,7 +1721,38 @@ class GenerationViewModelTest {
         runCurrent()
         model.stopGenerating()
         runCurrent()
+        // Said once the library wrote the pose, which may finish after Back.
+        assertEquals(0, kept.size)
+        maker.finish(Result.success(fakeGuide("kept")))
+        runCurrent()
         assertEquals(1, kept.size)
+    }
+
+    @Test
+    fun backWithNoCandidateKept_saysNothing_noPersonOrAStorageThatCannotWrite() = runTest {
+        val maker = TestAppContainer.ScriptedGuideMaker()
+        val full = object : SavedGuideStore by SavedGuideStore.InMemory() {
+            override suspend fun save(guide: ReferenceGuide, state: GuideState, favorite: Boolean) =
+                Result.failure<SavedGuide>(IOException("full"))
+        }
+        model = keepingModel(maker, full)
+        val kept = mutableListOf<Unit>()
+        backgroundScope.launch { model.posesKept.collect { kept += it } }
+        generateFromAPhoto()
+        generator.runs.single().apply {
+            plan()
+            send(ready("pose-1"), ready("pose-2"))
+            finish()
+        }
+        runCurrent()
+        maker.finish(Result.failure(NoPersonFoundException()))
+        maker.finish(Result.success(fakeGuide("not-written")))
+        runCurrent()
+
+        model.describeAgain()
+        runCurrent()
+
+        assertEquals(0, kept.size)
     }
 
     @Test

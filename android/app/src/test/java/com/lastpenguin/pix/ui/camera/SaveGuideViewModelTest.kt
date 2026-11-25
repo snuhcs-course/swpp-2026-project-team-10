@@ -31,7 +31,8 @@ import org.junit.Test
  * Partitions for *Save guide* on the Camera screen (FR-3.8), state-based, with the in-memory store.
  * onSaveGuide: a guide not kept yet (stored with its state as a favorite, shown as saved, SAVED), a favorite
  * (REMOVED: history again, still in the store, shown as not saved; a third tap marks it again), a guide kept as
- * history (#297: marked a favorite, SAVED), no guide (nothing), a store that cannot write
+ * history (#297: marked a favorite, SAVED), one whose history entry is written meanwhile (marked a favorite all the
+ * same, SAVED), no guide (nothing), a store that cannot write
  * (FAILED, not shown as saved, the button free again), a store that throws (the same, no crash), a second tap while
  * the first is writing (one save). A notice that comes while no screen collects waits for the screen.
  * guideSaved: a new guide (not saved), another guide replacing a saved one, a saved guide deleted from the store, a
@@ -117,6 +118,22 @@ class SaveGuideViewModelTest {
         guides.setGuide(fakeGuide("g1"))
         runCurrent()
         assertFalse(model.uiState.value.guideSaved)
+        val notices = notices(model)
+
+        model.onSaveGuide()
+        runCurrent()
+
+        assertEquals(listOf(GuideSaveNotice.SAVED), notices)
+        assertEquals(listOf("g1" to true), saved.saved.value.map { it.id to it.favorite })
+        assertTrue(model.uiState.value.guideSaved)
+    }
+
+    @Test
+    fun onSaveGuide_historyWrittenMeanwhile_marksItAFavoriteAllTheSame() = runTest(dispatcher) {
+        val racing = HistoryFirstStore(saved)
+        val model = model(racing)
+        guides.setGuide(fakeGuide("g1"))
+        runCurrent()
         val notices = notices(model)
 
         model.onSaveGuide()
@@ -250,6 +267,17 @@ class SaveGuideViewModelTest {
     private class ThrowingStore(private val inner: SavedGuideStore) : SavedGuideStore by inner {
         override suspend fun save(guide: ReferenceGuide, state: GuideState, favorite: Boolean): Result<SavedGuide> =
             throw IllegalStateException("Can't compress a recycled bitmap")
+    }
+
+    /**
+     * A store where a used photo guide's history entry (`keepPhotoGuide`) is written just before *Save guide*'s write,
+     * which then finds the entry kept and leaves it as it is.
+     */
+    private class HistoryFirstStore(private val inner: SavedGuideStore) : SavedGuideStore by inner {
+        override suspend fun save(guide: ReferenceGuide, state: GuideState, favorite: Boolean): Result<SavedGuide> {
+            inner.save(guide, state, favorite = false)
+            return inner.save(guide, state, favorite)
+        }
     }
 
     /** A store whose writes wait for [release], so a second tap arrives while the first is writing. */

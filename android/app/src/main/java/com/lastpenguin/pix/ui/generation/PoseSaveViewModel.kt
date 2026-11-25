@@ -113,6 +113,7 @@ class PoseSaveViewModel(private val library: PoseLibrary, private val store: Sav
         viewModelScope.launch {
             val notice = try {
                 val kept = library.keep(key.setId, key.poseId, image, turn, situation).await().getOrThrow()
+                check(kept.stored) { "The library could not keep the pose" }
                 store.setFavorite(kept.saved.id, true).getOrThrow()
                 marked.update { it + (key to Heart.Saved(kept.saved.id)) }
                 PoseSaveNotice.SAVED
@@ -126,11 +127,18 @@ class PoseSaveViewModel(private val library: PoseLibrary, private val store: Sav
         }
     }
 
+    /** Empties the heart at once; one the storage could not change is filled again, and says it failed. */
     private fun unmark(key: PoseKey, guideId: String) {
-        marked.update { it - key }
+        marked.update { it + (key to Heart.Saving) }
         viewModelScope.launch {
-            store.setFavorite(guideId, false)
-            _results.send(PoseSaveResult(key.setId, PoseSaveNotice.REMOVED))
+            val notice = if (store.setFavorite(guideId, false).isSuccess) {
+                marked.update { it - key }
+                PoseSaveNotice.REMOVED
+            } else {
+                marked.update { it + (key to Heart.Saved(guideId)) }
+                PoseSaveNotice.FAILED
+            }
+            _results.send(PoseSaveResult(key.setId, notice))
         }
     }
 }

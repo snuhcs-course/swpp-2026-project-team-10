@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -37,6 +37,7 @@ import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -237,6 +238,9 @@ class GenerationViewModel(
 
     /** The set being generated or picked from, as [share] knows it; null between sets. */
     private var setId: String? = null
+
+    /** The library's keeping of each candidate of the set (#297), for [posesKept] to say only what it kept. */
+    private var setKeeps = emptyList<Deferred<Result<PoseLibrary.Kept>>>()
 
     /**
      * The set made from a description, for the history (FR-4.11): [kept] once the server accepted the description, at
@@ -599,7 +603,7 @@ class GenerationViewModel(
         val state = _uiState.value
         val ended = state.phase == GenerationUiState.Phase.PICKING || state.phase == GenerationUiState.Phase.FAILED
         if (!ended || state.scene == null) return
-        if (state.phase == GenerationUiState.Phase.PICKING) tellPosesKept(state)
+        if (state.phase == GenerationUiState.Phase.PICKING) tellPosesKept()
         _uiState.update {
             it.copy(
                 phase = GenerationUiState.Phase.DESCRIBING,
@@ -636,7 +640,7 @@ class GenerationViewModel(
         generating?.cancel()
         generating = null
         closeSet()
-        tellPosesKept(state)
+        tellPosesKept()
         _uiState.update {
             it.copy(
                 phase = GenerationUiState.Phase.DESCRIBING,
@@ -652,9 +656,16 @@ class GenerationViewModel(
         openDescription()
     }
 
-    /** The set of [state] had candidates, which the library keeps: Generate poses says so (#297). */
-    private fun tellPosesKept(state: GenerationUiState) {
-        if (library != null && state.readyCount > 0) _posesKept.trySend(Unit)
+    /**
+     * The set's candidates are kept in the library (#297): Generate poses says so once the library wrote one, and says
+     * nothing when none had a person or the storage could not keep them, so *View* never opens on nothing new.
+     */
+    private fun tellPosesKept() {
+        val keeps = setKeeps
+        if (keeps.isEmpty()) return
+        viewModelScope.launch {
+            if (keeps.any { it.await().getOrNull()?.stored == true }) _posesKept.send(Unit)
+        }
     }
 
     /**
@@ -697,6 +708,7 @@ class GenerationViewModel(
         endDescription(started = true, text = described, setId = id)
         closeSet()
         setId = id
+        setKeeps = emptyList()
         // Kept once the server accepts it, whichever phone wrote it, with the friend as the set starts; suggested
         // poses have no description to keep.
         describedSet = described.takeIf { it.isNotEmpty() }?.let { DescribedSet(id, it, partner()?.userId) }
@@ -897,6 +909,7 @@ class GenerationViewModel(
                         share.candidate(id, event.poseId, event.image)
                         val state = _uiState.value
                         library?.keep(id, event.poseId, event.image, state.sceneTurn, state.situation)
+                            ?.let { setKeeps = setKeeps + it }
                     }
 
                     is CandidateEvent.Failed -> {

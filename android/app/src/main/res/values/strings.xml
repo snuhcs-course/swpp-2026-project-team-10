@@ -264,8 +264,8 @@
     <!-- Back on Generating poses, and on Pick a pose in a session, asks first, since going back loses the set the AI
          service was asked for: the title, the loss on each screen, and the button that goes back. -->
     <!-- ♥ on Pick a pose (FR-4.14): a candidate kept in this phone's library. -->
-    <string name="save_pose">Save this pose to My library</string>
-    <string name="remove_saved_pose">Remove this pose from My library</string>
+    <string name="save_pose">Add this pose to Favorites</string>
+    <string name="remove_saved_pose">Remove this pose from Favorites</string>
     <string name="pose_saved_notice">Pose added to Favorites in My library.</string>
     <string name="pose_removed_notice">Pose removed from Favorites. It stays in My library.</string>
     <string name="pose_no_person_notice">Couldn\'t find a person in this pose.</string>

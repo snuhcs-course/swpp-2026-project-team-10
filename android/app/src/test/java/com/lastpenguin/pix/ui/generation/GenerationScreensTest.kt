@@ -38,6 +38,7 @@ import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.fakeGuide
 import com.lastpenguin.pix.session.protocol.DescriptionStep
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
@@ -741,6 +742,9 @@ class GenerationScreensTest {
             }
         }
         scenario = s
+        idle()
+        // Said once the library wrote the pose.
+        modules.maker.finish(Result.success(fakeGuide("kept")))
         idle()
 
         s.onFragment {

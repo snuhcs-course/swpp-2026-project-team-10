@@ -32,6 +32,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -43,11 +44,13 @@ import org.junit.Test
  * PoseLibrary over them.
  * toggle (equivalence partitioning): an empty heart (Saving, then Saved with the guide kept in the library as a favorite
  * generated pose, SAVED, with the set's situation or none), a candidate the library kept already (marked, not cut out
- * again), a filled one (history again, still in the library, REMOVED), one still saving (ignored: one guide made), a
- * candidate without a person (nothing kept, NO_PERSON), a maker or a store that fails (nothing kept, FAILED).
+ * again), a filled one (history again, still in the library, REMOVED), a filled one the store cannot change (still
+ * filled, FAILED), one still saving (ignored: one guide made), a candidate without a person (nothing kept, NO_PERSON),
+ * a maker or a store that fails (nothing kept, FAILED).
  * Keys: the same pose id in another set (another heart); a guide deleted in the library (the heart empty again, and a
  * ♥ keeps it again without cutting it out again).
- * keptGuide: waits for the cut, the same guide for the ♥ and *Select*, cut once.
+ * keptGuide: waits for the cut, the same guide for the ♥ and *Select*, cut once; a store that cannot write (the cut all
+ * the same, not stored; kept by a later call once it writes, without cutting again).
  * results: kept until read, so a ♥ finished after Pick a pose was left still tells its set.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -133,6 +136,50 @@ class PoseSaveViewModelTest {
         assertEquals(listOf("guide-1" to false), saved.saved.value.map { it.id to it.favorite })
         val (_, removed) = model.results.take(2).toList()
         assertEquals(PoseSaveResult("set-1", PoseSaveNotice.REMOVED), removed)
+    }
+
+    @Test
+    fun aFilledHeart_aStoreThatCannotChangeIt_staysFilledAndSaysItFailed() = runTest {
+        val stuck = StuckFavorites(SavedGuideStore.InMemory())
+        val stuckModel = PoseSaveViewModel(PoseLibrary(maker, stuck, CoroutineScope(dispatcher)), stuck)
+        store.put("stuck", stuckModel)
+        stuckModel.toggle(first, fakeBitmap())
+        runCurrent()
+        maker.finish(Result.success(generated("guide-1")))
+        runCurrent()
+
+        stuckModel.toggle(first, fakeBitmap())
+        runCurrent()
+
+        assertEquals(Heart.Saved("guide-1"), stuckModel.hearts.value[first])
+        assertEquals(listOf(true), stuck.saved.value.map { it.favorite })
+        val (_, failed) = stuckModel.results.take(2).toList()
+        assertEquals(PoseSaveResult("set-1", PoseSaveNotice.FAILED), failed)
+    }
+
+    @Test
+    fun keptGuide_aStoreThatCannotWrite_stillGivesTheCut_andALaterHeartKeepsIt() = runTest {
+        val full = FailingStore()
+        val fullLibrary = PoseLibrary(maker, full, CoroutineScope(dispatcher))
+        val guide = generated("guide-1")
+
+        val kept = async { fullLibrary.keep("set-1", "pose-1", fakeBitmap()).await() }
+        runCurrent()
+        maker.finish(Result.success(guide))
+        runCurrent()
+
+        // *Select* goes on with the pose, though the library could not write it.
+        val result = kept.await().getOrThrow()
+        assertSame(guide, result.cut)
+        assertFalse(result.stored)
+
+        // The storage writes again: a later call keeps the same guide, without cutting it out again.
+        full.writes = true
+        val again = fullLibrary.keep("set-1", "pose-1", fakeBitmap())
+        runCurrent()
+        assertTrue(again.await().getOrThrow().stored)
+        assertEquals(listOf("guide-1"), full.saved.value.map { it.id })
+        assertEquals("cut out once", 1, maker.sources.size)
     }
 
     @Test
@@ -277,9 +324,18 @@ class PoseSaveViewModelTest {
         }
     }
 
-    /** A library whose disk is full: nothing saves. */
-    private class FailingStore : SavedGuideStore by SavedGuideStore.InMemory() {
+    /** A library whose disk is full: nothing saves, until [writes]. */
+    private class FailingStore(private val inner: SavedGuideStore = SavedGuideStore.InMemory()) :
+        SavedGuideStore by inner {
+        var writes = false
+
         override suspend fun save(guide: ReferenceGuide, state: GuideState, favorite: Boolean): Result<SavedGuide> =
-            Result.failure(IOException("No space left"))
+            if (writes) inner.save(guide, state, favorite) else Result.failure(IOException("No space left"))
+    }
+
+    /** A library that can mark a favorite but not take it out again, as when its file cannot be renamed. */
+    private class StuckFavorites(private val inner: SavedGuideStore) : SavedGuideStore by inner {
+        override suspend fun setFavorite(id: String, favorite: Boolean): Result<Unit> =
+            if (favorite) inner.setFavorite(id, true) else Result.failure(IOException("rename failed"))
     }
 }

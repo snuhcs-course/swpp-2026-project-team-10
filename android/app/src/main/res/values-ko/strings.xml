@@ -247,8 +247,8 @@
     <string name="pose_page_counter_description">포즈 %2$d개 중 %1$d번째</string>
     <string name="select_pose">선택</string>
     <!-- ♥ on Pick a pose (FR-4.14): a candidate kept in this phone's library. -->
-    <string name="save_pose">이 포즈를 내 보관함에 저장</string>
-    <string name="remove_saved_pose">이 포즈를 내 보관함에서 빼기</string>
+    <string name="save_pose">이 포즈를 즐겨찾기에 추가</string>
+    <string name="remove_saved_pose">이 포즈를 즐겨찾기에서 빼기</string>
     <string name="pose_saved_notice">포즈를 내 보관함 즐겨찾기에 넣었어요.</string>
     <string name="pose_removed_notice">포즈를 즐겨찾기에서 뺐어요. 내 보관함에는 남아 있어요.</string>
     <string name="pose_no_person_notice">이 포즈에서 사람을 찾지 못했어요.</string>

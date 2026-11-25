@@ -28,8 +28,11 @@ class PoseLibrary(
     private val store: SavedGuideStore,
     private val scope: CoroutineScope,
 ) {
-    /** A candidate's guide as cut, and as kept. */
-    class Kept(val cut: ReferenceGuide, val saved: ReferenceGuide)
+    /**
+     * A candidate's guide as cut, and as turned for the library; [stored] is false while the library could not write it,
+     * which leaves *Select* working all the same.
+     */
+    class Kept(val cut: ReferenceGuide, val saved: ReferenceGuide, val stored: Boolean = true)
 
     private val lock = Any()
 
@@ -39,9 +42,10 @@ class PoseLibrary(
 
     /**
      * Keeps the candidate [poseId] of the set [setId], whose image is [image], of a scene photo held at [turn] for
-     * [situation]: once, so a later call for it, from the ♥ or *Select*, gets the same guide. It fails when no person is
-     * found in the candidate ([com.lastpenguin.pix.guide.NoPersonFoundException]) or the storage cannot be written. A
-     * guide the library deleted since is kept again.
+     * [situation]: once, so a later call for it, from the ♥ or *Select*, gets the same guide. It fails only when no
+     * person is found in the candidate ([com.lastpenguin.pix.guide.NoPersonFoundException]): a storage that cannot be
+     * written gives the guide with [Kept.stored] false, so the pose can still be used, and a later call tries the storage
+     * again. A guide the library deleted since is kept again.
      */
     fun keep(
         setId: String,
@@ -58,14 +62,15 @@ class PoseLibrary(
         val earlier = kept[poseId]
         val done = earlier?.let(::finished)
         // Still being kept, failed (no person), or still in the library: the same answer.
-        if (earlier != null && (done == null || store.saved.value.any { it.id == done.saved.id })) return earlier
+        val inLibrary = done != null && done.stored && store.saved.value.any { it.id == done.saved.id }
+        if (earlier != null && (done == null || inLibrary)) return earlier
         scope.async {
             try {
-                // Deleted in the library since: kept again as it was cut, with its id.
+                // Deleted in the library since, or not written: kept again as it was cut, with its id.
                 val cut = done?.cut ?: maker.make(image, GuideSource.GENERATED).getOrThrow().forSituation(situation)
                 val saved = done?.saved ?: cut.intoFrameHeldAt(turn)
-                store.save(saved, GuideState(guideId = saved.id), favorite = false).getOrThrow()
-                Result.success(Kept(cut, saved))
+                val stored = store.save(saved, GuideState(guideId = saved.id), favorite = false).isSuccess
+                Result.success(Kept(cut, saved, stored))
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {

@@ -944,12 +944,30 @@ class RtcSessionManagerTest {
     // ---- Reconnection (Design 2.6.7) -----------------------------------------------------------------------------
 
     @Test
+    fun `a dropped link keeps the photographer's name and the subject's role in Reconnecting`() = runTest {
+        val (manager, peer) = connectedSubject(token = "subject-token")
+
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+
+        assertEquals(
+            SessionState.Reconnecting("s_1", 0L, peer = PeerInfo("Dongje"), role = Role.SUBJECT),
+            manager.state.value,
+        )
+        manager.leave()
+    }
+
+    @Test
     fun `a dropped link puts the photographer in Reconnecting, takes its place again, and restarts ICE`() = runTest {
         val (manager, peer) = connectedPhotographer(token = "photographer-token")
 
         peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
         runCurrent()
-        assertEquals(SessionState.Reconnecting("s_1", 0L), manager.state.value)
+        // The state says whose session reconnects, as Connected did (#293).
+        assertEquals(
+            SessionState.Reconnecting("s_1", 0L, peer = PeerInfo("Joonhyung"), role = Role.PHOTOGRAPHER),
+            manager.state.value,
+        )
         // A new socket, even though the old one looked open.
         assertEquals(2, signaling.connectedUrls.size)
 
@@ -1429,7 +1447,10 @@ class RtcSessionManagerTest {
         // The friend stays through a dropped link, for a set started meanwhile (FR-4.11).
         peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
         runCurrent()
-        assertEquals(SessionState.Reconnecting("s_1", 0L, friend), manager.state.value)
+        assertEquals(
+            SessionState.Reconnecting("s_1", 0L, friend, PeerInfo("Joonhyung"), Role.PHOTOGRAPHER),
+            manager.state.value,
+        )
         manager.leave()
     }
 

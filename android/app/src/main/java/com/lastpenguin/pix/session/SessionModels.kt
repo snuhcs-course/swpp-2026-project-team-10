@@ -83,9 +83,17 @@ sealed interface SessionState {
 
     /**
      * Both phones: the link dropped while connected, and the session tries to restore it for up to 30 s from [since],
-     * a time on the session's clock (Design 2.4, 2.6.7; NFR-11). [partner] stays the friend of `Connected`.
+     * a time on the session's clock (Design 2.4, 2.6.7; NFR-11). [partner] stays the friend of `Connected`, and [peer]
+     * and [role] stay its too, so a reader that missed that `Connected`, as a state flow's reader can, still knows
+     * whose session reconnects (#293).
      */
-    data class Reconnecting(val sessionId: String, val since: Long, val partner: SessionPartner? = null) : SessionState
+    data class Reconnecting(
+        val sessionId: String,
+        val since: Long,
+        val partner: SessionPartner? = null,
+        val peer: PeerInfo? = null,
+        val role: Role? = null,
+    ) : SessionState
 
     data class Ended(val reason: EndReason) : SessionState
 }

@@ -478,6 +478,10 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
     }
 
+    /** The photographer's drop as the session says it: with the subject's name and this phone's role (#293). */
+    private val dropped =
+        SessionState.Reconnecting("s1", 0L, peer = PeerInfo("Joonhyung"), role = Role.PHOTOGRAPHER)
+
     @Test
     fun aDroppedLink_saysWhoThePhoneReconnectsWith_forTheWholeWait_untilTheLinkIsBack() {
         val modules = launch(FakeCameraController())
@@ -486,7 +490,7 @@ class CameraFragmentInteractionTest {
         idle()
         idleFor(CameraViewModel.NOTICE_MS)
 
-        modules.session.setState(SessionState.Reconnecting("s1", 0L))
+        modules.session.setState(dropped)
         idle()
         onScreen { controls, _ ->
             assertEquals(string(R.string.peer_reconnecting, "Joonhyung"), controls.noticeText.text.toString())
@@ -510,7 +514,7 @@ class CameraFragmentInteractionTest {
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
         idleFor(CameraViewModel.NOTICE_MS)
-        modules.session.setState(SessionState.Reconnecting("s1", 0L))
+        modules.session.setState(dropped)
         idle()
 
         // The session gives the wait up as it does: the subject is gone, then the room waits again.
@@ -533,7 +537,7 @@ class CameraFragmentInteractionTest {
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
         idleFor(CameraViewModel.NOTICE_MS)
-        modules.session.setState(SessionState.Reconnecting("s1", 0L))
+        modules.session.setState(dropped)
         idle()
 
         // A photo taken meanwhile that cannot be read is not sent, and says so.
@@ -565,7 +569,7 @@ class CameraFragmentInteractionTest {
         }
 
         // The drop ends the pinch too, whose line going must not take this one down.
-        modules.session.setState(SessionState.Reconnecting("s1", 0L))
+        modules.session.setState(dropped)
         idle()
         idleFor(SessionViewModel.ZOOMING_LINGER_MS + 100)
         onScreen { controls, _ ->

@@ -254,9 +254,6 @@ class SessionViewModel(
     /** Whether the last state was Connected, so another Connected of the same connection says nothing new. */
     private var wasConnected = false
 
-    /** This phone's role in the session that runs or reconnects, as its last Connected said it. */
-    private var liveRole: Role? = null
-
     private var connectedJob: Job? = null
 
     /** When this session's last "set the focus" notice began, by [clock]; null before the first. */
@@ -422,13 +419,10 @@ class SessionViewModel(
         if (state !is SessionState.Connected && !reconnecting) _mobileDataPending.value = false
         val connected = state as? SessionState.Connected
         if (connected != null) peerName = connected.peer.displayName
-        // Reconnecting says no role, so the one of the session it goes on is kept through the drop.
-        if (connected != null) {
-            liveRole = connected.role
-        } else if (!reconnecting) {
-            liveRole = null
-        }
-        _reconnectingWith.value = peerName.takeIf { reconnecting && liveRole == Role.PHOTOGRAPHER }
+        // From the state alone, never from what an earlier Connected said: a state flow may never show this reader
+        // that Connected, and the name kept from it could then be another session's (#293).
+        val dropped = state as? SessionState.Reconnecting
+        _reconnectingWith.value = dropped?.peer?.displayName.takeIf { dropped?.role == Role.PHOTOGRAPHER }
         val inSession = state is SessionState.Connecting || connected != null || reconnecting
 
         // Frames start while the peer connection is still being set up, so the first video arrives sooner, and go on

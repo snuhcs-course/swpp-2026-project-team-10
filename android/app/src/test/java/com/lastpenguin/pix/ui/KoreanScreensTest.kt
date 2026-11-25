@@ -348,7 +348,9 @@ class KoreanScreensTest {
         val modules = camera()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
         idle()
-        modules.session.setState(SessionState.Reconnecting("s1", 0L))
+        modules.session.setState(
+            SessionState.Reconnecting("s1", 0L, peer = PeerInfo("Test Account 2"), role = Role.PHOTOGRAPHER),
+        )
         idle()
         val root = screen()
         val notice = FragmentCameraBinding.bind(root).noticeText

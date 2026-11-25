@@ -797,7 +797,9 @@ class RtcSessionManager(
     private fun startReconnecting() {
         val id = sessionId ?: return
         val since = clock()
-        _state.value = SessionState.Reconnecting(id, since, partner)
+        // What Connected said goes on with the state, for a reader that never saw that Connected (#293).
+        val connected = _state.value as? SessionState.Connected
+        _state.value = SessionState.Reconnecting(id, since, partner, connected?.peer, connected?.role ?: role)
         if (drop == null) drop = role?.let { DropStart(it, elapsed()) }
         Timings.mark("session.reconnecting")
         clearLatency()

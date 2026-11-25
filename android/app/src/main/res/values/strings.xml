@@ -497,6 +497,7 @@
     <string name="subject_receiving_photo">Receiving photo…</string>
     <string name="subject_shutter">Take a photo with %1$s\'s camera</string>
     <string name="subject_shutter_refused">Can\'t take a photo right now</string>
+    <string name="subject_poses_asking">Waiting for %1$s to agree</string>
     <string name="subject_poses_started">%1$s takes the scene photo for the poses</string>
     <string name="subject_poses_refused">Can\'t start AI poses right now</string>
     <string name="leave">Leave</string>

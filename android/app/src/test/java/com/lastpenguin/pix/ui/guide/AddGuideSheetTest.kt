@@ -508,7 +508,7 @@ class AddGuideSheetTest {
         tile(Situation.LANDMARK).root.performClick()
         idle()
 
-        assertEquals(listOf(SessionMessage.PoseStart("landmark")), starts(modules))
+        assertEquals(listOf("landmark"), starts(modules).map { it.situation })
         // The scene photo is the photographer's to take: this phone's camera is not asked for one.
         assertEquals(GenerationUiState.Phase.IDLE, generation.uiState.value.phase)
         assertFalse(sheet.isAdded)
@@ -524,7 +524,7 @@ class AddGuideSheetTest {
         tile(Situation.SELFIE).root.performClick()
         idle()
 
-        assertEquals(listOf(SessionMessage.PoseStart("selfie")), starts(modules))
+        assertEquals(listOf("selfie"), starts(modules).map { it.situation })
     }
 
     @Test
@@ -553,7 +553,7 @@ class AddGuideSheetTest {
         idle()
 
         assertTrue(modules.consent.given)
-        assertEquals(listOf(SessionMessage.PoseStart("full_body")), starts(modules))
+        assertEquals(listOf("full_body"), starts(modules).map { it.situation })
         assertFalse(sheet.isAdded)
     }
 

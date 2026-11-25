@@ -483,20 +483,23 @@ sealed interface SessionMessage {
      * S → P: the subject picked a situation on its *Add a pose guide* (FR-6.15, #276). The photographer's phone begins
      * the scene photo for it, as if its own user had picked it, and answers with `pose.start.answer`. [situation] is
      * the situation's name on the server (`Situation.apiName`), kept a string so that a phone that does not know one
-     * refuses that request alone.
+     * refuses that request alone. [request] numbers this phone's requests, and each answer names its request.
      */
     @Serializable
     @SerialName("pose.start")
-    data class PoseStart(val situation: String) : SessionMessage
+    data class PoseStart(val situation: String, val request: Int = 0) : SessionMessage
 
     /**
-     * P → S: whether the scene photo's step began for the subject's `pose.start` (#276). False when the photographer's
-     * phone could not begin it: its Camera screen is not in front or already in a step, it has no front camera for a
-     * selfie, or its user did not agree to the AI notice. With that notice up, the answer comes when it is answered.
+     * P → S: whether the scene photo's step began for the subject's `pose.start` numbered [request] (#276). False when
+     * the photographer's phone could not begin it: its Camera screen is not in front or already in a step, it has no
+     * front camera for a selfie, or its user did not agree to the AI notice. While that notice is up, an answer with
+     * [asking] says so at once, so the subject's phone waits for the answer that follows and does not give the
+     * request up.
      */
     @Serializable
     @SerialName("pose.start.answer")
-    data class PoseStartAnswer(val started: Boolean) : SessionMessage
+    data class PoseStartAnswer(val started: Boolean, val request: Int = 0, val asking: Boolean = false) :
+        SessionMessage
 
     /**
      * What the photographer did on their own camera (P → S, #292): the subject's phone says it in a line, as the

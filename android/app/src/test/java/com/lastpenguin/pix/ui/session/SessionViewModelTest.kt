@@ -29,6 +29,7 @@ import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.PhotoContent
 import com.lastpenguin.pix.session.PhotoReader
 import com.lastpenguin.pix.session.PhotoSyncer
+import com.lastpenguin.pix.session.PoseStartStep
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionEntry
@@ -105,8 +106,11 @@ import org.junit.runner.RunWith
  * The subject's shutter (#314): taken through the Camera screen in front, a notice; with that screen gone, not taken
  * and no notice.
  * The subject starts AI poses (#276): on the photographer's phone, begun through the Camera screen in front, a notice,
- * and refused with that screen gone; on the subject's phone, the situation sent and its answer heard, begun or not,
- * and nothing sent without a link, which counts as refused.
+ * and refused with that screen gone; on the subject's phone, the situation sent with its own number and its answer
+ * heard, begun or not; no answer, refused after POSE_START_WAIT_MS (1 ms before / at it) and a late one unheard; the
+ * photographer asked, waited for without a limit; an earlier request's answer, not the new one's; an answer no screen
+ * read and a request that waits, both gone with their session; and nothing sent without a link, which counts as
+ * refused.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 // Robolectric for ProcessLifecycleOwner, which the ViewModel observes for the background limit.
@@ -890,7 +894,7 @@ class SessionViewModelTest {
         val asked = mutableListOf<Situation>()
         model.setRemotePoseStarter { situation, answer ->
             asked += situation
-            answer(true)
+            answer(PoseStartStep.STARTED)
         }
         runCurrent()
         notices.clear()
@@ -907,7 +911,7 @@ class SessionViewModelTest {
     fun onceTheCameraScreenIsGone_theSubjectsStartIsRefused() = runTest(dispatcher) {
         val notices = asPhotographerOf("Joonhyung")
         backgroundScope.launch { model.notices.collect { notices += it } }
-        val starter: (Situation, (Boolean) -> Unit) -> Unit = { _, answer -> answer(true) }
+        val starter: (Situation, (PoseStartStep) -> Unit) -> Unit = { _, answer -> answer(PoseStartStep.STARTED) }
         model.setRemotePoseStarter(starter)
         model.dropRemotePoseStarter(starter)
         runCurrent()
@@ -920,10 +924,17 @@ class SessionViewModelTest {
         assertEquals(SessionMessage.PoseStartAnswer(started = false), session.sent.last())
     }
 
-    private fun TestScope.poseStartAnswers(): MutableList<Boolean> {
-        val answers = mutableListOf<Boolean>()
+    private fun TestScope.poseStartAnswers(): MutableList<PoseStartStep> {
+        val answers = mutableListOf<PoseStartStep>()
         backgroundScope.launch { model.poseStartAnswers.collect { answers += it } }
         return answers
+    }
+
+    /** The request sent last, whose number its answers name. */
+    private fun asked(): SessionMessage.PoseStart = session.sent.filterIsInstance<SessionMessage.PoseStart>().last()
+
+    private fun answerPoses(started: Boolean, asking: Boolean = false, request: Int = asked().request) {
+        session.deliver(SessionMessage.PoseStartAnswer(started, request, asking))
     }
 
     @Test
@@ -934,17 +945,107 @@ class SessionViewModelTest {
 
         model.askForPoses(Situation.LANDMARK)
         runCurrent()
-        assertEquals(SessionMessage.PoseStart("landmark"), session.sent.last())
+        assertEquals("landmark", asked().situation)
         assertTrue(answers.isEmpty())
 
-        session.deliver(SessionMessage.PoseStartAnswer(started = true))
+        answerPoses(started = true)
         runCurrent()
-        assertEquals(listOf(true), answers)
+        assertEquals(listOf(PoseStartStep.STARTED), answers)
 
         model.askForPoses(Situation.SELFIE)
-        session.deliver(SessionMessage.PoseStartAnswer(started = false))
         runCurrent()
-        assertEquals(listOf(true, false), answers)
+        answerPoses(started = false)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.STARTED, PoseStartStep.REFUSED), answers)
+        // Each request has its own number.
+        assertEquals(2, session.sent.filterIsInstance<SessionMessage.PoseStart>().map { it.request }.distinct().size)
+    }
+
+    @Test
+    fun aStartWithoutAnAnswer_countsAsRefusedAfterItsWait_andNotBefore() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+
+        advanceTimeBy(SessionViewModel.POSE_START_WAIT_MS - 1)
+        runCurrent()
+        assertTrue(answers.isEmpty())
+        advanceTimeBy(1)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED), answers)
+
+        // The answer comes after all: the request was given up, and nothing more is said.
+        answerPoses(started = true)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED), answers)
+    }
+
+    @Test
+    fun whileThePhotographerIsAsked_theSubjectWaitsWithoutATimeLimit_forTheirAnswer() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+
+        // The AI notice is up on the photographer's phone, which says so at once.
+        answerPoses(started = false, asking = true)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.ASKING), answers)
+        // However long they read it.
+        advanceTimeBy(60_000)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.ASKING), answers)
+
+        answerPoses(started = true)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.ASKING, PoseStartStep.STARTED), answers)
+    }
+
+    @Test
+    fun anAnswerToAnEarlierRequest_isNotTheNewOnes() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+        val first = asked().request
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+
+        answerPoses(started = false, request = first)
+        runCurrent()
+        assertTrue(answers.isEmpty())
+
+        answerPoses(started = true)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.STARTED), answers)
+    }
+
+    @Test
+    fun anAnswerNoScreenRead_andARequestThatWaits_goWithTheirSession() = runTest(dispatcher) {
+        // No screen reads the answers: Subject view is under Settings.
+        connected()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+        answerPoses(started = true)
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+
+        // The session ends, and another begins with another photographer.
+        session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        runCurrent()
+        session.setState(SessionState.Connected("s2", PeerInfo("Sungmin"), Role.SUBJECT))
+        runCurrent()
+        val answers = poseStartAnswers()
+        advanceTimeBy(SessionViewModel.POSE_START_WAIT_MS + 1)
+        runCurrent()
+
+        // Neither the old session's answer nor its request's time limit says anything in the new one.
+        assertTrue(answers.isEmpty())
     }
 
     @Test
@@ -959,7 +1060,7 @@ class SessionViewModelTest {
         runCurrent()
 
         assertTrue(session.sent.none { it is SessionMessage.PoseStart })
-        assertEquals(listOf(false), answers)
+        assertEquals(listOf(PoseStartStep.REFUSED), answers)
     }
 
     /** A drop as the session says it: with the other phone's name and this phone's role (#293). */

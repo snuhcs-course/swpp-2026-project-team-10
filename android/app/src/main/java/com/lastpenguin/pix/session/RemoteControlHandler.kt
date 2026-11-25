@@ -25,6 +25,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
+/**
+ * What became of the situation the subject picked for AI poses, on the photographer's phone (FR-6.15, #276): its user
+ * is [ASKING]ed to agree to the AI notice first, the scene photo's step [STARTED], or the start was [REFUSED].
+ */
+enum class PoseStartStep { ASKING, STARTED, REFUSED }
+
 /** A remote action the photographer's phone applied, for the notice "Joonhyung set zoom to 2×" (FR-7.4). */
 sealed interface RemoteAction {
     data class Zoom(val ratio: Float) : RemoteAction
@@ -122,7 +128,7 @@ class RemoteControlHandler(
      * whether it began: at once, or once the photographer answered the AI notice. The Camera screen sets it while it
      * is in front, as it does [shutter]; null otherwise.
      */
-    var poseStarter: ((Situation, (Boolean) -> Unit) -> Unit)? = null
+    var poseStarter: ((Situation, (PoseStartStep) -> Unit) -> Unit)? = null
 
     private val _actions = MutableSharedFlow<RemoteAction>(extraBufferCapacity = 16)
 
@@ -237,22 +243,29 @@ class RemoteControlHandler(
 
     /**
      * `pose.start`: the Camera screen begins the scene photo for the subject's situation, if it is in front and can
-     * (FR-6.15, #276). Every request is answered, a refusal at once and a start when it began, which waits for the
-     * photographer when the AI notice is up; an answer that comes once this session is over tells no one.
+     * (FR-6.15, #276). Every request is answered, by its number: a refusal at once, and a start when it began. That
+     * waits for the photographer when the AI notice is up, which the subject's phone is told at once, so that it does
+     * not give the request up. An answer that comes once this session is over tells no one.
      */
     private fun handlePoseStart(request: SessionMessage.PoseStart) {
         val situation = Situation.named(request.situation)
         val starter = poseStarter
         // The session this request came in, which may be over when the photographer answers the notice.
         val asked = scope
-        val answer = { started: Boolean ->
-            if (asked != null && scope === asked) {
-                Timings.mark("poses.remote", if (started) "started" else "refused")
-                session.send(SessionMessage.PoseStartAnswer(started))
+        var decided = false
+        val answer = { step: PoseStartStep ->
+            // One last answer, and none once this session is over.
+            if (!decided && asked != null && scope === asked) {
+                decided = step != PoseStartStep.ASKING
+                val started = step == PoseStartStep.STARTED
+                Timings.mark("poses.remote", step.name.lowercase())
+                session.send(
+                    SessionMessage.PoseStartAnswer(started, request.request, asking = step == PoseStartStep.ASKING),
+                )
                 if (started) _actions.tryEmit(RemoteAction.PoseStart)
             }
         }
-        if (situation == null || starter == null) answer(false) else starter(situation, answer)
+        if (situation == null || starter == null) answer(PoseStartStep.REFUSED) else starter(situation, answer)
     }
 
     /**

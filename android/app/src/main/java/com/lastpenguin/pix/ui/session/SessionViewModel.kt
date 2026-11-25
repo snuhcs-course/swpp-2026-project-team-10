@@ -22,6 +22,7 @@ import com.lastpenguin.pix.session.GuideSyncer
 import com.lastpenguin.pix.session.IcePath
 import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.PhotoSyncer
+import com.lastpenguin.pix.session.PoseStartStep
 import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteAction
 import com.lastpenguin.pix.session.RemoteControlHandler
@@ -171,6 +172,23 @@ class SessionViewModel(
      * wait up, which [SessionNotice.PeerGone] then says.
      */
     val reconnectingWith: StateFlow<String?> = _reconnectingWith.asStateFlow()
+
+    private val _poseStartAnswers = Channel<PoseStartStep>(Channel.BUFFERED)
+
+    /** How many times this phone asked for AI poses, the number of its last request; and the request that waits. */
+    private var poseRequests = 0
+    private var poseRequestWaiting: Int? = null
+
+    /** Runs while a request waits for the photographer's phone to say anything ([POSE_START_WAIT_MS]). */
+    private var poseStartWait: Job? = null
+
+    /**
+     * Subject: what became of each situation this phone picked for AI poses (FR-6.15, #276): the photographer's phone
+     * began the scene photo, could not, or asks its user to agree first, after which one of the two follows. No word
+     * within [POSE_START_WAIT_MS], and nothing that could be asked, count as refused. Subject view says each in a
+     * line; buffered, so one that comes under another screen is said when Subject view is back, in the same session.
+     */
+    val poseStartAnswers: Flow<PoseStartStep> = _poseStartAnswers.receiveAsFlow()
 
     private val _remoteFocus = MutableSharedFlow<RemoteFocus>(extraBufferCapacity = 16)
 
@@ -431,6 +449,7 @@ class SessionViewModel(
         val dropped = state as? SessionState.Reconnecting
         _reconnectingWith.value = dropped?.peer?.displayName.takeIf { dropped?.role == Role.PHOTOGRAPHER }
         val inSession = state is SessionState.Connecting || connected != null || reconnecting
+        if (!inSession) forgetPoseStarts()
 
         // Frames start while the peer connection is still being set up, so the first video arrives sooner, and go on
         // while it reconnects, so the video comes back with the link (Design 2.6.7).
@@ -670,23 +689,14 @@ class SessionViewModel(
      * The Camera screen, while it is in front, begins the scene photo for the situation the subject picked (FR-6.15,
      * #276), and says whether it began; null once it is not, and a request is then answered as not begun.
      */
-    fun setRemotePoseStarter(starter: ((Situation, (Boolean) -> Unit) -> Unit)?) {
+    fun setRemotePoseStarter(starter: ((Situation, (PoseStartStep) -> Unit) -> Unit)?) {
         remoteControl.poseStarter = starter
     }
 
     /** [starter]'s screen is no longer in front; a screen that came after it keeps its own. */
-    fun dropRemotePoseStarter(starter: (Situation, (Boolean) -> Unit) -> Unit) {
+    fun dropRemotePoseStarter(starter: (Situation, (PoseStartStep) -> Unit) -> Unit) {
         if (remoteControl.poseStarter === starter) remoteControl.poseStarter = null
     }
-
-    private val _poseStartAnswers = Channel<Boolean>(Channel.BUFFERED)
-
-    /**
-     * Subject: what became of each situation this phone picked for AI poses (FR-6.15, #276): true once the
-     * photographer's phone began the scene photo, false when it could not or nothing could be asked. Subject view says
-     * it in a line; buffered, so one that comes under another screen is said when Subject view is back.
-     */
-    val poseStartAnswers: Flow<Boolean> = _poseStartAnswers.receiveAsFlow()
 
     /**
      * Subject: asks the photographer's phone to begin AI poses for [situation] (FR-6.15, #276). The photographer takes
@@ -696,10 +706,47 @@ class SessionViewModel(
         val connected = state.value as? SessionState.Connected
         if (connected?.role != Role.SUBJECT) {
             // Nothing can be asked: the link dropped while the sheet was open.
-            _poseStartAnswers.trySend(false)
+            _poseStartAnswers.trySend(PoseStartStep.REFUSED)
             return
         }
-        session.send(SessionMessage.PoseStart(situation.apiName))
+        // Numbered, so only its own answers count: an earlier request's, come late, is not this one's.
+        val request = ++poseRequests
+        poseRequestWaiting = request
+        session.send(SessionMessage.PoseStart(situation.apiName, request))
+        poseStartWait?.cancel()
+        poseStartWait = viewModelScope.launch {
+            delay(POSE_START_WAIT_MS)
+            // No word of it in time, not even that the photographer is asked: as far as this phone knows, nothing began.
+            if (poseRequestWaiting == request) {
+                poseRequestWaiting = null
+                _poseStartAnswers.trySend(PoseStartStep.REFUSED)
+            }
+        }
+    }
+
+    /** What the photographer's phone says of the request that waits; any other request's answer is dropped. */
+    private fun onPoseStartAnswer(answer: SessionMessage.PoseStartAnswer) {
+        if (answer.request != poseRequestWaiting) return
+        poseStartWait?.cancel()
+        poseStartWait = null
+        if (answer.asking) {
+            // The photographer reads the AI notice: the request waits for their answer, however long that takes.
+            _poseStartAnswers.trySend(PoseStartStep.ASKING)
+            return
+        }
+        poseRequestWaiting = null
+        _poseStartAnswers.trySend(if (answer.started) PoseStartStep.STARTED else PoseStartStep.REFUSED)
+    }
+
+    /**
+     * The session is over: its request no longer waits, and an answer no screen read is not said in the next session,
+     * whose photographer is another.
+     */
+    private fun forgetPoseStarts() {
+        poseStartWait?.cancel()
+        poseStartWait = null
+        poseRequestWaiting = null
+        while (_poseStartAnswers.tryReceive().isSuccess) Unit
     }
 
     /** [taker]'s screen is no longer in front; a screen that came after it keeps its own. */
@@ -709,7 +756,7 @@ class SessionViewModel(
 
     private fun onMessage(message: SessionMessage) {
         if (message is SessionMessage.PoseStartAnswer) {
-            _poseStartAnswers.trySend(message.started)
+            onPoseStartAnswer(message)
             return
         }
         if (message !is SessionMessage.Leave) return
@@ -732,6 +779,12 @@ class SessionViewModel(
          * wait for the camera (`RemoteControlHandler.ECHO_TIMEOUT_MS`), so the line holds until the ratio's notice.
          */
         const val ZOOMING_LINGER_MS = 1_000L
+
+        /**
+         * How long the subject's start of AI poses waits for the photographer's phone to say anything (#276). That
+         * phone answers at once, also that its user is being asked, so this is the link's time alone.
+         */
+        const val POSE_START_WAIT_MS = 2_000L
 
         private const val BACKGROUND_LIMIT_MS = 60_000L
 

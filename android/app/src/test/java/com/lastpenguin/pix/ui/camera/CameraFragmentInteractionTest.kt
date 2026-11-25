@@ -684,7 +684,8 @@ class CameraFragmentInteractionTest {
         val words = notice.findViewById<TextView>(android.R.id.message)!!.text.toString()
         assertTrue(words, words.contains(string(R.string.pose_start_asked, "Joonhyung")))
         assertTrue(words, words.contains(string(R.string.consent_message)))
-        assertTrue(startAnswers(modules).isEmpty())
+        // The subject's phone hears at once that this phone's user is asked, so it does not give the request up.
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false, asking = true)), startAnswers(modules))
         assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
 
         notice.getButton(DialogInterface.BUTTON_POSITIVE).performClick()
@@ -692,7 +693,8 @@ class CameraFragmentInteractionTest {
 
         assertTrue(modules.consent.given)
         assertEquals(GenerationUiState.Phase.FRAMING, generation().uiState.value.phase)
-        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = true)), startAnswers(modules))
+        assertEquals(SessionMessage.PoseStartAnswer(started = true), startAnswers(modules).last())
+        assertEquals(2, startAnswers(modules).size)
     }
 
     @Test
@@ -703,16 +705,23 @@ class CameraFragmentInteractionTest {
         idle()
 
         // A second request while the notice is up is refused at once: one question at a time.
-        modules.session.deliver(SessionMessage.PoseStart("landmark"))
+        modules.session.deliver(SessionMessage.PoseStart("landmark", request = 2))
         idle()
-        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers(modules))
+        assertEquals(SessionMessage.PoseStartAnswer(started = false, request = 2), startAnswers(modules).last())
 
         (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
         idle()
 
         assertFalse(modules.consent.given)
         assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
-        assertEquals(2, startAnswers(modules).count { !it.started })
+        // The first request: asked, then refused.
+        assertEquals(
+            listOf(
+                SessionMessage.PoseStartAnswer(started = false, asking = true),
+                SessionMessage.PoseStartAnswer(started = false),
+            ),
+            startAnswers(modules).filter { it.request == 0 },
+        )
     }
 
     @Test

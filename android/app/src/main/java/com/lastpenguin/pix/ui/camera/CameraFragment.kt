@@ -68,6 +68,7 @@ import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.session.EndReason
+import com.lastpenguin.pix.session.PoseStartStep
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.Motion
@@ -394,7 +395,7 @@ class CameraFragment :
                 launch {
                     val taker = { takeForSubject(controls) }
                     // And it begins the scene photo for the situation the subject picked (FR-6.15, #276).
-                    val starter = { situation: Situation, answer: (Boolean) -> Unit ->
+                    val starter = { situation: Situation, answer: (PoseStartStep) -> Unit ->
                         startPosesForSubject(situation, answer)
                     }
                     sessionViewModel.setRemoteShutter(taker)
@@ -1940,13 +1941,15 @@ class CameraFragment :
      * so is a selfie on a phone without a front camera. This phone sends the photo, so without its user's agreement (FR-4.2) the notice asks
      * first, saying who wants the poses; the step begins once they agree, and "Not now" refuses.
      */
-    private fun startPosesForSubject(situation: Situation, answer: (Boolean) -> Unit) {
+    private fun startPosesForSubject(situation: Situation, answer: (PoseStartStep) -> Unit) {
         val free = cameraInFront() && !isScenePhotoActive() && askedForSubject == null
-        if (!free || !generationViewModel.chooseSituation(situation)) return answer(false)
+        if (!free || !generationViewModel.chooseSituation(situation)) return answer(PoseStartStep.REFUSED)
         if (!generationViewModel.needsConsent) {
             generationViewModel.beginScene()
-            return answer(true)
+            return answer(PoseStartStep.STARTED)
         }
+        // The subject's phone hears that the question is up, and waits for its answer however long it takes.
+        answer(PoseStartStep.ASKING)
         val name = (sessionViewModel.state.value as? SessionState.Connected)?.peer?.displayName
         val words = listOfNotNull(
             name?.let { getString(R.string.pose_start_asked, it) },
@@ -1960,12 +1963,12 @@ class CameraFragment :
                 agreed = true
                 generationViewModel.onConsentGiven()
                 generationViewModel.beginScene()
-                answer(true)
+                answer(PoseStartStep.STARTED)
             }
             .setNegativeButton(R.string.not_now, null)
             .setOnDismissListener {
                 askedForSubject = null
-                if (!agreed) answer(false)
+                if (!agreed) answer(PoseStartStep.REFUSED)
             }
             .show()
     }

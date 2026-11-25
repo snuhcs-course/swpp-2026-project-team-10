@@ -103,6 +103,7 @@ import com.lastpenguin.pix.ui.session.InviteSentSheet
 import com.lastpenguin.pix.ui.session.JoinCodeFragment
 import com.lastpenguin.pix.ui.session.RoomCodeSheet
 import com.lastpenguin.pix.ui.session.SessionNotFoundFragment
+import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.session.ShadowSurfaceViewRenderer
 import com.lastpenguin.pix.ui.session.ShootTogetherSheet
 import com.lastpenguin.pix.ui.session.SubjectConfirmFragment
@@ -1095,11 +1096,19 @@ class KoreanScreensTest {
         modules.video.deliverFrame()
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
 
-        for (started in listOf(true, false)) {
-            modules.session.deliver(SessionMessage.PoseStartAnswer(started))
+        // Asked to agree, begun, and not begun: each answers a request this phone made.
+        for ((started, asking) in listOf(false to true, true to false, false to false)) {
+            scenario!!.onFragment { it.requireActivity().viewModel<SessionViewModel>().askForPoses(Situation.DEFAULT) }
+            idle()
+            val request = modules.session.sent.filterIsInstance<SessionMessage.PoseStart>().last().request
+            modules.session.deliver(SessionMessage.PoseStartAnswer(started, request, asking))
             idle()
             val root = screen()
-            assertEquals("started $started", true, FragmentSubjectBinding.bind(root).toggleLabel.isShown)
+            assertEquals(
+                "started $started, asking $asking",
+                true,
+                FragmentSubjectBinding.bind(root).toggleLabel.isShown,
+            )
             assertKorean(root, *people)
         }
     }

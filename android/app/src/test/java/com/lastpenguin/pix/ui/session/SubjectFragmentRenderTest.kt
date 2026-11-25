@@ -26,6 +26,7 @@ import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.FakePoseCandidateCodec
 import com.lastpenguin.pix.session.GuideReference
@@ -43,6 +44,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
+import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.camera.ExposureBarView
 import com.lastpenguin.pix.ui.camera.ExposureScale
@@ -121,7 +123,7 @@ import org.robolectric.shadows.ShadowDialog
  * answered taken (free, no line), not taken (free, a line for a label's time), and not answered (the line after the
  * wait).
  * This phone's start of AI poses (FR-6.15, #276): the answer said where the lines show, begun (who takes the scene
- * photo) or not.
+ * photo), not begun, or the photographer asked to agree first; no answer, said after the wait.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -766,13 +768,23 @@ class SubjectFragmentRenderTest {
 
     // ---- This phone starts AI poses (FR-6.15, #276) --------------------------------------------------------------
 
+    /** This phone picks a situation, as its sheet does, and the photographer's phone answers that request. */
+    private fun askAndAnswer(modules: TestAppContainer, started: Boolean, asking: Boolean = false) {
+        onScreen { _, fragment ->
+            fragment.requireActivity().viewModel<SessionViewModel>().askForPoses(Situation.FULL_BODY)
+        }
+        idle()
+        val request = modules.session.sent.filterIsInstance<SessionMessage.PoseStart>().last().request
+        modules.session.deliver(SessionMessage.PoseStartAnswer(started, request, asking))
+        idle()
+    }
+
     @Test
     fun aSituationThePhotographersPhoneTookUp_saysWhoTakesTheScenePhoto() {
         val modules = launch()
         connectWithVideo(modules)
 
-        modules.session.deliver(SessionMessage.PoseStartAnswer(started = true))
-        idle()
+        askAndAnswer(modules, started = true)
 
         assertEquals(string(R.string.subject_poses_started, "Dongje") to true, label())
         waitMs(SubjectFragment.LABEL_MS + 100)
@@ -784,8 +796,32 @@ class SubjectFragmentRenderTest {
         val modules = launch()
         connectWithVideo(modules)
 
-        modules.session.deliver(SessionMessage.PoseStartAnswer(started = false))
+        askAndAnswer(modules, started = false)
+
+        assertEquals(string(R.string.subject_poses_refused) to true, label())
+    }
+
+    @Test
+    fun whileThePhotographerIsAskedToAgree_theSubjectIsToldTheyWait() {
+        val modules = launch()
+        connectWithVideo(modules)
+
+        askAndAnswer(modules, started = false, asking = true)
+
+        assertEquals(string(R.string.subject_poses_asking, "Dongje") to true, label())
+    }
+
+    @Test
+    fun aSituationThatGetsNoAnswer_saysAfterItsWaitThatThePosesCannotStart() {
+        val modules = launch()
+        connectWithVideo(modules)
+        onScreen { _, fragment ->
+            fragment.requireActivity().viewModel<SessionViewModel>().askForPoses(Situation.FULL_BODY)
+        }
         idle()
+        assertFalse(label().second)
+
+        waitMs(SessionViewModel.POSE_START_WAIT_MS + 100)
 
         assertEquals(string(R.string.subject_poses_refused) to true, label())
     }

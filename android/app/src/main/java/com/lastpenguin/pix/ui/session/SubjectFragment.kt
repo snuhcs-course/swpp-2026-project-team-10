@@ -40,6 +40,7 @@ import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.PhotographerAction
+import com.lastpenguin.pix.session.PoseStartStep
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.settings.TutorialScreen
@@ -411,9 +412,22 @@ class SubjectFragment :
                 launch { viewModel.photographerLines.collect { showPhotographerLine(binding, it) } }
                 launch {
                     // What became of the situation this phone picked for AI poses (FR-6.15, #276): the photographer
-                    // takes the scene photo next, or their phone could not begin.
-                    sessionViewModel.poseStartAnswers.collect { started ->
+                    // takes the scene photo next, is asked to agree first, or their phone could not begin.
+                    sessionViewModel.poseStartAnswers.collect { step ->
+                        val started = step == PoseStartStep.STARTED
                         val name = viewModel.uiState.value.photographerName
+                        if (step == PoseStartStep.ASKING) {
+                            // Their phone shows the AI notice first: this one waits, and says so.
+                            if (name != null) {
+                                showToggleLabel(
+                                    binding,
+                                    getString(R.string.subject_poses_asking, name),
+                                    R.drawable.ic_sparkle,
+                                    R.color.pix_text,
+                                )
+                            }
+                            return@collect
+                        }
                         if (started && name != null) {
                             showToggleLabel(
                                 binding,

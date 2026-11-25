@@ -462,6 +462,7 @@
     <string name="subject_receiving_photo">사진 받는 중…</string>
     <string name="subject_shutter">%1$s님의 카메라로 사진 찍기</string>
     <string name="subject_shutter_refused">지금은 사진을 찍을 수 없어요</string>
+    <string name="subject_poses_asking">%1$s님의 동의를 기다리고 있어요</string>
     <string name="subject_poses_started">%1$s님이 배경 사진을 찍으면 포즈를 만들어요</string>
     <string name="subject_poses_refused">지금은 AI 포즈를 시작할 수 없어요</string>
     <string name="leave">나가기</string>

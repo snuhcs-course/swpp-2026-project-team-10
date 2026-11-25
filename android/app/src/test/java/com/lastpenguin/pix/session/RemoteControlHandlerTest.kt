@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraStatus
@@ -27,7 +27,7 @@ import org.junit.Test
  * drag's request still outstanding, which keeps its own answer; the tap's answer marked as such, and no other echo
  * of the subject's (a brightness set after the tap); a base the camera does not apply, answered with the current
  * state after the wait and then forgotten, so a later change to that value is the photographer's. The photographer's
- * own focus (`camera.focus`): told
+ * own focus (`camera.focus`) and timer's countdown (`camera.timer`, FR-1.17): told
  * to the subject while the session runs, and to no one before it starts or after it stops.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -811,6 +811,28 @@ class RemoteControlHandlerTest {
         handler.stop()
         session.sent.clear()
         handler.didHere(PhotographerAction.GuideMove)
+        assertTrue(session.sent.isEmpty())
+    }
+
+    @Test
+    fun `the photographer's countdown is told to the subject only while the session runs`() = runTest {
+        handler.countdownHere(3)
+        assertTrue(session.sent.isEmpty())
+
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+        handler.countdownHere(3)
+        handler.countdownHere(0)
+        assertEquals(
+            listOf<SessionMessage>(SessionMessage.Countdown(3), SessionMessage.Countdown(0)),
+            session.sent.toList(),
+        )
+
+        handler.stop()
+        session.sent.clear()
+        handler.countdownHere(2)
         assertTrue(session.sent.isEmpty())
     }
 

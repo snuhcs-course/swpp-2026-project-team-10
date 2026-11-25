@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The camera menu's button (FR-1.17): a faint tile while the menu is open (activated). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/camera_option_selected" android:state_activated="true" />
+    <item android:color="@android:color/transparent" />
+</selector>

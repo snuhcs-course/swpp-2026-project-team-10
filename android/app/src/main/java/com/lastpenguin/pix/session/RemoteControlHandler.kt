@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraController
@@ -192,6 +192,16 @@ class RemoteControlHandler(
         if (scope == null) return
         session.send(action.toMessage())
         Timings.mark("did.told", action.toMessage().action)
+    }
+
+    /**
+     * The photographer's timer has [left] seconds before its photo, or 0 as it ends (FR-1.17): the subject's phone
+     * shows the countdown too. Only while a session runs.
+     */
+    fun countdownHere(left: Int) {
+        if (scope == null) return
+        session.send(SessionMessage.Countdown(left))
+        Timings.mark("timer.told", "$left")
     }
 
     /** Handles the subject's requests; other messages are ignored. */

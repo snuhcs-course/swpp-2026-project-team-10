@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -83,8 +83,10 @@ private const val SCENE_PANEL_OVER_IMAGE_DP = 16
  * The camera screens' layout on the Galaxy S22's app area, 360 x 705 dp (R&S 6.2, 6.6; Testing Documentation 2.1.6).
  * Ratios: 4:3, 16:9, and 1:1, each with the preview right below the top bar, the shutter's row in one place, and the
  * zoom row at the bottom of the image; 16:9 with every control of that row above the image's bottom edge. States of
- * the top bar: no guide, a guide with a pose tip, and a session, at font scale 1 and 1.3, none overlapping. The camera
- * switch between the shutter and the gallery button (FR-1.14). A guide's
+ * the top bar: no guide, a guide with a pose tip, a session, and the flash and the timer on beside the camera menu's
+ * button (FR-1.17), at font scale 1 and 1.3, none overlapping. The camera switch in the top bar (FR-1.14), and the
+ * gallery button as far right of the shutter as Guide is left of it. The camera menu under the top bar, each item taking
+ * taps on 48 dp, with its labels whole at font scale 1.3 (FR-1.17; in Korean: KoreanScreensTest). A guide's
  * panel in the space below a 4:3 image. The frame held while the ratio changes, moved with the scene into the new
  * ratio's area as the camera rebinds (Iter3-A12; until then it kept its place and the old ratio's area until the new
  * one streamed); a held 1:1 frame dimmed once. The ratios under the top bar, in their shapes, each taking taps on 48 dp.
@@ -311,7 +313,7 @@ class CameraLayoutTest {
         val screen = camera()
         val bar = screen.controls.topBar.box()
         val image = screen.controls.previewContainer.box().top
-        val icon = (screen.controls.flashButton as MaterialButton).iconSize
+        val icon = (screen.controls.cameraMenuButton as MaterialButton).iconSize
         val generation = screen.activity.viewModel<GenerationViewModel>()
 
         generation.beginScene()
@@ -488,7 +490,6 @@ class CameraLayoutTest {
         for (view in listOf(
             screen.controls.guideButton,
             screen.controls.shutterButton,
-            screen.controls.switchCameraButton,
             screen.controls.galleryButton,
         )) {
             assertTrue(
@@ -500,18 +501,60 @@ class CameraLayoutTest {
     }
 
     @Test
-    fun theCameraSwitch_sitsBetweenTheShutterAndTheGallery_onTheirCenterLine() {
+    fun theCameraSwitch_isInTheTopBar_beforeShootTogether() {
         val screen = camera()
 
-        val shutter = screen.controls.shutterButton.box()
+        val bar = screen.controls.topBar.box()
         val switch = screen.controls.switchCameraButton.box()
+        val together = screen.controls.shootTogetherButton.box()
+
+        assertTrue("$switch in $bar", screen.controls.switchCameraButton.isShown && bar.contains(switch))
+        assertTrue("$switch before $together", switch.right <= together.left)
+    }
+
+    @Test
+    fun theGallery_isAsFarRightOfTheShutterAsGuideIsLeftOfIt_onTheShuttersCenterLine() {
+        val screen = camera()
+
+        val guide = screen.controls.guideButton.box()
+        val shutter = screen.controls.shutterButton.box()
         val gallery = screen.controls.galleryButton.box()
 
-        assertTrue("$switch after $shutter", switch.left > shutter.right)
-        assertTrue("$switch before $gallery", switch.right <= gallery.left)
-        assertTrue("$gallery inside the screen", gallery.right <= 360)
-        assertEquals(shutter.centerY(), switch.centerY())
+        assertEquals(
+            (shutter.centerX() - guide.centerX()).toFloat(),
+            (gallery.centerX() - shutter.centerX()).toFloat(),
+            1f,
+        )
         assertEquals(shutter.centerY(), gallery.centerY())
+    }
+
+    @Test
+    fun theCameraMenu_isUnderTheTopBar_eachItemTakingTapsOn48Dp_withItsLabelWhole_atFontScale1_3() {
+        val screen = camera(fontScale = 1.3f)
+        screen.controls.cameraMenuButton.performClick()
+        idle()
+
+        val menu = screen.controls.cameraMenu
+        val bar = screen.controls.topBar.box()
+        assertTrue(menu.isShown)
+        assertTrue("${menu.box()} under $bar", menu.box().top >= bar.bottom - TOP_BAR_OVERHANG_DP.toInt())
+        val items = listOf(
+            screen.controls.menuFlash,
+            screen.controls.menuTimer,
+            screen.controls.menuGrid,
+            screen.controls.menuLevel,
+            screen.controls.menuSettings,
+        )
+        for (item in items) {
+            val box = item.box()
+            val name = item.resources.getResourceEntryName(item.id)
+            assertTrue("$name $box", box.width() >= 48 && box.height() >= 48)
+            assertTrue("$name in the menu", menu.box().contains(box))
+            val label = (item as ViewGroup).getChildAt(1) as TextView
+            assertEquals("$name on one line", 1, label.lineCount)
+            assertTrue("$name's label whole", label.paint.measureText(label.text.toString()) <= label.width + 0.5f)
+        }
+        assertTrue(items.zipWithNext().all { (a, b) -> a.box().right <= b.box().left })
     }
 
     @Test
@@ -664,12 +707,15 @@ class CameraLayoutTest {
     private fun Camera.assertTopBarFits(state: String) {
         val bar = controls.topBar.box()
         val shown = listOf(
-            controls.flashButton,
+            controls.cameraMenuButton,
+            controls.flashIndicator,
+            controls.timerIndicator,
             controls.aspectButton,
+            controls.switchCameraButton,
             controls.shootTogetherButton,
             controls.endSessionButton,
         ).filter { it.isShown }.map { it.resources.getResourceEntryName(it.id) to it.box() }
-        assertTrue(state, shown.size >= 3)
+        assertTrue(state, shown.size >= 4)
         for ((name, box) in shown) assertTrue("$state: $name inside the bar", bar.contains(box))
         for (i in shown.indices) {
             for (j in i + 1 until shown.size) {
@@ -689,6 +735,8 @@ class CameraLayoutTest {
         screen.assertTopBarFits("a guide with a tip")
         screen.session()
         screen.assertTopBarFits("a session")
+        screen.flashAndTimerOn()
+        screen.assertTopBarFits("the flash and the timer on, in a session")
     }
 
     @Test
@@ -698,6 +746,22 @@ class CameraLayoutTest {
         screen.assertTopBarFits("a guide with a tip, font 1.3")
         screen.session()
         screen.assertTopBarFits("a session, font 1.3")
+        screen.flashAndTimerOn()
+        screen.assertTopBarFits("the flash and the timer on, in a session, font 1.3")
+    }
+
+    /** The flash on and the timer at 10 s through the camera menu (FR-1.17), which then closes. */
+    private fun Camera.flashAndTimerOn() {
+        controls.cameraMenuButton.performClick()
+        idle()
+        repeat(2) {
+            controls.menuFlash.performClick()
+            controls.menuTimer.performClick()
+            idle()
+        }
+        controls.cameraMenuButton.performClick()
+        idle()
+        assertTrue(controls.flashIndicator.isShown && controls.timerIndicator.isShown)
     }
 
     // ---- The zoom readout -------------------------------------------------------------------

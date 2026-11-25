@@ -25,6 +25,20 @@
         <item name="android:textColor">@color/pix_text</item>
     </style>
 
+    <!-- The shutter's countdown over the image (FR-1.17): large enough to read from where the people in the photo stand,
+         with a shadow so it shows on a bright scene. -->
+    <style name="TextAppearance.Pix.Countdown" parent="TextAppearance.Material3.DisplayLarge">
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_extrabold</item>
+        <item name="fontFamily">@font/pix_extrabold</item>
+        <item name="android:textSize">120sp</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textColor">@color/pix_text</item>
+        <item name="android:shadowColor">@color/camera_dim</item>
+        <item name="android:shadowDy">4</item>
+        <item name="android:shadowRadius">24</item>
+    </style>
+
     <style name="TextAppearance.Pix.Header" parent="TextAppearance.Material3.TitleMedium">
         <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
         <item name="android:fontFamily">@font/pix_bold</item>
@@ -358,6 +372,47 @@
         <item name="fontFamily">@font/pix_semibold</item>
         <item name="android:textColor">@color/aspect_option</item>
         <item name="android:textSize">8sp</item>
+    </style>
+
+    <!-- An item of the camera menu under the top bar (FR-1.17): its icon over a one-word label, in a 48 dp wide, 64 dp
+         tall touch area (NFR-16); both in the accent while what it sets is on (activated). -->
+    <style name="Widget.Pix.CameraMenuOption" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">64dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:minWidth">48dp</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:gravity">center</item>
+        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <style name="Widget.Pix.CameraMenuOption.Icon" parent="">
+        <item name="android:layout_width">24dp</item>
+        <item name="android:layout_height">24dp</item>
+        <item name="android:duplicateParentState">true</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="tint">@color/camera_menu_option</item>
+    </style>
+
+    <!-- The item's label, 11 sp in the medium face, smaller only where a large font would not fit it on its line. -->
+    <style name="Widget.Pix.CameraMenuOption.Label" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">16dp</item>
+        <item name="android:layout_marginTop">6dp</item>
+        <item name="android:autoSizeMaxTextSize">11sp</item>
+        <item name="android:autoSizeMinTextSize">9sp</item>
+        <item name="android:autoSizeTextType">uniform</item>
+        <item name="android:duplicateParentState">true</item>
+        <item name="android:gravity">center</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Caption</item>
+        <item name="android:fontFamily">@font/pix_medium</item>
+        <item name="fontFamily">@font/pix_medium</item>
+        <item name="android:textColor">@color/camera_menu_option</item>
     </style>
 
     <!-- One half of a two-way switch, such as Cutout / Outline; selection is View.isSelected. -->

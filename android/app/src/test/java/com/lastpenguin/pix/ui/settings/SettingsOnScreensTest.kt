@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-12, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.Manifest
@@ -33,6 +33,8 @@ import com.lastpenguin.pix.ui.session.SubjectFragment
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
@@ -40,10 +42,12 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /*
- * What the settings change on the camera screens (FR-10.1, FR-10.3, FR-3.10). Partitions for the gear: shown on the
- * camera, also during a session (connected or reconnecting, #204), hidden during the scene photo, and opening Settings;
- * on Subject view, shown and opening Settings; Settings over Subject view goes back to it when the session ends, and
- * over the camera stays. For the latency indicator: off (even in a
+ * What the settings change on the camera screens (FR-10.1, FR-10.3, FR-3.10). Partitions for the camera menu's Settings
+ * (FR-1.17): the menu's button shown on the camera, also during a session (connected or reconnecting, #204), hidden
+ * during the scene photo, and Settings in the menu opening that screen and closing the menu; on Subject view, the same
+ * item opening Settings; Settings over Subject view goes back to it when the session ends, and over the camera stays.
+ * For the menu's grid and horizon bar: each tap turns the setting off and on again, on the overlay and in the item's
+ * accent, on both screens (the horizon bar on the camera only). For the latency indicator: off (even in a
  * session), on without a session, connected with no number yet, with a delay at each color's edge (150 and 300 ms) and
  * above, reconnecting, and during the scene photo; on Subject view, off and on. For the guide: the color of the
  * settings on the overlay, on both screens.
@@ -99,44 +103,94 @@ class SettingsOnScreensTest {
 
     private val connected = SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER)
 
-    // ---- The gear (FR-10.1) ----------------------------------------------------------------------------------------
+    // ---- The camera menu's Settings (FR-10.1, FR-1.17) --------------------------------------------------------------
 
     @Test
-    fun theGear_opensSettings_staysDuringASession_andHidesDuringTheScenePhoto() {
+    fun theMenusSettings_opensSettings_andTheMenuStaysDuringASession_andHidesDuringTheScenePhoto() {
         val modules = launchCamera()
         val nav = camera!!.attachNav(R.id.cameraFragment)
 
-        onCamera { controls, _ -> assertEquals(View.VISIBLE, controls.settingsButton.visibility) }
-        onCamera { controls, _ -> controls.settingsButton.performClick() }
+        onCamera { controls, _ -> controls.cameraMenuButton.performClick() }
+        onCamera { controls, _ -> controls.menuSettings.performClick() }
         assertEquals(R.id.settingsFragment, nav.currentDestination?.id)
+        onCamera { controls, _ -> assertEquals(View.GONE, controls.cameraMenu.visibility) }
 
         modules.session.setState(connected)
         idle()
         onCamera { controls, _ ->
-            assertEquals(View.VISIBLE, controls.settingsButton.visibility)
+            assertEquals(View.VISIBLE, controls.cameraMenuButton.visibility)
             assertEquals(View.VISIBLE, controls.endSessionButton.visibility)
         }
         modules.session.setState(SessionState.Reconnecting("s1", since = 0L))
         idle()
-        onCamera { controls, _ -> assertEquals(View.VISIBLE, controls.settingsButton.visibility) }
+        onCamera { controls, _ -> assertEquals(View.VISIBLE, controls.cameraMenuButton.visibility) }
         modules.session.setState(SessionState.Idle)
         idle()
-        onCamera { controls, _ -> assertEquals(View.VISIBLE, controls.settingsButton.visibility) }
+        onCamera { controls, _ -> assertEquals(View.VISIBLE, controls.cameraMenuButton.visibility) }
 
         onCamera { _, fragment -> fragment.requireActivity().viewModel<GenerationViewModel>().beginScene() }
-        onCamera { controls, _ -> assertEquals(View.GONE, controls.settingsButton.visibility) }
+        onCamera { controls, _ -> assertEquals(View.GONE, controls.cameraMenuButton.visibility) }
     }
 
     @Test
-    fun theGear_onSubjectView_opensSettings() {
+    fun theMenusSettings_onSubjectView_opensSettings() {
         val modules = launchSubject()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.SUBJECT))
         idle()
         val nav = subject!!.attachNav(R.id.subjectFragment)
 
-        onSubject { assertEquals(View.VISIBLE, it.settingsButton.visibility) }
-        onSubject { it.settingsButton.performClick() }
+        onSubject { it.cameraMenuButton.performClick() }
+        onSubject { assertEquals(View.VISIBLE, it.menuSettings.visibility) }
+        onSubject { it.menuSettings.performClick() }
         assertEquals(R.id.settingsFragment, nav.currentDestination?.id)
+    }
+
+    // ---- The camera menu's grid and horizon bar (FR-1.9, FR-1.10, FR-1.17) ------------------------------------------
+
+    @Test
+    fun theMenusGridAndHorizonBar_onCamera_turnTheSettingsOffAndOnAgain() {
+        val modules = launchCamera()
+        onCamera { controls, _ -> controls.cameraMenuButton.performClick() }
+        onCamera { controls, _ ->
+            assertTrue(controls.menuGrid.isActivated)
+            assertTrue(controls.menuLevel.isActivated)
+            controls.menuGrid.performClick()
+            controls.menuLevel.performClick()
+        }
+
+        onCamera { controls, _ ->
+            assertFalse(modules.appSettings.showGrid.value)
+            assertFalse(modules.appSettings.showLevel.value)
+            assertFalse(controls.compositionOverlay.showGrid)
+            assertFalse(controls.compositionOverlay.showLevel)
+            assertFalse(controls.menuGrid.isActivated)
+            assertEquals(string(R.string.grid_off), controls.menuGrid.contentDescription)
+            assertEquals(string(R.string.level_off), controls.menuLevel.contentDescription)
+            // A choice keeps the menu open.
+            assertEquals(View.VISIBLE, controls.cameraMenu.visibility)
+            controls.menuGrid.performClick()
+        }
+        onCamera { controls, _ ->
+            assertTrue(modules.appSettings.showGrid.value)
+            assertTrue(controls.compositionOverlay.showGrid)
+            assertTrue(controls.menuGrid.isActivated)
+        }
+    }
+
+    @Test
+    fun theMenusGrid_onSubjectView_turnsTheGridOff() {
+        val modules = launchSubject()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.SUBJECT))
+        idle()
+
+        onSubject { it.cameraMenuButton.performClick() }
+        onSubject { it.menuGrid.performClick() }
+
+        onSubject {
+            assertFalse(modules.appSettings.showGrid.value)
+            assertFalse(it.compositionOverlay.showGrid)
+            assertFalse(it.menuGrid.isActivated)
+        }
     }
 
     @Test

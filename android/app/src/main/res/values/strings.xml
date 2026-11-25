@@ -95,6 +95,19 @@
     <string name="flash_on">Flash on</string>
     <string name="scene_light_off">Light off</string>
     <string name="scene_light_on">Light on</string>
+    <string name="camera_menu">Camera menu</string>
+    <string name="menu_flash">Flash</string>
+    <string name="menu_timer">Timer</string>
+    <string name="menu_level">Horizon</string>
+    <string name="timer_off">Timer off</string>
+    <string name="timer_seconds">Timer %1$d s</string>
+    <string name="grid_on">Grid on</string>
+    <string name="grid_off">Grid off</string>
+    <string name="level_on">Horizon bar on</string>
+    <string name="level_off">Horizon bar off</string>
+    <string name="shutter_timer">Shutter, %1$d s timer</string>
+    <string name="shutter_cancel_timer">Cancel the timer</string>
+    <string name="countdown_cancel_hint">Tap the shutter to cancel</string>
     <string name="aspect_ratio_description">Aspect ratio %1$s</string>
     <string name="aspect_ratios">Aspect ratios</string>
     <string name="aspect_3_4" translatable="false">3:4</string>
@@ -119,6 +132,7 @@
     <string name="photo_not_deleted">Couldn\'t delete this photo.</string>
     <string name="remote_zoom_notice">%1$s set zoom to %2$s×</string>
     <string name="zoom_held_label">%1$s is zooming</string>
+    <string name="photographer_timer_label">%1$s is taking a photo</string>
     <string name="remote_guide_move_notice">%1$s moved the guide</string>
     <string name="remote_guide_notice">%1$s set a pose guide</string>
     <!-- For 3 s on Camera as a subject connects (#271). -->
@@ -579,7 +593,7 @@
     <string name="settings_tutorial">Show the tutorial again</string>
     <string name="settings_tutorial_reset">The tutorial shows again on each screen.</string>
     <string name="tutorial_close_hint">Tap anywhere to close</string>
-    <string name="tutorial_settings">Change the language and the guide\'s look</string>
+    <string name="tutorial_menu">Flash, timer, grid, and Settings</string>
     <string name="tutorial_together">Share your camera live with another phone</string>
     <string name="tutorial_guide">Add a photo or AI pose guide</string>
     <string name="tutorial_shutter">Only the photo is saved, never the guide</string>

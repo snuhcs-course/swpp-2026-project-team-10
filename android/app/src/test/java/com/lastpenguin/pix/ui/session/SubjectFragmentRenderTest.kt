@@ -78,7 +78,9 @@ import org.robolectric.shadows.ShadowToast
  * toggle, a hidden guide; the photographer's reference photo with its guide, enlarged, kept while the guide is hidden,
  * gone with a replaced or removed guide, moved to another corner on this phone only, and hidden at the video's side
  * by a flick and shown again by a tap on its handle, on this phone only, and hidden while enlarged (the small strip,
- * and small when it is back; #237), a mirror through each change of its size; a flash tap; remote focus with the
+ * and small when it is back; #237), a mirror through each change of its size; the camera menu (FR-1.17): its flash's
+ * tap, which keeps it open, and Back and its button closing it; the photographer's countdown (FR-1.17): each second
+ * with their name, and gone at its end; remote focus with the
  * brightness beside it (FR-7.7, FR-7.3, #273): a tap inside the image (the focus asked for at the photographer's x, the
  * box there, the bar beside it), beside the image and in guide-edit mode (nothing), on a camera without point focus
  * (the bar alone); a drag on the bar (steps, then the final value; both gone after the idle time); a drag on the video
@@ -182,7 +184,7 @@ class SubjectFragmentRenderTest {
             assertEquals(View.GONE, binding.compositionOverlay.visibility)
             assertFalse(binding.zoomReadout.isEnabled)
             assertEquals(View.GONE, binding.editGuideButton.visibility)
-            assertEquals(View.GONE, binding.flashButton.visibility)
+            assertEquals(View.GONE, binding.menuFlash.visibility)
             assertFalse(binding.exposureBar.isShown)
             // The tutorial shows the pinch (FR-10.4); TalkBack hears it from the video, which has no caption under it.
             assertEquals(string(R.string.subject_video_description), binding.liveView.contentDescription.toString())
@@ -249,8 +251,8 @@ class SubjectFragmentRenderTest {
             assertEquals(View.GONE, binding.connectingText.visibility)
             assertEquals(View.VISIBLE, binding.compositionOverlay.visibility)
             assertTrue(binding.zoomReadout.isEnabled)
-            assertEquals(View.VISIBLE, binding.flashButton.visibility)
-            assertTrue(binding.flashButton.isEnabled)
+            assertEquals(View.VISIBLE, binding.menuFlash.visibility)
+            assertTrue(binding.menuFlash.isEnabled)
             // The brightness comes up beside a tap on the video, not before it.
             assertFalse(binding.exposureBar.isShown)
             assertFalse(binding.focusRing.isShown)
@@ -276,7 +278,8 @@ class SubjectFragmentRenderTest {
 
         onScreen { binding, _ ->
             assertEquals(string(R.string.zoom_ratio, "2.0"), binding.zoomReadout.text.toString())
-            assertEquals(string(R.string.flash_auto), binding.flashButton.contentDescription)
+            assertEquals(string(R.string.flash_auto), binding.menuFlash.contentDescription)
+            assertTrue(binding.menuFlash.isActivated)
             assertEquals(AspectRatio.R16_9.frameAspect, binding.compositionOverlay.frameAspect)
             assertEquals(AspectRatio.R16_9.frameAspect, binding.guideOverlay.frameAspect)
             assertEquals(2, binding.exposureBar.index)
@@ -660,14 +663,65 @@ class SubjectFragmentRenderTest {
     }
 
     @Test
-    fun theFlashTap_sendsARequest() {
+    fun theMenusFlash_sendsARequest_andTheMenuStaysOpen() {
         val modules = launch()
         connect(modules, exposureRange = -4..4, hasFlash = true)
 
-        onScreen { binding, _ -> binding.flashButton.performClick() }
+        onScreen { binding, _ -> binding.cameraMenuButton.performClick() }
+        idle()
+        onScreen { binding, _ ->
+            assertEquals(View.VISIBLE, binding.cameraMenu.visibility)
+            assertTrue(binding.cameraMenuButton.isActivated)
+            binding.menuFlash.performClick()
+        }
         idle()
 
         assertTrue(modules.session.sent.any { it == SessionMessage.FlashSet(FlashMode.AUTO) })
+        onScreen { binding, _ -> assertEquals(View.VISIBLE, binding.cameraMenu.visibility) }
+    }
+
+    @Test
+    fun theMenu_closesAtBack_andAtItsButtonAgain() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, hasFlash = true)
+
+        onScreen { binding, _ -> binding.cameraMenuButton.performClick() }
+        idle()
+        onScreen { _, fragment -> fragment.requireActivity().onBackPressedDispatcher.onBackPressed() }
+        idle()
+        onScreen { binding, _ ->
+            assertEquals(View.GONE, binding.cameraMenu.visibility)
+            binding.cameraMenuButton.performClick()
+        }
+        idle()
+        onScreen { binding, _ -> binding.cameraMenuButton.performClick() }
+        idle()
+
+        onScreen { binding, _ -> assertEquals(View.GONE, binding.cameraMenu.visibility) }
+    }
+
+    // ---- The photographer's timer (FR-1.17) ----------------------------------------------------------------------
+
+    @Test
+    fun thePhotographersCountdown_showsEachSecondWithTheirName_andGoesAtItsEnd() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, hasFlash = true)
+        onScreen { binding, _ -> assertEquals(View.GONE, binding.countdownPanel.visibility) }
+
+        modules.session.deliver(SessionMessage.Countdown(3))
+        idle()
+        onScreen { binding, _ ->
+            assertEquals(View.VISIBLE, binding.countdownPanel.visibility)
+            assertEquals("3", binding.countdownNumber.text.toString())
+            assertEquals(string(R.string.photographer_timer_label, "Dongje"), binding.countdownLine.text.toString())
+        }
+        modules.session.deliver(SessionMessage.Countdown(2))
+        idle()
+        onScreen { binding, _ -> assertEquals("2", binding.countdownNumber.text.toString()) }
+
+        modules.session.deliver(SessionMessage.Countdown(0))
+        idle()
+        onScreen { binding, _ -> assertEquals(View.GONE, binding.countdownPanel.visibility) }
     }
 
     // ---- Remote focus, with the brightness beside it (FR-7.7, FR-7.3, #273) -----------------------------------

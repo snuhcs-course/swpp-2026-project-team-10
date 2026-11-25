@@ -80,6 +80,24 @@ sealed interface ToggleLabel {
     data object ZoomHeld : ToggleLabel
 }
 
+/** The shutter's timer (FR-1.17): off, or the seconds from the shutter to the photo. */
+enum class ShutterTimer(val seconds: Int) {
+    OFF(0),
+    THREE(3),
+    TEN(10),
+    ;
+
+    /** The choice after this one at a tap on the menu's Timer: off, 3 s, 10 s, and off again. */
+    fun next(): ShutterTimer = entries[(ordinal + 1) % entries.size]
+}
+
+/** What a choice in the camera menu changed (FR-1.17), which the screen says in a short notice. */
+sealed interface MenuNotice {
+    data class Flash(val mode: FlashMode) : MenuNotice
+
+    data class Timer(val timer: ShutterTimer) : MenuNotice
+}
+
 /**
  * The pose tip of the guide on the camera (FR-4.10), as the screen shows it: a banner over the bottom of the preview
  * that opens once when the guide comes, and the tip button in the zoom row.
@@ -154,6 +172,12 @@ data class CameraUiState(
     val brightnessOpen: Boolean = false,
     /** Whether the ratios are open under the top bar (FR-1.13). */
     val aspectsOpen: Boolean = false,
+    /** Whether the camera menu is open under the top bar (FR-1.17); it and the ratios are never open together. */
+    val menuOpen: Boolean = false,
+    /** The shutter's timer (FR-1.17), kept while the app runs; Pix starts with it off. */
+    val timer: ShutterTimer = ShutterTimer.OFF,
+    /** The seconds left before the timer's photo while it counts down, from the timer's seconds to 1; null otherwise. */
+    val countdown: Int? = null,
     /** False hides the flash button (FR-1.12). */
     val hasFlash: Boolean = false,
     val flash: FlashMode = FlashMode.OFF,
@@ -247,6 +271,11 @@ class CameraViewModel(
     private val onFocused: (x: Float, y: Float) -> Unit = { _, _ -> },
     /** Tells the subject's phone what was done on this camera (`RemoteControlHandler.didHere`, FR-7.4, #292). */
     private val onDid: (PhotographerAction) -> Unit = {},
+    /**
+     * Tells the subject's phone the seconds the timer has left, and 0 when it ends with the photo or is cancelled
+     * (`RemoteControlHandler.countdownHere`, FR-1.17).
+     */
+    private val onCountdown: (Int) -> Unit = {},
 ) : ViewModel() {
 
     /** Follows how the phone is held while [owner], the camera screen, is in front (FR-1.5, FR-1.15). */
@@ -283,6 +312,19 @@ class CameraViewModel(
 
     /** One per photo the viewer could not delete, for its notice; kept until the screen reads it. */
     val photoNotDeleted: Flow<Unit> = _photoNotDeleted.receiveAsFlow()
+
+    private val _menuNotices = Channel<MenuNotice>(Channel.CONFLATED)
+
+    /** One per choice in the camera menu, the newest replacing one not yet shown (FR-1.17). */
+    val menuNotices: Flow<MenuNotice> = _menuNotices.receiveAsFlow()
+
+    private val _timedShots = Channel<Unit>(Channel.CONFLATED)
+
+    /** One each time the timer's countdown ends in a photo, for the preview's blink, as at the shutter (FR-1.5). */
+    val timedShots: Flow<Unit> = _timedShots.receiveAsFlow()
+
+    // The timer's countdown while it runs (FR-1.17).
+    private var countdownJob: Job? = null
 
     // The thumbnail's and the viewer's sources (FR-1.6): outside a session Pix's album, with the photo just saved here
     // before MediaStore tells of it; in a session the session's photos alone.
@@ -440,7 +482,7 @@ class CameraViewModel(
      * Pix's album otherwise, so Pix stays in front in both.
      */
     fun openPhotos() {
-        _uiState.update { it.copy(photosOpen = it.viewerPhotos.isNotEmpty()) }
+        _uiState.update { it.copy(photosOpen = it.viewerPhotos.isNotEmpty() && it.countdown == null) }
     }
 
     /** The viewer's Back, or the system's, closes it. */
@@ -465,9 +507,37 @@ class CameraViewModel(
         }
     }
 
-    /** The ratios under the top bar open or close (FR-1.13). */
+    /**
+     * The ratios under the top bar open or close (FR-1.13). They open in the camera menu's place, which closes, and not
+     * while the timer counts down.
+     */
     fun setAspectsOpen(open: Boolean) {
-        _uiState.update { it.copy(aspectsOpen = open) }
+        _uiState.update {
+            val opens = open && it.countdown == null
+            it.copy(aspectsOpen = opens, menuOpen = it.menuOpen && !opens)
+        }
+    }
+
+    /**
+     * The camera menu under the top bar opens or closes (FR-1.17). It opens in the ratios' place, which close, and not
+     * while the timer counts down.
+     */
+    fun setMenuOpen(open: Boolean) {
+        _uiState.update {
+            val opens = open && it.countdown == null
+            it.copy(menuOpen = opens, aspectsOpen = it.aspectsOpen && !opens)
+        }
+    }
+
+    /**
+     * The menu's Timer (FR-1.17): each tap the next of off, 3 s, and 10 s, which the screen says in a notice. Not while
+     * the timer counts down.
+     */
+    fun onTimerTap() {
+        if (_uiState.value.countdown != null) return
+        val next = _uiState.value.timer.next()
+        _uiState.update { it.copy(timer = next) }
+        _menuNotices.trySend(MenuNotice.Timer(next))
     }
 
     /**
@@ -504,12 +574,74 @@ class CameraViewModel(
     }
 
     /**
+     * The shutter: with the timer off, the photo now ([shoot]), and true when it takes one. With the timer on, the
+     * countdown starts instead, and its end takes the photo ([timedShots]); a tap while it counts down cancels it
+     * (FR-1.17). Neither while the camera is not ready or has not yet taken the photo of the press before.
+     */
+    fun onShutter(): Boolean {
+        val state = _uiState.value
+        if (state.countdown != null) {
+            cancelCountdown()
+            return false
+        }
+        if (state.timer == ShutterTimer.OFF) return shoot()
+        if (state.shutterBusy || camera.status.value != CameraStatus.READY) return false
+        startCountdown(state.timer.seconds)
+        return false
+    }
+
+    /**
+     * The timer's countdown (FR-1.17): from [seconds] down to 1, a second each, told to the subject's phone at each
+     * step, then the photo. The shutter's own changes come at its start: the guide's edit mode and the open panels end,
+     * and an earlier photo's notice goes.
+     */
+    private fun startCountdown(seconds: Int) {
+        _uiState.update {
+            it.copy(
+                countdown = seconds,
+                captureNotice = null,
+                guideEditing = false,
+                aspectsOpen = false,
+                menuOpen = false,
+            )
+        }
+        countdownJob = viewModelScope.launch {
+            for (left in seconds downTo 1) {
+                _uiState.update { it.copy(countdown = left) }
+                onCountdown(left)
+                delay(COUNTDOWN_STEP_MS)
+            }
+            countdownJob = null
+            _uiState.update { it.copy(countdown = null) }
+            onCountdown(0)
+            // A camera that went away during the countdown takes no photo, and says so as a failed one would.
+            if (shoot()) {
+                _timedShots.trySend(Unit)
+            } else {
+                _uiState.update { it.copy(captureNotice = CaptureNotice.CAMERA_UNAVAILABLE) }
+            }
+        }
+    }
+
+    /**
+     * Stops the timer's countdown, if one runs, without a photo (FR-1.17): the shutter's second tap, or the screen
+     * going to the background or away. The subject's phone is told, so its number goes too.
+     */
+    fun cancelCountdown() {
+        val job = countdownJob ?: return
+        countdownJob = null
+        job.cancel()
+        _uiState.update { it.copy(countdown = null) }
+        onCountdown(0)
+    }
+
+    /**
      * Takes a photo, unless the camera is not ready or has not yet taken the photo of the press before; true when it
      * takes one. The shutter is free again as soon as the camera took the picture, while the photo is still being
      * saved (NFR-19), so photos can follow each other; [CameraUiState.isSaving] lasts until all of them are done. Their
      * results are published in shutter order.
      */
-    fun onShutter(): Boolean {
+    private fun shoot(): Boolean {
         if (_uiState.value.shutterBusy || camera.status.value != CameraStatus.READY) return false
         // Set before launching so two taps in the same frame cannot enqueue two captures. The shutter also ends
         // guide editing (Design 2.6.2): the guide is placed, and the next pinch zooms again.
@@ -521,6 +653,7 @@ class CameraViewModel(
                 captureNotice = null,
                 guideEditing = false,
                 aspectsOpen = false,
+                menuOpen = false,
             )
         }
         val takenAt = clock()
@@ -689,10 +822,13 @@ class CameraViewModel(
         _uiState.update { it.copy(brightnessOpen = open && it.exposureRange.first < it.exposureRange.last) }
     }
 
-    /** The flash button cycles off, auto, on (FR-1.12). */
+    /**
+     * The menu's Flash cycles off, auto, on (FR-1.12), which the screen says in a notice (FR-1.17); not while the timer
+     * counts down.
+     */
     fun onFlashTap() {
         val state = _uiState.value
-        if (!state.hasFlash) return
+        if (!state.hasFlash || state.countdown != null) return
         val next = when (state.flash) {
             FlashMode.OFF -> FlashMode.AUTO
             FlashMode.AUTO -> FlashMode.ON
@@ -700,15 +836,17 @@ class CameraViewModel(
         }
         camera.setFlash(next)
         onDid(PhotographerAction.Flash(next))
+        _menuNotices.trySend(MenuNotice.Flash(next))
     }
 
     /**
      * The camera switch (FR-1.14): the front camera for a selfie, or the rear one again, with or without a session. The
-     * choice lasts while the app runs; Pix opens with the rear camera.
+     * choice lasts while the app runs; Pix opens with the rear camera. Not while a photo is saved or the timer counts
+     * down.
      */
     fun onSwitchCamera() {
         val state = _uiState.value
-        if (state.isSaving || !state.canSwitchCamera) return
+        if (state.isSaving || !state.canSwitchCamera || state.countdown != null) return
         camera.setFacing(if (state.facing == CameraFacing.BACK) CameraFacing.FRONT else CameraFacing.BACK)
     }
 
@@ -719,7 +857,7 @@ class CameraViewModel(
     fun onAspectChosen(aspect: AspectRatio) {
         val state = _uiState.value
         _uiState.update { it.copy(aspectsOpen = false) }
-        if (state.isSaving || aspect == state.aspect) return
+        if (state.isSaving || aspect == state.aspect || state.countdown != null) return
         camera.setAspectRatio(aspect)
         viewModelScope.launch { settings.saveAspectRatio(aspect) }
     }
@@ -835,9 +973,13 @@ class CameraViewModel(
     override fun onCleared() {
         // A pinch cut off with the screen never sends its final value; the zoom must not stay the photographer's.
         zoomHold.release(Role.PHOTOGRAPHER)
+        cancelCountdown()
     }
 
     companion object {
+        /** One step of the timer's countdown (FR-1.17). */
+        const val COUNTDOWN_STEP_MS = 1_000L
+
         /** How long a short notice stays on the Camera screen, such as the remote action notices. */
         const val NOTICE_MS = 3_000L
 

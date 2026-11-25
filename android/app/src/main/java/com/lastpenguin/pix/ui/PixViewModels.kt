@@ -50,6 +50,7 @@ object PixViewModels {
                 zoomHold = container.remoteControlHandler.zoomHold,
                 onFocused = container.remoteControlHandler::focusedHere,
                 onDid = container.remoteControlHandler::didHere,
+                onCountdown = container.remoteControlHandler::countdownHere,
             )
         }
         initializer {

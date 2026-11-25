@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The memo button on a library cell (#270): a pencil on the kind icon's small dark disc (bg_kind_badge). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/bg_kind_badge" />
+    <item
+        android:bottom="6dp"
+        android:drawable="@drawable/ic_edit_small"
+        android:left="6dp"
+        android:right="6dp"
+        android:top="6dp" />
+</layer-list>

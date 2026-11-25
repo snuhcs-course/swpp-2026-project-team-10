@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -54,7 +54,7 @@ class SceneTurnTest {
     /** The turn each set started with, as the subject's phone hears it. */
     private val opened = mutableListOf<Int>()
     private val share = object : PoseShare by PoseShare.None {
-        override fun open(setId: String, sceneTurn: Int) {
+        override fun open(setId: String, sceneTurn: Int, situation: Situation?) {
             opened += sceneTurn
         }
     }

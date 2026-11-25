@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.content.res.ColorStateList
@@ -37,17 +37,22 @@ internal fun setLabelIcon(chip: TextView, @DrawableRes icon: Int, @ColorRes tint
     TextViewCompat.setCompoundDrawableTintList(chip, ColorStateList.valueOf(context.getColor(tint)))
 }
 
-/** The bookmark of a *Save guide* notice: filled once saved, empty once removed. */
+/** The ♥ of a *Save guide* notice: filled red once a favorite, empty once it is not (#297). */
 @DrawableRes
 internal fun guideSaveIcon(notice: GuideSaveNotice): Int = when (notice) {
-    GuideSaveNotice.SAVED, GuideSaveNotice.SAVED_OLDEST_REMOVED -> R.drawable.ic_bookmark_filled
-    GuideSaveNotice.REMOVED -> R.drawable.ic_bookmark
+    GuideSaveNotice.SAVED -> R.drawable.ic_heart_filled
+    GuideSaveNotice.REMOVED -> R.drawable.ic_heart
     GuideSaveNotice.FAILED -> R.drawable.ic_alert_small
 }
 
+/** *Save guide*'s ♥ on Camera and Subject view (#297): red while the guide is a favorite, the panel's white while not. */
+@ColorRes
+internal fun saveGuideTint(favorite: Boolean): Int =
+    if (favorite) R.color.button_heart_icon else R.color.button_secondary_text
+
 @ColorRes
 internal fun guideSaveTint(notice: GuideSaveNotice): Int = when (notice) {
-    GuideSaveNotice.SAVED, GuideSaveNotice.SAVED_OLDEST_REMOVED -> R.color.pix_accent
+    GuideSaveNotice.SAVED -> R.color.pix_heart
     GuideSaveNotice.REMOVED -> R.color.pix_text
     GuideSaveNotice.FAILED -> R.color.pix_danger
 }

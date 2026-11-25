@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
@@ -17,9 +17,9 @@ import com.lastpenguin.pix.ui.PixViewModels
 import kotlinx.coroutines.launch
 
 /**
- * Generating poses (R&S 6.3). Back at the top left asks first, since the images being created are lost, then stops the
- * set and returns to Generate poses with the photo and the description (#199). Owner: Server/AI/Sync (#7); Back
- * Iter4-P2.
+ * Generating poses (R&S 6.3). Back at the top left stops the set and returns to Generate poses with the photo and the
+ * description (#199), at once: the poses that came are in the library (#297). Owner: Server/AI/Sync (#7); Back
+ * Iter4-P2, #297.
  */
 class GeneratingFragment : Fragment(R.layout.fragment_generating) {
 
@@ -34,9 +34,9 @@ class GeneratingFragment : Fragment(R.layout.fragment_generating) {
             CandidateGridFit(resources.getDimensionPixelSize(R.dimen.pose_card_margin)),
         )
 
-        binding.backButton.setOnClickListener { askToStop() }
+        binding.backButton.setOnClickListener { stop() }
         // System back does what Back does (R&S 6.9).
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { askToStop() }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { stop() }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -45,12 +45,10 @@ class GeneratingFragment : Fragment(R.layout.fragment_generating) {
         }
     }
 
-    /** Back: asks first, as the images being created would be lost. */
-    private fun askToStop() {
-        confirmGoingBack(generating = true, onConfirm = ::stop)
-    }
-
-    /** Back confirmed: the requests stop, and Generate poses shows the photo and the description again. */
+    /**
+     * Back: the requests stop at once, and Generate poses shows the photo and the description again. The poses that
+     * came are in the library, which Generate poses says (#297).
+     */
     private fun stop() {
         val navController = findNavController()
         val generating = viewModel.uiState.value.phase == GenerationUiState.Phase.GENERATING

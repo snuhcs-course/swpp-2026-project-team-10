@@ -1,9 +1,10 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.session.PoseSetEnd
 import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.SessionManager
@@ -34,6 +35,8 @@ data class SubjectPickUiState(
     val photographerName: String? = null,
     /** How the photographer held the set's scene photo (`PoseStep.sceneTurn`), for a ♥ (FR-4.14). */
     val sceneTurn: Int = 0,
+    /** The set's situation (`PoseStep.situation`), which a ♥ keeps in the library (#270). */
+    val situation: Situation? = null,
 )
 
 /**
@@ -81,6 +84,7 @@ class SubjectPickViewModel(
                                     reconnecting = state is SessionState.Reconnecting,
                                     photographerName = name,
                                     sceneTurn = picking.sceneTurn,
+                                    situation = picking.situation,
                                 )
                             }
                         }

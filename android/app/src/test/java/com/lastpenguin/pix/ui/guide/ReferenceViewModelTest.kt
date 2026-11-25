@@ -8,6 +8,7 @@ import com.lastpenguin.pix.generation.GuideTip
 import com.lastpenguin.pix.generation.PoseTip
 import com.lastpenguin.pix.generation.PoseTipper
 import com.lastpenguin.pix.generation.PoseTips
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.TipSource
 import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.GuideChange
@@ -115,10 +116,21 @@ class ReferenceViewModelTest {
     }
 
     @Test
+    fun onCandidatePicked_ofASituationsSet_keepsTheSituationForTheLibrary() = runTest {
+        model.onCandidatePicked(bitmap(), situation = Situation.BACKGROUND)
+        runCurrent()
+        maker.finish(Result.success(guide()))
+        runCurrent()
+
+        val ready = model.uiState.value as ReferenceUiState.Ready
+        assertEquals(Situation.BACKGROUND, ready.guide.situation)
+    }
+
+    @Test
     fun onCandidatePicked_withTheGuideItsHeartSaved_goesOnWithIt_withoutCuttingAgain() = runTest {
         val saved = guide()
 
-        model.onCandidatePicked(bitmap(), saved = saved)
+        model.onCandidatePicked(bitmap(), kept = { Result.success(saved) })
         runCurrent()
 
         assertEquals(emptyList<GuideSource>(), maker.sources)

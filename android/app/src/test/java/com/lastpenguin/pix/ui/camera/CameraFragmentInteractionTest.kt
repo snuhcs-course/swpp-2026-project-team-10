@@ -90,7 +90,8 @@ import org.robolectric.shadows.ShadowToast
  * *Hide at the side* and its tap on a hidden one, another guide; hidden while enlarged, the small strip, and small when
  * it is back); the sliders, a pinch, a tap to focus, and the ratio button with its ratios (opened by the button, closed
  * by a choice, the button, a touch elsewhere, and Back; the ratio the camera has changing nothing); the preview's
- * stream state; *Save guide* (FR-3.8): a guide not saved, then saved, and a second tap that removes it; its icon kept
+ * stream state; *Save guide* (FR-3.8): a guide not saved (an empty ♥), then saved (filled red), and a second tap that
+ * empties it; its icon kept
  * while other state changes. Design 2.8's controls: the brightness bar beside the focus box after a tap to focus (its
  * place, a drag up and down, kept up while held, gone after the idle time), on the right and, near the image's right
  * edge, on the left; the focus box staying while the bar is up, held or not, both whole until the idle time and both
@@ -1079,12 +1080,14 @@ class CameraFragmentInteractionTest {
     // ---- Save guide --------------------------------------------------------------------
 
     @Test
-    fun saveGuide_fillsTheBookmarkAndSaysWhereItIs_andASecondTapRemovesIt() {
+    fun saveGuide_fillsTheHeartRedAndSaysWhereItIs_andASecondTapEmptiesIt() {
         val modules = launch()
         modules.guides.setGuide(guide())
         idle()
         onScreen { controls, _ ->
             assertEquals(string(R.string.save_guide), controls.saveGuideButton.contentDescription.toString())
+            assertEquals(R.drawable.ic_heart, shadowOf(controls.saveGuideButton.plainIcon).createdFromResId)
+            assertEquals(app.getColor(R.color.pix_text), controls.saveGuideButton.iconTint.defaultColor)
         }
 
         onScreen { controls, _ -> controls.saveGuideButton.performClick() }
@@ -1093,6 +1096,9 @@ class CameraFragmentInteractionTest {
         assertEquals(listOf("guide-1"), modules.saved.saved.value.map { it.id })
         onScreen { controls, _ ->
             assertEquals(string(R.string.guide_saved), controls.saveGuideButton.contentDescription.toString())
+            // A ♥ filled red, as on Pick a pose and in the library (#297).
+            assertEquals(R.drawable.ic_heart_filled, shadowOf(controls.saveGuideButton.plainIcon).createdFromResId)
+            assertEquals(app.getColor(R.color.pix_heart), controls.saveGuideButton.iconTint.defaultColor)
             assertTrue(controls.toggleLabel.isShown)
             assertEquals(string(R.string.guide_saved_notice), controls.toggleLabel.text.toString())
         }
@@ -1100,10 +1106,13 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ -> controls.saveGuideButton.performClick() }
         idle()
 
-        assertTrue(modules.saved.saved.value.isEmpty())
+        // History again, still in the library (#297).
+        assertEquals(listOf("guide-1" to false), modules.saved.saved.value.map { it.id to it.favorite })
         onScreen { controls, _ ->
             assertEquals(string(R.string.guide_removed_notice), controls.toggleLabel.text.toString())
             assertEquals(string(R.string.save_guide), controls.saveGuideButton.contentDescription.toString())
+            assertEquals(R.drawable.ic_heart, shadowOf(controls.saveGuideButton.plainIcon).createdFromResId)
+            assertEquals(app.getColor(R.color.pix_text), controls.saveGuideButton.iconTint.defaultColor)
         }
         shadowOf(Looper.getMainLooper()).idleFor(CameraViewModel.NOTICE_MS + 100, TimeUnit.MILLISECONDS)
         onScreen { controls, _ -> assertFalse(controls.toggleLabel.isShown) }

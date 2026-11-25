@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.settings
 
 import android.content.Context
@@ -9,7 +9,6 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
-import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -25,10 +24,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 
 /**
- * The choices on the settings screen that outlive the app (FR-10.1, Design 2.8): the guide's look, the camera's base
- * brightness, the grid and the horizon bar, the latency indicator, crash reports and usage data (FR-10.6), and which screens' tutorial tips were seen
+ * The choices that outlive the app (FR-10.1, Design 2.8): the guide's look, the grid and the horizon bar (from the camera
+ * menu, FR-1.17), the latency indicator, crash reports and usage data (FR-10.6), and which screens' tutorial tips were seen
  * (FR-10.4). Each change applies at once, through the flows.
  * The language is not here: Android keeps it as Pix's per-app language (`AppCompatDelegate.setApplicationLocales`).
  * Owner: Settings (#123).
@@ -39,12 +39,6 @@ interface AppSettings {
 
     /** Whether both phones' screens show the live view's delay during a session (FR-10.3); off by default. */
     val showLatency: StateFlow<Boolean>
-
-    /**
-     * The Camera screen's base brightness in EV (FR-1.11), within [BASE_BRIGHTNESS_EV]: every photo starts from it, and a
-     * drag after a tap to focus adds to it until the next tap; 0 by default.
-     */
-    val baseBrightness: StateFlow<Float>
 
     /** Whether the camera screens draw the 3×3 grid (FR-1.9); on by default. */
     val showGrid: StateFlow<Boolean>
@@ -67,12 +61,19 @@ interface AppSettings {
 
     suspend fun setShowLatency(show: Boolean)
 
-    /** Kept within [BASE_BRIGHTNESS_EV]. */
-    suspend fun setBaseBrightness(ev: Float)
-
     suspend fun setShowGrid(show: Boolean)
 
     suspend fun setShowLevel(show: Boolean)
+
+    /**
+     * Turns the grid off or on from what is stored, in one step (the camera menu's *Grid*, FR-1.17): two quick taps
+     * go there and back, where two sets of the opposite of [showGrid] could both read the value before the first
+     * change.
+     */
+    suspend fun toggleShowGrid()
+
+    /** Turns the horizon bar off or on from what is stored, in one step, as [toggleShowGrid]. */
+    suspend fun toggleShowLevel()
 
     suspend fun setShareUsage(share: Boolean)
 
@@ -86,7 +87,6 @@ interface AppSettings {
     class InMemory(
         look: GuideLook = GuideLook(),
         latency: Boolean = false,
-        brightness: Float = 0f,
         grid: Boolean = true,
         level: Boolean = true,
         tutorial: Set<TutorialScreen>? = TutorialScreen.entries.toSet(),
@@ -97,9 +97,6 @@ interface AppSettings {
 
         private val _showLatency = MutableStateFlow(latency)
         override val showLatency: StateFlow<Boolean> = _showLatency.asStateFlow()
-
-        private val _baseBrightness = MutableStateFlow(brightness)
-        override val baseBrightness: StateFlow<Float> = _baseBrightness.asStateFlow()
 
         private val _showGrid = MutableStateFlow(grid)
         override val showGrid: StateFlow<Boolean> = _showGrid.asStateFlow()
@@ -125,10 +122,6 @@ interface AppSettings {
             _showLatency.value = show
         }
 
-        override suspend fun setBaseBrightness(ev: Float) {
-            _baseBrightness.value = ev.coerceIn(BASE_BRIGHTNESS_EV)
-        }
-
         override suspend fun setShowGrid(show: Boolean) {
             _showGrid.value = show
         }
@@ -136,6 +129,10 @@ interface AppSettings {
         override suspend fun setShowLevel(show: Boolean) {
             _showLevel.value = show
         }
+
+        override suspend fun toggleShowGrid() = _showGrid.update { !it }
+
+        override suspend fun toggleShowLevel() = _showLevel.update { !it }
 
         override suspend fun setShareUsage(share: Boolean) {
             _shareUsage.value = share
@@ -150,9 +147,6 @@ interface AppSettings {
         }
     }
 }
-
-/** The base brightness's choices in EV (FR-1.11), as on the settings screen's slider; a camera's own range clamps it. */
-val BASE_BRIGHTNESS_EV: ClosedFloatingPointRange<Float> = -2f..2f
 
 /** The screens the first-use tutorial explains, each with its own tips the first time it opens (FR-10.4, Design 2.6.8). */
 enum class TutorialScreen {
@@ -187,10 +181,6 @@ class DataStoreAppSettings(private val store: DataStore<Preferences>, scope: Cor
     override val showLatency: StateFlow<Boolean> =
         preferences.map { it[SHOW_LATENCY] ?: false }.stateIn(scope, SharingStarted.Eagerly, false)
 
-    override val baseBrightness: StateFlow<Float> =
-        preferences.map { (it[BASE_BRIGHTNESS] ?: 0f).coerceIn(BASE_BRIGHTNESS_EV) }
-            .stateIn(scope, SharingStarted.Eagerly, 0f)
-
     override val showGrid: StateFlow<Boolean> =
         preferences.map { it[SHOW_GRID] ?: true }.stateIn(scope, SharingStarted.Eagerly, true)
 
@@ -222,11 +212,14 @@ class DataStoreAppSettings(private val store: DataStore<Preferences>, scope: Cor
 
     override suspend fun setShowLatency(show: Boolean) = save { it[SHOW_LATENCY] = show }
 
-    override suspend fun setBaseBrightness(ev: Float) = save { it[BASE_BRIGHTNESS] = ev.coerceIn(BASE_BRIGHTNESS_EV) }
-
     override suspend fun setShowGrid(show: Boolean) = save { it[SHOW_GRID] = show }
 
     override suspend fun setShowLevel(show: Boolean) = save { it[SHOW_LEVEL] = show }
+
+    // DataStore's edit reads and writes as one step, after any edit before it.
+    override suspend fun toggleShowGrid() = save { it[SHOW_GRID] = !(it[SHOW_GRID] ?: true) }
+
+    override suspend fun toggleShowLevel() = save { it[SHOW_LEVEL] = !(it[SHOW_LEVEL] ?: true) }
 
     override suspend fun setShareUsage(share: Boolean) = save { it[SHARE_USAGE] = share }
 
@@ -255,7 +248,6 @@ class DataStoreAppSettings(private val store: DataStore<Preferences>, scope: Cor
         val GUIDE_COLOR = stringPreferencesKey("guide_color")
         val GUIDE_THICKNESS = stringPreferencesKey("guide_thickness")
         val SHOW_LATENCY = booleanPreferencesKey("show_latency")
-        val BASE_BRIGHTNESS = floatPreferencesKey("base_brightness_ev")
         val SHOW_GRID = booleanPreferencesKey("show_grid")
         val SHOW_LEVEL = booleanPreferencesKey("show_level")
         val TUTORIAL_SEEN = stringSetPreferencesKey("tutorial_seen_screens")

@@ -26,8 +26,9 @@ const val PROTOCOL_VERSION = 3
 /**
  * Data channel messages between the two phones (Design 2.5.1).
  * The @SerialName goes into `t`, the class discriminator; the other fields form the body `b` of the
- * JSON envelope in Design 2.5.1. Only the photographer takes photos; the subject sends requests (zoom, brightness,
- * flash, guide moves), which the photographer applies and echoes (AD-7).
+ * JSON envelope in Design 2.5.1. Photos are taken on the photographer's phone; the subject sends requests (zoom,
+ * brightness, flash, guide moves, the shutter, a start of AI poses), which the photographer applies and echoes or
+ * answers (AD-7).
  */
 @OptIn(ExperimentalSerializationApi::class)
 @JsonClassDiscriminator("t")
@@ -500,6 +501,16 @@ sealed interface SessionMessage {
     @SerialName("pose.start.answer")
     data class PoseStartAnswer(val started: Boolean, val request: Int = 0, val asking: Boolean = false) :
         SessionMessage
+
+    /**
+     * P→S: the photographer's shutter timer (FR-1.17): the seconds [left] while it counts down, one message a second
+     * from the timer's seconds to 1, then 0 as it ends, with its photo or cancelled. The subject's phone shows the
+     * number. Not kept: a phone that connects during a countdown sees it from its next second, and an older subject
+     * ignores the type.
+     */
+    @Serializable
+    @SerialName("camera.timer")
+    data class Countdown(val left: Int) : SessionMessage
 
     /**
      * What the photographer did on their own camera (P → S, #292): the subject's phone says it in a line, as the

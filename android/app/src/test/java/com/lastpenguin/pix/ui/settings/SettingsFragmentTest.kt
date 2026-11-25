@@ -3,13 +3,13 @@ package com.lastpenguin.pix.ui.settings
 
 import android.content.Intent
 import android.provider.Settings
-import android.view.MotionEvent
+import android.view.ViewGroup
+import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.google.android.material.slider.Slider
 import com.lastpenguin.pix.BuildConfig
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.account.Account
@@ -31,7 +31,6 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,13 +39,13 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 
 /*
- * Settings on the real screen (FR-10.1–10.4, FR-10.6, FR-10.7, FR-1.9, FR-1.10, FR-3.10, FR-4.2), with the settings in
- * memory behind the ViewModel.
- * Partitions: the defaults (white, normal, the grid and the horizon bar on, the indicator off, the phone's language, an
- * agreement given, usage data shared, signed out); the grid and the horizon bar each turned off from its switch and on
- * from its row (#271), shown off as kept, and in one card with the base brightness, as every section's rows; usage data turned off from its switch and on from its row, and its switch while the stored
+ * Settings on the real screen (FR-10.1–10.4, FR-10.6, FR-10.7, FR-3.10, FR-4.2), with the settings in memory behind the
+ * ViewModel.
+ * Partitions: the defaults (white, normal, the indicator off, the phone's language, an agreement given, usage data
+ * shared, signed out); no Camera section, the Guide first (the grid, the horizon bar, and the brightness are on Camera
+ * alone, FR-1.17, FR-1.11); usage data turned off from its switch and on from its row, and its switch while the stored
  * answer loads (disabled, saving nothing, also when its restored state changes it) and once it arrives off;
- * the base brightness at 0 EV, slid to +1 EV and saved, and shown as kept; each color and thickness chosen; the indicator turned on from its switch and off from its row; a language chosen and
+ * each color and thickness chosen; the indicator turned on from its switch and off from its row; a language chosen and
  * the dialog cancelled; the agreement withdrawn, the row without one (its value 16 dp from the edge, with no chevron),
  * and the row while the stored answer loads; the
  * account signed in and signed out (Sign in; Friends until #188);
@@ -92,8 +91,6 @@ class SettingsFragmentTest {
             assertTrue(binding.thicknessNormal.isSelected)
             assertFalse(binding.thicknessThick.isSelected)
             assertEquals(GuideLook(), binding.guidePreview.look)
-            assertTrue(binding.gridSwitch.isChecked)
-            assertTrue(binding.levelSwitch.isChecked)
             assertFalse(binding.latencySwitch.isChecked)
             assertTrue(binding.usageSwitch.isChecked)
             assertEquals(string(R.string.settings_language_phone), binding.languageRow.settingValue.text.toString())
@@ -147,93 +144,14 @@ class SettingsFragmentTest {
     }
 
     @Test
-    fun theBaseBrightness_startsAtZero_isSavedAsItIsSlid_andShowsWhatIsKept() {
-        val modules = launch()
-        onScreen { binding ->
-            assertEquals(6f, binding.baseBrightnessSlider.value)
-            assertEquals("0", binding.baseBrightnessValue.text.toString())
-        }
-
-        // Three thirds of an EV up: +1 EV.
-        onScreen { binding -> slideTo(binding.baseBrightnessSlider, 9f) }
-        assertEquals(1f, modules.appSettings.baseBrightness.value, 0.001f)
-        onScreen { assertEquals("+1.0", it.baseBrightnessValue.text.toString()) }
-
-        runBlocking { modules.appSettings.setBaseBrightness(-2f) }
-        onScreen { binding ->
-            assertEquals(0f, binding.baseBrightnessSlider.value)
-            assertEquals("-2.0", binding.baseBrightnessValue.text.toString())
-        }
-
-        // Past the ends, the setting keeps to −2..+2 EV, the slider's ends.
-        runBlocking { modules.appSettings.setBaseBrightness(5f) }
-        assertEquals(2f, modules.appSettings.baseBrightness.value, 0.001f)
-        onScreen { binding ->
-            assertEquals(12f, binding.baseBrightnessSlider.value)
-            assertEquals("+2.0", binding.baseBrightnessValue.text.toString())
-        }
-    }
-
-    private fun slideTo(slider: Slider, value: Float) {
-        assertTrue(slider.trackWidth > 0)
-        val x =
-            slider.trackSidePadding +
-                (value - slider.valueFrom) / (slider.valueTo - slider.valueFrom) * slider.trackWidth
-        for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE, MotionEvent.ACTION_UP)) {
-            val event = MotionEvent.obtain(1_000L, 1_000L, action, x, slider.height / 2f, 0)
-            slider.dispatchTouchEvent(event)
-            event.recycle()
-        }
-    }
-
-    @Test
-    fun theGridAndTheHorizonBar_areEachTurnedOffFromTheirSwitch_andOnFromTheirRow() {
-        val modules = launch()
-
-        onScreen { it.gridSwitch.performClick() }
-        assertFalse(modules.appSettings.showGrid.value)
-        assertTrue(modules.appSettings.showLevel.value)
-        onScreen { it.levelSwitch.performClick() }
-        assertFalse(modules.appSettings.showLevel.value)
-        assertFalse(modules.appSettings.showGrid.value)
-
-        onScreen { it.gridRow.performClick() }
-        assertTrue(modules.appSettings.showGrid.value)
-        onScreen { it.levelRow.performClick() }
-        assertTrue(modules.appSettings.showLevel.value)
-        onScreen {
-            assertTrue(it.gridSwitch.isChecked)
-            assertTrue(it.levelSwitch.isChecked)
-        }
-    }
-
-    @Test
-    fun theCameraSection_isOneCard_withTheBrightnessAndBothSwitches() {
+    fun settings_hasNoCameraSection_andStartsWithTheGuide() {
         launch()
 
+        // The grid and the horizon bar are in the camera menu alone, and no setting sets the brightness (FR-1.11).
         onScreen { binding ->
-            assertSame(binding.cameraCard, binding.baseBrightnessRow.parent)
-            assertSame(binding.cameraCard, binding.gridRow.parent)
-            assertSame(binding.cameraCard, binding.levelRow.parent)
+            val sections = binding.settingsScroll.getChildAt(0) as ViewGroup
+            assertEquals(string(R.string.settings_section_guide), (sections.getChildAt(0) as TextView).text.toString())
         }
-    }
-
-    @Test
-    fun theGridAndTheHorizonBar_keptOff_showOff() {
-        val modules = TestAppContainer()
-        runBlocking {
-            modules.appSettings.setShowGrid(false)
-            modules.appSettings.setShowLevel(false)
-        }
-        launch(modules)
-
-        onScreen {
-            assertFalse(it.gridSwitch.isChecked)
-            assertFalse(it.levelSwitch.isChecked)
-        }
-        // Showing the kept answer saves nothing new.
-        assertFalse(modules.appSettings.showGrid.value)
-        assertFalse(modules.appSettings.showLevel.value)
     }
 
     @Test

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -18,7 +18,9 @@ import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.OwnActivities
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
+import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import java.time.Duration
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -36,12 +38,13 @@ import org.robolectric.shadows.ShadowChoreographer
 /*
  * The Camera screen's icons turning with the phone (FR-1.15, #207, R&S 6.2, Design 2.6.2) on the Galaxy S22's app
  * area, 360 x 705 dp.
- * Partitions (equivalence): the phone held at 0, 90, 180, and 270 degrees. What turns: the top bar's icons, the ratio
- * and the zoom readout as words, Shoot together's icon, the guide's icon buttons, the tip's, the guide-edit toggle's,
- * Guide with its label, the camera switch's icon, and the gallery thumbnail. What stays: Shoot together's label, the
- * shutter, the preview and what is drawn over it, the reference thumbnail, and every control's place and size. A turn
- * as the screen opens, at once; a later one, all together and smoothly; with the phone's animations off, at once. A new
- * icon, the flash's next one, keeps the turn.
+ * Partitions (equivalence): the phone held at 0, 90, 180, and 270 degrees. What turns: the top bar's icons (the camera
+ * menu's and the camera switch's among them), the flash and the timer beside the menu's button, the ratio, the zoom
+ * readout, and the timer's countdown as words, Shoot together's icon, the guide's icon buttons, the tip's, the
+ * guide-edit toggle's, the camera menu's items and Guide with their labels, and the gallery thumbnail (FR-1.17). What
+ * stays: Shoot together's label, the shutter, the preview and what is drawn over it, the reference thumbnail, and every
+ * control's place and size. A turn as the screen opens, at once; a later one, all together and smoothly; with the
+ * phone's animations off, at once. A new icon, the scene photo light's next one, keeps the turn.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -91,20 +94,28 @@ class CameraControlTurnTest {
         zoomReadout,
         sceneBackButton,
         flashButton,
+        cameraMenuButton,
         aspectButton,
-        settingsButton,
+        switchCameraButton,
         shootTogetherButton,
         hideGuideButton,
         saveGuideButton,
         removeGuideButton,
         tipButton,
         editGuideButton,
+        countdownNumber,
     )
 
-    /** Guide turns with its label, as one block. */
+    /** The icons beside the menu's button, and Guide and the menu's items, each turning with its label as one block. */
     private fun FragmentCameraBinding.turningViews(): List<View> = listOf(
+        flashIndicator,
+        timerIndicator,
+        menuFlash,
+        menuTimer,
+        menuGrid,
+        menuLevel,
+        menuSettings,
         guideButton,
-        switchCameraIcon,
         galleryThumbnail,
     )
 
@@ -219,8 +230,10 @@ class CameraControlTurnTest {
     }
 
     @Test
-    fun theFlashsNextIcon_keepsTheTurn() {
+    fun theScenePhotoLightsNextIcon_keepsTheTurn() {
         val screen = camera(turn = 90)
+        fragment.requireActivity().viewModel<GenerationViewModel>().beginScene()
+        idle()
         val before = shadowOf(screen.flashButton.plainIcon).createdFromResId
 
         screen.flashButton.performClick()

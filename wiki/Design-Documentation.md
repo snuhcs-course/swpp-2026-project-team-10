@@ -129,8 +129,10 @@
 | 4.12 | 2026-11-25 | The library's history, favorites, and selection (Iter5-A6, [#297]): `PoseLibrary` keeps each candidate, and a used photo guide is kept, as history; ♥ and *Save guide* mark favorites (`setFavorite`, `favorite` in `meta.json`); no limit of 100; the tabs *All* and *Favorites*, opening on *All*, with no tab per kind and no *Add photo*, a ♥ on each cell (`onToggleFavorite`), *Save guide* drawn as a ♥, selection, and ⋮; Back on *Generating poses* and *Pick a pose* without asking, with `posesKept` and *View* (AD-16, 2.1, 2.3, 2.4, 2.6.2, 2.6.3, 2.8). |
 | 4.13 | 2026-11-25 | Reconnection tries for 30 s, not 10 s; Camera says who it reconnects with for the whole wait (`SessionViewModel.reconnectingWith`), read from `Reconnecting`'s new `peer` and `role`; a photo's 30 s without word no longer count a drop, which `Connected`'s new `drops` tells of (Iter5-A2, [#293]; 1.1.3, 1.1.4, 2.3, 2.4, 2.6.7, 2.8). |
 | 4.14 | 2026-11-25 | Impeccable's findings: notices as Snackbars through `ui/Notices.kt`, *Undo* after *Remove guide* with the tip kept aside in `PoseTips`, *Leave* and *End session* asked first, and the camera screens at large fonts (2.6.2, 2.6.3, 2.6.7, 2.8; Iter5-A7, [#298]). |
-| 4.15 | 2026-11-25 | The subject's shutter (Iter5-A11, [#314]): `camera.shutter`, a numbered press on the realtime channel, and `camera.shutter.answer`, taken by the Camera screen alone and only in front (`RemoteControlHandler.shutter`, `takeForSubject`), `SubjectViewModel.onShutter` with its wait, and *Subject view*'s row as Camera's, with the camera's name above the shutter and a step's button beside the thumbnail (1.1.4, 2.5.1, 2.6.5, 2.6.8). |
-| 4.16 | 2026-11-25 | The subject starts AI poses (Iter5-P12, [#276]): `pose.start` and `pose.start.answer`, numbered, with the photographer asked said at once and a 2 s limit on the subject's phone, begun by the Camera screen as its own tile begins it (`RemoteControlHandler.poseStarter`, `startPosesForSubject`), consent on each phone, and what each phone says; no longer among the open points (*Still open*, 2.5.1, 2.6.3, 2.6.5, 2.9). |
+| 4.15 | 2026-11-25 | The self-timer and the camera menu (Iter5-P8, [#272]): `ShutterTimer` and the countdown in `CameraViewModel`, cancelled by a second tap or the screen stopping; the menu's button with *Flash*, *Timer*, *Grid*, *Horizon*, and *Settings* in place of the flash and the gear on both phones; `camera.timer` and the countdown on Subject view; *Still open* without the timer; Settings without its *Camera* section: the grid and the horizon bar only in the menu, toggled in one edit, and no base brightness, so each tap to focus goes back to 0 EV; *End session* and the subject's *Flash* waiting during the countdown; one 32 dp pill for the top bar's buttons, and `reveal` for the menu and the ratios (2.1, 2.2, 2.3, 2.5.1, 2.6.2, 2.6.5, 2.6.8, 2.8). |
+| 4.16 | 2026-11-25 | Ratio-change fixes: the ratio controls keep an open pose tip, a new ratio closes the brightness bar, Subject view sends no tap while its video reshapes, and no ratio while the scene photo's shutter waits (2.5.1, 2.8). |
+| 4.17 | 2026-11-25 | The subject's shutter (Iter5-A11, [#314]): `camera.shutter`, a numbered press on the realtime channel, and `camera.shutter.answer`, taken by the Camera screen alone and only in front (`RemoteControlHandler.shutter`, `takeForSubject`), `SubjectViewModel.onShutter` with its wait, the photographer's timer left to their own shutter (`CameraViewModel.onSubjectShutter`), and *Subject view*'s row as Camera's, with the camera's name above the shutter and a step's button beside the thumbnail (1.1.4, 2.5.1, 2.6.5, 2.6.8). |
+| 4.18 | 2026-11-25 | The subject starts AI poses (Iter5-P12, [#276]): `pose.start` and `pose.start.answer`, numbered, with the photographer asked said at once and a 2 s limit on the subject's phone, begun by the Camera screen as its own tile begins it (`RemoteControlHandler.poseStarter`, `startPosesForSubject`), consent on each phone, and what each phone says; no longer among the open points (*Still open*, 2.5.1, 2.6.3, 2.6.5, 2.9). |
 
 </details>
 
@@ -141,7 +143,6 @@ Audience: the development team. This page describes Pix's design as built throug
 | Decision | Current proposal | Owner | Decide by |
 |----|----|----|----|
 | The cutout as a guide (FR-2.2) | A guide can show the person's cutout from the reference photo, on both phones, drawn with the guide's opacity and never in a photo or the stream. Open: how the user switches between the outline and the cutout, for each guide or in the settings, and what is sent to the subject's phone, the reference copy it already gets or a larger one (AD-6, NFR-13; [#275]). | 한준형 | Iteration 5 |
-| The self-timer (FR-1.17) | A countdown over the preview before the photo. Open: the delays, and whether the subject's phone shows the countdown, which needs a message ([#272]). | 박재완 | Iteration 5 |
 | The live view after a reconnection (NFR-6) | Measure the resolution, bitrate, and frame rate before a drop and after the reconnection first. Open: fix it, show a notice while the quality is low, or record it as a limit ([#269]). | 박재완 | Iteration 5 |
 
 The tips' open question (Testing Documentation 3.2) is not planned: the kickoff of 11/21 left it out.
@@ -539,12 +540,16 @@ interface CameraSettings {                              // the last aspect ratio
 interface AppSettings {                                 // FR-10.1, 2.6.8: the settings screen's choices, in DataStore
     val guideLook: StateFlow<GuideLook>                 // color and thickness of every guide on this phone (FR-3.10)
     val showLatency: StateFlow<Boolean>                 // the latency indicator in a session (FR-10.3); off by default
-    val baseBrightness: StateFlow<Float>                // Camera's base brightness in EV (FR-1.11); 0 by default
+    val showGrid: StateFlow<Boolean>                    // the grid (FR-1.9), from the camera menu; on by default
+    val showLevel: StateFlow<Boolean>                   // the horizon bar (FR-1.10), from the camera menu; on by default
     val tutorialSeen: StateFlow<Set<TutorialScreen>?>   // screens whose tips were seen (FR-10.4); null until read
     suspend fun setGuideColor(color: GuideColor)
     suspend fun setGuideThickness(thickness: GuideThickness)
     suspend fun setShowLatency(show: Boolean)
-    suspend fun setBaseBrightness(ev: Float)            // kept within BASE_BRIGHTNESS_EV, -2..2 (key base_brightness_ev)
+    suspend fun setShowGrid(show: Boolean)              // key show_grid
+    suspend fun setShowLevel(show: Boolean)             // key show_level
+    suspend fun toggleShowGrid()                        // the camera menu's Grid: from what is stored, in one edit
+    suspend fun toggleShowLevel()                       // the camera menu's Horizon, as toggleShowGrid
     suspend fun setTutorialSeen(screens: Set<TutorialScreen>)   // adds them to the tips seen
     suspend fun resetTutorial()                         // *Show the tutorial again*: every screen's tips due again
     class InMemory : AppSettings                        // for tests
@@ -657,7 +662,12 @@ classDiagram
     +uiState StateFlow~CameraUiState~
     +guideSaveNotices Flow
     +toggleLabels Flow
+    +menuNotices Flow~MenuNotice~
+    +timedShots Flow
     +onShutter() Boolean
+    +cancelCountdown()
+    +onTimerTap()
+    +setMenuOpen(open)
     +onZoomChanged(ratio, final)
     +onZoomTap()
     +onSwitchCamera()
@@ -982,6 +992,7 @@ classDiagram
     +stop()
     +handle(message)
     +focusedHere(x, y)
+    +countdownHere(left)
   }
   class ZoomHold {
     +holder StateFlow~Role~
@@ -999,6 +1010,7 @@ classDiagram
     +onFocusTap(x, y) Boolean
     +photographerFocus SharedFlow~RemoteFocus~
     +setBrightnessOpen(open)
+    +setMenuOpen(open)
     +onFlashTap()
     +setReferenceExpanded(expanded)
     +setReferenceCorner(corner)
@@ -1284,13 +1296,15 @@ classDiagram
   class SettingsViewModel {
     +guideLook StateFlow~GuideLook~
     +showLatency StateFlow~Boolean~
-    +baseBrightness StateFlow~Float~
+    +showGrid StateFlow~Boolean~
+    +showLevel StateFlow~Boolean~
     +account StateFlow~AuthState~
     +language Language
     +setGuideColor(color)
     +setGuideThickness(thickness)
     +setShowLatency(show)
-    +setBaseBrightness(ev)
+    +setShowGrid(show)
+    +setShowLevel(show)
     +chooseLanguage(language)
     +tutorialDue(screen) Flow~Boolean~
     +tutorialSeen(screens)
@@ -1300,7 +1314,8 @@ classDiagram
     <<interface>>
     +guideLook StateFlow~GuideLook~
     +showLatency StateFlow~Boolean~
-    +baseBrightness StateFlow~Float~
+    +showGrid StateFlow~Boolean~
+    +showLevel StateFlow~Boolean~
     +tutorialSeen StateFlow~Set~
   }
   class DataStoreAppSettings
@@ -1325,7 +1340,7 @@ classDiagram
   SettingsViewModel --> AuthRepository : the Pix account row
   DataStoreAppSettings ..|> AppSettings
   AndroidAppLanguage ..|> AppLanguage
-  CameraViewModel --> AppSettings : base brightness
+  CameraFragment ..> SettingsViewModel : the menu's grid and horizon bar
   GuideOverlayView ..> SettingsViewModel : followLook
   GuideOverlayView ..> GuideOutlines : another thickness
   TutorialFragment --> SettingsViewModel : tips seen
@@ -1520,7 +1535,6 @@ enum class GuideThickness(val scale: Float) { THIN(0.75f), NORMAL(1f), THICK(1.5
 data class GuideLook(val color: GuideColor = WHITE, val thickness: GuideThickness = NORMAL)   // this phone's; never sent
 enum class Language(val tag: String?) { PHONE(null), ENGLISH("en"), KOREAN("ko") }   // FR-10.2
 enum class TutorialScreen { CAMERA, ADD_GUIDE, GUIDE_ON_CAMERA, GENERATE_POSES, SUBJECT_VIEW }   // FR-10.4
-val BASE_BRIGHTNESS_EV = -2f..2f                             // FR-1.11; a camera's own range clamps it
 ```
 
 ### 2.4 State machines
@@ -1649,6 +1663,7 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `camera.focus.set` | S→P | reliable | `x`, `y` | The subject's tap to focus, in the photographer's frame (FR-7.7, [#273]); answered with `camera.state` |
 | `camera.focus` | P→S | reliable | `x`, `y` | Where the photographer's own tap focused, in the photographer's frame (FR-7.7, [#273]); not kept |
 | `camera.did` | P→S | reliable | `action`, `zoom`, `exposure`, `flash` | What the photographer did on their own camera, for the subject's line (FR-7.4, [#292]); not kept |
+| `camera.timer` | P→S | reliable | `left` | The photographer's countdown: each second, then 0 at its end (FR-1.17, [#272]); not kept |
 | `camera.shutter` | S→P | realtime | `press` | The subject's press of *Subject view*'s shutter, numbered (FR-7.8, [#314]); answered with `camera.shutter.answer` |
 | `camera.shutter.answer` | P→S | reliable | `taken`, `press` | Whether the press of that number took a photo; the photo itself goes as any other (`photo.shutter`, `photo.begin`) |
 | `pose.start` | S→P | reliable | `situation`, `request` | The situation the subject picked on its *Add a pose guide*, numbered (FR-6.15, [#276]); answered with `pose.start.answer` |
@@ -1892,7 +1907,7 @@ When `hasFlash` is false, the photographer answers with the unchanged state.
 { "v": 3, "t": "camera.focus.set", "seq": 1, "ts": 1759212355000, "b": { "x": 0.62, "y": 0.4 } }
 ```
 
-The subject's tap on the live video (FR-7.7): `x` and `y` are fractions of the photographer's frame, 0 to 1, as the photographer's preview shows it. The subject's video of the rear camera is a mirror, so the subject sends 1 − x of what it sees; the front camera's video is mirrored on both phones. The photographer calls `setFocusPoint` and sets its base brightness again (2.6.5). The point has no echo, since focus has no lasting state. The answer is the `camera.state` with that brightness, `by: SUBJECT` and `focused: true`. A point outside 0 to 1 is dropped.
+The subject's tap on the live video (FR-7.7): `x` and `y` are fractions of the photographer's frame, 0 to 1, as the photographer's preview shows it. The subject's video of the rear camera is a mirror, so the subject sends 1 − x of what it sees; the front camera's video is mirrored on both phones. The photographer calls `setFocusPoint` and sets its brightness back to 0 EV (2.6.5). The point has no echo, since focus has no lasting state. The answer is the `camera.state` with that brightness, `by: SUBJECT` and `focused: true`. A point outside 0 to 1 is dropped. So is a tap while the camera is not ready. Subject view therefore sends no tap while its video reshapes for a new ratio, until a frame of the new shape shows.
 
 </details>
 
@@ -1919,6 +1934,17 @@ What the photographer did on their own camera (FR-7.4, [#292]), once, when the a
 </details>
 
 <details>
+<summary><code>camera.timer</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "camera.timer", "seq": 10, "ts": 1759212355000, "b": { "left": 3 } }
+```
+
+The photographer's self-timer (FR-1.17, [#272]). `left` is the seconds before the photo: one message a second, from the timer's seconds down to 1, then 0 as the countdown ends, with its photo or cancelled. The subject shows the number, and takes it down at 0, at a drop, or 2 s after the last second. Nothing is kept: a subject that connects during a countdown sees it from its next second. An older subject ignores the type, as any unknown one.
+
+</details>
+
+<details>
 <summary><code>camera.shutter</code> · realtime · S→P, and <code>camera.shutter.answer</code> · reliable · P→S</summary>
 
 ```json
@@ -1926,7 +1952,7 @@ What the photographer did on their own camera (FR-7.4, [#292]), once, when the a
 { "v": 3, "t": "camera.shutter.answer", "seq": 4, "ts": 1759212355100, "b": { "taken": true, "press": 7 } }
 ```
 
-The subject's press of *Subject view*'s shutter, and what became of it (FR-7.8, [#314]). The photographer's phone takes the photo at once, as at its own shutter, and answers every press. `taken` is false when it took none: its Camera screen is not in front, it frames a pose's scene photo, or its camera still takes the photo before. Nothing is kept for later. A press is a moment that is wrong late, so it goes on the realtime channel, at once or not at all: on the reliable one it could wait behind a full buffer or a drop and take a photo after the subject was told that none was taken. A lost press frees the subject's shutter after 2 s, and the subject presses again. `press` numbers the subject's presses, and the answer names its press: an answer that comes after its press was given up is not the next press's. With the realtime channel lost, the press goes on the reliable one like every realtime message (2.6.7). A phone that does not know the types ignores them, so `protocol` stays 3.
+The subject's press of *Subject view*'s shutter, and what became of it (FR-7.8, [#314]). The photographer's phone takes the photo at once, as at its own shutter, and answers every press. `taken` is false when it took none: its Camera screen is not in front, it frames a pose's scene photo, its timer counts down, or its camera still takes the photo before. Nothing is kept for later. A press is a moment that is wrong late, so it goes on the realtime channel, at once or not at all: on the reliable one it could wait behind a full buffer or a drop and take a photo after the subject was told that none was taken. A lost press frees the subject's shutter after 2 s, and the subject presses again. `press` numbers the subject's presses, and the answer names its press: an answer that comes after its press was given up is not the next press's. With the realtime channel lost, the press goes on the reliable one like every realtime message (2.6.7). A phone that does not know the types ignores them, so `protocol` stays 3.
 
 </details>
 
@@ -1939,7 +1965,7 @@ The subject's press of *Subject view*'s shutter, and what became of it (FR-7.8, 
 { "v": 3, "t": "pose.start.answer", "seq": 7, "ts": 1759212361000, "b": { "started": true, "request": 3, "asking": false } }
 ```
 
-The situation the subject picked for AI poses, and whether the photographer's Camera began the scene photo for it (FR-6.15, [#276]). `situation` is the situation's name on the server, kept a string: a phone that does not know one refuses that request alone. `started` is false when the photographer's phone could not begin: its Camera is not in front or is already in a step, it has no front camera for a selfie, or its user answered the AI notice with *Not now*. With that notice up, an answer with `asking` goes at once, and the last answer when the notice is answered. `request` numbers the subject's requests, and each answer names its request, so a late answer is not taken for a later request's. The subject's phone waits 2 s for any answer and then counts the request as refused; `asking` ends that limit. Nothing is kept for later.
+The situation the subject picked for AI poses, and whether the photographer's Camera began the scene photo for it (FR-6.15, [#276]). `situation` is the situation's name on the server, kept a string: a phone that does not know one refuses that request alone. `started` is false when the photographer's phone could not begin: its Camera is not in front or is already in a step, its timer counts down, it has no front camera for a selfie, or its user answered the AI notice with *Not now*. With that notice up, an answer with `asking` goes at once, and the last answer when the notice is answered. `request` numbers the subject's requests, and each answer names its request, so a late answer is not taken for a later request's. The subject's phone waits 2 s for any answer and then counts the request as refused; `asking` ends that limit. Nothing is kept for later.
 
 </details>
 
@@ -2731,20 +2757,24 @@ guide size on screen:   hPx = height · H · s,   wPx = hPx · aspect
 - **Photos.** Before each `takePhoto`, `setPhotoTurn` sets `ImageCapture.targetRotation` from the turn at the press (`targetRotationFor`). The photo's EXIF orientation is then as held, and the viewport's crop and the front camera's EXIF flip stay. The subject's phone saves the same file, so it opens there the same way (FR-6.14).
 - **The scene photo.** The frame is turned upright as held when it is taken (2.6.3), and Camera holds it as framed while it is checked.
 - **A pose's guide.** Segmentation cuts the guide from the candidate as it is (2.6.1), and *Reference confirm* shows it there. *Use this guide* turns it back by the scene photo's turn into the frame (`intoFrameHeldAt`): its mask, outline, thumbnail, and `anchor`. It then starts where the person stood in the framed photo, and lies on the preview held the same way, on both phones (NFR-8). A picked photo and a saved guide go on as they are, so a pose's ♥ saves its guide already turned back (2.6.3, *Saving a pose*).
-- **The controls (FR-1.15, [#207]).** `TurningIcons` turns the controls the other way by the same quarter, so they stand upright to the user. They turn together, each around its own center, the shortest way, in 250 ms (`Motion.TURN_MS`); a half turn goes clockwise. A new turn during a turn goes on from where they are. The turn as a screen opens, and every turn with Android's animations off, is at once. A `TurningButton` turns its icon through a `RotateDrawable`, so its background and its tap area stay, and a new icon keeps the turn; with `turnsLabel` its label turns too. A `TurningLabel` is a text that turns, such as the zoom readout, in its pill. Both turn a label as one word in its own place and width (`TurnedLabelSpan`), so the view keeps its size. An icon or a thumbnail in a square, and a bottom-row button with its label under its icon, turn whole. On Camera these are the top bar's icons, the ratio, *Shoot together*'s icon, the zoom readout, the guide's icon buttons, the tip's and the guide-edit toggle's icons, *Guide*, the camera switch's icon, and the gallery thumbnail. On Subject view they are the top bar's icons, the zoom readout, the brightness, tip, *Save guide*, and guide-edit icons, *Guide*, *Pick a pose*, and the photo thumbnail; they follow the subject's own phone, and nothing is sent. The other texts stay, such as *Shoot together*'s label, as do the shutter, the preview and everything over it, the reference thumbnail, the panels, and the layout. The brightness bar's sun looks the same at every quarter, so it is not turned. The photo viewer over either screen turns whole, as a landscape screen while sideways (2.6.5).
+- **The controls (FR-1.15, [#207]).** `TurningIcons` turns the controls the other way by the same quarter, so they stand upright to the user. They turn together, each around its own center, the shortest way, in 250 ms (`Motion.TURN_MS`); a half turn goes clockwise. A new turn during a turn goes on from where they are. The turn as a screen opens, and every turn with Android's animations off, is at once. A `TurningButton` turns its icon through a `RotateDrawable`, so its background and its tap area stay, and a new icon keeps the turn; with `turnsLabel` its label turns too. A `TurningLabel` is a text that turns, such as the zoom readout, in its pill. Both turn a label as one word in its own place and width (`TurnedLabelSpan`), so the view keeps its size. An icon or a thumbnail in a square, and a bottom-row button with its label under its icon, turn whole. On Camera these are the top bar's icons (the camera menu's, the flash and the timer beside it, and the camera switch's), the ratio, *Shoot together*'s icon, the zoom readout, the countdown, the guide's icon buttons, the tip's and the guide-edit toggle's icons, the camera menu's items and *Guide* with their labels, and the gallery thumbnail. On Subject view they are the top bar's icon, the zoom readout, the countdown, the tip, *Save guide*, and guide-edit icons, the camera menu's items, *Guide*, and *Pick a pose* with their labels, and the photo thumbnail; they follow the subject's own phone, and nothing is sent. The other texts stay, such as *Shoot together*'s label, as do the shutter, the preview and everything over it, the reference thumbnail, the panels, and the layout. The brightness bar's sun looks the same at every quarter, so it is not turned. The photo viewer over either screen turns whole, as a landscape screen while sideways (2.6.5).
 
 **Photographer composition aids (FR-1.9, FR-1.10).** `CameraCompositionView` draws in the same rectangle. The rule-of-thirds grid is 0.5 dp with a 1 dp dark outline. The horizon bar is 1.5 dp with a 2.5 dp outline, and its middle counter-rotates with the roll. `CameraLevelMonitor` smooths the gravity sensor, or the accelerometer. Beyond 45° of roll the phone counts as on its side (`CameraLevel.baseDegrees`, 0 or 90), and the bar runs along the frame's long side (`cameraLevelFromGravity`; Iter3-A15, [#182]). Level enters within ±2°, exits beyond ±3°, and turns the bar dark yellow (`#D4AC24`). The bar hides past 20° (`MAX_LEVEL_TILT_DEGREES`), on invalid readings, and with the phone face up or down. The aids never enter photos, analysis frames, or the stream. Settings turns the grid and the bar off apart (`showGrid`, `showLevel`; 2.6.8).
 
 **Camera zoom and the guide-edit mode (AD-17).** With guide-edit mode off, a pinch on the preview zooms; with it on, every drag and pinch edits the guide. A new guide starts with the mode off: people zoom and focus more often than they move the guide, so those gestures work at once ([#304]). The toggle turns it on, and the shutter, another guide, hiding, or removing turns it off. On Subject view it starts off too and chooses between `camera.zoom.set` and `guide.move` (2.6.5). The zoom row holds the readout, the pose tip's button (Camera only), and the mode's toggle. The toggle is one person icon, lit in the guide color while the mode is on. Then `GuideOverlayView.filled` tints the inside of the guide in the guide color at 25 % (`camera_guide_fill`), whatever the line's color. The tint is the mask's inside at the outline's level (`guideInside`), made once per guide off the main thread (`GuideOutlines.inside`), never while drawing, and drawn under the outline ([#271]). A tap on the readout steps through `quickZoomSteps` (FR-1.3): the camera's minimum when below 1×, then 1× and 2× where available. `nextZoomStep` takes the first step above the zoom (2 % tolerance), else the first; a tap before the last step is applied goes on from that step. On Subject view a late echo of an earlier step is ignored. The readout's tap area is at least 48 dp wide around a 28 dp pill, with Zoom in / Zoom out accessibility actions. The top bar's ratio button opens 3:4, 9:16, and 1:1 in a row (Iter3-A12, FR-1.13). Brightness is a bar beside the focus box (`ExposureBarView`; 2.8, *Camera labels and brightness*; [#182]). A lens switch keeps the pinch's target through `STARTING`.
 
-**Screen layout (It 3, Iter3-A2).** `previewArea` puts the image at full width below the top bar: 1:1 inside the 4:3 area with the outside dimmed, not clipped, and 16:9 down under the controls. The controls keep one size and place for every ratio, and the panels above them sit below a 4:3 or 1:1 image and over a 16:9 one. `placeZoomRow` draws the zoom row 8 dp above the image's bottom or the first panel, whichever is higher. Every control takes taps on at least 48 × 48 dp (NFR-16): the top bar's buttons reach 4 dp over the image (`TOP_BAR_OVERHANG_DP`), and everything in the bar centers on the 48 dp above that part, the scene photo's title included (`@dimen/top_bar_overhang`, [#204]); the zoom row sits 6 dp above it (`ZOOM_ROW_MARGIN_DP`). While a session streams, `LiveDotView` blinks a red dot at the frame's top right on both phones (FR-6.6, FR-6.8). Subject view follows the same layout (2.6.5). At large fonts ([#298]), Camera's bottom row stays 88 dp around the shutter and grows below it for a *Guide* label taller than 16 dp, as Subject view's does, so *Guide*'s icon stays on one line on both; the scene photo's title and Subject view's camera name shrink to 11 and 12 dp, not sp, so each keeps its line at 200 %. The screens: R&S 6.2.
+**The camera menu (It 5, FR-1.17, [#272]).** The flash, the timer, the grid, the horizon bar, and Settings share one menu. Its button sits at the top left of the top bar, and it opens a row under the bar on the ratios' glass (`cameraMenu`, `CameraUiState.menuOpen`). The menu and the ratios are never open together. Each comes down 8 dp as it fades in over 150 ms (`reveal` in `ui/Motion.kt`), and goes at once, so the other one or the image is there with the tap. The top bar's buttons draw one pill under a touch, 50 × 32 dp on the bar's line: the menu's button and the ratio also while their panel is open (`camera_top_bar_button_background`). The pill comes from the styles (`Widget.Pix.Button.Icon.TopBar`, `.Text.TopBar`, the `top_bar_pill_inset_*` dimens), never from a view's own insets. The icon buttons' empty line of text is sized in dp, and the ratio's label follows the font only to 130 % (`capPillText`), so neither makes the pill or the bar taller at a large font. Each item is an icon over a one-word label, in a thinner line than the bar's icons, and in the accent while what it sets is on (`isActivated`, `camera_menu_option`). *Flash* and *Timer* go to their next choice at each tap, and a change says so in a short notice (`MenuNotice`): "Flash auto", "Timer 3 s". *Grid* and *Horizon* turn the grid and the horizon bar off and on, and the choice is kept (2.6.8). Each tap turns over what is stored in one DataStore edit (`AppSettings.toggleShowGrid`, `toggleShowLevel`): setting the opposite of the flow's value would let two quick taps both read the value before the first save, and change it once. A choice keeps the menu open; a touch anywhere else, Back, or *Settings* closes it. While the flash is on or auto, and while the timer is on, its icon stands beside the menu's button, at the bar's icons' size and line, on their center line. The camera switch sits beside *Shoot together* or *End session*. The scene photo hides the menu, the icons beside it, and the camera switch; its light has its own button (2.6.3). Subject view has the same menu with the photographer's flash, this phone's grid, and Settings (2.6.5).
 
-**Changes on screen (It 3, Iter3-A12, [#179]).** Camera changes animate in 300 ms or less (`ui/Motion.kt`: move 250 ms, turn 300 ms, fade 200 ms, dim 150 ms). With Android's animations off, each shows its end at once.
+**The self-timer (It 5, FR-1.17, [#272]).** The timer is off, 3 s, or 10 s (`ShutterTimer`), kept while Pix runs. With it on, the shutter starts a countdown in `CameraViewModel` instead of a photo. The seconds go down one a second (`COUNTDOWN_STEP_MS`) and show large over the preview with "Tap the shutter to cancel" (`countdownPanel`). At 0 the photo is taken as at the shutter, with its blink (`timedShots`). A second tap cancels it, and so does the screen stopping, for another screen or the background (`CameraFragment.onStop`, `cancelCountdown`). A camera that is not ready at 0 takes no photo and shows the failed photo's message. While it counts, *Guide*, the thumbnail, the menu, the ratio, the camera switch, and *Shoot together* or *End session* wait, dimmed to 35 %; zoom and focus still work. Ended during the count, a session would be gone before its photo. The number is 120 dp, not sp, so a large font cannot push it out of its square, and it turns with the phone (FR-1.15). In a session each second, and 0 at the end, goes to the subject as `camera.timer` (2.5.1, 2.6.5).
+
+**Screen layout (It 3, Iter3-A2).** `previewArea` puts the image at full width below the top bar: 1:1 inside the 4:3 area with the outside dimmed, not clipped, and 16:9 down under the controls. The controls keep one size and place for every ratio, and the panels above them sit below a 4:3 or 1:1 image and over a 16:9 one. `placeZoomRow` draws the zoom row 8 dp above the image's bottom or the first panel, whichever is higher. Every control takes taps on at least 48 × 48 dp (NFR-16): the top bar's buttons reach 4 dp over the image (`TOP_BAR_OVERHANG_DP`), and everything in the bar centers on the 48 dp above that part, the scene photo's title included (`@dimen/top_bar_overhang`, [#204]); the zoom row sits 6 dp above it (`ZOOM_ROW_MARGIN_DP`). While a session streams, `LiveDotView` blinks a red dot at the frame's top right on both phones (FR-6.6, FR-6.8). Subject view follows the same layout (2.6.5). At large fonts ([#298]), Camera's bottom row stays 88 dp around the shutter and grows below it for a *Guide* label taller than 16 dp, as Subject view's does, so *Guide*'s icon stays on one line on both; the scene photo's title and Subject view's camera name shrink to 11 and 12 dp, not sp, so each keeps its line at 200 %. The top bar's pill, *Shoot together* or *End session*, and the ratio follow the font only to 130 % (`capPillText`), so the pill fits beside the camera menu's icons, the ratio, and the camera switch, and the ratio's pill stays as tall as the icons', and the camera menu's labels shrink to 8 dp where they would not fit ([#272]). The screens: R&S 6.2.
+
+**Changes on screen (It 3, Iter3-A12, [#179]).** Camera changes animate in 300 ms or less (`ui/Motion.kt`: move 250 ms, turn 300 ms, fade 200 ms, dim 150 ms, a panel under the top bar 150 ms). With Android's animations off, each shows its end at once.
 
 - *New ratio.* The held frame dims to half (`previewScrim`) and blurs 16 dp in 150 ms (`RenderEffect`, Android 12 and later). In 250 ms the image's place, the zoom row, the live dot, and the held frame move to the new ratio's (`FramePlace`, `sceneMove`). The frame scales with the camera image's width around it, `max(width, height × 3/4)`, so the scene lands where the new preview shows it: 4:3 to 16:9 is a third larger, and 16:9 to 1:1 three quarters as large. On the Galaxy S22 the first also moves it 80 dp lower. The grid and guide stay hidden until the new binding streams; then the frame fades out in 200 ms and they fade in (FR-3.7).
 - *Other camera (FR-1.14).* The same hold, with the grid and guide kept. The frame turns over top over bottom in 300 ms (`rotationX`), then fades into the new preview.
 - *Lens change of the zoom.* The held frame goes at once (2.6.5).
-- *Shutter (FR-1.5, FR-1.6).* The preview blinks to 60 % dark and back in 120 ms when a photo is taken (`CameraViewModel.onShutter`, 2.2), not for the scene photo. The new thumbnail grows in from 60 % in 200 ms. The shutter is disabled only until the camera has taken the picture (`CameraUiState.shutterBusy`), so the next photo can follow while this one is saved. Nothing says that a photo is being saved. *Guide*, *Shoot together*, the camera switch, and the ratio wait until every photo is saved (`isSaving`), because leaving Camera or rebinding would lose a photo ([#208]).
+- *Shutter (FR-1.5, FR-1.6).* The preview blinks to 60 % dark and back in 120 ms when a photo is taken (`CameraViewModel.onShutter`, 2.2), not for the scene photo. The new thumbnail grows in from 60 % in 200 ms. The shutter is disabled only until the camera has taken the picture (`CameraUiState.shutterBusy`), so the next photo can follow while this one is saved. Nothing says that a photo is being saved. *Guide*, *Shoot together*, the camera switch, the ratio, and the menu's *Settings* wait until every photo is saved (`isSaving`), because leaving Camera or rebinding would lose a photo ([#208]).
 - *Reference thumbnail (FR-3.9, [#237]).* It follows the finger. At a release, a tap, or a move by TalkBack it settles into its place, size, and opacity in 200 ms (`Motion.THUMBNAIL_MS`, `showReference`). It is laid out once, at the larger of the two sizes, and drawn smaller by its scale, about its middle: growing, at the new size from the start, and shrinking, at the old size until the end. So the photo is never a small one enlarged. Its corner radius and line are divided by that scale at every frame, so they look as at rest (`keepShapeAt`). The same scale flips it for Subject view's mirror, so only `showReference` sets the thumbnail's scale (`mirrored`). A render for the place a glide is already going to leaves the glide running, and so does a press: a second tap turns the glide back from the size it has then, and only a drag stops it, holding the thumbnail by the box it is drawn at then. It shows its end at once when it first appears, with another photo, and with animations off.
 - *Subject view.* The video area moves the same way when `camera.state.aspect` changes. The grid and guide wait for a frame of the new shape (`FrameWatchdog.shape`, within 2 %) or 2 s (2.6.4).
 
@@ -2908,8 +2938,8 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - Each change of the holder goes to the subject as `camera.zoom.hold`, and again when the session connects. The subject's session keeps it, so a screen that opens late knows it. Subject view then sends nothing, ends a pinch that is running with a cancel (`camera.zoom.set` with `cancel`), which changes no zoom, and its readout follows the echo.
   - The phone held back says who is zooming in its toggle label (2.8).
 - **Unanswered requests.** `RemoteControlHandler` gives a final zoom, brightness, or flash request 500 ms, and longer while the camera is `STARTING`. It then confirms a request the camera holds, or answers with the current state, `by: PHOTOGRAPHER`, so the control snaps back. A request applied within 5 s still counts as the subject's.
-- **Brightness and flash (It 2, FR-7.3).** Subject view sets the brightness with Camera's bar, over the exposure range from `camera.capabilities`. The bar comes up beside the focus box at a tap on the video (remote focus below, 2.8). Until Iteration 4 it was a slider opened from a button ([#182], [#273]). The flash button is in the top bar. Each control hides when the camera lacks it.
-  - The bar sends `camera.exposure.set` like zoom. The flash button sends `camera.flash.set` and shows the tapped mode until the echo.
+- **Brightness and flash (It 2, FR-7.3).** Subject view sets the brightness with Camera's bar, over the exposure range from `camera.capabilities`. The bar comes up beside the focus box at a tap on the video (remote focus below, 2.8). Until Iteration 4 it was a slider opened from a button ([#182], [#273]). The flash is *Flash* in the camera menu, with this phone's *Grid* and *Settings* (2.6.2, [#272]). Each control hides when the camera lacks it.
+  - The bar sends `camera.exposure.set` like zoom. *Flash* sends `camera.flash.set` and shows the tapped mode until the echo.
   - The photographer clamps and calls `setExposure` or `setFlash`. It answers a request the camera cannot take with the unchanged `camera.state`.
   - Each exposure, flash, or ratio change, from either phone, goes out as `camera.state`, `by: SUBJECT` when it matches the subject's request. A step of the bar is echoed as a step. Camera's own controls call the same methods (FR-1.11, FR-1.12).
 - **Guide moves (It 2, FR-7.2).** Subject view shows the guide-edit toggle and its label while a guide is on the video, off by default (2.6.2, 2.8).
@@ -2925,7 +2955,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
 - **Shared steps (It 3, FR-6.15, US-16, [#120]).** Only the photographer's phone generates poses. Its *Generate poses*, *Generating poses*, *Pick a pose*, and *Reference confirm* also show on the subject's phone (2.5.1).
   - The photographer's syncer sends each step while connected, with images encoded off the main thread. After a reconnect it sends the current step, or only its end (2.6.7).
   - The subject's syncer keeps a mirror in memory (`MirrorDescription`, `MirrorPoseSet`, `MirrorConfirm`) through a reconnect, until its end, the next one, or the session's end.
-  - Subject view opens each one once by itself while it is the current destination (`claimSetOpening`, `claimConfirmOpening`, `claimDescribeOpening`). Otherwise a button beside the thumbnail, where Camera has its camera switch, opens it ([#314]; in the row's middle until then). One that arrives under *Add a pose guide* opens when the sheet closes.
+  - Subject view opens each one once by itself while it is the current destination (`claimSetOpening`, `claimConfirmOpening`, `claimDescribeOpening`). Otherwise a button beside the thumbnail, which moves aside for it, opens it ([#314]; in the row's middle until then). One that arrives under *Add a pose guide* opens when the sheet closes.
   - The subject's paused video says "Dongje is describing a pose…", "Dongje is creating poses…", "Dongje is picking a pose…", or "Dongje is checking the guide…".
   - The first request to reach the photographer's phone decides (AD-7). One unanswered for 5 s says "Couldn't send your request", "Couldn't send your pick", or "Couldn't send your choice".
   - Each subject screen follows the session itself. The shared screens say "… sees this too".
@@ -2970,7 +3000,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
 - **Remote focus (It 5, FR-7.7, [#273]).** A tap on Subject view's video does what a tap on Camera does (FR-1.4), on the photographer's camera.
   - `PinchZoomController` owns the video's touches and reports the tap and a one-finger drag up or down, as on Camera. In guide-edit mode it is off, so a tap does not focus: the touch is the guide's. A tap outside the image does nothing. Nor does one while the video is not showing, as under "The photographer's camera is paused.": that camera would drop the request, and a box would show a focus never set.
   - `SubjectViewModel.onFocusTap` sends `camera.focus.set` with the point in the photographer's frame (2.5.1). It needs a camera that focuses on a point or has a brightness range (`camera.capabilities`).
-  - `RemoteControlHandler` calls `setFocusPoint` on a camera that takes a point, and sets the base brightness from Settings again (`CameraCapabilities.baseExposureIndex`, the rule Camera's own tap uses). A camera that is not `READY` drops the tap.
+  - `RemoteControlHandler` calls `setFocusPoint` on a camera that takes a point, and sets the brightness back to 0 EV (`CameraCapabilities.baseExposureIndex`, the rule Camera's own tap uses). A camera that is not `READY` drops the tap.
   - Every tap is answered with a `camera.state`, `by: SUBJECT` and `focused: true`: at once when the camera has the base already, and otherwise when the camera reports it. A camera that has not taken the base after 500 ms is answered for with its current state, and the base is no longer waited for, so a later change to that value is not taken for it. The tap makes no brightness notice. The mark keeps the subject from taking another echo of its own for the answer, such as an earlier pinch's, which still carries the old brightness.
   - Subject view shows the focus box at the tap and the brightness bar beside it (`FocusBrightness`, 2.8). A drag that starts with the bar down taps first. It then waits for the tap's answer (`SubjectUiState.baseAwaited`), at most 1 s: the 500 ms the photographer's phone itself waits for its camera, and 500 ms for the link, so the bar starts from the photographer's base, which this phone does not know otherwise. If the bar went while the drag waited, the drag moves nothing. A finger put on the bar itself, a drag on the video with the bar already up, or TalkBack's change waits for the same answer (`ExposureBarView.awaitingValue`): until then the bar shows the brightness from before the tap.
   - The bar closes when Subject view's view goes, as under Settings or *Add a pose guide*: it stood beside a box of that view, on that view's time.
@@ -3004,14 +3034,15 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - A press is refused while a pose's scene photo is framed or held, which is the photographer's own step, and while the camera is not ready or still takes the photo before. Nothing is queued: a press is one moment.
   - The subject's shutter is held from a press to the answer that names it, or for 2 s without one (`SHUTTER_WAIT_MS`). It is dimmed while the photographer's video does not show (`videoShowing`): before the first frame, while the link reconnects, and during the photographer's pose steps. A press that took no photo says "Can't take a photo right now" where the labels show.
   - The photographer's preview blinks, with "Joonhyung took a photo" (`RemoteAction.Shutter`). The subject's phone needs no line of its own: `photo.shutter` already blinks its video and says "Receiving photo…".
-  - A countdown is left to the self-timer ([#272]).
+  - The photographer's timer is their own shutter's (FR-1.17): the subject's phone neither shows nor sets it. A press takes the photo at once whatever the timer is set to (`CameraViewModel.onSubjectShutter`). While the timer counts down, a press takes no photo and does not stop the countdown, which only the photographer cancels; Subject view dims its shutter then, and a press that still comes, sent before the first second arrived, is answered not taken.
 - **AI poses from the subject's phone (FR-6.15, [#276]).** The subject's *Add a pose guide* offers the situations. A tile sends `pose.start` (`SessionViewModel.askForPoses`) and starts nothing on the subject's phone, whose camera has no part in it.
   - The photographer's Camera screen begins the scene photo's step for that situation, through the code its own tile runs (`CameraFragment.startPosesForSubject`, `GenerationViewModel.chooseSituation`, `beginScene`). It gives itself to `RemoteControlHandler` while it is started, as for the shutter (`SessionViewModel.setRemotePoseStarter`).
   - From there nothing differs from the photographer's own start: the photographer takes the scene photo, and `DescriptionShare`, `PoseShare`, and `ConfirmShare` carry the steps to both phones. The subject's shutter stays refused during the scene photo's step.
-  - The start is refused while Camera is not the screen in front, while a scene photo is framed or held, with the photos open over the camera, and for a selfie on a phone without a front camera. The answer is `pose.start.answer`; nothing is queued.
+  - The start is refused while Camera is not the screen in front, while a scene photo is framed or held, with the photos open over the camera, while the photographer's timer counts down, when their own *Guide* waits too (FR-1.17), and for a selfie on a phone without a front camera. The answer is `pose.start.answer`; nothing is queued.
   - Consent is each phone's own (FR-4.2). The subject's phone asks before it sends the request, in words that say the photographer takes the photo. The photographer's phone sends the photo, so without its user's consent it shows the notice with "Joonhyung asked for AI poses." and begins once they agree; *Not now*, or leaving Camera, refuses. A second request while the notice is up is refused.
   - Camera says "Joonhyung started AI poses" (`RemoteAction.PoseStart`). Subject view says "Dongje takes the scene photo for the poses", "Waiting for Dongje to agree" while the photographer reads the notice, or "Can't start AI poses right now" (`SessionViewModel.poseStartAnswers`, buffered, so an answer that comes under another screen is said when Subject view is back).
   - The subject's request waits 2 s for the photographer's phone to say anything (`POSE_START_WAIT_MS`), then counts as refused: a message can be lost (2.8). An answer with `asking` ends that limit, since the notice may be read for long. Only the request that waits is answered, by its number. A session's end drops its waiting request and any answer no screen has read, so the next session, with another photographer, says nothing of them.
+- **The photographer's countdown (It 5, FR-1.17, [#272]).** `CameraViewModel` tells `RemoteControlHandler.countdownHere` each second of the timer and 0 at its end, and the handler sends `camera.timer` while a session runs. Subject view shows the number large over the video with "Dongje is taking a photo" (`SubjectUiState.countdown`). Each second keeps it up for 2 s at most (`COUNTDOWN_STALE_MS`), so a number whose end never came goes by itself, and a drop takes it down. Only the photographer can cancel it. The subject's shutter waits (above), and the subject's *Flash* waits as the photographer's does: Subject view disables it, and `RemoteControlHandler` answers a `camera.flash.set` that still comes, sent before the first second arrived, with the unchanged state.
 - **Notices.** Camera shows each final remote action for 3 s, named from `hello` (FR-7.4, 2.5.1): "Joonhyung set zoom to 2×", "… moved the guide", "… set brightness to +1.0", "… turned the flash on" or "off", "… set the flash to auto", or "… set a pose guide". Subject view shows the same lines about the photographer, where its labels show ([#292]). The photographer's phone knows its own user's actions exactly, so it tells each once, when it ends, as `camera.did` (`RemoteControlHandler.didHere`, called by `CameraViewModel` and, for a guide set from a photo or the library, by `ReferenceViewModel`): a state alone would not say whether a brightness was set by hand or put back by a tap to focus. A chosen pose's guide is not told, since its Reference confirm ends with "… used this guide" on the subject's phone. The focus's line comes with `camera.focus`, as rarely as Camera's.
   - Camera says "Joonhyung is watching your camera" for 3 s when a subject connects, not after a drop (`SessionNotice.Watching`, [#271]); a new subject after the room waited alone is a new start. Subject view has no such notice: the line above its shutter names the camera for the whole session.
 - **The subject gone.** "Joonhyung left" or "… disconnected" (FR-6.10, FR-6.11) stays 10 s (`CameraViewModel.PEER_GONE_NOTICE_MS`), since the photographer may not be looking. It goes once the subject is back. A "Couldn't send" notice waits for it (FR-6.14).
@@ -3073,11 +3104,10 @@ Subject view's controls are requests. The photographer's phone applies them in a
 
 #### 2.6.8 Settings (Iteration 3)
 
-The settings screen (FR-10.1, R&S 6.10; Iter3-P23, [#123]) opens from a gear on Camera's top bar. The gear hides during the scene photo only. In a session it stays beside *End session*, and Subject view has its own beside *Leave* ([#204]). Settings over Subject view covers it, so it watches the session and goes back to Subject view when the session ends, as the guide screens do. On the photographer's phone, Settings leaves Camera, so the subject's video pauses until the photographer comes back. `SettingsViewModel` is activity-scoped, so each screen applies a change when it shows again.
+The settings screen (FR-10.1, R&S 6.10; Iter3-P23, [#123]) opens from *Settings* in the camera menu, on Camera and on Subject view, also in a session (2.6.2, [#204], [#272]). The menu hides during the scene photo only. Settings over Subject view covers it, so it watches the session and goes back to Subject view when the session ends, as the guide screens do. On the photographer's phone, Settings leaves Camera, so the subject's video pauses until the photographer comes back. `SettingsViewModel` is activity-scoped, so each screen applies a change when it shows again.
 
 | Section | Rows |
 |----|----|
-| Camera | *Base brightness*, *Grid*, *Horizon bar* |
 | Guide | Color, thickness, preview |
 | Shoot together | *Show the delay* |
 | General | *Language*, *Notifications* |
@@ -3087,8 +3117,7 @@ The settings screen (FR-10.1, R&S 6.10; Iter3-P23, [#123]) opens from a gear on 
 
 Each section's rows share one card, without dividers.
 
-- **Base brightness (FR-1.11, [#182]).** "Every photo starts from it. Tap to focus, then drag up or down to change it until the next tap." The slider runs from −2 to +2 EV in thirds, 0 by default, and shows its value, such as "+1.0". It is saved as `AppSettings.baseBrightness` (DataStore `base_brightness_ev`). Camera returns to it at each tap to focus (2.8, *Camera labels and brightness*). A camera with a smaller range clamps it.
-- **Grid and horizon bar (FR-1.9, FR-1.10, [#271]).** Two switches, on by default, kept as `AppSettings.showGrid` and `showLevel` (DataStore `show_grid`, `show_level`). `CameraCompositionView` draws each only while its switch is on; 1:1's dim stays. The grid's switch applies on Camera and Subject view, which has no bar. Camera's level sensor runs only while the screen is resumed and the bar is on.
+- **Grid and horizon bar (FR-1.9, FR-1.10, [#271], [#272]).** Not on this screen: the camera menu's *Grid* and *Horizon* turn them off and on (2.6.2). Both are on by default and kept as `AppSettings.showGrid` and `showLevel` (DataStore `show_grid`, `show_level`). `CameraCompositionView` draws each only while it is on; 1:1's dim stays. The grid applies on Camera and Subject view, which has no horizon bar. Camera's level sensor runs only while the screen is resumed and the bar is on.
 - **Guide look (FR-3.10).** Five colors: white, the default (FR-2.2); black; yellow; mint; and pink. Three thicknesses: about 1.5, 2, and 3 dp (`GuideThickness` 0.75, 1, 1.5), 2 dp by default. DataStore keeps them (`app_settings`).
   - A color is a `SRC_IN` filter on the white outline (`GuideOverlayView.lineColor`). The opacity still applies.
   - `GuideOutlines` traces another thickness from the mask off the main thread and keeps the last four. The default line shows until it is ready.
@@ -3454,7 +3483,7 @@ erDiagram
 - CameraX opens every binding without the exposure index and the flash mode. `CameraXController` keeps them, as it keeps the zoom, and applies them again after a rebind, a lens switch, or the screen's return.
 - The camera stays `STARTING` until the exposure index is back, so no photo is taken at 0 EV.
 - While a separately exposed ultrawide without a flash is bound, the capabilities and the state report no flash, so the button hides. The chosen mode returns with the primary camera.
-- The capabilities come from the chosen side's primary camera: rear, or front in selfie mode. A switch of side starts again at 1× and the base brightness.
+- The capabilities come from the chosen side's primary camera: rear, or front in selfie mode. A switch of side starts again at 1× and 0 EV.
 - A tap focuses, meters, and sets the white balance at that point, then returns to continuous focus after 5 s (`FocusMeteringAction`). The point maps from frame to preview buffer through its crop and rotation, mirrored on the front camera.
 
 **Guide-edit mode** (AD-17)
@@ -3468,17 +3497,19 @@ erDiagram
 - The chip shows for 3 s (`CameraViewModel.NOTICE_MS`), and a new label replaces it at once. It is a live region for TalkBack. The hint chip steps aside for it, and opening the ratios takes it down (FR-1.13).
 - The guide-edit mode toggle shows `pinchModeLabel` above it for 3 s: *Guide* in the guide's color while drags and pinches move the guide, *Camera* in white while a pinch zooms. TalkBack reads "Pinch moves the guide" or "Pinch zooms the camera".
 - Subject view shows the same labels for its zoom step, its *Save guide*, and its toggle.
-- The pose tip's button closes an open tip, as any touch does (FR-4.10). The screen-wide touch skips the button, so one tap does not close and reopen the tip.
+- The pose tip's button closes an open tip, as any touch does (FR-4.10). The screen-wide touch skips the button, so one tap does not close and reopen the tip. It also skips the ratio button and the ratios: a new ratio keeps the guide, so its tip stays open.
 - Brightness is `ExposureBarView`: a 48 × 128 dp touch area, a 1.5 dp accent line with a 2.5 dp outline, and a sun at the applied exposure index (FR-1.11).
 - A tap to focus brings the bar up beside the focus box: on its right, or its left near the image's right edge, always inside the image. Without point focus, it comes up at the tap.
 - Up without a tap point, as after the screen is made again, the bar stands at the middle of the image's right edge, clear of the horizon bar.
 - A drag on the bar, or one finger's drag up or down anywhere on the preview (`PinchZoomController.VerticalDrag`), moves the sun from where it was, up brighter. It changes the brightness by 1 EV for each 150 dp of the finger's way, whatever the camera's range and step (`ExposureBarView.DP_PER_EV`), so a swipe changes it by about 1 EV and a camera's usual ±2 EV takes a long drag each way, as with an iPhone's sun. Before, the bar's 114 dp of travel spanned the whole range, so a short swipe went most of the way ([#207]). The bar spans the camera's whole range, so the sun moves less than the finger. Each step applies at once, and the last again on release.
 - A drag that starts with the bar down first focuses there, as a tap, and starts from the base. A sideways move or a second finger is no brightness drag; guide-edit mode keeps the preview's drags.
-- Every photo starts from the base brightness in Settings, like iPhone's exposure adjustment (2.6.8). `CameraViewModel` applies `AppSettings.baseBrightness` as the nearest exposure index in the camera's range (`CameraCapabilities.baseExposureIndex`), and so does a tap from the subject's phone (2.6.5).
-- It applies it when the range is first known, when the range or step changes (another camera), and when the setting changes. Each tap to focus drops a drag's change and sets the base again; the setting stays.
+- Every photo starts at 0 EV, the base, like iPhone's exposure adjustment; no setting changes it ([#272]). `CameraViewModel` applies the index of 0 EV in the camera's range, or the range's nearest end (`CameraCapabilities.baseExposureIndex`), and so does a tap from the subject's phone (2.6.5).
+- It applies it when the range is first known and when the range or step changes (another camera). Each tap to focus drops a drag's change and sets the base again.
 - TalkBack reads the bar as a slider with scroll actions. The bar fades after 3 s without a touch (`FocusBrightness.IDLE_MS`). It stays while dragged or in TalkBack's focus; the idle time restarts when the focus leaves.
 - The focus box (`bg_focus_ring`) is a 64 dp square of a 1 dp accent line, with a short tick at the middle of each side. Subject view has the same box and bar for the photographer's camera, in place of its brightness button and slider (2.6.5, [#273]). `FocusBrightness` places and times both on either screen.
 - Beside the bar, the box stays as long as the bar does, and the two fade out together in 200 ms, whatever closes the bar (`FocusBrightness`). On a camera without brightness, the box fades by itself after about a second. Before, it went after a second while the bar stayed and still changed the brightness ([#207]).
+- A new ratio closes the bar on both screens. The rebind drops the focus point, so the box would mark a focus that is gone.
+- The ratio cannot change while the scene photo's shutter waits for its frame (`GenerationUiState.shooting`). A rebind then would leave no frame to take.
 
 **Language** (FR-10.2)
 
@@ -3606,7 +3637,7 @@ Left out of Iteration 4 at its kickoff, for the UAT and its fixes: the remote-co
 | The live view's sharpness after a reconnection (Iter5-P5, [#269]) | 박재완 | 11/25 | Open | 2.6.7, *Still open* |
 | The library's situations and memos (Iter5-P6, [#270]) | 한준형 | 11/26 | Open | 2.6.2, AD-16 |
 | UI fixes: switches for the grid and the horizon bar, "up to 30 s", and UAT cycle 2's opinions (Iter5-P7, [#271]) | 박재완 | 11/27 | Open | 2.6.2, 2.6.8 |
-| A self-timer for the shutter (Iter5-P8, [#272]) | 박재완 | 11/27 | Open | 2.6.2, *Still open* |
+| A self-timer for the shutter (Iter5-P8, [#272]) | 박재완 | 11/27 | Open | 2.2, 2.5.1, 2.6.2, 2.6.5, 2.6.8 |
 | Remote focus, with the brightness beside the focus box (Iter5-P9, [#273]) | 박동제 | 11/27 | Open | 2.5.1, 2.6.5, 2.6.8, 2.8 |
 | Options to choose on *Generate poses* (Iter5-P10, [#274]) | 박동제 | 11/27 | Open | 2.6.3, 2.6.5 |
 | The cutout as a guide (Iter5-P11, [#275]) | 한준형 | 11/27 | Open | AD-6, 2.5.1, 2.6.1, 2.6.8, *Still open* |

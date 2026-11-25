@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Subject view (R&S 6.6, FR-6.6, FR-6.7, FR-7.1–7.3). No shutter: only the photographer takes photos. A pinch on
-     the video zooms the photographer's camera while guide-edit mode is off (AD-17); with it on, drags and pinches
-     move the photographer's guide. The brightness slider and the flash button are the photographer's controls. The
+<!-- Subject view (R&S 6.6, FR-6.6, FR-6.7, FR-7.1–7.3, FR-7.8). Its shutter asks the photographer's phone for the
+     photo, which is taken there (#314). A pinch on the video zooms the photographer's camera while guide-edit mode is off (AD-17); with it on, drags and pinches
+     move the photographer's guide. The brightness bar and the camera menu's flash are the photographer's controls. The
      video is placed as on the Camera screen (previewArea, in code), and the zoom row and the caption lie above it. The
      root reports the end of every touch, which closes the photographer's tip (FR-4.10). -->
 <com.lastpenguin.pix.ui.camera.TouchWatchingLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -24,19 +24,19 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <!-- The photographer's flash, cycled from here (FR-7.3); hidden when their phone has none. -->
+        <!-- The camera menu, as on the photographer's Camera screen (FR-1.17): the photographer's flash, this phone's
+             grid, and Settings. -->
         <com.lastpenguin.pix.ui.camera.TurningButton
-            android:id="@+id/flashButton"
+            android:id="@+id/cameraMenuButton"
             style="@style/Widget.Pix.Button.Icon.TopBar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:contentDescription="@string/flash_off"
-            android:visibility="gone"
-            app:icon="@drawable/ic_flash_off"
+            android:contentDescription="@string/camera_menu"
+            app:backgroundTint="@color/camera_top_bar_button_background"
+            app:icon="@drawable/ic_tune"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            tools:visibility="visible" />
+            app:layout_constraintTop_toTopOf="parent" />
 
         <!-- The latency indicator, when Settings turns it on (FR-10.3). -->
         <TextView
@@ -47,22 +47,10 @@
             android:visibility="gone"
             app:drawableStartCompat="@drawable/ic_status_dot"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/settingsButton"
+            app:layout_constraintEnd_toStartOf="@id/leaveButton"
             app:layout_constraintTop_toTopOf="parent"
             tools:text="@string/latency_value"
             tools:visibility="visible" />
-
-        <!-- Settings (FR-10.1), beside Leave as on the photographer's Camera screen (#204). -->
-        <com.lastpenguin.pix.ui.camera.TurningButton
-            android:id="@+id/settingsButton"
-            style="@style/Widget.Pix.Button.Icon.TopBar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:contentDescription="@string/settings"
-            app:icon="@drawable/ic_settings"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/leaveButton"
-            app:layout_constraintTop_toTopOf="parent" />
 
         <!-- Red, as End session on the photographer's Camera screen (#271). -->
         <Button
@@ -75,6 +63,88 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
     </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- The camera menu (FR-1.17), opened from its button in the top bar, as on the Camera screen: the photographer's flash
+         (FR-7.3), each tap its next choice, this phone's grid (FR-1.9), on or off, and Settings (FR-10.1). No timer, which
+         is the photographer's own shutter's (FR-7.8), and no horizon bar, which this screen does not draw. A touch anywhere else,
+         or Back, closes it. -->
+    <LinearLayout
+        android:id="@+id/cameraMenu"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="4dp"
+        android:accessibilityPaneTitle="@string/camera_menu"
+        android:background="@drawable/bg_aspect_panel"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:outlineProvider="none"
+        android:paddingHorizontal="8dp"
+        android:translationZ="2dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topBar"
+        tools:visibility="visible">
+
+        <LinearLayout
+            android:id="@+id/menuFlash"
+            style="@style/Widget.Pix.CameraMenuOption"
+            android:layout_width="72dp"
+            android:layout_weight="0"
+            android:contentDescription="@string/flash_off">
+
+            <ImageView
+                android:id="@+id/menuFlashIcon"
+                style="@style/Widget.Pix.CameraMenuOption.Icon"
+                android:src="@drawable/ic_menu_flash_off"
+                tools:ignore="ContentDescription" />
+
+            <TextView
+                style="@style/Widget.Pix.CameraMenuOption.Label"
+                android:text="@string/menu_flash" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/menuGrid"
+            style="@style/Widget.Pix.CameraMenuOption"
+            android:layout_width="72dp"
+            android:layout_weight="0"
+            android:contentDescription="@string/grid_on">
+
+            <ImageView
+                style="@style/Widget.Pix.CameraMenuOption.Icon"
+                android:src="@drawable/ic_menu_grid"
+                tools:ignore="ContentDescription" />
+
+            <TextView
+                style="@style/Widget.Pix.CameraMenuOption.Label"
+                android:text="@string/settings_grid" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="32dp"
+            android:layout_marginHorizontal="4dp"
+            android:background="@color/pix_outline"
+            android:importantForAccessibility="no" />
+
+        <LinearLayout
+            android:id="@+id/menuSettings"
+            style="@style/Widget.Pix.CameraMenuOption"
+            android:layout_width="72dp"
+            android:layout_weight="0"
+            android:contentDescription="@string/settings">
+
+            <ImageView
+                style="@style/Widget.Pix.CameraMenuOption.Icon"
+                android:src="@drawable/ic_menu_settings"
+                tools:ignore="ContentDescription" />
+
+            <TextView
+                style="@style/Widget.Pix.CameraMenuOption.Label"
+                android:text="@string/settings" />
+        </LinearLayout>
+    </LinearLayout>
 
     <FrameLayout
         android:id="@+id/videoContainer"
@@ -210,6 +280,37 @@
             android:visibility="gone"
             tools:text="@string/guide_saved_notice"
             tools:visibility="visible" />
+
+        <!-- The photographer's timer counting down (FR-1.17), as their Camera screen shows it: the seconds left, large in
+             the middle of the video, and whose photo it is. The number turns with the phone (FR-1.15). -->
+        <LinearLayout
+            android:id="@+id/countdownPanel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <com.lastpenguin.pix.ui.camera.TurningLabel
+                android:id="@+id/countdownNumber"
+                android:layout_width="200dp"
+                android:layout_height="200dp"
+                android:accessibilityLiveRegion="polite"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:textAppearance="@style/TextAppearance.Pix.Countdown"
+                android:textSize="120dp"
+                tools:ignore="SpUsage"
+                tools:text="3" />
+
+            <TextView
+                android:id="@+id/countdownLine"
+                style="@style/Widget.Pix.Chip.Small"
+                android:textSize="13sp"
+                tools:text="@string/photographer_timer_label" />
+        </LinearLayout>
     </FrameLayout>
 
     <!-- Right above the shutter, as the Camera screen's panels sit above its own: the photographer's tip (FR-4.10),
@@ -484,8 +585,8 @@
 
         <!-- Camera's row in thirds (R&S 6.6), 88 dp as Camera's: Guide in the middle of the left third and the shutter
              in the middle, each where Camera's is (FR-7.8, #314); the session photos' thumbnail, a view of the screen's
-             own, in the middle of the right third, and beside it, where Camera has its camera switch, a step's button
-             such as Pick a pose while the photographer's step lasts (FR-6.15). Held sideways, Pick a pose turns with
+             own, in the middle of the right third, where Camera's gallery button is, and beside it a step's button
+             such as Pick a pose while the photographer's step lasts (FR-6.15), for which the thumbnail moves aside. Held sideways, Pick a pose turns with
              its label and stands taller than the row, so neither clips it (FR-1.15). -->
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/guideRow"

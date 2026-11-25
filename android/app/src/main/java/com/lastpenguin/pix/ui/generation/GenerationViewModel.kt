@@ -113,6 +113,11 @@ data class GenerationUiState(
     /** The shutter gave no photo; told on Camera until the next attempt. */
     val shotFailed: Boolean = false,
     /**
+     * The shutter was pressed and the frame is not taken yet, which may wait for the light ([GenerationViewModel.takeScene]):
+     * the ratio cannot change now, since a rebind would leave no frame to take.
+     */
+    val shooting: Boolean = false,
+    /**
      * The phone's light is turned on for the scene photo, a frame of the preview that a photo's flash would not reach
      * (FR-4.1). It is on only while the scene is framed, and stays chosen when Back on Generate poses shoots again.
      */
@@ -354,16 +359,22 @@ class GenerationViewModel(
     fun takeScene() {
         if (_uiState.value.phase != GenerationUiState.Phase.FRAMING || shooting?.isActive == true) return
         // The message about the photo before goes with the press.
-        _uiState.update { if (it.noPerson) it.copy(noPerson = false) else it }
+        _uiState.update { it.copy(noPerson = false, shooting = true) }
         shooting = viewModelScope.launch {
-            val canLight = camera.capabilities.value?.hasFlash == true
-            val wanted = _uiState.value.light && canLight
-            withTimeoutOrNull(LIGHT_WAIT_MS) { settledLight.first { it == wanted } }
             // The camera the frame comes from, and how the phone is held, read with it: a selfie gets selfie poses
             // (FR-1.14), and a photo held sideways landscape ones (FR-4.3).
-            val selfie = camera.facing.value == CameraFacing.FRONT
-            val turn = phoneTurn.value
-            val frame = camera.grabFrame()
+            var selfie = false
+            var turn = 0
+            val frame = try {
+                val canLight = camera.capabilities.value?.hasFlash == true
+                val wanted = _uiState.value.light && canLight
+                withTimeoutOrNull(LIGHT_WAIT_MS) { settledLight.first { it == wanted } }
+                selfie = camera.facing.value == CameraFacing.FRONT
+                turn = phoneTurn.value
+                camera.grabFrame()
+            } finally {
+                _uiState.update { if (it.shooting) it.copy(shooting = false) else it }
+            }
             frame.exceptionOrNull()?.let { Log.w(TAG, "No scene photo: $it") }
             val upright = frame.getOrNull()?.let {
                 if (turn ==

@@ -174,6 +174,10 @@ data class SubjectUiState(
     val photosOpen: Boolean = false,
     /** A photo of the photographer's is on its way here, from their shutter until it is saved (FR-6.14, #271). */
     val receivingPhoto: Boolean = false,
+    /** Whether the camera menu is open under the top bar (FR-1.17). */
+    val menuOpen: Boolean = false,
+    /** The seconds the photographer's timer has left before its photo (FR-1.17), from `camera.timer`; null otherwise. */
+    val countdown: Int? = null,
 ) {
     /** The thumbnail's photo, none until the session's first. */
     val lastPhoto: Uri?
@@ -343,6 +347,9 @@ class SubjectViewModel(
     // How many times this phone's shutter asked for a photo: the number of the press that waits, if one does.
     private var shutterPresses = 0
 
+    // Takes down a number whose next second never came (showCountdown).
+    private var countdownExpiry: Job? = null
+
     private val guideSender = StepSender<GuideState>(viewModelScope, SEND_INTERVAL_MS) { state, final ->
         val guideId = state.guideId ?: return@StepSender
         session.send(SessionMessage.GuideMove(guideId, state.cx, state.cy, state.height, final))
@@ -388,13 +395,17 @@ class SubjectViewModel(
         viewModelScope.launch {
             session.state.collect { state ->
                 val connected = state as? SessionState.Connected
-                if (connected == null) endInteractions()
+                if (connected == null) {
+                    endInteractions()
+                    countdownExpiry?.cancel()
+                }
                 _uiState.update {
                     it.copy(
                         connected = connected != null,
                         photographerName = connected?.peer?.displayName ?: it.photographerName,
-                        // The bar is for a camera that can be reached.
+                        // The bar is for a camera that can be reached; so is a countdown, whose end may not come.
                         brightnessOpen = it.brightnessOpen && connected != null,
+                        countdown = it.countdown.takeIf { connected != null },
                     )
                 }
             }
@@ -441,6 +452,10 @@ class SubjectViewModel(
                     if (message.press == shutterPresses && endShutterWait() && !message.taken) {
                         _shutterRefusals.trySend(Unit)
                     }
+                    return@collect
+                }
+                if (message is SessionMessage.Countdown) {
+                    showCountdown(message.left)
                     return@collect
                 }
                 if (message !is SessionMessage.CameraStateUpdate) return@collect
@@ -848,11 +863,12 @@ class SubjectViewModel(
 
     /**
      * This phone's shutter (FR-7.8, #314): asks the photographer's phone for a photo, at once, and holds the shutter
-     * until its answer or [SHUTTER_WAIT_MS]. False when nothing was asked: not connected, or a press still waits.
+     * until its answer or [SHUTTER_WAIT_MS]. False when nothing was asked: not connected, a press still waits, or the
+     * photographer's timer counts down, whose photo is on its way (FR-1.17).
      */
     fun onShutter(): Boolean {
         val ui = _uiState.value
-        if (!ui.connected || ui.shutterWaiting) return false
+        if (!ui.connected || ui.shutterWaiting || ui.countdown != null) return false
         // Numbered, so only its own answer ends its wait: one that comes after the wait is for no later press.
         val press = ++shutterPresses
         session.send(SessionMessage.ShutterPress(press))
@@ -881,10 +897,35 @@ class SubjectViewModel(
         _uiState.update { it.copy(brightnessOpen = open && it.hasBrightness) }
     }
 
-    /** The flash button cycles off, auto, on, like the photographer's own (FR-7.3); the echo confirms or reverts it. */
+    /** The camera menu under the top bar opens or closes (FR-1.17). */
+    fun setMenuOpen(open: Boolean) {
+        _uiState.update { it.copy(menuOpen = open) }
+    }
+
+    /**
+     * The photographer's timer has [left] seconds before its photo, or 0 as it ended (`camera.timer`, FR-1.17). Each
+     * second's message keeps the number up for [COUNTDOWN_STALE_MS] at most, so a number whose end never came, as
+     * when the photographer's phone stopped, goes by itself.
+     */
+    private fun showCountdown(left: Int) {
+        countdownExpiry?.cancel()
+        val shown = left.takeIf { it > 0 }
+        _uiState.update { it.copy(countdown = shown) }
+        if (shown == null) return
+        countdownExpiry = viewModelScope.launch {
+            delay(COUNTDOWN_STALE_MS)
+            _uiState.update { it.copy(countdown = null) }
+        }
+    }
+
+    /**
+     * The menu's Flash cycles the photographer's flash off, auto, on, like their own (FR-7.3); the echo confirms or
+     * reverts it.
+     */
     fun onFlashTap() {
         val ui = _uiState.value
-        if (!ui.connected || !ui.hasFlash) return
+        // Not while the photographer's timer counts down, as on their own phone (FR-1.17).
+        if (!ui.connected || !ui.hasFlash || ui.countdown != null) return
         val next = when (ui.flash) {
             FlashMode.OFF -> FlashMode.AUTO
             FlashMode.AUTO -> FlashMode.ON
@@ -905,17 +946,23 @@ class SubjectViewModel(
         guideSender.cancel()
     }
 
-    internal companion object {
+    companion object {
+        private const val SEND_INTERVAL_MS = 50L
+
         /**
          * How long a press of the shutter waits for its answer. The photographer's phone answers at once, so this is
          * the link's time alone; after it the press counts as not taken.
          */
         const val SHUTTER_WAIT_MS = 2_000L
 
-        const val SEND_INTERVAL_MS = 50L
+        /**
+         * How long one second of the photographer's countdown stays without the next (FR-1.17): the second itself
+         * (`CameraViewModel.COUNTDOWN_STEP_MS`), and as much again for the link.
+         */
+        const val COUNTDOWN_STALE_MS = 2_000L
 
         /** What the link may add to an answer's way, both directions together (NFR-7's 0.5 s for a remote action). */
-        const val LINK_ALLOWANCE_MS = 500L
+        private const val LINK_ALLOWANCE_MS = 500L
 
         /**
          * How long a tap to focus waits for its answer: as long as the photographer's phone itself waits for its
@@ -924,6 +971,6 @@ class SubjectViewModel(
          * in a tenth of a second or two as a rule; only an older photographer, which sends none, makes a drag begun
          * with the tap wait this long.
          */
-        const val BASE_WAIT_MS = RemoteControlHandler.ECHO_TIMEOUT_MS + LINK_ALLOWANCE_MS
+        private const val BASE_WAIT_MS = RemoteControlHandler.ECHO_TIMEOUT_MS + LINK_ALLOWANCE_MS
     }
 }

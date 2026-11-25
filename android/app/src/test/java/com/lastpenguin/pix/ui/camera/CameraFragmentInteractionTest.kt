@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -111,10 +111,13 @@ import org.robolectric.shadows.ShadowDialog
  * and the line is back after it; a drop during the subject's pinch, where the pinch's end must not take the line down.
  * The subject's shutter (#314, FR-7.8): a photo taken here with its notice; nothing while a pose's scene photo is
  * framed, neither a photo nor the scene; nothing while the camera is not ready; nothing once this screen is left, and
- * a photo again when it is back; nothing with a sheet or the photos over the camera, which stays started under them.
+ * a photo again when it is back; nothing with a sheet or the photos over the camera, which stays started under them;
+ * with this phone's timer on, the photo at once and no countdown; while the timer counts down, no photo, and the
+ * countdown goes on to its own.
  * The subject starts AI poses (#276, FR-6.15): the scene photo's step begun here for their situation, with its notice;
- * refused for a selfie without a front camera, while a scene photo is already framed (the step unchanged), and with a
- * sheet over the camera; without the agreement on this phone, asked first with the subject's name, begun once agreed,
+ * refused for a selfie without a front camera, while a scene photo is already framed (the step unchanged), with a
+ * sheet over the camera, and while this phone's timer counts down (the countdown going on to its photo); without the
+ * agreement on this phone, asked first with the subject's name, begun once agreed,
  * refused at "Not now", and a second request refused while the question is up.
  */
 @RunWith(AndroidJUnit4::class)
@@ -548,6 +551,47 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
     }
 
+    /** The photographer's timer set to 3 s in the camera menu (FR-1.17), which then closes. */
+    private fun chooseThreeSeconds() {
+        onScreen { controls, _ -> controls.cameraMenuButton.performClick() }
+        onScreen { controls, _ -> controls.menuTimer.performClick() }
+        onScreen { controls, _ -> controls.cameraMenuButton.performClick() }
+    }
+
+    @Test
+    fun withTheTimerOn_theSubjectsShutterTakesThePhotoAtOnce_withoutACountdown() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+        chooseThreeSeconds()
+
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idle()
+
+        // The timer is this phone's own shutter's: the subject's press is the photo, now.
+        assertEquals(1, camera.photoTurns.size)
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = true, press = 1)), shutterAnswers(modules))
+        assertTrue(modules.session.sent.none { it is SessionMessage.Countdown })
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.countdownPanel.visibility) }
+    }
+
+    @Test
+    fun whileTheTimerCountsDown_theSubjectsPressIsNotTaken_andTheCountdownGoesOnToItsPhoto() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+        chooseThreeSeconds()
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idleFor(1_000)
+
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idle()
+
+        // Neither a photo nor the countdown's end: only this phone's shutter cancels it (FR-1.17).
+        assertTrue(camera.photoTurns.isEmpty())
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), shutterAnswers(modules))
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.countdownPanel.visibility) }
+
+        idleFor(2_100)
+        assertEquals(1, camera.photoTurns.size)
+    }
+
     @Test
     fun onceThisScreenIsLeft_aPressIsNotTaken_andItIsAgainWhenTheScreenIsBack() {
         val (modules, camera) = inASessionWithACameraThatSaves()
@@ -668,6 +712,27 @@ class CameraFragmentInteractionTest {
 
         assertEquals(Situation.HALF_BODY, generation.uiState.value.situation)
         assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers(modules))
+    }
+
+    @Test
+    fun whileTheTimerCountsDown_theSubjectsStartIsRefused_andTheCountdownGoesOnToItsPhoto() {
+        val camera = FakeCameraController().apply { photo = Uri.parse("content://media/external/images/9") }
+        val modules = TestAppContainer(camera = camera)
+        inASession(modules)
+        chooseThreeSeconds()
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idleFor(1_000)
+
+        modules.session.deliver(SessionMessage.PoseStart("full_body"))
+        idle()
+
+        // Guide waits on this phone while the timer counts down (FR-1.17), and so does the subject's start.
+        assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers(modules))
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.countdownPanel.visibility) }
+
+        idleFor(2_100)
+        assertEquals(1, camera.photoTurns.size)
     }
 
     @Test
@@ -1469,28 +1534,23 @@ class CameraFragmentInteractionTest {
     }
 
     @Test
-    fun theBaseBrightnessFromSettings_isWhereTheCameraStarts_andEachTapToFocusGoesBackToIt() {
-        // 0.5 EV per index: +1 EV is index 2.
+    fun theCameraStartsAt0Ev_andEachTapToFocusGoesBackToIt() {
         val camera = FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true)
-        val modules = launch(camera)
+        launch(camera)
         assertEquals(0, camera.exposureRequests.last())
-
-        runBlocking { modules.appSettings.setBaseBrightness(1f) }
-        idle()
-        assertEquals(2, camera.exposureRequests.last())
 
         onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 3f) }
         idle()
         onScreen { controls, _ -> drag(controls.exposureBar, steps = 2) }
         idle()
-        assertEquals(4, camera.exposureRequests.last())
+        assertEquals(2, camera.exposureRequests.last())
 
-        // A new focus drops what the drag added, and keeps the base; past the double-tap time, or the detector would take
-        // the two taps for one double tap.
+        // A new focus drops what the drag added; past the double-tap time, or the detector would take the two taps for
+        // one double tap.
         shadowOf(Looper.getMainLooper()).idleFor(ViewConfiguration.getDoubleTapTimeout() + 100L, TimeUnit.MILLISECONDS)
         onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 2f) }
         idle()
-        assertEquals(2, camera.exposureRequests.last())
+        assertEquals(0, camera.exposureRequests.last())
         assertEquals(2, camera.focusPoints.size)
     }
 

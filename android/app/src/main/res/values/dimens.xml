@@ -7,6 +7,10 @@
     <dimen name="pose_page_gap">12dp</dimen>
     <!-- The camera bars' last part, over the image (TOP_BAR_OVERHANG_DP): what is in the bar centers above it. -->
     <dimen name="top_bar_overhang">4dp</dimen>
+    <!-- The top bar buttons' pill, 32 dp of the bar's 52: what is left above and below it, 4 dp more below for the
+         overhang, so it centers on the bar's line. -->
+    <dimen name="top_bar_pill_inset_top">8dp</dimen>
+    <dimen name="top_bar_pill_inset_bottom">12dp</dimen>
     <!-- The pose flow's bar under the top bar (R&S 6.3, #210). -->
     <dimen name="flow_progress_height">3dp</dimen>
     <!-- Between the situations' tiles on Add a pose guide (FR-4.8). -->

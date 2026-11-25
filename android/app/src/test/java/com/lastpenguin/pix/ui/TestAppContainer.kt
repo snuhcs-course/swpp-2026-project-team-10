@@ -222,7 +222,6 @@ class TestAppContainer(
             camera,
             guides,
             attributeGuideChanges = syncer::attribute,
-            baseBrightness = appSettings.baseBrightness,
         ),
         mobileDataNotice = mobileData,
         appSettings = appSettings,

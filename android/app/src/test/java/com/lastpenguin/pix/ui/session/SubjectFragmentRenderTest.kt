@@ -84,7 +84,9 @@ import org.robolectric.shadows.ShadowDialog
  * toggle, a hidden guide; the photographer's reference photo with its guide, enlarged, kept while the guide is hidden,
  * gone with a replaced or removed guide, moved to another corner on this phone only, and hidden at the video's side
  * by a flick and shown again by a tap on its handle, on this phone only, and hidden while enlarged (the small strip,
- * and small when it is back; #237), a mirror through each change of its size; a flash tap; remote focus with the
+ * and small when it is back; #237), a mirror through each change of its size; the camera menu (FR-1.17): its flash's
+ * tap, which keeps it open, and Back and its button closing it; the photographer's countdown (FR-1.17): each second
+ * with their name, the menu's flash disabled, and all gone at its end; remote focus with the
  * brightness beside it (FR-7.7, FR-7.3, #273): a tap inside the image (the focus asked for at the photographer's x, the
  * box there, the bar beside it), beside the image and in guide-edit mode (nothing), on a camera without point focus
  * (the bar alone); a drag on the bar (steps, then the final value; both gone after the idle time); a drag on the video
@@ -95,7 +97,8 @@ import org.robolectric.shadows.ShadowDialog
  * photographer's own focus (the box alone at its place on the mirror; this phone's bar up, which goes, or held under a
  * finger, where nothing moves; while a drag still waits for its tap's answer, which ends that drag); TalkBack's action
  * on the video (the focus at the image's middle and the bar, and nothing in guide-edit mode); a tap and TalkBack's
- * action while the photographer's camera is paused (nothing), and once frames come again; the live view on mobile data (FR-6.13); the Guide button (FR-6.15) disabled until connected, adding or
+ * action while the photographer's camera is paused (nothing), and once frames come again; a tap while their camera
+ * rebinds for a new ratio (nothing), and once a frame of the new shape comes; the live view on mobile data (FR-6.13); the Guide button (FR-6.15) disabled until connected, adding or
  * changing the guide, opening Add a pose guide, and "Couldn't send the guide" for a guide that did not go; Leave and the
  * back button, which both ask first (#298: confirmed, cancelled), and the session ending by a lost connection (also with Add a pose guide open over it) or
  * the photographer, named or before the name arrived. Save guide (FR-6.16): hidden without a guide, then saving it
@@ -113,13 +116,14 @@ import org.robolectric.shadows.ShadowDialog
  * The UAT's opinions (#271): the line above the shutter (#314; in the shutter's place until then) empty until
  * connected, then whose camera this is and "Live" on one line, the name alone while a step's button shows beside the
  * thumbnail, with no notice saying it as well; *Leave* red; the guide-edit toggle one person icon, unlit with the guide plain and lit with it
- * filled. The grid on by default and off from Settings. The tip, Save guide, and guide-edit buttons on glass, the
+ * filled. The grid on by default and kept off. The tip, Save guide, and guide-edit buttons on glass, the
  * toggle's tinted while on (#298).
  * What the photographer did (#292): each action a line with their name where the labels show, for a label's time and
  * the focus's for its shorter one; the photographer's pinch named for as long as it, replaced by the ratio's line, gone
  * when it ends without one; another label meanwhile keeps its own time, and the line is back after it.
  * This phone's shutter (FR-7.8, #314; state-based): dimmed before the session, connected without a frame, while the
- * link reconnects, and during the photographer's step; with the video showing a press asks once and holds the shutter;
+ * link reconnects, during the photographer's step, and while the photographer's timer counts down, free again at its
+ * end; with the video showing a press asks once and holds the shutter;
  * answered taken (free, no line), not taken (free, a line for a label's time), and not answered (the line after the
  * wait).
  * This phone's start of AI poses (FR-6.15, #276): the answer said where the lines show, begun (who takes the scene
@@ -196,7 +200,7 @@ class SubjectFragmentRenderTest {
             assertEquals(View.GONE, binding.compositionOverlay.visibility)
             assertFalse(binding.zoomReadout.isEnabled)
             assertEquals(View.GONE, binding.editGuideButton.visibility)
-            assertEquals(View.GONE, binding.flashButton.visibility)
+            assertEquals(View.GONE, binding.menuFlash.visibility)
             assertFalse(binding.exposureBar.isShown)
             // The tutorial shows the pinch (FR-10.4); TalkBack hears it from the video, which has no caption under it.
             assertEquals(string(R.string.subject_video_description), binding.liveView.contentDescription.toString())
@@ -263,8 +267,8 @@ class SubjectFragmentRenderTest {
             assertEquals(View.GONE, binding.connectingText.visibility)
             assertEquals(View.VISIBLE, binding.compositionOverlay.visibility)
             assertTrue(binding.zoomReadout.isEnabled)
-            assertEquals(View.VISIBLE, binding.flashButton.visibility)
-            assertTrue(binding.flashButton.isEnabled)
+            assertEquals(View.VISIBLE, binding.menuFlash.visibility)
+            assertTrue(binding.menuFlash.isEnabled)
             // The brightness comes up beside a tap on the video, not before it.
             assertFalse(binding.exposureBar.isShown)
             assertFalse(binding.focusRing.isShown)
@@ -290,7 +294,8 @@ class SubjectFragmentRenderTest {
 
         onScreen { binding, _ ->
             assertEquals(string(R.string.zoom_ratio, "2.0"), binding.zoomReadout.text.toString())
-            assertEquals(string(R.string.flash_auto), binding.flashButton.contentDescription)
+            assertEquals(string(R.string.flash_auto), binding.menuFlash.contentDescription)
+            assertTrue(binding.menuFlash.isActivated)
             assertEquals(AspectRatio.R16_9.frameAspect, binding.compositionOverlay.frameAspect)
             assertEquals(AspectRatio.R16_9.frameAspect, binding.guideOverlay.frameAspect)
             assertEquals(2, binding.exposureBar.index)
@@ -766,6 +771,26 @@ class SubjectFragmentRenderTest {
         assertEquals(0, presses(modules))
     }
 
+    @Test
+    fun whileThePhotographersTimerCountsDown_theShutterIsDimmed_andTakesNoPress() {
+        val modules = launch()
+        connectWithVideo(modules)
+
+        modules.session.deliver(SessionMessage.Countdown(3))
+        idle()
+        onScreen { binding, _ ->
+            assertFalse(binding.shutterButton.isEnabled)
+            binding.shutterButton.performClick()
+        }
+        idle()
+        assertEquals(0, presses(modules))
+
+        // Its end, with its photo or cancelled, frees the shutter.
+        modules.session.deliver(SessionMessage.Countdown(0))
+        idle()
+        onScreen { binding, _ -> assertTrue(binding.shutterButton.isEnabled) }
+    }
+
     // ---- This phone starts AI poses (FR-6.15, #276) --------------------------------------------------------------
 
     /** This phone picks a situation, as its sheet does, and the photographer's phone answers that request. */
@@ -853,7 +878,7 @@ class SubjectFragmentRenderTest {
     }
 
     @Test
-    fun theGrid_isOnByDefault_andOffFromSettings() {
+    fun theGrid_isOnByDefault_andOffWhenKeptOff() {
         val modules = launch()
         connect(modules)
         onScreen { binding, _ -> assertTrue(binding.compositionOverlay.showGrid) }
@@ -869,14 +894,70 @@ class SubjectFragmentRenderTest {
     }
 
     @Test
-    fun theFlashTap_sendsARequest() {
+    fun theMenusFlash_sendsARequest_andTheMenuStaysOpen() {
         val modules = launch()
         connect(modules, exposureRange = -4..4, hasFlash = true)
 
-        onScreen { binding, _ -> binding.flashButton.performClick() }
+        onScreen { binding, _ -> binding.cameraMenuButton.performClick() }
+        idle()
+        onScreen { binding, _ ->
+            assertEquals(View.VISIBLE, binding.cameraMenu.visibility)
+            assertTrue(binding.cameraMenuButton.isActivated)
+            binding.menuFlash.performClick()
+        }
         idle()
 
         assertTrue(modules.session.sent.any { it == SessionMessage.FlashSet(FlashMode.AUTO) })
+        onScreen { binding, _ -> assertEquals(View.VISIBLE, binding.cameraMenu.visibility) }
+    }
+
+    @Test
+    fun theMenu_closesAtBack_andAtItsButtonAgain() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, hasFlash = true)
+
+        onScreen { binding, _ -> binding.cameraMenuButton.performClick() }
+        idle()
+        onScreen { _, fragment -> fragment.requireActivity().onBackPressedDispatcher.onBackPressed() }
+        idle()
+        onScreen { binding, _ ->
+            assertEquals(View.GONE, binding.cameraMenu.visibility)
+            binding.cameraMenuButton.performClick()
+        }
+        idle()
+        onScreen { binding, _ -> binding.cameraMenuButton.performClick() }
+        idle()
+
+        onScreen { binding, _ -> assertEquals(View.GONE, binding.cameraMenu.visibility) }
+    }
+
+    // ---- The photographer's timer (FR-1.17) ----------------------------------------------------------------------
+
+    @Test
+    fun thePhotographersCountdown_showsEachSecondWithTheirName_andGoesAtItsEnd() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, hasFlash = true)
+        onScreen { binding, _ -> assertEquals(View.GONE, binding.countdownPanel.visibility) }
+
+        modules.session.deliver(SessionMessage.Countdown(3))
+        idle()
+        onScreen { binding, _ ->
+            assertEquals(View.VISIBLE, binding.countdownPanel.visibility)
+            assertEquals("3", binding.countdownNumber.text.toString())
+            assertEquals(string(R.string.photographer_timer_label, "Dongje"), binding.countdownLine.text.toString())
+            // The photographer's flash waits, as on their phone.
+            assertFalse(binding.menuFlash.isEnabled)
+        }
+        modules.session.deliver(SessionMessage.Countdown(2))
+        idle()
+        onScreen { binding, _ -> assertEquals("2", binding.countdownNumber.text.toString()) }
+
+        modules.session.deliver(SessionMessage.Countdown(0))
+        idle()
+        onScreen { binding, _ ->
+            assertEquals(View.GONE, binding.countdownPanel.visibility)
+            assertTrue(binding.menuFlash.isEnabled)
+        }
     }
 
     // ---- Remote focus, with the brightness beside it (FR-7.7, FR-7.3, #273) -----------------------------------
@@ -1350,6 +1431,33 @@ class SubjectFragmentRenderTest {
         idle()
         assertEquals(1, focuses(modules).size)
         onScreen { binding, _ -> assertTrue(binding.exposureBar.isShown) }
+    }
+
+    @Test
+    fun whileThePhotographersCameraRebindsForANewRatio_aTapAsksForNothing_untilAFrameOfTheNewShape() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, focuses = true)
+        modules.video.deliverFrame(720, 960)
+        idle()
+
+        // The photographer's new ratio: their camera rebinds and drops a tap until it is ready again.
+        modules.session.deliver(
+            SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, aspect = AspectRatio.R16_9),
+        )
+        idle()
+        tapTheImage()
+        idle()
+        assertTrue(focuses(modules).isEmpty())
+        onScreen { binding, _ ->
+            assertFalse(binding.exposureBar.isShown)
+            assertFalse(binding.focusRing.isShown)
+        }
+
+        modules.video.deliverFrame(720, 1280)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        tapTheImage()
+        idle()
+        assertEquals(1, focuses(modules).size)
     }
 
     @Test

@@ -76,6 +76,9 @@ class ChannelRouterTest {
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PoseStartAnswer(started = true)))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PhotographerDid("zoom", zoom = 2f)))
         assertFalse(router.latestOnly(SessionMessage.PhotographerDid("zoom", zoom = 2f)))
+        // The countdown's seconds in order, its end among them (FR-1.17).
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.Countdown(3)))
+        assertFalse(router.latestOnly(SessionMessage.Countdown(3)))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ControlPermission(false)))
         assertTrue(router.latestOnly(SessionMessage.GuideMove("g", 0.4f, 0.5f, 0.8f)))
         assertTrue(router.latestOnly(SessionMessage.ExposureSet(3)))

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.drawable.RotateDrawable
@@ -28,9 +28,9 @@ import org.robolectric.annotation.GraphicsMode
 /*
  * Subject view's icons turning with the subject's own phone (FR-1.15, #207, R&S 6.6, Design 2.6.2) on the Galaxy
  * S22's app area, 360 x 705 dp.
- * Partitions (equivalence): the phone held at 0, 90, 180, and 270 degrees. What turns: the top bar's icons, the
- * brightness, tip, save, and guide-edit buttons' icons, the zoom readout as a word, Guide and Pick a pose each with
- * its label, and the photo thumbnail. What stays: Leave, the video and what is drawn over it, the reference
+ * Partitions (equivalence): the phone held at 0, 90, 180, and 270 degrees. What turns: the camera menu's icon, the
+ * tip, save, and guide-edit buttons' icons, the zoom readout and the photographer's countdown as words, the menu's
+ * items, Guide, and Pick a pose each with its label, and the photo thumbnail (FR-1.17). What stays: Leave, the video and what is drawn over it, the reference
  * thumbnail, and every control's place and size. The turn is this phone's own: nothing is sent to the photographer.
  */
 @RunWith(AndroidJUnit4::class)
@@ -62,10 +62,13 @@ class SubjectControlTurnTest {
 
     /** The controls that turn what they draw: the buttons' icons and the zoom readout. */
     private fun FragmentSubjectBinding.turningButtons(): List<View> =
-        listOf(flashButton, settingsButton, tipButton, saveGuideButton, editGuideButton, zoomReadout)
+        listOf(cameraMenuButton, tipButton, saveGuideButton, editGuideButton, zoomReadout, countdownNumber)
 
-    /** Guide and Pick a pose turn with their labels, each as one block; the thumbnail turns whole. */
+    /** The menu's items, Guide, and Pick a pose turn with their labels, each as one block; the thumbnail turns whole. */
     private fun FragmentSubjectBinding.turningViews(): List<View> = listOf(
+        menuFlash,
+        menuGrid,
+        menuSettings,
         guideButton,
         pickPoseButton,
         galleryThumbnail,

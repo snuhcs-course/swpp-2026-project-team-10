@@ -1371,7 +1371,7 @@ class GenerationScreensTest {
     }
 
     @Test
-    fun pick_backAndSystemBack_askFirst_thenReturnToGeneratePoses_withThePhotoAndTheDescription_withoutTheSet() {
+    fun pick_backAndSystemBack_returnAtOnceToGeneratePoses_withThePhotoAndTheDescription_withoutTheSet() {
         val back: List<(PickPoseFragment) -> Unit> = listOf(
             { FragmentPickPoseBinding.bind(it.requireView()).backButton.performClick() },
             { it.requireActivity().onBackPressedDispatcher.onBackPressed() },

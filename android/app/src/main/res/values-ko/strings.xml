@@ -108,7 +108,6 @@
     <string name="tip_failed">이 포즈의 팁을 받지 못했어요</string>
     <string name="show_tip">팁 보기</string>
     <string name="close_tip">팁 닫기</string>
-    <string name="hint_pinch_zoom">두 손가락으로 확대·축소</string>
     <string name="flash_off">플래시 끔</string>
     <string name="flash_auto">플래시 자동</string>
     <string name="flash_on">플래시 켬</string>
@@ -167,12 +166,12 @@
     <string name="person_found">인물을 인식했어요</string>
     <string name="couldnt_use_photo">이 사진은 사용할 수 없어요. 다른 사진을 고르세요.</string>
     <string name="use">사용</string>
-    <string name="choose_another_photo">다른 사진 고르기</string>
     <string name="cut_from_screenshot">스크린샷에서 사진만 남겼어요</string>
     <string name="kept_photo_description">스크린샷에서 남긴 사진</string>
     <string name="use_whole_image">이미지 전체 사용</string>
     <string name="no_person_title">인물을 인식하지 못했어요</string>
     <string name="no_person_message">인물 한 명이 또렷하게 나온 사진을 골라 주세요.</string>
+    <string name="no_person_photo_message">뒤로 가서 인물 한 명이 또렷하게 나온 사진을 골라 주세요.</string>
 
     <!-- Flow 2: Pose generation -->
     <string name="generating_title">포즈 생성 중</string>
@@ -574,7 +573,7 @@
     <string name="tutorial_move">끌어서 옮기고, 두 손가락으로 크기 조절</string>
     <string name="tutorial_edit">이 버튼을 켜면 가이드를 옮길 수 있어요</string>
     <string name="tutorial_fade">흐리게 하거나 숨길 수 있어요</string>
-    <string name="tutorial_save">저장해서 다시 써요</string>
+    <string name="tutorial_save">내 보관함 즐겨찾기에 넣어요</string>
     <string name="tutorial_remove">올려 둔 가이드를 내려요</string>
     <string name="tutorial_scene">이 사진으로 포즈를 만들어요</string>
     <string name="tutorial_describe">원하는 포즈를 적어요</string>

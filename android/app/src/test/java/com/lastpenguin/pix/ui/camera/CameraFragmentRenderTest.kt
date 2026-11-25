@@ -54,8 +54,8 @@ import org.robolectric.annotation.GraphicsMode
  * FragmentScenario with a container of fakes. Partitions, one test each: camera permission denied or granted;
  * camera status STARTING, READY; the grid and the horizon bar on by default, and each off from Settings (#271); a
  * guide added, with the guide-edit toggle unlit and the guide not filled (#304), the toggle tapped on (lit, the guide
- * filled) and off again (unlit, the same icon, no fill; #271), hidden, removed by the shutter's end of edit mode; a
- * photo saved or
+ * filled) and off again (unlit, the same icon, no fill; #271), hidden, removed by the shutter's end of edit mode; the
+ * hint chip with no line for the pinch, and "Guide hidden" for a hidden guide (#306); a photo saved or
  * failed; the flash and brightness controls with and without the capability; the aspect ratio 4:3 and 16:9; the
  * scene photo step framing and reviewing, with Back at the top left of each (out to the camera, and from the review back
  * to framing) and Use at the top right of the review (#199), the flow's bar at its first and second step, the panel
@@ -238,9 +238,9 @@ class CameraFragmentRenderTest {
             )
             assertTrue(controls.opacitySlider.isEnabled)
             assertEquals(string(R.string.guide_opacity_percent, 50), controls.opacityValue.text.toString())
-            // What a pinch does while the guide is on the camera and not being edited.
-            assertEquals(string(R.string.hint_pinch_zoom), controls.hintText.text.toString())
-            assertEquals(View.VISIBLE, controls.hintText.visibility)
+            // No line about the pinch, which zooms as on a camera without a guide (#306).
+            assertEquals("", controls.hintText.text.toString())
+            assertEquals(View.INVISIBLE, controls.hintText.visibility)
             assertEquals(string(R.string.guide_change_description), controls.guideButton.contentDescription)
             assertTrue(controls.guideButton.isActivated)
             assertEquals(View.VISIBLE, controls.referenceThumbnail.visibility)
@@ -281,8 +281,7 @@ class CameraFragmentRenderTest {
             )
             assertFalse(controls.guideOverlay.editable)
             assertFalse(controls.guideOverlay.filled)
-            assertEquals(string(R.string.hint_pinch_zoom), controls.hintText.text.toString())
-            assertEquals(View.VISIBLE, controls.hintText.visibility)
+            assertEquals(View.INVISIBLE, controls.hintText.visibility)
         }
     }
 
@@ -356,7 +355,7 @@ class CameraFragmentRenderTest {
             // No notice: the thumbnail shows the photo (FR-1.6, #204).
             assertEquals(View.GONE, controls.captureStatus.visibility)
             assertFalse(controls.editGuideButton.isChecked)
-            assertEquals(string(R.string.hint_pinch_zoom), controls.hintText.text.toString())
+            assertEquals(View.INVISIBLE, controls.hintText.visibility)
             assertTrue(controls.galleryButton.isEnabled)
         }
     }

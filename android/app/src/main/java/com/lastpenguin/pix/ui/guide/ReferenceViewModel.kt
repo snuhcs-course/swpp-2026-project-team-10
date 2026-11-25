@@ -83,6 +83,13 @@ class ReferenceViewModel(
     /** The photo picked last, which *Use the whole image* makes the guide from again; null for a chosen pose. */
     private var picked: Uri? = null
 
+    /**
+     * Whether the reference on Reference confirm, or the one No person found is about, is a photo from the picker and
+     * not a generated pose: Back then returns to where photos are chosen (#294).
+     */
+    val fromPhoto: Boolean
+        get() = picked != null
+
     /** The guide whose tip was asked for and that has not gone on the camera yet. */
     private var tipFor: String? = null
 

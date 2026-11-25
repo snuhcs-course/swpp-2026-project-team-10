@@ -129,8 +129,11 @@
 | 4.6 | 2026-11-24 | The UI fixes (Iter5-P7, [#271]): their tests, and added steps on IT-20, IT-21, IT-33, and IT-34; the two heuristic findings they build (1.1, 2.1.5, 4.2, Appendix A). |
 | 4.7 | 2026-11-24 | Remote focus, with the brightness beside the focus box (Iter5-P9, [#273]): its owner and tests, IT-41, and what changes in IT-6 and US-12's step 4 (1.1, 2.1.5, 2.1.6, 4.3, Appendix A). |
 | 4.8 | 2026-11-24 | A new guide starts with the camera's gestures (Iter5-A8, [#304]): its owner and tests, and what changes in IT-5 and IT-34 (1.1, Appendix A). |
-| 4.9 | 2026-11-25 | The library's situations and memos (Iter5-P6, [#270]): its owner and tests, their partitions in two techniques, and steps on IT-26 (1.1, 2.1.5, 2.1.6, Appendix A). |
-| 4.10 | 2026-11-25 | The library's history, favorites, and selection (Iter5-A6, [#297]): its owner and tests, their partitions in two techniques, steps on IT-26, and what changes in IT-27 and IT-35 (1.1, 2.1.5, 2.1.6, Appendix A). |
+| 4.9 | 2026-11-24 | Camera's hint chip without "Pinch to zoom" (Iter5-A9, [#306]): its owner and tests, and an added result on IT-34 (1.1, Appendix A). |
+| 4.10 | 2026-11-25 | *No person found* without its button, and Back to where the photo was chosen (Iter5-A3, [#294]): its owner and tests, and what changes in US-2's steps, IT-35, and US-2's failure case (1.1, 4.3, Appendix A, Appendix B). |
+| 4.11 | 2026-11-25 | UAT cycle 2's follow-ups decided in [#298]'s review: the guide is filled in edit mode ([#271]), and no "Go back?" once poses are kept ([#297]) (4.4). |
+| 4.12 | 2026-11-25 | The library's situations and memos (Iter5-P6, [#270]): its owner and tests, their partitions in two techniques, and steps on IT-26 (1.1, 2.1.5, 2.1.6, Appendix A). |
+| 4.13 | 2026-11-25 | The library's history, favorites, and selection (Iter5-A6, [#297]): its owner and tests, their partitions in two techniques, steps on IT-26, and what changes in IT-27 and IT-35 (1.1, 2.1.5, 2.1.6, Appendix A). |
 
 </details>
 
@@ -222,6 +225,8 @@ One member writes and maintains each component's tests, following the module own
 | *Generate poses*: Auto, the options, and the scene photo large (Iter5-P10, [#274]) | Models, Views | `generation/` (`PoseOptionsTest`), `ui/generation/` (`DescriptionFormTest`, `SituationOptionsTest`, `GenerationScreensTest`), `ui/session/` (`SubjectDescribeFragmentTest`), `ui/` (`KoreanScreensTest`) | 박동제 |
 | The scene photo straight to *Generate poses* (Iter5-A5, [#296]) | ViewModels, Views | `ui/generation/` (`GenerationViewModelTest`, `SceneArrivalTest`, `GenerationScreensTest`, `SceneTurnTest`), `ui/camera/` (`CameraFragmentRenderTest`, `CameraFragmentInteractionTest`, `CameraLayoutTest`), `ui/` (`FlowProgressViewTest`, `HeaderActionTest`) | 박동제 |
 | A new guide starts with the camera's gestures (Iter5-A8, [#304]) | ViewModels, Views | `ui/camera/` (`CameraViewModelTest`, `GuideControlsViewModelTest`, `CameraFragmentRenderTest`, `CameraFragmentInteractionTest`); IT-5 and IT-34 on phones | 박동제 |
+| Camera's hint chip without "Pinch to zoom" (Iter5-A9, [#306]) | Views | `ui/camera/CameraFragmentRenderTest`; IT-34 on a phone | 박동제 |
+| *No person found*: Back returns to *Add a pose guide* (Iter5-A3, [#294]) | Views | `ui/guide/` (`NoPersonFoundFragmentTest`, `ReferenceConfirmFragmentTest`, `AddGuideSheetTest`), `ui/` (`ScreenTransitionsTest` on the real navigation, `KoreanScreensTest`); IT-35 and US-2 on phones, where alone the system's photo picker shows | 박동제 |
 | The live view after a reconnection, the UI fixes, and the self-timer (Iter5-P5, P7, P8) | Platform, ViewModels, Views | `session/`, `settings/`, `ui/camera/`, `ui/settings/`; the UI fixes also in `guide/`, `ui/session/`, `ui/`: `DataStoreAppSettingsTest`, `SettingsFragmentTest`, `CameraCompositionViewTest`, `CameraFragmentRenderTest`, `CameraLayoutTest`, `SubjectFragmentRenderTest`, `SubjectSessionPhotoTest`, `SessionViewModelTest`, `PhotoSyncerTest`, `MessageCodecTest`, `ChannelRouterTest`, `SessionIdentityTest`, `RtcSessionManagerTest`, `GuideOverlayViewTest`, `GuideLookTest`, `MaskMathTest`, `KoreanScreensTest` | 박재완 |
 | The library's history, favorites, and selection (Iter5-A6, [#297]) | Repositories, Managers, ViewModels, Views | `guide/` (`FileSavedGuideStoreTest`), `ui/generation/` (`PoseSaveViewModelTest`, `GenerationScreensTest`), `ui/camera/` (`SaveGuideViewModelTest`), `ui/session/` (`SubjectViewModelTest`), `ui/guide/` (`LibraryPageTest`, `SavedGuidesViewModelTest`, `ReferenceViewModelTest`, `LibraryFragmentTest`, `PoseGuideTurnTest`), `ui/` (`KoreanScreensTest`); IT-26, IT-27, and IT-35 on phones | 한준형 |
 | The library's situations and memos (Iter5-P6, [#270]) | Repositories, Models, ViewModels, Views, the session protocol | `guide/` (`FileSavedGuideStoreTest`), `ui/guide/` (`LibraryPageTest`, `SavedGuidesViewModelTest`, `ReferenceViewModelTest`, `LibraryFragmentTest`), `ui/generation/` (`PoseSaveViewModelTest`, `GenerationViewModelTest`), `session/` (`PoseSyncerTest`, `GuideSyncerTest`), `ui/` (`KoreanScreensTest`); IT-26 on phones | 한준형 |
@@ -1007,7 +1012,7 @@ The UAT runs in class on 11/16 and 11/18 (Iteration 4). Testers outside the team
 | Step | Tester does | Pass when |
 |---|---|---|
 | 1 | On A's Camera, tap *Guide* › *Choose from the gallery*, and choose R2. *Changed in Iter4-P13 ([#210]): *Choose from the gallery*; was: *Add photo*.* | *No person found* appears. |
-| 2 | Tap *Choose another photo*, and choose R1. | The photo picker opens again. Within 2 s of choosing R1, *Reference confirm* shows the person as an outline. The guide contains none of the photo's pixels or background. |
+| 2 | Tap *Choose another photo*, and choose R1. *Changed in Iter5-A3 ([#294]): tap Back, and choose R1; the button is gone.* | The photo picker opens again. *Changed in Iter5-A3: it opens over "Add a pose guide", which Back opened again.* Within 2 s of choosing R1, *Reference confirm* shows the person as an outline. The guide contains none of the photo's pixels or background. |
 | 3 | Look at the outline. | It is smooth. The stretched arm and the legs keep their real shape and length. |
 | 4 | Tap *Use* at the top right. *Changed in Iter4-P2 ([#199]): *Use*; was: *Use this guide*.* | Camera shows the guide over the live preview. |
 | 5 | Tap *Guide*, which asks "Replace the pose guide?". Tap *Choose from the gallery*, and choose R3. *Changed in Iter4-P13 ([#210]): *Choose from the gallery*; was: *Add photo*.* | *Reference confirm* shows the screenshot cut to the post's photo, with "Cut from a screenshot". Only the post's person is outlined. |
@@ -1129,9 +1134,9 @@ UAT cycle 2, held in class on 11/23 (Iter5-P3, [#267]). A student of another tea
 | *Choose another photo* should be a main button at the bottom | US-2 · 3 · T2 · 3 | *Iteration 5:* the button goes, and Back returns to *Add a pose guide*, still open (Iter5-A3, [#294]) |
 | *Use* on *Reference confirm* looks unneeded: the guide could show at once | US-2 · 5 · T2 · 3 | The step stays, since a screenshot's cut must be seen. *Iteration 5:* every photo shrinks to its thumbnail while its outline is drawn (Iter5-A4, [#295]) |
 | The scene photo's confirm step looks unneeded | US-4 · 6 · T2 · 3 | *Iteration 5:* the step goes. The photo shrinks into *Generate poses*, where a tap shows it large; without a person, the camera stays and says so (Iter5-A5, [#296]) |
-| A wrong tap loses a pose: keep every pose and guide as history, with favorites chosen from them | US-4 · 10 · T2 · 3 | *Iteration 5:* a history of every candidate and guide with no limit, a *Favorites* tab, selecting several, and a ⋮ menu in the library (Iter5-A6, [#297]) |
+| A wrong tap loses a pose: keep every pose and guide as history, with favorites chosen from them | US-4 · 10 · T2 · 3 | *Iteration 5:* a history of every candidate and guide with no limit, a *Favorites* tab, selecting several, and a ⋮ menu in the library. Back from the poses no longer asks "Go back?", since nothing is lost (Iter5-A6, [#297]) |
 | The zoom notice shows only after the fingers lift | US-10, US-12 · 2 · T1 · 4 | *Iteration 5:* the notice shows while the subject pinches (Iter5-A1, [#292]) |
-| The guide-edit button is not clear | US-10, US-12 · 7 · T2 · 4 | *Iteration 5:* one person icon, lit while the guide can be edited (Iter5-P7, [#271]) |
+| The guide-edit button is not clear | US-10, US-12 · 7 · T2 · 4 | *Iteration 5:* one person icon, lit while the guide can be edited, and a light teal fill inside the guide meanwhile (Iter5-P7, [#271]) |
 | "Saved the photo" comes late, with nothing shown meanwhile | US-10, US-12 · 11 · T2 · 4 | *Iteration 5:* Subject view shows that the photo is saving (Iter5-P7, [#271]) |
 | Airplane mode did not turn Wi-Fi off | US-10, US-12 · 13 · T1 · 5 | No change to Pix: the comment is about the sheet's step |
 | The UI needs work: fewer screens to go through, and what a wrong tap keeps or loses | T2's overall comment | The rows above for [#294], [#296], and [#297]. *Iteration 5:* Impeccable is checked on Pix's screens and applied (Iter5-A7, [#298]) |
@@ -1868,10 +1873,11 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 **Expected result**
 
 - Each toggle shows its label at the top of the image for 3 s, a new one at once, and TalkBack reads it. The mode label reads *Guide* or *Camera* over the toggle. *Changed in Iter5-A8 ([#304]): with a new guide the toggle is off, so its first tap reads "Guide".*
+- *Added in Iter5-A9 ([#306]):* with a guide shown and guide-edit mode off, no hint is over the image. After *Hide*, the hint reads "Guide hidden" once the toggle's label goes.
 - Camera has no brightness button. The bar stands beside the focus box, inside the image, and starts at +1.0. It changes the brightness as a drag on the preview or on the bar moves. It goes after 3 s untouched, but not while TalkBack's focus is on it, and is back at +1.0 at the next tap.
 - A drag with the bar gone focuses where it started and moves from +1.0. A sideways drag changes nothing.
 - The horizon bar runs along the long side when the phone is on its side, and is gone past 20°.
-- The second tap closes the tip. The second *Save guide* says "Removed from My library." and empties the bookmark; the third saves again.
+- The second tap closes the tip. The second *Save guide* says "Removed from My library." and empties the bookmark; the third saves again. *Changed in Iter5-A6 ([#297]): it says "Removed from Favorites. It stays in My library."*
 - The button reads *Suggest 4 poses*, then *Generate 4 poses from this*. Back opens *Generate poses* with the photo and the description; the ✕ opens the camera. *Changed in Iter4-P2 ([#199]): *Suggest*, then *Generate*; Back asks first and drops the set (IT-35).* *Changed in Iter5-P10 ([#274]): *Generate* for both, since the empty field says *Auto*.*
 - The refused description is not among *Used before*, and the accepted one is, on both phones.
 - The lines stay visible on both scenes.
@@ -1894,6 +1900,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 9. In a session, generate from the photographer's phone. On its *Pick a pose*, tap Back, then *Go back*. *Changed in Iter5-A6: tap Back once.*
 10. Generate again and tap *Select* on the photographer's phone; on *Reference confirm*, tap Back.
 11. Add a photo without a person from *Guide* › *Choose from the gallery*; on *No person found*, tap Back.
+12. *Added in Iter5-A3 ([#294]):* after step 11, close the gallery without a photo, then close the sheet. Add a photo of a person from *Guide* › *Choose from the gallery*, and tap Back on *Reference confirm*. Repeat steps 11 and 12 from the library's *Add photo*, and in a session from *Subject view*'s *Guide*.
 
 **Expected result**
 
@@ -1904,6 +1911,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 - After Back on *Reference confirm*, another candidate can be selected. *Regenerate* sends the same description again (`pose.start described` in the log), and its set replaces the last.
 - Back on *Couldn't create poses* opens *Generate poses* with the photo and the text.
 - In the session, *Pick a pose* has no *Regenerate*; its Back drops the set on both phones, and Back on *Reference confirm* returns to the camera, closing the subject's screen.
+- *Added in Iter5-A3 ([#294]):* *No person found* has Back alone and says "Go back and pick a photo where one person is clearly visible." Its Back shows the camera with *Add a pose guide* open and the gallery over it; with the gallery closed, the sheet stays, and with the sheet closed, the camera has the guide it had. Back on *Reference confirm* opens the sheet without the gallery. From the library, both Backs show the library, with no gallery. From *Subject view*, the sheet opens over *Subject view*.
 - On every pose and guide screen, the step's action sits at the top right, the same size and 20 dp from the edge; Back is at the top left.
 
 
@@ -2181,7 +2189,7 @@ Observations and open steps:
 | US-2 | Normal · photo with a person → outline within 2 s, no pixels or background | `MlKitReferenceGuideMakerTest`, `OutlineExtractorTest`, `GuideOverlayViewTest`, `ReferenceViewModelTest`, `ReferenceConfirmFragmentTest` | IT-5 (`reference_image.mp4`, `Streaming.mov`) |
 | US-2 | Normal · arm out, legs apart → smooth outline, limbs keep their shape | `MaskSmoothingTest`, `OutlineExtractorTest`, `ContourTest` | IT-5 |
 | US-2 | Normal · *Use this guide* → guide over the preview | `ReferenceConfirmFragmentTest`, `ReferenceViewModelTest`, `CameraFragmentRenderTest` | IT-5 |
-| US-2 | Failure · no person → *No person found*, with *Choose another photo* and *Back to camera* | `MlKitReferenceGuideMakerTest`, `MaskSmoothingTest`, `ReferenceViewModelTest`, `ReferenceConfirmFragmentTest`, `NoPersonFoundFragmentTest` | — |
+| US-2 | Failure · no person → *No person found*, with *Choose another photo* and *Back to camera*. *Changed in Iter5-A3 ([#294]): with Back alone, which opens "Add a pose guide" again with the gallery.* | `MlKitReferenceGuideMakerTest`, `MaskSmoothingTest`, `ReferenceViewModelTest`, `ReferenceConfirmFragmentTest`, `NoPersonFoundFragmentTest` | — |
 | US-2 | Edge · two people → both in the guide | `MaskSmoothingTest`, `ContourTest` | — |
 | US-2 | Edge · picker closed without a choice → guide unchanged | none (`AddGuideSheet` handles the null uri, untested) | — |
 | US-3 | Normal · drag the guide → follows the finger | `GuideOverlayGestureTest`, `CameraGuideGestureTest` | IT-5 |
@@ -2621,3 +2629,4 @@ Observations: every Iteration 4 step held, and no defect was found.
 [#297]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/297
 [#298]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/298
 [#304]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/304
+[#306]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/306

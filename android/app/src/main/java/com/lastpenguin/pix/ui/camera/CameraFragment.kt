@@ -972,14 +972,11 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.guideButton.contentDescription =
             getString(if (state.guide == null) R.string.guide_add_description else R.string.guide_change_description)
         // The tutorial shows how to add a guide and move it (FR-10.4), so the chip says only what the screen does not:
-        // that the guide is hidden, and that a pinch zooms again once edit mode is off.
-        when {
-            state.guide == null || state.guideEditing -> showHint(controls.hintText, null)
-
-            !state.guideState.visible ->
-                showHint(controls.hintText, R.string.hint_guide_hidden, R.drawable.ic_visibility_off_small)
-
-            else -> showHint(controls.hintText, R.string.hint_pinch_zoom, R.drawable.ic_zoom_small)
+        // that the guide is hidden. It says nothing about the pinch, which zooms as on any camera (#306).
+        if (state.guide != null && !state.guideEditing && !state.guideState.visible) {
+            showHint(controls.hintText, R.string.hint_guide_hidden, R.drawable.ic_visibility_off_small)
+        } else {
+            showHint(controls.hintText, null)
         }
         controls.cameraMessagePanel.isVisible = !granted || unavailable
         // The permission and camera messages fill the preview; nothing over it applies then.

@@ -1,10 +1,12 @@
-// AI-generated with Claude Code, 2026-11-13, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
 import androidx.activity.addCallback
+import androidx.annotation.IdRes
+import androidx.core.os.bundleOf
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -50,11 +52,16 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
         shown = null
         binding.screenshotCut.outline = binding.referenceImage
 
-        // Back leaves without the guide: a person still being found and the tip asked for it stop (FR-4.10).
+        // Back leaves without the guide: a person still being found and the tip asked for it stop (FR-4.10). It goes
+        // to where the reference was chosen, for a photo from Add a pose guide that sheet again (#294).
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) {
             viewModel.onConfirmLeft()
-            isEnabled = false
-            requireActivity().onBackPressedDispatcher.onBackPressed()
+            backToChoosing(
+                viewModel,
+                from = R.id.referenceConfirmFragment,
+                toSheet = R.id.action_referenceConfirm_to_addGuide,
+                gallery = false,
+            )
         }
         binding.backButton.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
         binding.useGuideButton.setOnClickListener {
@@ -145,6 +152,36 @@ class ReferenceConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
             else -> Unit
         }
     }
+}
+
+/**
+ * Back on Reference confirm and No person found, the screen [from] (#294): to where the reference was chosen. A photo
+ * picked from Add a pose guide opens that sheet again through [toSheet], over the camera or Subject view, and with
+ * [gallery] the sheet opens its picker at once. The sheet is a dialog, which closed when the photo was picked, so it
+ * cannot wait under these screens. A photo from the library and a generated pose go one step back: to the library,
+ * and to Pick a pose or, in a session, the camera. A second Back while the first still moves the screen does nothing.
+ */
+internal fun Fragment.backToChoosing(
+    viewModel: ReferenceViewModel,
+    @IdRes from: Int,
+    @IdRes toSheet: Int,
+    gallery: Boolean,
+) {
+    val navController = findNavController()
+    if (navController.currentDestination?.id != from) return
+    val before = navController.previousBackStackEntry?.destination?.id
+    val fromSheet = viewModel.fromPhoto && (before == R.id.cameraFragment || before == R.id.subjectFragment)
+    if (!fromSheet) {
+        navController.popBackStack()
+        return
+    }
+    navController.navigate(
+        toSheet,
+        bundleOf(
+            AddGuideSheet.ARG_FROM_SUBJECT to viewModel.forSubject,
+            AddGuideSheet.ARG_OPEN_GALLERY to gallery,
+        ),
+    )
 }
 
 /** Back to the screen *Add a pose guide* was opened from: Subject view for the subject's guide, else the camera. */

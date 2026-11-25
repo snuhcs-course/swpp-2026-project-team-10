@@ -480,6 +480,15 @@ class KoreanScreensTest {
         assertKorean(screen())
     }
 
+    @Test
+    fun noPersonFound_afterAPhoto_withItsLineToGoBack_isInKorean() {
+        TestAppContainer().install()
+        scenario = launchPrepared<NoPersonFoundFragment>(R.id.noPersonFoundFragment) {
+            it.viewModel<ReferenceViewModel>().onPhotoPicked(Uri.parse("content://photos/1"))
+        }.first
+        assertKorean(screen())
+    }
+
     // ---- Pose generation ---------------------------------------------------------------
 
     private fun generationModules(): TestAppContainer =

@@ -382,13 +382,13 @@
                 tools:text="@string/photo_save_failed"
                 tools:visibility="visible" />
 
-            <!-- What the screen does not show by itself: a hidden guide, or that a pinch zooms (Design 2.6.8). -->
+            <!-- What the screen does not show by itself: a hidden guide (Design 2.6.8). -->
             <TextView
                 android:id="@+id/hintText"
                 style="@style/Widget.Pix.Chip.Small"
                 android:visibility="invisible"
-                tools:drawableStartCompat="@drawable/ic_zoom_small"
-                tools:text="@string/hint_pinch_zoom"
+                tools:drawableStartCompat="@drawable/ic_visibility_off_small"
+                tools:text="@string/hint_guide_hidden"
                 tools:visibility="visible" />
         </LinearLayout>
 

@@ -120,6 +120,8 @@ import org.robolectric.shadows.ShadowDialog
  * link reconnects, and during the photographer's step; with the video showing a press asks once and holds the shutter;
  * answered taken (free, no line), not taken (free, a line for a label's time), and not answered (the line after the
  * wait).
+ * This phone's start of AI poses (FR-6.15, #276): the answer said where the lines show, begun (who takes the scene
+ * photo) or not.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -754,6 +756,32 @@ class SubjectFragmentRenderTest {
         }
         idle()
         assertEquals(0, presses(modules))
+    }
+
+    // ---- This phone starts AI poses (FR-6.15, #276) --------------------------------------------------------------
+
+    @Test
+    fun aSituationThePhotographersPhoneTookUp_saysWhoTakesTheScenePhoto() {
+        val modules = launch()
+        connectWithVideo(modules)
+
+        modules.session.deliver(SessionMessage.PoseStartAnswer(started = true))
+        idle()
+
+        assertEquals(string(R.string.subject_poses_started, "Dongje") to true, label())
+        waitMs(SubjectFragment.LABEL_MS + 100)
+        assertFalse(label().second)
+    }
+
+    @Test
+    fun aSituationThePhotographersPhoneCouldNotTakeUp_saysSo() {
+        val modules = launch()
+        connectWithVideo(modules)
+
+        modules.session.deliver(SessionMessage.PoseStartAnswer(started = false))
+        idle()
+
+        assertEquals(string(R.string.subject_poses_refused) to true, label())
     }
 
     @Test

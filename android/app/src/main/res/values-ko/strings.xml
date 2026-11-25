@@ -145,6 +145,7 @@
     <string name="remote_brightness_notice">%1$s님이 밝기를 %2$s에 맞췄어요</string>
     <string name="remote_focus_notice">%1$s님이 초점을 맞췄어요</string>
     <string name="remote_shutter_notice">%1$s님이 사진을 찍었어요</string>
+    <string name="remote_pose_start_notice">%1$s님이 AI 포즈를 시작했어요</string>
     <string name="remote_flash_on_notice">%1$s님이 플래시를 켰어요</string>
     <string name="remote_flash_off_notice">%1$s님이 플래시를 껐어요</string>
     <string name="remote_flash_auto_notice">%1$s님이 플래시를 자동으로 바꿨어요</string>
@@ -183,6 +184,8 @@
     <string name="generating_title">포즈 생성 중</string>
     <string name="consent_title">이 사진을 AI 서비스로 보낼까요?</string>
     <string name="consent_message">포즈를 생성하기 위해 이어서 찍을 배경 사진을 Pix 서버를 거쳐 외부 AI 이미지 서비스로 보내요. Pix 서버에는 사진이 저장되지 않아요.</string>
+    <string name="pose_start_asked">%1$s님이 AI 포즈를 요청했어요.</string>
+    <string name="consent_message_subject">포즈를 생성하기 위해 촬영자가 이어서 찍을 배경 사진을 Pix 서버를 거쳐 외부 AI 이미지 서비스로 보내요. Pix 서버에는 사진이 저장되지 않아요.</string>
     <string name="consent_agree">동의하고 계속</string>
     <string name="not_now">나중에</string>
     <string name="scene_title">배경 사진 촬영</string>
@@ -459,6 +462,8 @@
     <string name="subject_receiving_photo">사진 받는 중…</string>
     <string name="subject_shutter">%1$s님의 카메라로 사진 찍기</string>
     <string name="subject_shutter_refused">지금은 사진을 찍을 수 없어요</string>
+    <string name="subject_poses_started">%1$s님이 배경 사진을 찍으면 포즈를 만들어요</string>
+    <string name="subject_poses_refused">지금은 AI 포즈를 시작할 수 없어요</string>
     <string name="leave">나가기</string>
     <string name="leave_session_title">카메라 공유에서 나갈까요?</string>
     <string name="focus_and_brightness_action">초점을 맞추고 밝기 조절</string>

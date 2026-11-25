@@ -70,6 +70,8 @@ class ChannelRouterTest {
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ShutterPress))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ShutterAnswer(taken = true)))
         assertFalse(router.latestOnly(SessionMessage.ShutterPress))
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PoseStart("full_body")))
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PoseStartAnswer(started = true)))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PhotographerDid("zoom", zoom = 2f)))
         assertFalse(router.latestOnly(SessionMessage.PhotographerDid("zoom", zoom = 2f)))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ControlPermission(false)))

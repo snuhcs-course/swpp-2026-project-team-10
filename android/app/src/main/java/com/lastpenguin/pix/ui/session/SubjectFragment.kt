@@ -410,6 +410,28 @@ class SubjectFragment :
                 // What the photographer did on their own camera, said where this screen's labels show (FR-7.4, #292).
                 launch { viewModel.photographerLines.collect { showPhotographerLine(binding, it) } }
                 launch {
+                    // What became of the situation this phone picked for AI poses (FR-6.15, #276): the photographer
+                    // takes the scene photo next, or their phone could not begin.
+                    sessionViewModel.poseStartAnswers.collect { started ->
+                        val name = viewModel.uiState.value.photographerName
+                        if (started && name != null) {
+                            showToggleLabel(
+                                binding,
+                                getString(R.string.subject_poses_started, name),
+                                R.drawable.ic_sparkle,
+                                R.color.pix_text,
+                            )
+                        } else if (!started) {
+                            showToggleLabel(
+                                binding,
+                                getString(R.string.subject_poses_refused),
+                                R.drawable.ic_alert_small,
+                                R.color.pix_text,
+                            )
+                        }
+                    }
+                }
+                launch {
                     // A press that took no photo is said where the other lines are (FR-7.8, #314).
                     viewModel.shutterRefusals.collect {
                         showToggleLabel(

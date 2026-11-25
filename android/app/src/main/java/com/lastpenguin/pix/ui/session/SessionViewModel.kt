@@ -14,6 +14,7 @@ import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.account.SentInvitation
 import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.session.ConfirmSyncer
 import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.EndReason
@@ -60,6 +61,9 @@ sealed interface SessionNotice {
 
     /** The subject's shutter took a photo: "Joonhyung took a photo" (FR-7.8, #314). */
     data class RemoteShutter(val name: String) : SessionNotice
+
+    /** The subject started AI poses, and this phone now takes the scene photo: "Joonhyung started AI poses" (#276). */
+    data class RemotePoseStart(val name: String) : SessionNotice
 
     /** The subject moved or resized the guide: "Joonhyung moved the guide" (FR-7.2, FR-7.4). */
     data class RemoteGuideMove(val name: String) : SessionNotice
@@ -526,6 +530,8 @@ class SessionViewModel(
 
                                 is RemoteAction.Shutter -> _notices.tryEmit(SessionNotice.RemoteShutter(name))
 
+                                is RemoteAction.PoseStart -> _notices.tryEmit(SessionNotice.RemotePoseStart(name))
+
                                 is RemoteAction.Focus -> {
                                     _remoteFocus.tryEmit(RemoteFocus(action.x, action.y))
                                     val now = clock()
@@ -660,12 +666,52 @@ class SessionViewModel(
         remoteControl.shutter = taker
     }
 
+    /**
+     * The Camera screen, while it is in front, begins the scene photo for the situation the subject picked (FR-6.15,
+     * #276), and says whether it began; null once it is not, and a request is then answered as not begun.
+     */
+    fun setRemotePoseStarter(starter: ((Situation, (Boolean) -> Unit) -> Unit)?) {
+        remoteControl.poseStarter = starter
+    }
+
+    /** [starter]'s screen is no longer in front; a screen that came after it keeps its own. */
+    fun dropRemotePoseStarter(starter: (Situation, (Boolean) -> Unit) -> Unit) {
+        if (remoteControl.poseStarter === starter) remoteControl.poseStarter = null
+    }
+
+    private val _poseStartAnswers = Channel<Boolean>(Channel.BUFFERED)
+
+    /**
+     * Subject: what became of each situation this phone picked for AI poses (FR-6.15, #276): true once the
+     * photographer's phone began the scene photo, false when it could not or nothing could be asked. Subject view says
+     * it in a line; buffered, so one that comes under another screen is said when Subject view is back.
+     */
+    val poseStartAnswers: Flow<Boolean> = _poseStartAnswers.receiveAsFlow()
+
+    /**
+     * Subject: asks the photographer's phone to begin AI poses for [situation] (FR-6.15, #276). The photographer takes
+     * the scene photo, and the steps after it show on both phones as when the photographer starts them.
+     */
+    fun askForPoses(situation: Situation) {
+        val connected = state.value as? SessionState.Connected
+        if (connected?.role != Role.SUBJECT) {
+            // Nothing can be asked: the link dropped while the sheet was open.
+            _poseStartAnswers.trySend(false)
+            return
+        }
+        session.send(SessionMessage.PoseStart(situation.apiName))
+    }
+
     /** [taker]'s screen is no longer in front; a screen that came after it keeps its own. */
     fun dropRemoteShutter(taker: () -> Boolean) {
         if (remoteControl.shutter === taker) remoteControl.shutter = null
     }
 
     private fun onMessage(message: SessionMessage) {
+        if (message is SessionMessage.PoseStartAnswer) {
+            _poseStartAnswers.trySend(message.started)
+            return
+        }
         if (message !is SessionMessage.Leave) return
         val name = peerName ?: return
         _notices.tryEmit(SessionNotice.PeerGone(name, message.reason))

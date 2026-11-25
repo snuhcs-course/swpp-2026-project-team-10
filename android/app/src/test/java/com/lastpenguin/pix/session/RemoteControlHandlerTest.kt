@@ -3,6 +3,7 @@ package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.session.protocol.SessionMessage
@@ -31,6 +32,9 @@ import org.junit.Test
  * to the subject while the session runs, and to no one before it starts or after it stops.
  * The subject's shutter (#314): taken by the Camera screen (answered, one action); refused by it; no Camera screen in
  * front; two presses in a row, each answered.
+ * The subject's start of AI poses (#276): begun by the Camera screen (answered, one action); not begun by it; no Camera
+ * screen in front; a situation this phone does not know; the answer that waits for the photographer's agreement, and one
+ * that comes after the session ended.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemoteControlHandlerTest {
@@ -651,6 +655,111 @@ class RemoteControlHandlerTest {
             answers(),
         )
         handler.stop()
+    }
+
+    // ---- The subject's start of AI poses (FR-6.15, #276) ----------------------------------------------------------
+
+    private fun startAnswers(): List<SessionMessage.PoseStartAnswer> =
+        session.sent.filterIsInstance<SessionMessage.PoseStartAnswer>()
+
+    @Test
+    fun `the subject's situation begins the scene photo through the Camera screen, answered and reported once`() =
+        runTest {
+            val asked = mutableListOf<Situation>()
+            handler.poseStarter = { situation, answer ->
+                asked += situation
+                answer(true)
+            }
+            backgroundScope.launch { handler.actions.collect { actions += it } }
+            handler.start(this)
+            advanceTimeBy(200)
+            runCurrent()
+
+            handler.handle(SessionMessage.PoseStart("full_body"))
+            runCurrent()
+
+            assertEquals(listOf(Situation.FULL_BODY), asked)
+            assertEquals(listOf(SessionMessage.PoseStartAnswer(started = true)), startAnswers())
+            assertEquals(listOf<RemoteAction>(RemoteAction.PoseStart), actions)
+            handler.stop()
+        }
+
+    @Test
+    fun `a start the Camera screen cannot begin is answered so, and is no action`() = runTest {
+        // A step of the photographer's own already runs, or the phone has no front camera for a selfie.
+        handler.poseStarter = { _, answer -> answer(false) }
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.PoseStart("selfie"))
+        runCurrent()
+
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers())
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
+    fun `a start while the Camera screen is not in front, or for a situation this phone does not know, is refused`() =
+        runTest {
+            handler.start(this)
+            advanceTimeBy(200)
+            runCurrent()
+
+            handler.handle(SessionMessage.PoseStart("full_body"))
+            runCurrent()
+            assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers())
+
+            var asked = 0
+            handler.poseStarter = { _, answer ->
+                asked++
+                answer(true)
+            }
+            handler.handle(SessionMessage.PoseStart("a situation of a later Pix"))
+            runCurrent()
+            assertEquals(0, asked)
+            assertEquals(2, startAnswers().count { !it.started })
+            handler.stop()
+        }
+
+    @Test
+    fun `a start that waits for the photographer's agreement is answered when they answer, once`() = runTest {
+        var later: ((Boolean) -> Unit)? = null
+        handler.poseStarter = { _, answer -> later = answer }
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.PoseStart("default"))
+        runCurrent()
+        // The AI notice is up on the photographer's phone: no answer yet.
+        assertTrue(startAnswers().isEmpty())
+
+        checkNotNull(later)(true)
+        runCurrent()
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = true)), startAnswers())
+        assertEquals(listOf<RemoteAction>(RemoteAction.PoseStart), actions)
+        handler.stop()
+    }
+
+    @Test
+    fun `an agreement answered after the session ended tells no one`() = runTest {
+        var later: ((Boolean) -> Unit)? = null
+        handler.poseStarter = { _, answer -> later = answer }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        handler.handle(SessionMessage.PoseStart("default"))
+        runCurrent()
+
+        handler.stop()
+        checkNotNull(later)(true)
+        runCurrent()
+
+        assertTrue(startAnswers().isEmpty())
     }
 
     @Test

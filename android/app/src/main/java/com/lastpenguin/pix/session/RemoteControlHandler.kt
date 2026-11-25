@@ -6,6 +6,7 @@ import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.baseExposureIndex
 import com.lastpenguin.pix.core.Timings
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlin.math.abs
@@ -41,6 +42,9 @@ sealed interface RemoteAction {
 
     /** The subject's shutter took a photo (FR-7.8, #314). */
     data object Shutter : RemoteAction
+
+    /** The subject started AI poses, and the scene photo's step began here (FR-6.15, #276). */
+    data object PoseStart : RemoteAction
 }
 
 /**
@@ -90,6 +94,10 @@ sealed interface RemoteAction {
  *
  * **Shutter (It 5, FR-7.8, #314).** `camera.shutter` is the subject's press. The photo is the Camera screen's to take
  * ([shutter]), as at its own shutter, and every press is answered with `camera.shutter.answer`.
+ *
+ * **AI poses (It 5, FR-6.15, #276).** `pose.start` is the situation the subject picked. The Camera screen begins the
+ * scene photo for it ([poseStarter]), as if its own user had picked it, and the request is answered with
+ * `pose.start.answer`.
  * Owner: Real-time (#10, #57).
  */
 class RemoteControlHandler(
@@ -108,6 +116,13 @@ class RemoteControlHandler(
      * while it is in front, since only there is the camera bound and the shutter the camera's own; null otherwise.
      */
     var shutter: (() -> Boolean)? = null
+
+    /**
+     * Begins a pose's scene photo for the situation the subject picked (FR-6.15, #276), and tells its second argument
+     * whether it began: at once, or once the photographer answered the AI notice. The Camera screen sets it while it
+     * is in front, as it does [shutter]; null otherwise.
+     */
+    var poseStarter: ((Situation, (Boolean) -> Unit) -> Unit)? = null
 
     private val _actions = MutableSharedFlow<RemoteAction>(extraBufferCapacity = 16)
 
@@ -215,8 +230,29 @@ class RemoteControlHandler(
             is SessionMessage.FocusSet -> handleFocus(message)
             is SessionMessage.GuideMove -> handleGuideMove(message)
             is SessionMessage.ShutterPress -> handleShutter()
+            is SessionMessage.PoseStart -> handlePoseStart(message)
             else -> Unit
         }
+    }
+
+    /**
+     * `pose.start`: the Camera screen begins the scene photo for the subject's situation, if it is in front and can
+     * (FR-6.15, #276). Every request is answered, a refusal at once and a start when it began, which waits for the
+     * photographer when the AI notice is up; an answer that comes once this session is over tells no one.
+     */
+    private fun handlePoseStart(request: SessionMessage.PoseStart) {
+        val situation = Situation.named(request.situation)
+        val starter = poseStarter
+        // The session this request came in, which may be over when the photographer answers the notice.
+        val asked = scope
+        val answer = { started: Boolean ->
+            if (asked != null && scope === asked) {
+                Timings.mark("poses.remote", if (started) "started" else "refused")
+                session.send(SessionMessage.PoseStartAnswer(started))
+                if (started) _actions.tryEmit(RemoteAction.PoseStart)
+            }
+        }
+        if (situation == null || starter == null) answer(false) else starter(situation, answer)
     }
 
     /**

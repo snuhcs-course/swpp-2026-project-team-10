@@ -21,6 +21,7 @@ import org.junit.Test
  * photographer, and the echo of a `guide.move` carries `by: SUBJECT`; `camera.zoom.hold` naming a holder, null, or no
  * holder at all, the last two meaning a free zoom, and a `camera.zoom.set` with `cancel`, which is false when left out (#236).
  * The subject's shutter (#314): the press, which has no field, and its answer, taken or not.
+ * The subject's start of AI poses (#276): the situation's name, and the answer, begun or not.
  */
 class RemoteControlMessagesTest {
     private val codec = MessageCodec(clock = { 1_759_212_345_678L })
@@ -153,6 +154,17 @@ class RemoteControlMessagesTest {
     }
 
     @Test
+    fun theSubjectsStartOfPoses_andItsAnswer_designExamples_decode() {
+        val start = """{ "v": 3, "t": "pose.start", "seq": 12, "ts": 1759212355000,
+            "b": { "situation": "full_body" } }"""
+        val answer = """{ "v": 3, "t": "pose.start.answer", "seq": 6, "ts": 1759212355100,
+            "b": { "started": true } }"""
+
+        assertEquals(SessionMessage.PoseStart("full_body"), decode(start))
+        assertEquals(SessionMessage.PoseStartAnswer(started = true), decode(answer))
+    }
+
+    @Test
     fun requests_roundTrip_keepEveryField() {
         val messages = listOf(
             SessionMessage.GuideMove("g", 0.1f, 0.2f, 0.3f, final = true),
@@ -164,6 +176,9 @@ class RemoteControlMessagesTest {
             SessionMessage.ShutterPress,
             SessionMessage.ShutterAnswer(taken = true),
             SessionMessage.ShutterAnswer(taken = false),
+            SessionMessage.PoseStart("selfie"),
+            SessionMessage.PoseStartAnswer(started = true),
+            SessionMessage.PoseStartAnswer(started = false),
         )
 
         for (message in messages) assertEquals(message, decode(codec.encode(message)))

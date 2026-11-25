@@ -25,6 +25,11 @@ import com.lastpenguin.pix.databinding.ItemSituationTileBinding
 import com.lastpenguin.pix.databinding.SheetAddGuideBinding
 import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.session.FakeCameraController
+import com.lastpenguin.pix.session.PeerInfo
+import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
@@ -68,8 +73,10 @@ import org.robolectric.shadows.ShadowDialog
  * sheet is opened from its button. The order at the
  * Galaxy S22's 360 × 705 dp, at font scale 1.0 and 1.3 (boundary, #243): the title, then What are you taking? with the
  * tiles, Auto's badge whole on its tile, then the guide from a photo with its two rows, each whole and clear of the
- * next. From Subject view (FR-6.15): no situations, Add a pose guide as the title, and Replace only for a guide on the
- * video, not one on this phone's camera.
+ * next. From Subject view (FR-6.15): the situations too (#276), Add a pose guide as the title, and Replace only for a
+ * guide on the video, not one on this phone's camera; a tile asks the photographer's phone and starts no scene photo
+ * here; the selfie's tile on whatever this phone's cameras; without consent, asked first in the subject's words, "Not
+ * now" sending nothing and "Agree" asking.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -319,12 +326,13 @@ class AddGuideSheetTest {
     }
 
     @Test
-    fun fromSubjectView_offersNoPosesAndAsksToReplaceTheGuideOnTheVideo() {
+    fun fromSubjectView_offersThePosesToo_andAsksToReplaceTheGuideOnTheVideo() {
         val modules = TestAppContainer()
         modules.guides.setGuide(guide())
         launch(modules, fromSubject = true)
         onSheet { binding ->
-            assertEquals(View.GONE, binding.newPosesSection.visibility)
+            // The situations too, all of them (#276): the photographer's phone takes it from there.
+            assertEquals(View.VISIBLE, binding.newPosesSection.visibility)
             assertEquals(string(R.string.add_guide_title), binding.titleText.text.toString())
         }
         scenario?.close()
@@ -480,6 +488,72 @@ class AddGuideSheetTest {
 
         assertEquals(GenerationUiState.Phase.FRAMING, generation.uiState.value.phase)
         assertEquals(Situation.LANDMARK, generation.uiState.value.situation)
+        assertFalse(sheet.isAdded)
+    }
+
+    // ---- From Subject view: the situation goes to the photographer's phone (FR-6.15, #276) ------------------------
+
+    private fun starts(modules: TestAppContainer): List<SessionMessage.PoseStart> =
+        modules.session.sent.filterIsInstance<SessionMessage.PoseStart>()
+
+    private fun asSubject(modules: TestAppContainer = TestAppContainer()): TestAppContainer {
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
+        return launch(modules, fromSubject = true)
+    }
+
+    @Test
+    fun fromSubjectView_aTileAsksThePhotographersPhone_andStartsNothingHere() {
+        val modules = asSubject()
+
+        tile(Situation.LANDMARK).root.performClick()
+        idle()
+
+        assertEquals(listOf(SessionMessage.PoseStart("landmark")), starts(modules))
+        // The scene photo is the photographer's to take: this phone's camera is not asked for one.
+        assertEquals(GenerationUiState.Phase.IDLE, generation.uiState.value.phase)
+        assertFalse(sheet.isAdded)
+    }
+
+    @Test
+    fun fromSubjectView_theSelfieTileIsOn_whateverThisPhonesCameras() {
+        // The selfie is taken with the photographer's front camera, which this phone knows nothing of.
+        val camera = FakeCameraController().apply { hasFrontCamera.value = false }
+        val modules = asSubject(TestAppContainer(camera = camera))
+
+        assertTrue(tile(Situation.SELFIE).root.isEnabled)
+        tile(Situation.SELFIE).root.performClick()
+        idle()
+
+        assertEquals(listOf(SessionMessage.PoseStart("selfie")), starts(modules))
+    }
+
+    @Test
+    fun fromSubjectView_withoutConsent_asksFirstInTheSubjectsWords_notNowSendsNothing_agreeAsks() {
+        val modules = asSubject(TestAppContainer().apply { consent.given = false })
+
+        tile(Situation.FULL_BODY).root.performClick()
+        idle()
+        val notice = ShadowDialog.getLatestDialog() as AlertDialog
+        assertTrue(notice.isShowing)
+        assertEquals(
+            string(R.string.consent_message_subject),
+            notice.findViewById<TextView>(android.R.id.message)!!.text.toString(),
+        )
+        assertTrue(starts(modules).isEmpty())
+
+        notice.getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
+        idle()
+        assertTrue(starts(modules).isEmpty())
+        assertFalse(modules.consent.given)
+        assertTrue(sheet.isAdded)
+
+        tile(Situation.FULL_BODY).root.performClick()
+        idle()
+        (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idle()
+
+        assertTrue(modules.consent.given)
+        assertEquals(listOf(SessionMessage.PoseStart("full_body")), starts(modules))
         assertFalse(sheet.isAdded)
     }
 

@@ -38,6 +38,7 @@ import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
+import com.lastpenguin.pix.databinding.SheetAddGuideBinding
 import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.Situation
@@ -366,6 +367,40 @@ class KoreanScreensTest {
     }
 
     @Test
+    fun camera_whenTheSubjectStartedAiPoses_isInKorean() {
+        val modules = camera()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        idle()
+
+        modules.session.deliver(SessionMessage.PoseStart("full_body"))
+        idle()
+
+        val root = screen()
+        val notice = FragmentCameraBinding.bind(root).noticeText
+        assertEquals(
+            root.context.getString(R.string.remote_pose_start_notice, "Test Account 2"),
+            notice.text.toString(),
+        )
+        assertKorean(root, *people)
+    }
+
+    @Test
+    fun camera_askedForTheAgreementByTheSubjectsStart_isInKorean() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
+        val modules = TestAppContainer().apply { consent.given = false }.install()
+        scenario = launchFragmentInContainer<CameraFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        idle()
+
+        modules.session.deliver(SessionMessage.PoseStart("default"))
+        idle()
+
+        assertKorean(checkNotNull(ShadowDialog.getLatestDialog().window).decorView, *people)
+    }
+
+    @Test
     fun camera_whileTheLinkReconnects_isInKorean() {
         val modules = camera()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
@@ -411,6 +446,25 @@ class KoreanScreensTest {
         runBlocking { modules.saved.save(guide(), GuideState(guideId = "guide-1")) }
         scenario = launchFragment<AddGuideSheet>(themeResId = R.style.Theme_Pix)
         assertKorean(screen())
+    }
+
+    @Test
+    fun addGuide_fromSubjectView_withTheSituations_andItsAgreement_isInKorean() {
+        val modules = TestAppContainer().apply { consent.given = false }.install()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.SUBJECT))
+        scenario = launchFragment<AddGuideSheet>(
+            fragmentArgs = bundleOf(AddGuideSheet.ARG_FROM_SUBJECT to true),
+            themeResId = R.style.Theme_Pix,
+        )
+        idle()
+        val sheet = screen()
+        assertEquals(true, SheetAddGuideBinding.bind(sheet).newPosesSection.isShown)
+        assertKorean(sheet)
+
+        // A tile, before this phone agreed: the notice in the subject's words (#276).
+        SheetAddGuideBinding.bind(sheet).situationRowTop.getChildAt(0).performClick()
+        idle()
+        assertKorean(checkNotNull(ShadowDialog.getLatestDialog().window).decorView)
     }
 
     @Test
@@ -1028,6 +1082,25 @@ class KoreanScreensTest {
         val root = screen()
         assertEquals(true, FragmentSubjectBinding.bind(root).toggleLabel.isShown)
         assertKorean(root, *people)
+    }
+
+    @Test
+    @Config(shadows = [ShadowSurfaceViewRenderer::class], instrumentedPackages = ["org.webrtc"])
+    fun subjectView_whenItsStartOfPosesIsAnswered_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.SUBJECT))
+        modules.video.deliverFrame()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+
+        for (started in listOf(true, false)) {
+            modules.session.deliver(SessionMessage.PoseStartAnswer(started))
+            idle()
+            val root = screen()
+            assertEquals("started $started", true, FragmentSubjectBinding.bind(root).toggleLabel.isShown)
+            assertKorean(root, *people)
+        }
     }
 
     @Test

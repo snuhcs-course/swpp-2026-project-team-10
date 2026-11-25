@@ -64,6 +64,7 @@ import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.session.EndReason
@@ -129,6 +130,9 @@ class CameraFragment :
         private set
     private var previewLogged = false
     private var noticeJob: Job? = null
+
+    /** The AI notice that the subject's start of poses asked this phone's user, while it is up (#276). */
+    private var askedForSubject: AlertDialog? = null
 
     /** The notices shown without a time of their own ([holdNotice]), each until it is let go. */
     private val heldNotices = EnumMap<HeldNotice, String>(HeldNotice::class.java)
@@ -389,11 +393,17 @@ class CameraFragment :
                 // only here is the camera bound, and the shutter the camera's own.
                 launch {
                     val taker = { takeForSubject(controls) }
+                    // And it begins the scene photo for the situation the subject picked (FR-6.15, #276).
+                    val starter = { situation: Situation, answer: (Boolean) -> Unit ->
+                        startPosesForSubject(situation, answer)
+                    }
                     sessionViewModel.setRemoteShutter(taker)
+                    sessionViewModel.setRemotePoseStarter(starter)
                     try {
                         awaitCancellation()
                     } finally {
                         sessionViewModel.dropRemoteShutter(taker)
+                        sessionViewModel.dropRemotePoseStarter(starter)
                     }
                 }
                 launch { viewModel.uiState.collect(::render) }
@@ -519,6 +529,9 @@ class CameraFragment :
                             is SessionNotice.RemoteFocus -> getString(R.string.remote_focus_notice, notice.name)
 
                             is SessionNotice.RemoteShutter -> getString(R.string.remote_shutter_notice, notice.name)
+
+                            is SessionNotice.RemotePoseStart ->
+                                getString(R.string.remote_pose_start_notice, notice.name)
 
                             is SessionNotice.Watching -> getString(R.string.peer_watching_notice, notice.name)
                         }
@@ -661,6 +674,8 @@ class CameraFragment :
     override fun onDestroyView() {
         dismissEndSession()
         dismissUndo()
+        // The question for the subject's poses goes with the screen, which answers it as "Not now".
+        askedForSubject?.dismiss()
         photoViewer?.stop()
         photoViewer = null
         photosBack = null
@@ -1904,6 +1919,45 @@ class CameraFragment :
         if (!viewModel.onShutter()) return false
         blinkPreview(controls.previewScrim)
         return true
+    }
+
+    /**
+     * The subject picked a situation for AI poses (FR-6.15, #276): the scene photo's step begins here, as if this
+     * phone's user had picked the tile, and [answer] hears whether it began. Only from the camera itself: a request
+     * that comes over a step, a sheet, the photos, or the question below is refused, and so is a selfie on a phone
+     * without a front camera. This phone sends the photo, so without its user's agreement (FR-4.2) the notice asks
+     * first, saying who wants the poses; the step begins once they agree, and "Not now" refuses.
+     */
+    private fun startPosesForSubject(situation: Situation, answer: (Boolean) -> Unit) {
+        val destination = runCatching { findNavController().currentDestination?.id }.getOrNull()
+        val onCamera = destination == null || destination == R.id.cameraFragment
+        val free = onCamera && !isScenePhotoActive() && askedForSubject == null && !viewModel.uiState.value.photosOpen
+        if (!free || !generationViewModel.chooseSituation(situation)) return answer(false)
+        if (!generationViewModel.needsConsent) {
+            generationViewModel.beginScene()
+            return answer(true)
+        }
+        val name = (sessionViewModel.state.value as? SessionState.Connected)?.peer?.displayName
+        val words = listOfNotNull(
+            name?.let { getString(R.string.pose_start_asked, it) },
+            getString(R.string.consent_message),
+        ).joinToString("\n\n")
+        var agreed = false
+        askedForSubject = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.consent_title)
+            .setMessage(words)
+            .setPositiveButton(R.string.consent_agree) { _, _ ->
+                agreed = true
+                generationViewModel.onConsentGiven()
+                generationViewModel.beginScene()
+                answer(true)
+            }
+            .setNegativeButton(R.string.not_now, null)
+            .setOnDismissListener {
+                askedForSubject = null
+                if (!agreed) answer(false)
+            }
+            .show()
     }
 
     /** Over the guide-edit mode toggle for [CameraViewModel.NOTICE_MS]: what a pinch moves now (Design 2.8). */

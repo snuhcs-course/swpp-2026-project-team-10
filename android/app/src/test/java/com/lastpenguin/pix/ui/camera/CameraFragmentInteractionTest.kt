@@ -35,6 +35,7 @@ import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.IcePath
@@ -111,6 +112,10 @@ import org.robolectric.shadows.ShadowDialog
  * The subject's shutter (#314, FR-7.8): a photo taken here with its notice; nothing while a pose's scene photo is
  * framed, neither a photo nor the scene; nothing while the camera is not ready; nothing once this screen is left, and
  * a photo again when it is back.
+ * The subject starts AI poses (#276, FR-6.15): the scene photo's step begun here for their situation, with its notice;
+ * refused for a selfie without a front camera, while a scene photo is already framed (the step unchanged), and with a
+ * sheet over the camera; without the agreement on this phone, asked first with the subject's name, begun once agreed,
+ * refused at "Not now", and a second request refused while the question is up.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -561,6 +566,131 @@ class CameraFragmentInteractionTest {
         idle()
         assertEquals(1, camera.photoTurns.size)
         assertEquals(SessionMessage.ShutterAnswer(taken = true), shutterAnswers(modules).last())
+    }
+
+    // ---- The subject starts AI poses (FR-6.15, #276) --------------------------------------------------------------
+
+    private fun startAnswers(modules: TestAppContainer): List<SessionMessage.PoseStartAnswer> =
+        modules.session.sent.filterIsInstance<SessionMessage.PoseStartAnswer>()
+
+    /** Camera in a session as the photographer, on [modules], with no notice showing. */
+    private fun inASession(modules: TestAppContainer) {
+        shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
+        modules.install()
+        scenario = launchFragmentInContainer<CameraFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        idleFor(CameraViewModel.NOTICE_MS)
+    }
+
+    @Test
+    fun theSubjectsSituation_beginsTheScenePhotoHere_andSaysWhoStartedIt() {
+        val modules = TestAppContainer()
+        inASession(modules)
+
+        modules.session.deliver(SessionMessage.PoseStart("full_body"))
+        idle()
+
+        // As if the photographer had picked the tile: the scene photo's step, for that situation.
+        val scene = generation().uiState.value
+        assertEquals(GenerationUiState.Phase.FRAMING, scene.phase)
+        assertEquals(Situation.FULL_BODY, scene.situation)
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = true)), startAnswers(modules))
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.remote_pose_start_notice, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+    }
+
+    @Test
+    fun aSelfieForAPhoneWithoutAFrontCamera_isRefused() {
+        val camera = FakeCameraController().apply { hasFrontCamera.value = false }
+        val modules = TestAppContainer(camera = camera)
+        inASession(modules)
+
+        modules.session.deliver(SessionMessage.PoseStart("selfie"))
+        idle()
+
+        assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers(modules))
+    }
+
+    @Test
+    fun whileTheScenePhotoIsAlreadyFramed_theSubjectsStartIsRefused_andTheStepStaysAsItWas() {
+        val modules = TestAppContainer()
+        inASession(modules)
+        val generation = generation()
+        generation.chooseSituation(Situation.HALF_BODY)
+        generation.beginScene()
+        idle()
+
+        modules.session.deliver(SessionMessage.PoseStart("landmark"))
+        idle()
+
+        assertEquals(Situation.HALF_BODY, generation.uiState.value.situation)
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers(modules))
+    }
+
+    @Test
+    fun withoutTheAgreementOnThisPhone_theSubjectsStartAsksForItFirst_andBeginsOnceAgreed() {
+        val modules = TestAppContainer().apply { consent.given = false }
+        inASession(modules)
+
+        modules.session.deliver(SessionMessage.PoseStart("default"))
+        idle()
+
+        // This phone sends the photo, so its user is asked, and told who wants the poses.
+        val notice = ShadowDialog.getLatestDialog() as AlertDialog
+        assertTrue(notice.isShowing)
+        val words = notice.findViewById<TextView>(android.R.id.message)!!.text.toString()
+        assertTrue(words, words.contains(string(R.string.pose_start_asked, "Joonhyung")))
+        assertTrue(words, words.contains(string(R.string.consent_message)))
+        assertTrue(startAnswers(modules).isEmpty())
+        assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
+
+        notice.getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idle()
+
+        assertTrue(modules.consent.given)
+        assertEquals(GenerationUiState.Phase.FRAMING, generation().uiState.value.phase)
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = true)), startAnswers(modules))
+    }
+
+    @Test
+    fun notNowToTheAgreement_refusesTheSubjectsStart_andSendsNothing() {
+        val modules = TestAppContainer().apply { consent.given = false }
+        inASession(modules)
+        modules.session.deliver(SessionMessage.PoseStart("default"))
+        idle()
+
+        // A second request while the notice is up is refused at once: one question at a time.
+        modules.session.deliver(SessionMessage.PoseStart("landmark"))
+        idle()
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers(modules))
+
+        (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
+        idle()
+
+        assertFalse(modules.consent.given)
+        assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
+        assertEquals(2, startAnswers(modules).count { !it.started })
+    }
+
+    @Test
+    fun withASheetOverTheCamera_theSubjectsStartIsRefused() {
+        val modules = TestAppContainer()
+        inASession(modules)
+        val nav = scenario!!.attachNav(R.id.cameraFragment)
+        // Add a pose guide is open over Camera, which stays under it.
+        nav.navigate(R.id.action_camera_to_addGuide)
+        idle()
+
+        modules.session.deliver(SessionMessage.PoseStart("full_body"))
+        idle()
+
+        assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers(modules))
     }
 
     /** The photographer's drop as the session says it: with the subject's name and this phone's role (#293). */

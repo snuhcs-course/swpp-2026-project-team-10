@@ -13,6 +13,7 @@ import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.camera.PhotoAlbum
 import com.lastpenguin.pix.generation.GuideTip
 import com.lastpenguin.pix.generation.PoseTip
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.session.EndReason
@@ -103,6 +104,9 @@ import org.junit.runner.RunWith
  * session's name.
  * The subject's shutter (#314): taken through the Camera screen in front, a notice; with that screen gone, not taken
  * and no notice.
+ * The subject starts AI poses (#276): on the photographer's phone, begun through the Camera screen in front, a notice,
+ * and refused with that screen gone; on the subject's phone, the situation sent and its answer heard, begun or not,
+ * and nothing sent without a link, which counts as refused.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 // Robolectric for ProcessLifecycleOwner, which the ViewModel observes for the background limit.
@@ -875,6 +879,87 @@ class SessionViewModelTest {
 
         assertTrue(notices.isEmpty())
         assertEquals(SessionMessage.ShutterAnswer(taken = false), session.sent.last())
+    }
+
+    // ---- The subject starts AI poses (FR-6.15, #276) --------------------------------------------------------------
+
+    @Test
+    fun theSubjectsSituation_beginsTheScenePhotoOnTheCameraScreen_andIsANotice() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        val asked = mutableListOf<Situation>()
+        model.setRemotePoseStarter { situation, answer ->
+            asked += situation
+            answer(true)
+        }
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.PoseStart("half_body"))
+        runCurrent()
+
+        assertEquals(listOf(Situation.HALF_BODY), asked)
+        assertEquals(listOf<SessionNotice>(SessionNotice.RemotePoseStart("Joonhyung")), notices)
+        assertEquals(SessionMessage.PoseStartAnswer(started = true), session.sent.last())
+    }
+
+    @Test
+    fun onceTheCameraScreenIsGone_theSubjectsStartIsRefused() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        val starter: (Situation, (Boolean) -> Unit) -> Unit = { _, answer -> answer(true) }
+        model.setRemotePoseStarter(starter)
+        model.dropRemotePoseStarter(starter)
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.PoseStart("half_body"))
+        runCurrent()
+
+        assertTrue(notices.isEmpty())
+        assertEquals(SessionMessage.PoseStartAnswer(started = false), session.sent.last())
+    }
+
+    private fun TestScope.poseStartAnswers(): MutableList<Boolean> {
+        val answers = mutableListOf<Boolean>()
+        backgroundScope.launch { model.poseStartAnswers.collect { answers += it } }
+        return answers
+    }
+
+    @Test
+    fun theSubject_asksForPosesWithItsSituation_andHearsWhatBecameOfIt() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+        assertEquals(SessionMessage.PoseStart("landmark"), session.sent.last())
+        assertTrue(answers.isEmpty())
+
+        session.deliver(SessionMessage.PoseStartAnswer(started = true))
+        runCurrent()
+        assertEquals(listOf(true), answers)
+
+        model.askForPoses(Situation.SELFIE)
+        session.deliver(SessionMessage.PoseStartAnswer(started = false))
+        runCurrent()
+        assertEquals(listOf(true, false), answers)
+    }
+
+    @Test
+    fun withoutALink_theSubjectsSituationIsNotSent_andCountsAsRefused() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        session.setState(SessionState.Reconnecting("s1", 0L))
+        runCurrent()
+
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+
+        assertTrue(session.sent.none { it is SessionMessage.PoseStart })
+        assertEquals(listOf(false), answers)
     }
 
     /** A drop as the session says it: with the other phone's name and this phone's role (#293). */

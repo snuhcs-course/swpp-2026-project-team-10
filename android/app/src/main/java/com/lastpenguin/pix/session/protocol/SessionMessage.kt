@@ -477,6 +477,25 @@ sealed interface SessionMessage {
     data class ShutterAnswer(val taken: Boolean) : SessionMessage
 
     /**
+     * S → P: the subject picked a situation on its *Add a pose guide* (FR-6.15, #276). The photographer's phone begins
+     * the scene photo for it, as if its own user had picked it, and answers with `pose.start.answer`. [situation] is
+     * the situation's name on the server (`Situation.apiName`), kept a string so that a phone that does not know one
+     * refuses that request alone.
+     */
+    @Serializable
+    @SerialName("pose.start")
+    data class PoseStart(val situation: String) : SessionMessage
+
+    /**
+     * P → S: whether the scene photo's step began for the subject's `pose.start` (#276). False when the photographer's
+     * phone could not begin it: its Camera screen is not in front or already in a step, it has no front camera for a
+     * selfie, or its user did not agree to the AI notice. With that notice up, the answer comes when it is answered.
+     */
+    @Serializable
+    @SerialName("pose.start.answer")
+    data class PoseStartAnswer(val started: Boolean) : SessionMessage
+
+    /**
      * What the photographer did on their own camera (P → S, #292): the subject's phone says it in a line, as the
      * photographer's phone says the subject's (FR-7.4). [action] is a name, kept a string so that a phone that does
      * not know one drops only that line: `zoom` with [zoom], `brightness` with [exposure], `flash` with [flash],

@@ -20,6 +20,13 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 - [Dongje, 11-25] "Show me the draft for point 2 first." (The agent drew Camera during the wait from the real layout: as it is now, with the live light off and no word; A, "Reconnecting with Joonhyung…" above the shutter for the whole wait; B, the plain "Reconnecting…" that *Subject view* has; and "Joonhyung disconnected" after the wait, as today.)
 - [Dongje, 11-25] "Build A." (Built test-first: the wait at 30 s, with a link back after 25 s and the end at 30 s; a photo's 30 s without word that no longer count a drop; `SessionViewModel.reconnectingWith`, read from `Reconnecting`'s own `peer` and `role`; and Camera's line, held like "… is zooming" and shown before it, so a drop during the subject's pinch keeps it. R&S 4.12, Design 4.13, Testing 4.15.)
 
+## A shutter on *Subject view* ([#314])
+
+- [Dongje, 11-25] "Open a new issue and assign it to me: a shutter on the subject's screen too, so the subject can take the photo. List what I have to consider, as before. Moving the texts that are now in the shutter's place looks important too." (The agent opened #314 and read the requirements and the code. The documents state "Only the photographer takes the photo" as a principle, which this changes. It put up seven points, each with a recommendation: a switch for the photographer, where the shutter place's texts go, a countdown, what a press does when no photo can be taken, what each phone shows, two presses at once, and the tasks it meets, #272 and #276.)
+- [Dongje, 11-25] "Go with all the recommendations, and draw the options for point 2." (Three drawings on the real screen: A, one line right above the shutter that turns into "Receiving photo…"; B, the name in the top bar; C, the name as a chip beside the red dot. In each, a step's button stands beside the thumbnail, where Camera has its camera switch.)
+- [Dongje, 11-25] "Build A." (Built test-first: `camera.shutter` and its answer; the Camera screen alone takes the photo, through its own shutter's code, and refuses while a pose's scene photo is framed; the subject's shutter held until the answer and dimmed while the video does not show; Subject view's row made Camera's. The layout tests found that the tip and the new line do not fit above the shutter together at a font scale of 200 %, so the open tip takes the line's place. R&S 4.14, Design 4.15, Testing 4.17, and flow 5's wireframes.)
+
 [#268]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/268
 [#273]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/273
 [#293]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/293
+[#314]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/314

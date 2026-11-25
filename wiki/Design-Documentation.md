@@ -129,6 +129,7 @@
 | 4.12 | 2026-11-25 | The library's history, favorites, and selection (Iter5-A6, [#297]): `PoseLibrary` keeps each candidate, and a used photo guide is kept, as history; ♥ and *Save guide* mark favorites (`setFavorite`, `favorite` in `meta.json`); no limit of 100; the tabs *All* and *Favorites*, opening on *All*, with no tab per kind and no *Add photo*, a ♥ on each cell (`onToggleFavorite`), *Save guide* drawn as a ♥, selection, and ⋮; Back on *Generating poses* and *Pick a pose* without asking, with `posesKept` and *View* (AD-16, 2.1, 2.3, 2.4, 2.6.2, 2.6.3, 2.8). |
 | 4.13 | 2026-11-25 | Reconnection tries for 30 s, not 10 s; Camera says who it reconnects with for the whole wait (`SessionViewModel.reconnectingWith`), read from `Reconnecting`'s new `peer` and `role`; a photo's 30 s without word no longer count a drop, which `Connected`'s new `drops` tells of (Iter5-A2, [#293]; 1.1.3, 1.1.4, 2.3, 2.4, 2.6.7, 2.8). |
 | 4.14 | 2026-11-25 | Impeccable's findings: notices as Snackbars through `ui/Notices.kt`, *Undo* after *Remove guide* with the tip kept aside in `PoseTips`, *Leave* and *End session* asked first, and the camera screens at large fonts (2.6.2, 2.6.3, 2.6.7, 2.8; Iter5-A7, [#298]). |
+| 4.15 | 2026-11-25 | The subject's shutter (Iter5-A11, [#314]): `camera.shutter` and `camera.shutter.answer`, taken by the Camera screen alone (`RemoteControlHandler.shutter`, `takeForSubject`), `SubjectViewModel.onShutter` with its wait, and *Subject view*'s row as Camera's, with the camera's name above the shutter and a step's button beside the thumbnail (1.1.4, 2.5.1, 2.6.5, 2.6.8). |
 
 </details>
 
@@ -262,7 +263,7 @@ sequenceDiagram
   Note over S: snaps to the applied zoom
 ```
 
-*Figure 3. The photographer's phone applies each request and echoes the applied value, so both phones end on the same zoom. Only the photographer takes photos.*
+*Figure 3. The photographer's phone applies each request and echoes the applied value, so both phones end on the same zoom. A photo is taken on the photographer's phone, at either phone's shutter (2.6.5).*
 
 **Invitation (Iteration 3)**
 
@@ -1623,7 +1624,7 @@ Each protocol has a summary table, followed by a JSON example for every message 
 
 #### 2.5.1 Data channel protocol (phone ↔ phone)
 
-The photographer owns the camera, the guide, and the shared steps. The subject sends requests, which the photographer applies and echoes (AD-7). Only the photographer takes photos.
+The photographer owns the camera, the guide, and the shared steps. The subject sends requests, which the photographer applies and echoes (AD-7). A photo is taken on the photographer's phone alone, at its own shutter or at the subject's request (`camera.shutter`, [#314]).
 
 - **Channels.** Before its offer, the photographer opens `realtime` (`ordered = false`, `maxRetransmits = 0`) and `reliable` (ordered, reliable). `ChannelRouter` picks the channel of each message.
 - **Envelope.** `{"v", "t", "seq", "ts", "b"}`: the protocol version (3), the type, a counter per type, the send time in ms, and the body. `MessageCodec` keeps `t`, the class discriminator of `SessionMessage`, at the top and moves the other fields into `b`.
@@ -1648,6 +1649,8 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `camera.focus.set` | S→P | reliable | `x`, `y` | The subject's tap to focus, in the photographer's frame (FR-7.7, [#273]); answered with `camera.state` |
 | `camera.focus` | P→S | reliable | `x`, `y` | Where the photographer's own tap focused, in the photographer's frame (FR-7.7, [#273]); not kept |
 | `camera.did` | P→S | reliable | `action`, `zoom`, `exposure`, `flash` | What the photographer did on their own camera, for the subject's line (FR-7.4, [#292]); not kept |
+| `camera.shutter` | S→P | reliable | — | The subject's press of *Subject view*'s shutter (FR-7.8, [#314]); answered with `camera.shutter.answer` |
+| `camera.shutter.answer` | P→S | reliable | `taken` | Whether that press took a photo; the photo itself goes as any other (`photo.shutter`, `photo.begin`) |
 | `control.permission` | P→S | reliable | `allowed` | Whether remote control is allowed (FR-7.5, dropped at the kickoff of 11/21; never sent) |
 | `guide.image.begin` / `.chunk` / `.end` | both | reliable | chunks | The guide's mask; S→P for a guide made on the subject's phone |
 | `guide.reference.begin` / `.chunk` / `.end` | both | reliable | chunks | The guide's reference photo, for the other phone's thumbnail (FR-3.9); S→P for a guide made on the subject's phone |
@@ -1910,6 +1913,18 @@ Where the photographer's own tap on Camera focused (FR-7.7, [#273]), in the same
 ```
 
 What the photographer did on their own camera (FR-7.4, [#292]), once, when the action ends. `action` is `zoom` with `zoom`, `brightness` with `exposure`, `flash` with `flash`, `guide.move`, or `guide`; a value that does not belong to the action is left at its default. The subject says it in a line and changes nothing: the camera's values still come as `camera.state`, and the guide as `guide.state`. `action` is a string, so a subject that does not know one drops that line alone. The photographer's own focus has `camera.focus`, since the subject draws its box too. Nothing is kept: a subject that connects later gets none.
+
+</details>
+
+<details>
+<summary><code>camera.shutter</code>, <code>camera.shutter.answer</code> · reliable · S→P, P→S</summary>
+
+```json
+{ "v": 3, "t": "camera.shutter", "seq": 9, "ts": 1759212355000, "b": {} }
+{ "v": 3, "t": "camera.shutter.answer", "seq": 4, "ts": 1759212355100, "b": { "taken": true } }
+```
+
+The subject's press of *Subject view*'s shutter, and what became of it (FR-7.8, [#314]). The photographer's phone takes the photo at once, as at its own shutter, and answers every press. `taken` is false when it took none: its Camera screen is not in front, it frames a pose's scene photo, or its camera still takes the photo before. Nothing is kept for later. A press is reliable, although it is a moment: one lost would look like a button that does nothing. A phone that does not know the types ignores them, so `protocol` stays 3; the subject's shutter then frees itself after 2 s.
 
 </details>
 
@@ -2895,7 +2910,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
 - **Shared steps (It 3, FR-6.15, US-16, [#120]).** Only the photographer's phone generates poses. Its *Generate poses*, *Generating poses*, *Pick a pose*, and *Reference confirm* also show on the subject's phone (2.5.1).
   - The photographer's syncer sends each step while connected, with images encoded off the main thread. After a reconnect it sends the current step, or only its end (2.6.7).
   - The subject's syncer keeps a mirror in memory (`MirrorDescription`, `MirrorPoseSet`, `MirrorConfirm`) through a reconnect, until its end, the next one, or the session's end.
-  - Subject view opens each one once by itself while it is the current destination (`claimSetOpening`, `claimConfirmOpening`, `claimDescribeOpening`). Otherwise a button in the middle of the bottom row, where Camera's shutter is, opens it. One that arrives under *Add a pose guide* opens when the sheet closes.
+  - Subject view opens each one once by itself while it is the current destination (`claimSetOpening`, `claimConfirmOpening`, `claimDescribeOpening`). Otherwise a button beside the thumbnail, where Camera has its camera switch, opens it ([#314]; in the row's middle until then). One that arrives under *Add a pose guide* opens when the sheet closes.
   - The subject's paused video says "Dongje is describing a pose…", "Dongje is creating poses…", "Dongje is picking a pose…", or "Dongje is checking the guide…".
   - The first request to reach the photographer's phone decides (AD-7). One unanswered for 5 s says "Couldn't send your request", "Couldn't send your pick", or "Couldn't send your choice".
   - Each subject screen follows the session itself. The shared screens say "… sees this too".
@@ -2925,7 +2940,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - The subject sees "Photo saved to your Pix album" or "Couldn't save Dongje's photo". The photographer sees "Couldn't send a photo to Joonhyung" for an unreadable or refused photo, one over 40 MiB, or one stalled for 30 s.
   - `PhotoSyncer.sessionPhotos` lists the session's photos on this phone, oldest first: those taken on the photographer's phone, those saved on the subject's. It is null outside a session, empty until the first, and kept through a reconnect, which keeps the session's id ([#235]).
   - In a session, both phones' thumbnails show only the newest of these, so neither shows a photo from before. Both thumbnails are empty until the session's first photo. *Subject view*'s bottom row is Camera's, in thirds: *Guide* in the middle of the left third, where Camera's is, and the thumbnail in the middle of the right third (`showPhotoThumbnails`), on *Guide*'s icon line.
-  - In the middle, where Camera's shutter is, *Subject view* says "Dongje's camera" and "Live" once connected, centered on the line of *Guide*'s icon and the thumbnail; a step's button takes the place while it shows ([#271]). A long name, such as a Galaxy's own name "길동의 Galaxy S23 Ultra", makes the text smaller, down to 12 sp; a name still too long is cut short, so "'s camera" stays (`cameraTitle`). Each photo is waited for by its `shot`: from its `photo.shutter`, or its `photo.begin` when the shutter was lost or came during a drop, until it is saved or refused. Meanwhile `PhotoSyncer.receiving` is true, and "Live" becomes "Receiving photo…" with a spinner. A photo the photographer gave up, before its begin (`photo.dropped`) or for the next photo, is not waited for, and each ends only its own wait. A `photo.shutter` that comes after its photo's `photo.dropped` or save, as the realtime channel allows, starts none (`Waits.ended`). A phone before #271 names no `shot`, so its photos are counted instead. 30 s without a photo message, as from a phone that does not send `photo.dropped`, or the session's end, ends the wait (`STALL_MS`).
+  - Right above its shutter, *Subject view* says "Dongje's camera" and "Live" on one line once connected ([#271]; in the shutter's place until [#314]). The line is in the panels above the bottom row, where Camera shows its notices. A name too long for the line, such as a Galaxy's own name "길동의 Galaxy S23 Ultra", is cut short, so "'s camera" stays (`cameraTitle`); at a font too large for one line, the name stands over "Live" (`fitCaption`). While a step's button shows, the line is the name alone. The open tip takes the line's place, since the two do not fit above the shutter at the largest font. Each photo is waited for by its `shot`: from its `photo.shutter`, or its `photo.begin` when the shutter was lost or came during a drop, until it is saved or refused. Meanwhile `PhotoSyncer.receiving` is true, and "Live" becomes "Receiving photo…" with a spinner. A photo the photographer gave up, before its begin (`photo.dropped`) or for the next photo, is not waited for, and each ends only its own wait. A `photo.shutter` that comes after its photo's `photo.dropped` or save, as the realtime channel allows, starts none (`Waits.ended`). A phone before #271 names no `shot`, so its photos are counted instead. 30 s without a photo message, as from a phone that does not send `photo.dropped`, or the session's end, ends the wait (`STALL_MS`).
   - A tap on either opens the session's photos in a viewer over the whole screen, inside Pix (`PhotoViewer`): one page each, opened at the newest, under a header with Back, *Share*, and *Delete* and no title, decoded to the screen's long side (`photoToView`). The phone's gallery would put Pix in the background, where the video stops and, on the photographer's phone, the session ends after 60 s (2.8, *Lifecycle*).
   - A newer photo adds a page and keeps the page on screen. Back closes the viewer, and so does the session's end. On the subject's phone, a step the photographer starts meanwhile opens once it closes. While it is open, TalkBack reads only the viewer.
   - The viewer works as a gallery app's (FR-1.16, [#247]). A strip of 40 dp thumbnails is under the photo, each taking taps on 48 dp, with the one on screen outlined and the others dimmed. A tap on one shows its photo, and the strip scrolls to keep it in the middle. There is no counter; TalkBack reads each page and thumbnail as "Photo 2 of 12".
@@ -2967,9 +2982,15 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - *Zero-shutter-lag is not used.* It took the picture in 0.18 s and stopped the preview for 0.1 s instead of 0.35 s. Its photos carry twice the noise, and CameraX turns it off on the S22's US models for its colors (`ZslDisablerQuirk`), a list the Korean model is not on. It also does not work with the flash on or on auto.
   - *The shutter is free while a photo is saved.* `takePhoto` calls `onCaptured` when the camera has taken the picture (CameraX's `onCaptureStarted`), and `CameraViewModel` frees the shutter then. CameraX takes the photos asked for meanwhile in order, but it can finish saving a later one first: it saves one at a time only on low-memory phones. `CameraViewModel` therefore publishes each result after the one of the press before, so the thumbnail is the newest photo and the session sends the photos as they were taken (`PhotoSyncer`). Saving takes 0.2 s to 0.5 s more at 3:4. At 9:16 and 1:1 CameraX decodes, crops, and encodes the photo again, 0.2 s more on a plain scene; asking the camera for a 16:9 size does not avoid it, since that size is not exactly 16:9.
   - Not done yet: the photos against the phone's own camera on the same scenes, CameraX Extensions (`HDR`, `NIGHT`), and the S21.
-- **Photos.** Only the photographer takes photos.
+- **Photos.** A photo is taken on the photographer's phone, at either phone's shutter (FR-7.8, [#314]).
+  - *Subject view*'s shutter sends `camera.shutter` (`SubjectViewModel.onShutter`). `RemoteControlHandler` asks the Camera screen to take the photo and answers with `camera.shutter.answer`.
+  - Only the Camera screen takes it, through its own shutter's code (`CameraFragment.takeForSubject`, `CameraViewModel.onShutter`): the camera is bound there alone, and the photo then has its turn, its order, and its place among the session's photos like any other. The screen gives itself to the handler while it is started (`SessionViewModel.setRemoteShutter`). Without it, the answer is not taken.
+  - A press is refused while a pose's scene photo is framed or held, which is the photographer's own step, and while the camera is not ready or still takes the photo before. Nothing is queued: a press is one moment.
+  - The subject's shutter is held from a press to its answer, or for 2 s without one (`SHUTTER_WAIT_MS`). It is dimmed while the photographer's video does not show (`videoShowing`): before the first frame, while the link reconnects, and during the photographer's pose steps. A press that took no photo says "Can't take a photo right now" where the labels show.
+  - The photographer's preview blinks, with "Joonhyung took a photo" (`RemoteAction.Shutter`). The subject's phone needs no line of its own: `photo.shutter` already blinks its video and says "Receiving photo…".
+  - A countdown is left to the self-timer ([#272]).
 - **Notices.** Camera shows each final remote action for 3 s, named from `hello` (FR-7.4, 2.5.1): "Joonhyung set zoom to 2×", "… moved the guide", "… set brightness to +1.0", "… turned the flash on" or "off", "… set the flash to auto", or "… set a pose guide". Subject view shows the same lines about the photographer, where its labels show ([#292]). The photographer's phone knows its own user's actions exactly, so it tells each once, when it ends, as `camera.did` (`RemoteControlHandler.didHere`, called by `CameraViewModel` and, for a guide set from a photo or the library, by `ReferenceViewModel`): a state alone would not say whether a brightness was set by hand or put back by a tap to focus. A chosen pose's guide is not told, since its Reference confirm ends with "… used this guide" on the subject's phone. The focus's line comes with `camera.focus`, as rarely as Camera's.
-  - Camera says "Joonhyung is watching your camera" for 3 s when a subject connects, not after a drop (`SessionNotice.Watching`, [#271]); a new subject after the room waited alone is a new start. Subject view has no such notice: its shutter slot names the camera for the whole session.
+  - Camera says "Joonhyung is watching your camera" for 3 s when a subject connects, not after a drop (`SessionNotice.Watching`, [#271]); a new subject after the room waited alone is a new start. Subject view has no such notice: the line above its shutter names the camera for the whole session.
 - **The subject gone.** "Joonhyung left" or "… disconnected" (FR-6.10, FR-6.11) stays 10 s (`CameraViewModel.PEER_GONE_NOTICE_MS`), since the photographer may not be looking. It goes once the subject is back. A "Couldn't send" notice waits for it (FR-6.14).
 
 #### 2.6.6 Invitations and push (Iteration 3)
@@ -3067,6 +3088,7 @@ Each section's rows share one card, without dividers.
   - *Add a pose guide* rings the situations, then the whole *Choose from the gallery* and *My library* rows ([#210], [#243]). Each row's caption sits on its ring's top edge at the right, half over the row, with no arrow (`TutorialTip.onEdge`). The ring stops on both sides of it, as an outlined field's border does at its label. My library's row is the sheet's last, with the closing line under it, so its caption sits on the seam where the gallery's ring meets its own, and both rings stop around it (`seamRing`). A caption keeps to one line, shrinking to 50 % at most; with no room even then, it goes beside the row only where nothing is in the way, or the tip is left out. The two rows touch, so their rings each give up half of what they share and keep 6 dp apart; each gives up as much on its other side, so it stays centered on its row.
   - A ring is a circle only around a near-square control (sides within 4:5). The 3:4 scene photo gets a rounded ring, which keeps its corners, and its caption goes beside it.
   - The *Guide* button's ring goes around its icon, not its label, so the line fits below the controls.
+  - *Subject view*'s tips are *Guide*, the shutter ("Take the photo yourself", [#314]), the zoom readout, the tap to focus, and the mode toggle. *Guide*'s and the shutter's captions stand above them, as Camera's.
   - The guide's tips include *Remove*, "Take the guide off", below its ✕ since *Save guide*'s caption is above ([#204]).
   - `showTutorialWhenDue` waits until the screen is in front, checking every 250 ms (`RECHECK_MS`). Camera's tips come 0.8 s after the preview streams, outside a session (FR-1.1, NFR-1); the guide's once a visible guide is drawn, also in a session. Subject view's come 0.8 s after the video shows.
   - `AppSettings.tutorialSeen` (DataStore `tutorial_seen_screens`) is null until read, so seen tips never flash. *Show the tutorial again* clears it (`resetTutorial`).
@@ -3742,3 +3764,4 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#304]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/304
 [#306]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/306
 [#310]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/310
+[#314]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/314

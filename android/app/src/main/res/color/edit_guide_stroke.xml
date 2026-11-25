@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The guide-edit mode toggle's edge: the glass's, in the guide's color while the mode is on (checked). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/pix_guide_stroke" android:state_checked="true" />
+    <item android:color="@color/pix_glass_stroke" />
+</selector>

@@ -297,7 +297,7 @@
 
                 <com.lastpenguin.pix.ui.camera.TurningButton
                     android:id="@+id/tipButton"
-                    style="@style/Widget.Pix.Button.Icon"
+                    style="@style/Widget.Pix.Button.Icon.OnPhoto"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:contentDescription="@string/show_tip"
@@ -329,7 +329,7 @@
             android:importantForAccessibility="yes"
             android:minWidth="48dp"
             android:paddingHorizontal="12dp"
-            android:paddingVertical="10dp"
+            android:paddingVertical="8dp"
             android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
             android:textColor="@color/zoom_readout_text"
             android:textSize="11sp"
@@ -339,7 +339,7 @@
              phone (#297). -->
         <com.lastpenguin.pix.ui.camera.TurningButton
             android:id="@+id/saveGuideButton"
-            style="@style/Widget.Pix.Button.Icon"
+            style="@style/Widget.Pix.Button.Icon.OnPhoto"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="end|center_vertical"
@@ -353,7 +353,7 @@
              in the guide's color while checked, as on Camera (#271). -->
         <com.lastpenguin.pix.ui.camera.TurningButton
             android:id="@+id/editGuideButton"
-            style="@style/Widget.Pix.Button.Icon"
+            style="@style/Widget.Pix.Button.Icon.OnPhoto"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:checkable="true"
@@ -361,6 +361,7 @@
             android:contentDescription="@string/edit_guide"
             android:visibility="gone"
             app:backgroundTint="@color/edit_guide_background"
+            app:strokeColor="@color/edit_guide_stroke"
             app:icon="@drawable/ic_guide_mode"
             app:iconTint="@color/edit_guide_icon"
             tools:visibility="visible" />
@@ -435,7 +436,6 @@
                 android:minWidth="48dp"
                 android:minHeight="48dp"
                 android:orientation="vertical"
-                android:paddingHorizontal="8dp"
                 app:layout_constraintEnd_toEndOf="@id/guideLine"
                 app:layout_constraintStart_toStartOf="@id/guideLine"
                 app:layout_constraintTop_toTopOf="parent">
@@ -454,7 +454,7 @@
 
                 <TextView
                     android:layout_width="wrap_content"
-                    android:layout_height="16dp"
+                    android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:duplicateParentState="true"
                     android:gravity="center"
@@ -495,10 +495,13 @@
                     android:src="@drawable/ic_sparkle"
                     app:tint="@color/guide_button_icon" />
 
+                <!-- At most 128 dp wide, so at a large font a long step's name takes two lines, clear of Guide and the
+                     thumbnail, rather than reaching them (#298). -->
                 <TextView
                     android:id="@+id/pickPoseLabel"
                     android:layout_width="wrap_content"
-                    android:layout_height="16dp"
+                    android:layout_height="wrap_content"
+                    android:maxWidth="128dp"
                     android:layout_marginTop="4dp"
                     android:duplicateParentState="true"
                     android:gravity="center"
@@ -509,7 +512,8 @@
                     android:textColor="@color/pix_text_soft" />
             </LinearLayout>
 
-            <!-- The slot's text, between Guide and the thumbnail, centered on their icons' line, as tall as Guide's icon. -->
+            <!-- The slot's text, between Guide and the thumbnail, centered on their icons' line, as tall as Guide's icon;
+                 from 28 % to 72 % of the row, clear of Guide's label at a font scale of 200 % (#298). -->
             <Space
                 android:id="@+id/iconLine"
                 android:layout_width="0dp"
@@ -523,14 +527,14 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                app:layout_constraintGuide_percent="0.26" />
+                app:layout_constraintGuide_percent="0.28" />
 
             <androidx.constraintlayout.widget.Guideline
                 android:id="@+id/captionEnd"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                app:layout_constraintGuide_percent="0.74" />
+                app:layout_constraintGuide_percent="0.72" />
 
             <!-- Once connected, in the slot where Camera's shutter is (#271): whose camera this is, and that it is live,
                  or that their photo is on its way here (FR-6.14), centered on the line of Guide's icon and the
@@ -548,15 +552,15 @@
                 app:layout_constraintTop_toTopOf="@id/iconLine"
                 tools:visibility="visible">
 
-                <!-- A long name, or a large font, makes the text smaller, down to 12 sp; a name still too long is cut
-                     short so "'s camera" stays (SubjectFragment.cameraTitle). 24 dp holds a line of 15 sp, the size it
-                     starts at. -->
+                <!-- A long name, or a large font, makes the text smaller, down to 12 dp, not sp, so a line fits at any
+                     font scale, 200 % included (#298); a name still too long is cut short so "'s camera" stays
+                     (SubjectFragment.cameraTitle). 24 dp holds a line of 15 sp, the size it starts at. -->
                 <TextView
                     android:id="@+id/cameraCaptionTitle"
                     android:layout_width="match_parent"
                     android:layout_height="24dp"
                     android:autoSizeMaxTextSize="15sp"
-                    android:autoSizeMinTextSize="12sp"
+                    android:autoSizeMinTextSize="12dp"
                     android:autoSizeTextType="uniform"
                     android:ellipsize="end"
                     android:gravity="center"

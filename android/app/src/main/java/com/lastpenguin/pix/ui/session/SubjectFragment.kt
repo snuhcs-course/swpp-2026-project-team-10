@@ -12,11 +12,11 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.TextView
-import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.annotation.ColorRes
 import androidx.annotation.DrawableRes
 import androidx.annotation.VisibleForTesting
+import androidx.appcompat.app.AlertDialog
 import androidx.core.animation.doOnEnd
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
@@ -43,6 +43,8 @@ import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.Motion
+import com.lastpenguin.pix.ui.NoticeAnchor
+import com.lastpenguin.pix.ui.NoticeLength
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.camera.ExposureScale
 import com.lastpenguin.pix.ui.camera.FocusBrightness
@@ -89,6 +91,7 @@ import com.lastpenguin.pix.ui.settings.followLook
 import com.lastpenguin.pix.ui.settings.renderLatency
 import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
 import com.lastpenguin.pix.ui.settings.tutorialFor
+import com.lastpenguin.pix.ui.showNotice
 import java.text.DecimalFormat
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -123,7 +126,9 @@ import org.webrtc.VideoSink
  * Owner: Real-time (#8, #10, #57), with the guide from #9 and Iter3-P9; *Save guide*, the candidates, and the outline
  * Iter3-P16.
  */
-class SubjectFragment : Fragment(R.layout.fragment_subject) {
+class SubjectFragment :
+    Fragment(R.layout.fragment_subject),
+    NoticeAnchor {
 
     private val viewModel: SubjectViewModel by viewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
@@ -136,6 +141,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private var renderer: SurfaceViewRenderer? = null
     private var watchdog: FrameWatchdog? = null
     private var referenceDrag: ReferenceDragController? = null
+    private var leaveDialog: AlertDialog? = null
     private var turningIcons: TurningIcons? = null
     private var photoViewer: PhotoViewer? = null
     private var toggleLabelJob: Job? = null
@@ -278,7 +284,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         // A session that ended while Add a pose guide was open has no transition left for this screen to see.
         (sessionViewModel.state.value as? SessionState.Ended)?.let { view.post { onTransition(it) } }
 
-        binding.leaveButton.setOnClickListener { leaveNow() }
+        // Leave asks first, as Back does (#298).
+        binding.leaveButton.setOnClickListener { confirmLeave() }
         // Settings in a session (#204): it covers this screen and comes back to it when the session ends.
         binding.settingsButton.setOnClickListener {
             val nav = findNavController()
@@ -304,7 +311,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                 }
                 launch {
                     viewModel.photoNotDeleted.collect {
-                        Toast.makeText(requireContext(), R.string.photo_not_deleted, Toast.LENGTH_SHORT).show()
+                        showNotice(R.string.photo_not_deleted)
                     }
                 }
                 launch {
@@ -381,7 +388,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                 }
                 launch {
                     sessionViewModel.guideOfferFailed.collect {
-                        Toast.makeText(requireContext(), R.string.guide_offer_failed, Toast.LENGTH_SHORT).show()
+                        showNotice(R.string.guide_offer_failed)
                     }
                 }
                 launch {
@@ -437,7 +444,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                     // A set that ended while this screen is in front; its Pick a pose says so itself while open.
                     viewModel.poseSetEnds.collect { end ->
                         poseSetEndNotice(requireContext(), end, viewModel.uiState.value.photographerName)?.let {
-                            Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show()
+                            showNotice(it)
                         }
                     }
                 }
@@ -445,7 +452,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                     // Generate poses that the photographer closed while this screen is in front.
                     viewModel.describeEnds.collect { end ->
                         describeEndNotice(requireContext(), end, viewModel.uiState.value.photographerName)?.let {
-                            Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show()
+                            showNotice(it)
                         }
                     }
                 }
@@ -453,14 +460,14 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                     // A confirm that ended while this screen is in front; its Your reference says so itself while open.
                     viewModel.confirmEnds.collect { end ->
                         confirmEndNotice(requireContext(), end, viewModel.uiState.value.photographerName)?.let {
-                            Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show()
+                            showNotice(it)
                         }
                     }
                 }
                 launch {
                     sessionViewModel.mobileDataPending.collect { pending ->
                         if (!pending) return@collect
-                        Toast.makeText(requireContext(), R.string.mobile_data_notice, Toast.LENGTH_LONG).show()
+                        showNotice(R.string.mobile_data_notice, NoticeLength.LONG)
                         sessionViewModel.mobileDataNoticeShown()
                     }
                 }
@@ -762,6 +769,9 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     }
 
     override fun onDestroyView() {
+        // A dialog belongs to the activity: one left open would leave a screen that is gone.
+        leaveDialog?.dismiss()
+        leaveDialog = null
         turningIcons?.stop()
         turningIcons = null
         photoViewer?.stop()
@@ -1211,26 +1221,26 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
             EndReason.PEER_LEFT -> {
                 val name = viewModel.uiState.value.photographerName
-                Toast.makeText(
-                    requireContext(),
+                showNotice(
                     name?.let { getString(R.string.peer_ended_session, it) }
                         ?: getString(R.string.peer_ended_session_unnamed),
-                    Toast.LENGTH_SHORT,
-                ).show()
+                )
                 backToCamera()
             }
 
             EndReason.LEFT, EndReason.CANCELLED -> backToCamera()
 
             else -> {
-                Toast.makeText(requireContext(), R.string.session_ended, Toast.LENGTH_SHORT).show()
+                showNotice(R.string.session_ended)
                 backToCamera()
             }
         }
     }
 
+    /** Asks before leaving, for Back and Leave alike (#298); one tap leaves the photographer's camera for good. */
     private fun confirmLeave() {
-        MaterialAlertDialogBuilder(requireContext())
+        if (leaveDialog?.isShowing == true) return
+        leaveDialog = MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.leave_session_title)
             .setPositiveButton(R.string.leave) { _, _ -> leaveNow() }
             .setNegativeButton(R.string.cancel, null)
@@ -1247,6 +1257,10 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private fun backToCamera() {
         findNavController().popBackStack(R.id.cameraFragment, false)
     }
+
+    /** Notices sit above the zoom row, as on Camera, clear of the slot and the controls under the video (#298). */
+    override val noticeAnchor: View?
+        get() = view?.let(FragmentSubjectBinding::bind)?.let { if (it.zoomRow.isShown) it.zoomRow else it.bottomPanel }
 
     /**
      * Passes frames to the renderer and remembers when the last one came, to detect a paused camera, and its shape. It

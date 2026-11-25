@@ -1,10 +1,9 @@
-// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.os.Bundle
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
@@ -17,7 +16,9 @@ import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentSignInBinding
+import com.lastpenguin.pix.ui.NoticeLength
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.showNotice
 import kotlinx.coroutines.launch
 
 /**
@@ -73,11 +74,10 @@ class SignInFragment : Fragment(R.layout.fragment_sign_in) {
                 .setOnCancelListener { viewModel.forgetGoogle() }
                 .show()
 
-            is AccountEvent.GoogleNotAdded -> Toast.makeText(
-                requireContext(),
+            is AccountEvent.GoogleNotAdded -> showNotice(
                 getString(R.string.google_not_added, requireContext().accountMessage(event.error)),
-                Toast.LENGTH_LONG,
-            ).show()
+                NoticeLength.LONG,
+            )
 
             else -> Unit
         }

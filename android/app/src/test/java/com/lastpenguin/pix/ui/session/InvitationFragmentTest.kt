@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.core.os.bundleOf
@@ -19,6 +19,7 @@ import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import kotlinx.coroutines.CompletableDeferred
@@ -29,7 +30,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
-import org.robolectric.shadows.ShadowToast
 
 /*
  * Invitation, the friend's phone (R&S 6.6; FR-6.1, FR-6.4; Testing Documentation 2.1.6), on the real Fragment opened
@@ -161,7 +161,7 @@ class InvitationFragmentTest {
         onScreen { binding -> binding.primaryButton.performClick() }
         idle()
 
-        assertEquals(string(R.string.invitation_in_session), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.invitation_in_session), shownNotice())
         assertEquals(listOf("open:inv_1"), modules.invitations.calls)
         assertTrue(modules.session.starts.isEmpty())
         onScreen { binding ->
@@ -197,7 +197,7 @@ class InvitationFragmentTest {
         gate.complete(Unit)
         idle()
 
-        assertEquals(string(R.string.invitation_in_session), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.invitation_in_session), shownNotice())
         assertTrue(modules.session.starts.isEmpty())
         assertGone()
     }

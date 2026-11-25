@@ -97,6 +97,10 @@ import org.junit.runner.RunWith
  * when the notice with the ratio follows; a pinch that ends without a last value (a cancel) stays named for
  * ZOOMING_LINGER_MS (just before its end / at its end); a quick step, one final value, names no one; a session that
  * ends during a pinch names no one.
+ * The drop on the photographer's phone (#293, FR-6.12): the subject named for the whole wait, however long, until the
+ * link is back; no longer once the wait ends (the room waits again, an invitation's session ends); the subject's
+ * phone names no one; a drop whose Connected this reader never saw, named from the state alone and not by an earlier
+ * session's name.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 // Robolectric for ProcessLifecycleOwner, which the ViewModel observes for the background limit.
@@ -833,6 +837,78 @@ class SessionViewModelTest {
 
         assertNull(model.lastCode)
         assertEquals(SessionEntry.NewRoom to Role.PHOTOGRAPHER, session.starts.last())
+    }
+
+    /** A drop as the session says it: with the other phone's name and this phone's role (#293). */
+    private fun dropped(id: String, name: String, role: Role = Role.PHOTOGRAPHER) =
+        SessionState.Reconnecting(id, 0L, peer = PeerInfo(name), role = role)
+
+    @Test
+    fun aDropSeenWithoutItsConnected_namesTheSubjectFromTheStateAlone() = runTest(dispatcher) {
+        // An earlier session, whose name must not come back.
+        session.setState(SessionState.Connected("s_0", PeerInfo("Sungmin"), Role.PHOTOGRAPHER))
+        runCurrent()
+        session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        runCurrent()
+
+        // A state flow shows its reader only the latest value: Connected and the drop right after it come as one.
+        session.setState(SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        session.setState(dropped("s_1", "Joonhyung"))
+        runCurrent()
+
+        assertEquals("Joonhyung", model.reconnectingWith.value)
+    }
+
+    @Test
+    fun aDrop_namesTheSubjectForTheWholeWait_untilTheLinkIsBack() = runTest(dispatcher) {
+        val connected = SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER)
+        session.setState(connected)
+        runCurrent()
+        assertNull(model.reconnectingWith.value)
+
+        session.setState(dropped("s_1", "Joonhyung"))
+        runCurrent()
+        assertEquals("Joonhyung", model.reconnectingWith.value)
+        // The session decides how long the wait is; the name has no time of its own.
+        advanceTimeBy(29_000)
+        runCurrent()
+        assertEquals("Joonhyung", model.reconnectingWith.value)
+
+        session.setState(connected)
+        runCurrent()
+        assertNull(model.reconnectingWith.value)
+    }
+
+    @Test
+    fun aDropThatIsGivenUp_namesNoOne() = runTest(dispatcher) {
+        // A room code's photographer waits in its room again.
+        session.setState(SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        runCurrent()
+        session.setState(dropped("s_1", "Joonhyung"))
+        runCurrent()
+        session.setState(SessionState.Waiting("482915"))
+        runCurrent()
+        assertNull(model.reconnectingWith.value)
+
+        // An invitation's session ends.
+        session.setState(SessionState.Connected("s_2", PeerInfo("Sungmin"), Role.PHOTOGRAPHER))
+        runCurrent()
+        session.setState(dropped("s_2", "Sungmin"))
+        runCurrent()
+        assertEquals("Sungmin", model.reconnectingWith.value)
+        session.setState(SessionState.Ended(EndReason.CONNECTION_LOST))
+        runCurrent()
+        assertNull(model.reconnectingWith.value)
+    }
+
+    @Test
+    fun theSubjectsPhone_namesNoOneWhileReconnecting() = runTest(dispatcher) {
+        // Subject view has its own "Reconnecting…" over the video.
+        connected()
+        runCurrent()
+        session.setState(dropped("s1", "Dongje", Role.SUBJECT))
+        runCurrent()
+        assertNull(model.reconnectingWith.value)
     }
 
     private fun connected() = session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))

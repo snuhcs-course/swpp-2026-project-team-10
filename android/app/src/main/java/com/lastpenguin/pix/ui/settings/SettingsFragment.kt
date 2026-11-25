@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.content.ActivityNotFoundException
@@ -8,7 +8,6 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
@@ -34,6 +33,7 @@ import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.camera.ExposureScale
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
+import com.lastpenguin.pix.ui.showNotice
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
@@ -108,7 +108,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         binding.tutorialRow.settingValue.isVisible = false
         binding.tutorialRow.root.setOnClickListener {
             viewModel.resetTutorial()
-            Toast.makeText(requireContext(), R.string.settings_tutorial_reset, Toast.LENGTH_SHORT).show()
+            showNotice(R.string.settings_tutorial_reset)
         }
         binding.aboutRow.settingTitle.setText(R.string.settings_about)
         binding.aboutRow.settingValue.text = getString(R.string.settings_version, BuildConfig.VERSION_NAME)

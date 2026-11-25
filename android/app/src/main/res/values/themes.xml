@@ -60,6 +60,9 @@
         <item name="bottomSheetDialogTheme">@style/ThemeOverlay.Pix.BottomSheetDialog</item>
         <item name="bottomSheetDragHandleStyle">@style/Widget.Pix.BottomSheet.DragHandle</item>
         <item name="materialAlertDialogTheme">@style/ThemeOverlay.Pix.MaterialAlertDialog</item>
+        <item name="snackbarStyle">@style/Widget.Pix.Snackbar</item>
+        <item name="snackbarTextViewStyle">@style/Widget.Pix.Snackbar.TextView</item>
+        <item name="snackbarButtonStyle">@style/Widget.Pix.Snackbar.Action</item>
     </style>
 
     <!-- The first-use tutorial (FR-10.4): a see-through dialog over the whole screen, its own dimming drawn by

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.Manifest
@@ -32,6 +32,7 @@ import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import kotlinx.coroutines.launch
@@ -43,7 +44,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
-import org.robolectric.shadows.ShadowToast
 
 /*
  * See their camera's render paths, Join with code until #188 (R&S 6.7, FR-8.2, FR-8.3, FR-8.5; Testing Documentation
@@ -343,7 +343,7 @@ class JoinCodeFragmentTest {
         rows().single().acceptButton.performClick()
         idle()
 
-        assertEquals(string(R.string.invitation_in_session), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.invitation_in_session), shownNotice())
         assertFalse(modules.invitations.calls.any { it.startsWith("accept") })
         assertEquals(1, rows().size)
     }
@@ -376,7 +376,7 @@ class JoinCodeFragmentTest {
         rows().single().acceptButton.performClick()
         idle()
 
-        assertEquals(string(R.string.invitation_gone_title), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.invitation_gone_title), shownNotice())
         assertTrue(modules.session.starts.isEmpty())
         onScreen { binding, _ ->
             assertEquals(View.GONE, binding.invitationsSection.visibility)
@@ -394,7 +394,7 @@ class JoinCodeFragmentTest {
         modules.session.setState(SessionState.Ended(EndReason.NOT_FOUND))
         idle()
 
-        assertEquals(string(R.string.invitation_gone_title), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.invitation_gone_title), shownNotice())
         assertEquals(R.id.joinCodeFragment, nav.currentDestination?.id)
         // Answered, so its row went with the accept.
         onScreen { binding, _ -> assertEquals(View.GONE, binding.invitationsSection.visibility) }

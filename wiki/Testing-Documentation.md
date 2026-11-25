@@ -131,7 +131,8 @@
 | 4.8 | 2026-11-24 | A new guide starts with the camera's gestures (Iter5-A8, [#304]): its owner and tests, and what changes in IT-5 and IT-34 (1.1, Appendix A). |
 | 4.9 | 2026-11-24 | Camera's hint chip without "Pinch to zoom" (Iter5-A9, [#306]): its owner and tests, and an added result on IT-34 (1.1, Appendix A). |
 | 4.10 | 2026-11-25 | *No person found* without its button, and Back to where the photo was chosen (Iter5-A3, [#294]): its owner and tests, and what changes in US-2's steps, IT-35, and US-2's failure case (1.1, 4.3, Appendix A, Appendix B). |
-| 4.11 | 2026-11-25 | Who is zooming and what the photographer did, on both phones (Iter5-A1, [#292]), and a tap on the zoom readout that glides (Iter5-A10, [#310]): their owner and tests, and added steps on IT-6, IT-10, and US-12 (1.1, 4.3, Appendix A). |
+| 4.11 | 2026-11-25 | UAT cycle 2's follow-ups decided in [#298]'s review: the guide is filled in edit mode ([#271]), and no "Go back?" once poses are kept ([#297]) (4.4). |
+| 4.12 | 2026-11-25 | Who is zooming and what the photographer did, on both phones (Iter5-A1, [#292]), and a tap on the zoom readout that glides (Iter5-A10, [#310]): their owner and tests, and added steps on IT-6, IT-10, and US-12 (1.1, 4.3, Appendix A). |
 
 </details>
 
@@ -1132,9 +1133,9 @@ UAT cycle 2, held in class on 11/23 (Iter5-P3, [#267]). A student of another tea
 | *Choose another photo* should be a main button at the bottom | US-2 · 3 · T2 · 3 | *Iteration 5:* the button goes, and Back returns to *Add a pose guide*, still open (Iter5-A3, [#294]) |
 | *Use* on *Reference confirm* looks unneeded: the guide could show at once | US-2 · 5 · T2 · 3 | The step stays, since a screenshot's cut must be seen. *Iteration 5:* every photo shrinks to its thumbnail while its outline is drawn (Iter5-A4, [#295]) |
 | The scene photo's confirm step looks unneeded | US-4 · 6 · T2 · 3 | *Iteration 5:* the step goes. The photo shrinks into *Generate poses*, where a tap shows it large; without a person, the camera stays and says so (Iter5-A5, [#296]) |
-| A wrong tap loses a pose: keep every pose and guide as history, with favorites chosen from them | US-4 · 10 · T2 · 3 | *Iteration 5:* a history of every candidate and guide with no limit, a *Favorites* tab, selecting several, and a ⋮ menu in the library (Iter5-A6, [#297]) |
+| A wrong tap loses a pose: keep every pose and guide as history, with favorites chosen from them | US-4 · 10 · T2 · 3 | *Iteration 5:* a history of every candidate and guide with no limit, a *Favorites* tab, selecting several, and a ⋮ menu in the library. Back from the poses no longer asks "Go back?", since nothing is lost (Iter5-A6, [#297]) |
 | The zoom notice shows only after the fingers lift | US-10, US-12 · 2 · T1 · 4 | *Iteration 5:* the notice shows while the subject pinches (Iter5-A1, [#292]) |
-| The guide-edit button is not clear | US-10, US-12 · 7 · T2 · 4 | *Iteration 5:* one person icon, lit while the guide can be edited (Iter5-P7, [#271]) |
+| The guide-edit button is not clear | US-10, US-12 · 7 · T2 · 4 | *Iteration 5:* one person icon, lit while the guide can be edited, and a light teal fill inside the guide meanwhile (Iter5-P7, [#271]) |
 | "Saved the photo" comes late, with nothing shown meanwhile | US-10, US-12 · 11 · T2 · 4 | *Iteration 5:* Subject view shows that the photo is saving (Iter5-P7, [#271]) |
 | Airplane mode did not turn Wi-Fi off | US-10, US-12 · 13 · T1 · 5 | No change to Pix: the comment is about the sheet's step |
 | The UI needs work: fewer screens to go through, and what a wrong tap keeps or loses | T2's overall comment | The rows above for [#294], [#296], and [#297]. *Iteration 5:* Impeccable is checked on Pix's screens and applied (Iter5-A7, [#298]) |

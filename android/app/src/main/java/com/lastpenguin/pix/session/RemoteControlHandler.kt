@@ -70,7 +70,7 @@ sealed interface RemoteAction {
  *
  * **Focus (It 5, FR-7.7).** `camera.focus.set` is the subject's tap, in fractions of the photographer's frame as the
  * photographer's preview shows it. It does what a tap on Camera does (FR-1.4): the camera focuses and meters there
- * when it can focus on a point, and the brightness goes back to the photographer's base ([baseBrightness], FR-1.11).
+ * when it can focus on a point, and the brightness goes back to the base, 0 EV (FR-1.11).
  * The point has no echo, since focus has no lasting state. The tap is answered with the `camera.state` that carries
  * the base, as the subject's and marked `focused`, so the subject's bar knows where a drag starts from and takes no
  * other echo for it: at once when the camera has the base already, and otherwise when the camera reports it, or
@@ -94,8 +94,6 @@ class RemoteControlHandler(
     private val clock: () -> Long = System::currentTimeMillis,
     /** Who holds the zoom; `CameraViewModel` takes it for the photographer's own pinch. */
     val zoomHold: ZoomHold = ZoomHold(),
-    /** The photographer's base brightness from Settings, in EV (FR-1.11), which a remote tap to focus sets again. */
-    private val baseBrightness: StateFlow<Float> = MutableStateFlow(0f),
 ) {
     private val _actions = MutableSharedFlow<RemoteAction>(extraBufferCapacity = 16)
 
@@ -400,9 +398,9 @@ class RemoteControlHandler(
         if (camera.status.value != CameraStatus.READY) return
         val caps = camera.capabilities.value ?: return
         // The subject's phone asks only of a camera that focuses on a point or has a brightness range.
-        if (!caps.supportsFocusPoint && caps.baseExposureIndex(baseBrightness.value) == null) return
+        if (!caps.supportsFocusPoint && caps.baseExposureIndex() == null) return
         if (caps.supportsFocusPoint) camera.setFocusPoint(x, y)
-        val base = caps.baseExposureIndex(baseBrightness.value)
+        val base = caps.baseExposureIndex()
         if (base == null || (pendingExposure == null && camera.state.value.exposure == base)) {
             // No brightness to set, or already there with nothing outstanding, so the camera will not emit again:
             // answered now.

@@ -450,8 +450,8 @@
             android:importantForAccessibility="no"
             android:visibility="gone" />
 
-        <!-- Brightness (FR-1.11): a vertical bar beside where a tap focused; a drag up on it or on the preview adds to
-             the base brightness from Settings until the next tap. It fades out after a few seconds without a touch
+        <!-- Brightness (FR-1.11): a vertical bar beside where a tap focused; a drag up on it or on the preview sets it
+             from 0 EV, where each tap puts it back. It fades out after a few seconds without a touch
              (Design 2.8). 48 dp wide for the touch (NFR-16); placed in code. -->
         <com.lastpenguin.pix.ui.camera.ExposureBarView
             android:id="@+id/exposureBar"

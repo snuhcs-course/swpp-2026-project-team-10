@@ -45,7 +45,6 @@ object PixViewModels {
                 albumPhotos = container.albumPhotos,
                 sessionPhotos = container.photoSyncer.sessionPhotos,
                 deleter = container.photoDeleter,
-                baseBrightness = container.appSettings.baseBrightness,
                 phoneTurns = container.phoneTurns,
                 zoomHold = container.remoteControlHandler.zoomHold,
                 onFocused = container.remoteControlHandler::focusedHere,

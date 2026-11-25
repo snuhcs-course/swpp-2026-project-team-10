@@ -266,8 +266,6 @@ class CameraViewModel(
     private val sessionPhotos: Flow<List<Uri>?> = flowOf(null),
     /** Deletes a photo from the viewer, from the album and the session's photos (`AppContainer.photoDeleter`). */
     private val deleter: PhotoDeleter = PhotoDeleter { false },
-    /** The base brightness in EV from the settings (FR-1.11): each tap to focus starts from it again. */
-    private val baseBrightness: StateFlow<Float> = MutableStateFlow(0f),
     private val clock: () -> Long = System::currentTimeMillis,
     /** For durations, the telemetry's times (Design 2.8): never set back, unlike [clock], which dates the photos. */
     private val elapsed: () -> Long = SystemClock::elapsedRealtime,
@@ -391,12 +389,11 @@ class CameraViewModel(
             }
         }
         viewModelScope.launch {
-            // The base brightness, once the camera's range is known and whenever the setting or the camera changes;
-            // what a drag added is gone with it (FR-1.11).
+            // The base brightness, 0 EV, once the camera's range is known and whenever the camera changes; what a
+            // drag added is gone with it (FR-1.11).
             camera.capabilities
                 .map { it?.exposureRange to it?.exposureStep }
                 .distinctUntilChanged()
-                .combine(baseBrightness) { _, _ -> }
                 .collect { applyBaseBrightness() }
         }
         viewModelScope.launch {
@@ -817,8 +814,8 @@ class CameraViewModel(
         applyBaseBrightness()
     }
 
-    /** The exposure index of the base brightness for this camera, or null without exposure compensation. */
-    fun baseExposureIndex(): Int? = camera.capabilities.value?.baseExposureIndex(baseBrightness.value)
+    /** The exposure index of the base brightness, 0 EV, for this camera, or null without exposure compensation. */
+    fun baseExposureIndex(): Int? = camera.capabilities.value?.baseExposureIndex()
 
     private fun applyBaseBrightness() {
         baseExposureIndex()?.let(camera::setExposure)

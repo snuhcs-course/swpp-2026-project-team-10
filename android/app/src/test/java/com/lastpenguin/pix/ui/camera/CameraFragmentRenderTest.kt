@@ -56,7 +56,7 @@ import org.robolectric.annotation.GraphicsMode
 /*
  * The Camera screen's render paths (R&S 6.2, Testing Documentation 2.1.6), on the real Fragment under
  * FragmentScenario with a container of fakes. Partitions, one test each: camera permission denied or granted;
- * camera status STARTING, READY; the grid and the horizon bar on by default, and each off from Settings (#271); a
+ * camera status STARTING, READY; the grid and the horizon bar on by default, and each kept off (#271); a
  * guide added, with the guide-edit toggle unlit and the guide not filled (#304), the toggle tapped on (lit, the guide
  * filled) and off again (unlit, the same icon, no fill; #271), hidden, removed by the shutter's end of edit mode; the
  * tip and guide-edit buttons on glass, the toggle's tinted while on (#298); Remove guide's notice above the zoom row
@@ -486,7 +486,7 @@ class CameraFragmentRenderTest {
     @Test
     fun aBarUpWithoutATapToFocus_asAfterTheScreenIsMadeAgain_standsAtTheRightEdge() {
         launch(FakeCameraController(exposureRange = -4..4))
-        // No button opens it: the base brightness is in Settings (FR-1.11), and a tap to focus brings the bar.
+        // No button opens it: a tap to focus brings the bar (FR-1.11).
         onScreen { controls, _ -> assertEquals(View.GONE, controls.exposureBar.visibility) }
 
         onScreen { _, fragment ->

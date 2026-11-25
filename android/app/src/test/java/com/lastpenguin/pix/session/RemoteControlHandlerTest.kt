@@ -41,11 +41,9 @@ class RemoteControlHandlerTest {
     private val handler = RemoteControlHandler(session, camera, guides, attributions::add, clock = { now })
     private val actions = mutableListOf<RemoteAction>()
 
-    /** The photographer's base brightness from Settings, in EV, and a camera that focuses on a point (FR-7.7). */
-    private val baseBrightness = MutableStateFlow(0f)
+    /** A camera that focuses on a point (FR-7.7); the base brightness is 0 EV, index 0. */
     private val focusCamera = FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true)
-    private val focusHandler =
-        RemoteControlHandler(session, focusCamera, guides, clock = { now }, baseBrightness = baseBrightness)
+    private val focusHandler = RemoteControlHandler(session, focusCamera, guides, clock = { now })
 
     private fun echoes(): List<SessionMessage.CameraStateUpdate> =
         session.sent.filterIsInstance<SessionMessage.CameraStateUpdate>()
@@ -576,8 +574,7 @@ class RemoteControlHandlerTest {
     @Test
     fun `a focus request focuses there, puts the brightness back to the base, and is reported as one action`() =
         runTest {
-            // +1 EV at 0.5 EV per index is index 2; a drag before the tap left the camera at 3.
-            baseBrightness.value = 1f
+            // A drag before the tap left the camera at 3; the base is 0 EV, index 0.
             focusCamera.state.value = focusCamera.state.value.copy(exposure = 3)
             backgroundScope.launch { focusHandler.actions.collect { actions += it } }
             focusHandler.start(this)
@@ -589,10 +586,10 @@ class RemoteControlHandlerTest {
             runCurrent()
 
             assertEquals(listOf(0.62f to 0.4f), focusCamera.focusPoints)
-            assertEquals(listOf(2), focusCamera.exposureRequests)
+            assertEquals(listOf(0), focusCamera.exposureRequests)
             // The tap's answer: the state with the base, as the subject's, and no brightness notice.
             assertEquals(
-                SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 2, focused = true),
+                SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 0, focused = true),
                 echoes().single(),
             )
             assertEquals(listOf<RemoteAction>(RemoteAction.Focus(0.62f, 0.4f)), actions)

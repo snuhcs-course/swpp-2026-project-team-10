@@ -111,7 +111,7 @@ import org.robolectric.shadows.ShadowDialog
  * the photographer's pinch holds the zoom: nothing sent, and the label names the photographer (FR-7.6, #236).
  * The UAT's opinions (#271): the slot where Camera's shutter is empty until connected, then whose camera this is and
  * "Live", given up to a step's button, with no notice saying it as well; *Leave* red; the guide-edit toggle one person icon, unlit with the guide plain and lit with it
- * filled. The grid on by default and off from Settings. The tip, Save guide, and guide-edit buttons on glass, the
+ * filled. The grid on by default and kept off. The tip, Save guide, and guide-edit buttons on glass, the
  * toggle's tinted while on (#298).
  * What the photographer did (#292): each action a line with their name where the labels show, for a label's time and
  * the focus's for its shorter one; the photographer's pinch named for as long as it, replaced by the ratio's line, gone
@@ -669,7 +669,7 @@ class SubjectFragmentRenderTest {
     }
 
     @Test
-    fun theGrid_isOnByDefault_andOffFromSettings() {
+    fun theGrid_isOnByDefault_andOffWhenKeptOff() {
         val modules = launch()
         connect(modules)
         onScreen { binding, _ -> assertTrue(binding.compositionOverlay.showGrid) }

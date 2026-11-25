@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -36,9 +36,15 @@ data class ReferenceGuide(
     /**
      * The picked image this guide was cut from, and where (FR-2.10): a screenshot of a feed post cut to its photo, which
      * [mask], [anchor], and [reference] are made from. Null when the image was used whole, and for a generated pose.
-     * Stays on this phone: never sent and not saved.
+     * Stays on this phone: never sent and not saved, and dropped once the guide is used.
      */
     val crop: PhotoCrop? = null,
+    /**
+     * The picked photo, used whole, long side at most 1024 px, which Reference confirm shows turning into this guide
+     * (FR-2.3, #295). Null for a screenshot cut to its photo, whose [crop] holds it, and for a generated pose. Stays on
+     * this phone like [crop].
+     */
+    val photo: Bitmap? = null,
     /**
      * The situation a generated pose was made for (FR-3.11, FR-4.8), which the library keeps and filters by; null for
      * a photo guide, and for a pose from an older photographer that did not send it (#270).
@@ -52,6 +58,13 @@ data class ReferenceGuide(
  */
 fun ReferenceGuide.forSituation(situation: Situation?): ReferenceGuide =
     if (situation == this.situation) this else copy(situation = situation)
+
+/**
+ * This guide without the picked image Reference confirm showed ([ReferenceGuide.crop], [ReferenceGuide.photo]), as it
+ * goes on the camera, so the camera does not hold it; this very guide when it has none, like [forSituation].
+ */
+fun ReferenceGuide.withoutPicked(): ReferenceGuide =
+    if (crop == null && photo == null) this else copy(crop = null, photo = null)
 
 /** A picked image and the part of it a guide was made from (FR-2.10). */
 data class PhotoCrop(

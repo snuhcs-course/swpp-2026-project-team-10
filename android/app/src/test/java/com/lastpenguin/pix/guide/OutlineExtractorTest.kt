@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-13, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -12,7 +12,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 
-/** Real Canvas drawing (Robolectric native graphics). */
+/*
+ * Real Canvas drawing (Robolectric native graphics). Partitions on the mask: a disc (a line on its edge, anti-aliased),
+ * a person cut off by the photo's bottom (no line along it), and nothing (no line). The lines alone, which Reference
+ * confirm draws along the person (#295), are the ones the outline is drawn with.
+ */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class OutlineExtractorTest {
@@ -35,6 +39,31 @@ class OutlineExtractorTest {
         }
         assertEquals(0, Color.alpha(outline.getPixel(50, 50)))
         assertEquals(0, Color.alpha(outline.getPixel(5, 5)))
+    }
+
+    @Test
+    fun `its lines, drawn with the same stroke, are the outline`() {
+        val mask = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        Canvas(mask).drawCircle(50f, 50f, 30f, Paint().apply { color = Color.BLACK })
+
+        val lines = extractor.lines(mask)
+
+        assertEquals(1, lines.size)
+        val drawn = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 4f
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+            color = Color.WHITE
+        }
+        lines.forEach { Canvas(drawn).drawPath(it, paint) }
+        assertTrue(drawn.sameAs(extractor.extract(mask, strokePx = 4f)))
+    }
+
+    @Test
+    fun `a mask with nothing in it has no lines`() {
+        assertTrue(extractor.lines(Bitmap.createBitmap(40, 40, Bitmap.Config.ARGB_8888)).isEmpty())
     }
 
     @Test

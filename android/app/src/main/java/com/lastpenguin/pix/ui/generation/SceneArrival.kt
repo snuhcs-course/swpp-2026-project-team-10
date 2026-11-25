@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.animation.ValueAnimator
@@ -85,8 +85,8 @@ private const val FULL_TURN = 360
 /**
  * Shows [scene], the scene photo just taken, coming from the camera into its [place], its thumbnail on this screen
  * (#296): drawn over the screen where the camera held it, as wide as the screen right [under] the header, or as high
- * as the room there for a frame taller than that. It moves as the photo of a screenshot's cut goes to its corner on
- * Reference confirm (ScreenshotCut), so loading a guide and a scene photo look alike: it holds for
+ * as the room there for a frame taller than that. It moves as a picked photo goes to its corner on Reference confirm
+ * (PhotoToGuide), so loading a guide and a scene photo look alike: it holds for
  * [SceneArrival.HOLD_MS], then goes to the thumbnail in [SceneArrival.MOVE_MS], slow to start and slow to settle,
  * its corners rounding to the thumbnail's. A first try in 250 ms without the hold was too fast to follow on a phone.
  * Longer than Motion's other lengths, but nothing waits for it: the screen under it takes touches at once.

@@ -71,6 +71,8 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 - [Jaewan, 11-25] "when will the check stop?"
 - [Jaewan, 11-25] "close the emulator. it seems good"
 - [Jaewan, 11-25] "do it. just don't run the check we'll check what runs on the pr. are the docs updated?"
+- [Jaewan, 11-25] "codex left reviews. check them"
+- [Jaewan, 11-25] "push, update the pr description, and respond to the review and resolve them."
 
 [#270]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/270
 [#272]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/272

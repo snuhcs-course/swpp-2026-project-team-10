@@ -865,7 +865,8 @@ class SubjectViewModel(
      */
     fun onFlashTap() {
         val ui = _uiState.value
-        if (!ui.connected || !ui.hasFlash) return
+        // Not while the photographer's timer counts down, as on their own phone (FR-1.17).
+        if (!ui.connected || !ui.hasFlash || ui.countdown != null) return
         val next = when (ui.flash) {
             FlashMode.OFF -> FlashMode.AUTO
             FlashMode.AUTO -> FlashMode.ON

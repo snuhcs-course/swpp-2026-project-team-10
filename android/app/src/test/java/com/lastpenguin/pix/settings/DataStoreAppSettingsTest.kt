@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park
 package com.lastpenguin.pix.settings
 
 import android.content.Context
@@ -13,6 +13,8 @@ import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNotNull
@@ -31,7 +33,7 @@ import org.junit.runner.RunWith
 /*
  * The settings kept across runs (FR-10.1, Design 2.8): the defaults before any choice (usage data shared, FR-10.6; the
  * grid and the horizon bar on, FR-1.9, FR-1.10), then each choice in the flows and read back by a new instance, as after
- * a restart; and a store that cannot be read,
+ * a restart; two toggles of the grid at once (back where it was) and one of the horizon bar; and a store that cannot be read,
  * whose usage choice stays unread instead of taking the default (FR-10.6) while the other settings take theirs. One test, because the DataStore behind the context extension lives
  * for the process.
  */
@@ -80,6 +82,16 @@ class DataStoreAppSettingsTest {
         assertEquals(seen, withTimeout(TIMEOUT_MS) { restarted.tutorialSeen.first { it == seen } })
         // Off from the first read: a phone whose user turned it off never sends in between (FR-10.6).
         assertEquals(false, withTimeout(TIMEOUT_MS) { restarted.shareUsage.filterNotNull().first() })
+
+        // The camera menu's Grid tapped twice at once, and Horizon once: each toggle reads what the one before it saved,
+        // so the grid is back off and the horizon bar on (FR-1.17).
+        listOf(
+            async { restarted.toggleShowGrid() },
+            async { restarted.toggleShowGrid() },
+            async { restarted.toggleShowLevel() },
+        ).awaitAll()
+        assertTrue(withTimeout(TIMEOUT_MS) { restarted.showLevel.first { it } })
+        assertFalse(restarted.showGrid.value)
 
         // Show the tutorial again: every screen's tips due again, also after a restart.
         restarted.resetTutorial()

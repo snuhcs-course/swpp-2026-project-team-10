@@ -1063,7 +1063,7 @@ class SubjectFragment :
     private fun setupMenu(binding: FragmentSubjectBinding) {
         binding.cameraMenuButton.setOnClickListener { viewModel.setMenuOpen(!viewModel.uiState.value.menuOpen) }
         binding.menuFlash.setOnClickListener { viewModel.onFlashTap() }
-        binding.menuGrid.setOnClickListener { settingsViewModel.setShowGrid(!settingsViewModel.showGrid.value) }
+        binding.menuGrid.setOnClickListener { settingsViewModel.toggleShowGrid() }
         binding.menuSettings.setOnClickListener {
             viewModel.setMenuOpen(false)
             val nav = findNavController()
@@ -1079,7 +1079,8 @@ class SubjectFragment :
         binding.cameraMenuButton.isActivated = ui.menuOpen
         binding.cameraMenu.reveal(ui.menuOpen)
         binding.menuFlash.isVisible = ui.hasFlash
-        binding.menuFlash.isEnabled = ui.connected
+        // The photographer's flash waits while their timer counts down, as on their phone (FR-1.17).
+        binding.menuFlash.isEnabled = ui.connected && ui.countdown == null
         binding.menuFlash.isActivated = ui.flash != FlashMode.OFF
         val icon = when (ui.flash) {
             FlashMode.OFF -> R.drawable.ic_menu_flash_off

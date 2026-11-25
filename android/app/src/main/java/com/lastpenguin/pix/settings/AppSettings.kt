@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 
 /**
  * The choices that outlive the app (FR-10.1, Design 2.8): the guide's look, the grid and the horizon bar (from the camera
@@ -63,6 +64,16 @@ interface AppSettings {
     suspend fun setShowGrid(show: Boolean)
 
     suspend fun setShowLevel(show: Boolean)
+
+    /**
+     * Turns the grid off or on from what is stored, in one step (the camera menu's *Grid*, FR-1.17): two quick taps
+     * go there and back, where two sets of the opposite of [showGrid] could both read the value before the first
+     * change.
+     */
+    suspend fun toggleShowGrid()
+
+    /** Turns the horizon bar off or on from what is stored, in one step, as [toggleShowGrid]. */
+    suspend fun toggleShowLevel()
 
     suspend fun setShareUsage(share: Boolean)
 
@@ -118,6 +129,10 @@ interface AppSettings {
         override suspend fun setShowLevel(show: Boolean) {
             _showLevel.value = show
         }
+
+        override suspend fun toggleShowGrid() = _showGrid.update { !it }
+
+        override suspend fun toggleShowLevel() = _showLevel.update { !it }
 
         override suspend fun setShareUsage(share: Boolean) {
             _shareUsage.value = share
@@ -200,6 +215,11 @@ class DataStoreAppSettings(private val store: DataStore<Preferences>, scope: Cor
     override suspend fun setShowGrid(show: Boolean) = save { it[SHOW_GRID] = show }
 
     override suspend fun setShowLevel(show: Boolean) = save { it[SHOW_LEVEL] = show }
+
+    // DataStore's edit reads and writes as one step, after any edit before it.
+    override suspend fun toggleShowGrid() = save { it[SHOW_GRID] = !(it[SHOW_GRID] ?: true) }
+
+    override suspend fun toggleShowLevel() = save { it[SHOW_LEVEL] = !(it[SHOW_LEVEL] ?: true) }
 
     override suspend fun setShareUsage(share: Boolean) = save { it[SHARE_USAGE] = share }
 

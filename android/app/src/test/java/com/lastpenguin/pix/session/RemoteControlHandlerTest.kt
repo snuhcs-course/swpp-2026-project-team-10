@@ -28,7 +28,8 @@ import org.junit.Test
  * of the subject's (a brightness set after the tap); a base the camera does not apply, answered with the current
  * state after the wait and then forgotten, so a later change to that value is the photographer's. The photographer's
  * own focus (`camera.focus`) and timer's countdown (`camera.timer`, FR-1.17): told
- * to the subject while the session runs, and to no one before it starts or after it stops.
+ * to the subject while the session runs, and to no one before it starts or after it stops; the subject's flash while
+ * the countdown runs (answered unchanged) and after its 0 (applied).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemoteControlHandlerTest {
@@ -469,6 +470,30 @@ class RemoteControlHandlerTest {
         assertEquals(listOf<RemoteAction>(RemoteAction.Flash(FlashMode.AUTO)), actions)
         handler.stop()
     }
+
+    @Test
+    fun `a flash request while the photographer's timer counts down is answered unchanged, and applies after`() =
+        runTest {
+            backgroundScope.launch { handler.actions.collect { actions += it } }
+            handler.start(this)
+            advanceTimeBy(200)
+            runCurrent()
+            handler.countdownHere(3)
+            session.sent.clear()
+
+            handler.handle(SessionMessage.FlashSet(FlashMode.ON))
+            runCurrent()
+
+            assertTrue(camera.flashRequests.isEmpty())
+            assertEquals(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true), echoes().single())
+            assertTrue(actions.isEmpty())
+
+            handler.countdownHere(0)
+            handler.handle(SessionMessage.FlashSet(FlashMode.AUTO))
+            runCurrent()
+            assertEquals(listOf(FlashMode.AUTO), camera.flashRequests)
+            handler.stop()
+        }
 
     @Test
     fun `a guide move is clamped by the repository, attributed to the subject, and reported once per gesture`() =

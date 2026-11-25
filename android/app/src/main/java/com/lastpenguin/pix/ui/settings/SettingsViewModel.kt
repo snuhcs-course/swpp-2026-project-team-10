@@ -61,12 +61,14 @@ class SettingsViewModel(
         viewModelScope.launch { settings.setShowLatency(show) }
     }
 
-    fun setShowGrid(show: Boolean) {
-        viewModelScope.launch { settings.setShowGrid(show) }
+    /** The camera menu's *Grid*: off or on from what is stored, so two quick taps go there and back. */
+    fun toggleShowGrid() {
+        viewModelScope.launch { settings.toggleShowGrid() }
     }
 
-    fun setShowLevel(show: Boolean) {
-        viewModelScope.launch { settings.setShowLevel(show) }
+    /** The camera menu's *Horizon*, as [toggleShowGrid]. */
+    fun toggleShowLevel() {
+        viewModelScope.launch { settings.toggleShowLevel() }
     }
 
     fun setShareUsage(share: Boolean) {

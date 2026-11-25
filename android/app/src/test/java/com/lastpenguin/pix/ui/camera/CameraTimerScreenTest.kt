@@ -38,7 +38,7 @@ import org.robolectric.annotation.GraphicsMode
  * the shutter's spoken label) and off again (both gone); the countdown on the screen (the seconds over the preview,
  * the hint, the other controls dimmed and waiting, the shutter's label for cancelling), its end (one photo, all back),
  * the shutter's second tap (no photo), and the screen stopping (no photo); in a session, each second and the end told
- * to the subject's phone.
+ * to the subject's phone, and End session waiting, dimmed, until the end.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -227,14 +227,23 @@ class CameraTimerScreenTest {
     }
 
     @Test
-    fun inASession_eachSecondAndTheEnd_areToldToTheSubjectsPhone() {
+    fun inASession_eachSecondAndTheEnd_areToldToTheSubjectsPhone_andEndSessionWaits() {
         val modules = launch()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
         idle()
         chooseThreeSeconds()
 
         onScreen { controls, _ -> controls.shutterButton.performClick() }
+        onScreen { controls, _ ->
+            assertTrue(controls.endSessionButton.isShown)
+            assertFalse(controls.endSessionButton.isEnabled)
+            assertTrue(controls.endSessionButton.alpha < 1f)
+        }
         pass(3_100)
+        onScreen { controls, _ ->
+            assertTrue(controls.endSessionButton.isEnabled)
+            assertEquals(1f, controls.endSessionButton.alpha)
+        }
 
         assertEquals(
             listOf(3, 2, 1, 0),

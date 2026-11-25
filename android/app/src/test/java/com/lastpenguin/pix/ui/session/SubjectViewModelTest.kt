@@ -71,7 +71,8 @@ import org.junit.Test
  * before its end / at its end), with its box at every tap; the photographer's pinch holding the zoom (zooming here),
  * free again, and this phone's own pinch holding it (not the photographer's). The photographer's countdown
  * (`camera.timer`, FR-1.17): each second shown, 0 ending it, a second whose next never comes gone after its wait (1 ms
- * before / at it), and the session dropping. The camera menu: open and closed.
+ * before / at it), and the session dropping; the flash while it runs (nothing sent) and after its 0. The camera menu:
+ * open and closed.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SubjectViewModelTest {
@@ -977,6 +978,26 @@ class SubjectViewModelTest {
         session.deliver(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, flash = FlashMode.AUTO))
         runCurrent()
         assertEquals(FlashMode.AUTO, viewModel.uiState.value.flash)
+    }
+
+    @Test
+    fun `the flash waits while the photographer's countdown runs`() = runTest(dispatcher) {
+        connectWithControls()
+        runCurrent()
+        session.deliver(SessionMessage.Countdown(3))
+        runCurrent()
+
+        viewModel.onFlashTap()
+        assertEquals(FlashMode.OFF, viewModel.uiState.value.flash)
+        assertTrue(session.sent.none { it is SessionMessage.FlashSet })
+
+        session.deliver(SessionMessage.Countdown(0))
+        runCurrent()
+        viewModel.onFlashTap()
+        assertEquals(
+            listOf(SessionMessage.FlashSet(FlashMode.AUTO)),
+            session.sent.filterIsInstance<SessionMessage.FlashSet>(),
+        )
     }
 
     // ---- Save guide (FR-6.16) and the photographer's set (FR-6.15), Iter3-P16 ---------------------------------------

@@ -83,7 +83,7 @@ import org.robolectric.shadows.ShadowDialog
  * by a flick and shown again by a tap on its handle, on this phone only, and hidden while enlarged (the small strip,
  * and small when it is back; #237), a mirror through each change of its size; the camera menu (FR-1.17): its flash's
  * tap, which keeps it open, and Back and its button closing it; the photographer's countdown (FR-1.17): each second
- * with their name, and gone at its end; remote focus with the
+ * with their name, the menu's flash disabled, and all gone at its end; remote focus with the
  * brightness beside it (FR-7.7, FR-7.3, #273): a tap inside the image (the focus asked for at the photographer's x, the
  * box there, the bar beside it), beside the image and in guide-edit mode (nothing), on a camera without point focus
  * (the bar alone); a drag on the bar (steps, then the final value; both gone after the idle time); a drag on the video
@@ -736,6 +736,8 @@ class SubjectFragmentRenderTest {
             assertEquals(View.VISIBLE, binding.countdownPanel.visibility)
             assertEquals("3", binding.countdownNumber.text.toString())
             assertEquals(string(R.string.photographer_timer_label, "Dongje"), binding.countdownLine.text.toString())
+            // The photographer's flash waits, as on their phone.
+            assertFalse(binding.menuFlash.isEnabled)
         }
         modules.session.deliver(SessionMessage.Countdown(2))
         idle()
@@ -743,7 +745,10 @@ class SubjectFragmentRenderTest {
 
         modules.session.deliver(SessionMessage.Countdown(0))
         idle()
-        onScreen { binding, _ -> assertEquals(View.GONE, binding.countdownPanel.visibility) }
+        onScreen { binding, _ ->
+            assertEquals(View.GONE, binding.countdownPanel.visibility)
+            assertTrue(binding.menuFlash.isEnabled)
+        }
     }
 
     // ---- Remote focus, with the brightness beside it (FR-7.7, FR-7.3, #273) -----------------------------------

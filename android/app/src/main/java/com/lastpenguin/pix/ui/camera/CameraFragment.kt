@@ -1092,12 +1092,16 @@ class CameraFragment :
         }
         controls.guideButton.isEnabled = !state.isSaving && !counting
         controls.shootTogetherButton.isEnabled = !state.isSaving && !counting
+        // In a session End session takes Shoot together's place, and waits as well: ended during the count, the session
+        // would be gone before the photo it was counting for.
+        controls.endSessionButton.isEnabled = !counting
         controls.galleryButton.isEnabled = state.lastPhoto != null && !counting
         val dim = if (counting) COUNTDOWN_DIM else 1f
         for (control in listOf(
             controls.cameraSettings,
             controls.switchCameraButton,
             controls.shootTogetherButton,
+            controls.endSessionButton,
             controls.guideButton,
             controls.galleryButton,
         )) {
@@ -1525,8 +1529,8 @@ class CameraFragment :
         controls.timerIndicator.setOnClickListener(toggle)
         controls.menuFlash.setOnClickListener { viewModel.onFlashTap() }
         controls.menuTimer.setOnClickListener { viewModel.onTimerTap() }
-        controls.menuGrid.setOnClickListener { settingsViewModel.setShowGrid(!settingsViewModel.showGrid.value) }
-        controls.menuLevel.setOnClickListener { settingsViewModel.setShowLevel(!settingsViewModel.showLevel.value) }
+        controls.menuGrid.setOnClickListener { settingsViewModel.toggleShowGrid() }
+        controls.menuLevel.setOnClickListener { settingsViewModel.toggleShowLevel() }
         controls.menuSettings.setOnClickListener {
             viewModel.setMenuOpen(false)
             findNavController().navigate(R.id.action_camera_to_settings)

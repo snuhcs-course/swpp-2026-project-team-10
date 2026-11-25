@@ -118,6 +118,9 @@ class RemoteControlHandler(
     private var pendingExposure: PendingValue<Int>? = null
     private var pendingFlash: PendingValue<FlashMode>? = null
 
+    // True while the photographer's timer counts down (countdownHere): the subject's flash waits, as theirs does.
+    private var photographerCounting = false
+
     // The base brightness a tap to focus asked for, until the camera reports it: its echo is the subject's, without
     // the notice of a brightness the subject chose.
     private var pendingBase: PendingValue<Int>? = null
@@ -197,6 +200,7 @@ class RemoteControlHandler(
      * shows the countdown too. Only while a session runs.
      */
     fun countdownHere(left: Int) {
+        photographerCounting = left > 0
         if (scope == null) return
         session.send(SessionMessage.Countdown(left))
         Timings.mark("timer.told", "$left")
@@ -356,10 +360,13 @@ class RemoteControlHandler(
         }
     }
 
-    /** `camera.flash.set`: applied when the camera has a flash; otherwise ignored with an unchanged echo. */
+    /**
+     * `camera.flash.set`: applied when the camera has a flash; otherwise ignored with an unchanged echo, and so while
+     * the photographer's timer counts down, as their own Flash waits then (FR-1.17).
+     */
     private fun handleFlash(request: SessionMessage.FlashSet) {
         Timings.mark("flash.received", "${request.mode}")
-        if (camera.capabilities.value?.hasFlash != true) {
+        if (camera.capabilities.value?.hasFlash != true || photographerCounting) {
             send(camera.zoom.value, Role.PHOTOGRAPHER, final = true)
             return
         }

@@ -1,0 +1,52 @@
+// AI-generated with Claude Code, 2026-11-25, reviewed by Dongje Park
+package com.lastpenguin.pix.session
+
+import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.session.protocol.SessionMessage
+
+/**
+ * What the photographer did on their own camera, which the subject's phone says in a line (FR-7.4, #292), as the
+ * photographer's phone says the subject's ([RemoteAction]). Each goes as `camera.did` once, when the action ends.
+ * The photographer's own focus is not here: it goes as `camera.focus`, since the subject's phone draws its box too.
+ * Owner: Real-time (#292).
+ */
+sealed interface PhotographerAction {
+    /** A pinch's last value, a quick step, or a zoom action: the ratio asked for. */
+    data class Zoom(val ratio: Float) : PhotographerAction
+
+    /** The end of a drag for the brightness: the exposure index it left. */
+    data class Brightness(val index: Int) : PhotographerAction
+
+    data class Flash(val mode: FlashMode) : PhotographerAction
+
+    /** The end of a drag or a pinch that moved the guide. */
+    data object GuideMove : PhotographerAction
+
+    /** A guide put on the camera from a photo or the library. */
+    data object Guide : PhotographerAction
+}
+
+private const val ZOOM = "zoom"
+private const val BRIGHTNESS = "brightness"
+private const val FLASH = "flash"
+private const val GUIDE_MOVE = "guide.move"
+private const val GUIDE = "guide"
+
+/** The message that tells the subject's phone of this action. */
+fun PhotographerAction.toMessage(): SessionMessage.PhotographerDid = when (this) {
+    is PhotographerAction.Zoom -> SessionMessage.PhotographerDid(ZOOM, zoom = ratio)
+    is PhotographerAction.Brightness -> SessionMessage.PhotographerDid(BRIGHTNESS, exposure = index)
+    is PhotographerAction.Flash -> SessionMessage.PhotographerDid(FLASH, flash = mode)
+    PhotographerAction.GuideMove -> SessionMessage.PhotographerDid(GUIDE_MOVE)
+    PhotographerAction.Guide -> SessionMessage.PhotographerDid(GUIDE)
+}
+
+/** The action a message names, or null for one this phone does not know or cannot show, as a newer phone may send. */
+fun SessionMessage.PhotographerDid.toAction(): PhotographerAction? = when (action) {
+    ZOOM -> PhotographerAction.Zoom(zoom).takeIf { zoom.isFinite() && zoom > 0f }
+    BRIGHTNESS -> PhotographerAction.Brightness(exposure)
+    FLASH -> PhotographerAction.Flash(flash)
+    GUIDE_MOVE -> PhotographerAction.GuideMove
+    GUIDE -> PhotographerAction.Guide
+    else -> null
+}

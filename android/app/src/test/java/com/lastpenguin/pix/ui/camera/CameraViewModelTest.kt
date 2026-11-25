@@ -741,6 +741,13 @@ class CameraViewModelTest {
             zoomRequests.add(ratio)
             zoomFinals.add(final)
         }
+
+        /** The ratios asked for as a glide (#310), each also a final request, as the camera makes it. */
+        val glides = mutableListOf<Float>()
+        override fun glideZoom(ratio: Float) {
+            glides += ratio
+            setZoom(ratio, final = true)
+        }
         override fun setFocusPoint(x: Float, y: Float) = Unit
         override fun setExposure(index: Int) = Unit
         override fun setFlash(mode: FlashMode) = Unit
@@ -802,6 +809,25 @@ class CameraViewModelTest {
         // Nothing to clear, and nothing for Undo to put back (#298).
         assertEquals(emptyList<ReferenceGuide?>(), guides.set)
     }
+
+    @Test
+    fun `a tap on the readout and a pinch's last value glide, and a pinch's steps are applied as they come`() =
+        runTest(dispatcher) {
+            runCurrent()
+
+            model.onZoomTap()
+            assertEquals(listOf(2f), camera.glides)
+
+            // A pinch: each step at once, so the picture follows the fingers; its last value settles as a tap's does,
+            // which the camera shows at once where the picture already is.
+            model.onZoomChanged(2.4f, final = false)
+            model.onZoomChanged(2.8f, final = false)
+            assertEquals(listOf(2f), camera.glides)
+            assertEquals(listOf(2.4f, 2.8f), camera.zoomRequests.takeLast(2))
+            assertEquals(listOf(false, false), camera.zoomFinals.takeLast(2))
+            model.onZoomChanged(3f, final = true)
+            assertEquals(listOf(2f, 3f), camera.glides)
+        }
 
     @Test
     fun `a new guide keeps the camera's gestures, and the shutter, another guide, hiding, or removal ends edit mode`() =

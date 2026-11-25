@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.SystemClock
@@ -142,6 +142,19 @@ class SessionViewModel(
 
     private val _notices = MutableSharedFlow<SessionNotice>(extraBufferCapacity = 16)
     val notices: SharedFlow<SessionNotice> = _notices.asSharedFlow()
+
+    /** Runs while a pinch that ended without its last value is still named ([ZOOMING_LINGER_MS]). */
+    private var zoomingLinger: Job? = null
+
+    private val _subjectZooming = MutableStateFlow<String?>(null)
+
+    /**
+     * Photographer: the subject's name while their pinch changes the zoom (FR-7.4, #292), from its first step, for
+     * Camera's line "… is zooming". Null again once the pinch's last value is applied, just before
+     * [SessionNotice.RemoteZoom] says the ratio; a pinch that ends without one stays named [ZOOMING_LINGER_MS]
+     * longer, the time its last value may take to be applied.
+     */
+    val subjectZooming: StateFlow<String?> = _subjectZooming.asStateFlow()
 
     private val _remoteFocus = MutableSharedFlow<RemoteFocus>(extraBufferCapacity = 16)
 
@@ -481,7 +494,11 @@ class SessionViewModel(
                         remoteControl.actions.collect { action ->
                             val name = peerName ?: return@collect
                             when (action) {
-                                is RemoteAction.Zoom -> _notices.tryEmit(SessionNotice.RemoteZoom(name, action.ratio))
+                                is RemoteAction.Zoom -> {
+                                    // The ratio's line takes the place of the pinch's, unless the next pinch began.
+                                    if (remoteControl.zoomHold.holder.value != Role.SUBJECT) noOneZooming()
+                                    _notices.tryEmit(SessionNotice.RemoteZoom(name, action.ratio))
+                                }
 
                                 is RemoteAction.GuideMove -> _notices.tryEmit(SessionNotice.RemoteGuideMove(name))
 
@@ -508,6 +525,21 @@ class SessionViewModel(
                             _notices.tryEmit(SessionNotice.RemoteGuide(name))
                         }
                     }
+                    launch {
+                        // The subject's pinch holds the zoom from its first step to its end (FR-7.6), and Camera names
+                        // them meanwhile (#292). Its end waits for the applied ratio's notice before the name goes.
+                        remoteControl.zoomHold.holder.collect { holder ->
+                            if (holder == Role.SUBJECT) {
+                                zoomingLinger?.cancel()
+                                _subjectZooming.value = peerName
+                            } else if (_subjectZooming.value != null && zoomingLinger?.isActive != true) {
+                                zoomingLinger = launch {
+                                    delay(ZOOMING_LINGER_MS)
+                                    _subjectZooming.value = null
+                                }
+                            }
+                        }
+                    }
                     guideSyncer.startAsSender(this, resumed)
                     poseSyncer?.startAsSender(this)
                     confirmSyncer?.startAsSender(this)
@@ -520,7 +552,15 @@ class SessionViewModel(
             connectedJob?.cancel()
             connectedJob = null
             remoteControl.stop()
+            noOneZooming()
         }
+    }
+
+    /** The subject's pinch is no longer named on Camera (#292). */
+    private fun noOneZooming() {
+        zoomingLinger?.cancel()
+        zoomingLinger = null
+        _subjectZooming.value = null
     }
 
     /**
@@ -608,6 +648,12 @@ class SessionViewModel(
 
         /** How long after that notice another tap to focus makes none. */
         const val FOCUS_NOTICE_QUIET_MS = 2_000L
+
+        /**
+         * How long a pinch that ended stays named without its last value applied (#292): above the photographer's
+         * wait for the camera (`RemoteControlHandler.ECHO_TIMEOUT_MS`), so the line holds until the ratio's notice.
+         */
+        const val ZOOMING_LINGER_MS = 1_000L
 
         private const val BACKGROUND_LIMIT_MS = 60_000L
 

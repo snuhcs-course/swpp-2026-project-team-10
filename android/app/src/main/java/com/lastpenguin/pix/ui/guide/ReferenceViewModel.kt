@@ -70,6 +70,11 @@ class ReferenceViewModel(
     private val tips: PoseTips? = null,
     private val subject: SubjectGuideTarget? = null,
     private val confirms: ConfirmShare = ConfirmShare.None,
+    /**
+     * Tells the subject's phone that the photographer put a guide on the camera from a photo or the library
+     * (`RemoteControlHandler.didHere`, FR-7.4, #292). Not for a chosen pose, whose Reference confirm says so itself.
+     */
+    private val onGuideSet: () -> Unit = {},
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ReferenceUiState>(ReferenceUiState.Idle)
@@ -181,9 +186,14 @@ class ReferenceViewModel(
      * candidate of a scene photo held at [turn], is turned back into the camera's portrait frame (Design 2.6.2), so it
      * lies on the preview held that way, on both phones (NFR-8).
      */
-    private fun use(guide: ReferenceGuide, turn: Int = 0) {
+    private fun use(guide: ReferenceGuide, turn: Int = 0, shared: Boolean = false) {
         val target = subject
-        if (forSubject && target != null) target.offer(guide) else guides.setGuide(guide.intoFrameHeldAt(turn))
+        if (forSubject && target != null) {
+            target.offer(guide)
+            return
+        }
+        guides.setGuide(guide.intoFrameHeldAt(turn))
+        if (!shared) onGuideSet()
     }
 
     /** A photo from the system photo picker; on a Reference confirm the subject shares, it stays shared. */
@@ -256,7 +266,8 @@ class ReferenceViewModel(
         val ready = _uiState.value as? ReferenceUiState.Ready ?: return false
         // Its tip goes with it to the camera; leaving the screen now must not drop it.
         if (ready.guide.id == tipFor) tipFor = null
-        use(ready.guide, heldAt)
+        // A confirm the subject's phone shows too ends with its own line there, "… used this guide".
+        use(ready.guide, heldAt, shared = sharedId != null)
         _uiState.value = ReferenceUiState.Idle
         endShare { confirms.used(it, ready.guide.id, by) }
         return true

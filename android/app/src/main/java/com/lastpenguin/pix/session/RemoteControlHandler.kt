@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraController
@@ -184,6 +184,16 @@ class RemoteControlHandler(
         Timings.mark("focus.told", "$x $y")
     }
 
+    /**
+     * The photographer did [action] on their own camera (FR-7.4, #292): the subject's phone says it in a line. Only
+     * while a session runs.
+     */
+    fun didHere(action: PhotographerAction) {
+        if (scope == null) return
+        session.send(action.toMessage())
+        Timings.mark("did.told", action.toMessage().action)
+    }
+
     /** Handles the subject's requests; other messages are ignored. */
     fun handle(message: SessionMessage) {
         when (message) {
@@ -226,8 +236,10 @@ class RemoteControlHandler(
         // A final echo still due for the previous step would send a stale zoom after the subject's pinch ended.
         // The newer request brings its own echoes: when applied, or from the timeout answer.
         finalJob?.cancel()
-        // The subject's pinch holds the lens like a local one until its last value (Design 2.6.5).
-        camera.setZoom(ratio, request.final)
+        // The subject's pinch holds the lens like a local one until its last value (Design 2.6.5). That value, and a
+        // quick step's one value, glide where the camera can show it, as the photographer's own do (#310); the camera's
+        // states on the way are the photographer's echoes, and the one that arrives is the subject's.
+        if (request.final) camera.glideZoom(ratio) else camera.setZoom(ratio, final = false)
         if (!request.final) return
         timeoutJob = scope?.launch {
             answerIfStalled(

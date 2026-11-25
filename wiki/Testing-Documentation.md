@@ -132,6 +132,7 @@
 | 4.9 | 2026-11-24 | Camera's hint chip without "Pinch to zoom" (Iter5-A9, [#306]): its owner and tests, and an added result on IT-34 (1.1, Appendix A). |
 | 4.10 | 2026-11-25 | *No person found* without its button, and Back to where the photo was chosen (Iter5-A3, [#294]): its owner and tests, and what changes in US-2's steps, IT-35, and US-2's failure case (1.1, 4.3, Appendix A, Appendix B). |
 | 4.11 | 2026-11-25 | UAT cycle 2's follow-ups decided in [#298]'s review: the guide is filled in edit mode ([#271]), and no "Go back?" once poses are kept ([#297]) (4.4). |
+| 4.12 | 2026-11-25 | Who is zooming and what the photographer did, on both phones (Iter5-A1, [#292]), and a tap on the zoom readout that glides (Iter5-A10, [#310]): their owner and tests, and added steps on IT-6, IT-10, and US-12 (1.1, 4.3, Appendix A). |
 
 </details>
 
@@ -225,6 +226,8 @@ One member writes and maintains each component's tests, following the module own
 | A new guide starts with the camera's gestures (Iter5-A8, [#304]) | ViewModels, Views | `ui/camera/` (`CameraViewModelTest`, `GuideControlsViewModelTest`, `CameraFragmentRenderTest`, `CameraFragmentInteractionTest`); IT-5 and IT-34 on phones | 박동제 |
 | Camera's hint chip without "Pinch to zoom" (Iter5-A9, [#306]) | Views | `ui/camera/CameraFragmentRenderTest`; IT-34 on a phone | 박동제 |
 | *No person found*: Back returns to *Add a pose guide* (Iter5-A3, [#294]) | Views | `ui/guide/` (`NoPersonFoundFragmentTest`, `ReferenceConfirmFragmentTest`, `AddGuideSheetTest`), `ui/` (`ScreenTransitionsTest` on the real navigation, `KoreanScreensTest`); IT-35 and US-2 on phones, where alone the system's photo picker shows | 박동제 |
+| Who is zooming, and the photographer's actions on *Subject view* (Iter5-A1, [#292]) | Models, ViewModels, Views | `session/` (`RemoteControlHandlerTest`, `protocol/RemoteControlMessagesTest`, `protocol/ChannelRouterTest`), `ui/session/` (`SessionViewModelTest`, `SubjectViewModelTest`, `SubjectFragmentRenderTest`), `ui/camera/` (`CameraControlsViewModelTest`, `CameraFragmentInteractionTest`), `ui/guide/` (`ReferenceViewModelTest`, `SavedGuidesViewModelTest`, `ReferenceConfirmFragmentTest`); IT-6 on two phones | 박동제 |
+| A tap on the zoom readout glides (Iter5-A10, [#310]) | Models, ViewModels | `camera/ZoomGlideTest`, `ui/camera/CameraViewModelTest`, `session/RemoteControlHandlerTest`. `CameraXController`'s part needs a camera: IT-10 on the S22 and the S21, by eye and with `zoom_timings.py` | 박동제 |
 | The live view after a reconnection, the UI fixes, and the self-timer (Iter5-P5, P7, P8) | Platform, ViewModels, Views | `session/`, `settings/`, `ui/camera/`, `ui/settings/`; the UI fixes also in `guide/`, `ui/session/`, `ui/`: `DataStoreAppSettingsTest`, `SettingsFragmentTest`, `CameraCompositionViewTest`, `CameraFragmentRenderTest`, `CameraLayoutTest`, `SubjectFragmentRenderTest`, `SubjectSessionPhotoTest`, `SessionViewModelTest`, `PhotoSyncerTest`, `MessageCodecTest`, `ChannelRouterTest`, `SessionIdentityTest`, `RtcSessionManagerTest`, `GuideOverlayViewTest`, `GuideLookTest`, `MaskMathTest`, `KoreanScreensTest` | 박재완 |
 | The library's situations and memos, the cutout, and pose generation started by the subject (Iter5-P6, P11, P12) | Managers, ViewModels, Views, the session protocol | `guide/`, `ui/guide/`, `session/`, `ui/session/`, `generation/` | 한준형 |
 | AI module tests: the outline and the person check (Iter5-P16, P17) | The phone's segmentation and person check; the server's person check | 3.1, 3.2 | 박재완 (the outline), 한준형 (the person check) |
@@ -1050,7 +1053,7 @@ The UAT runs in class on 11/16 and 11/18 (Iteration 4). Testers outside the team
 | Step | Tester does | Pass when |
 |---|---|---|
 | 1 | On A, tap *Guide* › *Choose from the gallery* (*Add photo* before Iter4-P13), choose R1, and tap *Use* (*Use this guide* before Iter4-P2). Invite B as in US-10 step 3; B accepts from the notification. | B's *Subject view* shows A's camera live, with the guide. |
-| 2 | On B, with guide-edit mode off (the toggle beside the zoom readout says *Camera*), pinch the live video to 2×, and let go. | B's readout follows the pinch. A's camera zooms, both readouts settle on the same ratio, and A shows "Test Account 2 set zoom to 2×". |
+| 2 | On B, with guide-edit mode off (the toggle beside the zoom readout says *Camera*), pinch the live video to 2×, and let go. | B's readout follows the pinch. A's camera zooms, both readouts settle on the same ratio, and A shows "Test Account 2 set zoom to 2×". *Added in Iter5-A1 ([#292]): while B pinches, A shows "Test Account 2 is zooming".* |
 | 3 | On B, tap the toggle so that it says *Guide*. Drag the guide to the right, and pinch it larger. | The guide moves and grows on both phones. A shows "Test Account 2 moved the guide". |
 | 4 | On B, tap the brightness button, and raise the slider. *Changed in Iter5-P9 ([#273]): the button and the slider are gone; tap the live video, and drag the bar beside the focus box up.* | A's preview and B's live view get brighter. |
 | 5 | On B, tap the flash button. | A's flash moves to its next state, and both phones show that state. |
@@ -1272,12 +1275,16 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 
 1. On the subject's phone, 20 times each: pinch, the brightness slider, the flash button, and, with the guide-edit toggle on, a drag and a pinch on the guide. *Changed in Iter5-P9 ([#273]): the slider is gone; tap the video once, then drag the bar beside the focus box, 20 times.*
 2. *Added in Iter4-A3 ([#236]):* with guide-edit mode off on both phones, the photographer starts a pinch, and while it runs the subject pinches the live view. Both lift, then the subject pinches again. Repeat with the subject first, then with the subject tapping the zoom readout during the photographer's pinch. 10 times each.
+3. *Added in Iter5-A1 ([#292]):* the subject pinches slowly for 5 s and lets go; then starts a pinch and lifts one finger at once. On the photographer's phone: pinch for 5 s and let go, tap the zoom readout, drag the brightness bar, tap the flash, tap to focus three times in a row, move the guide with guide-edit mode on, and put a guide on the camera from the gallery.
+4. *Added in Iter5-A10 ([#310]):* on each phone, tap the zoom readout through all its steps; then tap it twice in a row, and tap it once and press the shutter at once on the photographer's phone.
 
 **Expected result**
 
 - Each is applied on the photographer's phone within 0.5 s, with the notice once per gesture. Both phones agree on release.
 - The NFR-7 number is the round trip in the subject's `PixTimings` log, from `zoom.sent`, `exposure.sent`, or `move.sent` with `final` to the echo (`zoom.echo`, `guide.applied`). No clock alignment is needed.
 - *Added in Iter4-A3:* the image does not jump on either phone. The first pinch sets the zoom; the other phone's pinch or tap changes nothing, its readout follows the zoom, and it shows "Dongje is zooming" or "Joonhyung is zooming". The subject's next pinch zooms. Both readouts end on the same ratio.
+- *Added in Iter5-A1:* from the first movement of the subject's pinch, the photographer's phone shows "Joonhyung is zooming" above the shutter, for the whole pinch, and "Joonhyung set zoom to …" in its place at the end; a pinch that ended at once takes the line down within about 1 s. For each of the photographer's actions, Subject view shows its line where its labels show: "Dongje is zooming" during the pinch, then "Dongje set zoom to …", "… set brightness to …", "… turned the flash on", "… set the focus" once for the three taps, "… moved the guide", and "… set a pose guide".
+- *Added in Iter5-A10:* on the photographer's phone and in the subject's video, the readout shows the step at once, and the picture zooms in or out to it for about a quarter of a second, with no jump. A second tap goes on to the next step. The photo taken at once has the step's zoom. On the S21, a step that needs the other lens changes as before, behind the held frame.
 
 ### IT-7 procedure
 
@@ -1346,6 +1353,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 2. Make 20 zoom changes: pinches that cross 1× and pinches above it, also from the subject's phone.
 3. Press the shutter, and measure with `zoom_timings.py` (2.1.4).
 4. Added 2026-11-16 ([#208]), since the shutter no longer waits for the save: press the shutter eight times, a few seconds apart, on the rear camera and on the front one. Then press it three times as fast as it allows.
+5. *Added in Iter5-A10 ([#310]):* tap the zoom readout through its steps ten times, on the S22 and on the S21, and once with the phone's *Remove animations* on. Measure with `zoom_timings.py`.
 
 **Expected result**
 
@@ -1354,6 +1362,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 - A lens switch shows the last frame, not the spinner.
 - The `Timings` numbers go in the PR.
 - Added 2026-11-16 ([#208]): nothing says that a photo is being saved. The three fast presses give three photos in the gallery. The *Shutter* table's medians go in the PR with those of the build before.
+- *Added in Iter5-A10:* a step on one lens glides: the log has `zoom.glide` and then a `zoom.apply` per frame for about 250 ms, with the frame interval's p95 within 1.5 times its median. A step onto the other lens (the S21 below 1×) has no `zoom.glide`. With *Remove animations*, each step is one `zoom.apply`.
 
 ### IT-11 procedure
 
@@ -2615,3 +2624,4 @@ Observations: every Iteration 4 step held, and no defect was found.
 [#298]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/298
 [#304]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/304
 [#306]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/306
+[#310]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/310

@@ -26,7 +26,13 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 - [Dongje, 11-25] "Go with all the recommendations, and draw the options for point 2." (Three drawings on the real screen: A, one line right above the shutter that turns into "Receiving photo…"; B, the name in the top bar; C, the name as a chip beside the red dot. In each, a step's button stands beside the thumbnail, where Camera has its camera switch.)
 - [Dongje, 11-25] "Build A." (Built test-first: `camera.shutter` and its answer; the Camera screen alone takes the photo, through its own shutter's code, and refuses while a pose's scene photo is framed; the subject's shutter held until the answer and dimmed while the video does not show; Subject view's row made Camera's. The layout tests found that the tip and the new line do not fit above the shutter together at a font scale of 200 %, so the open tip takes the line's place. R&S 4.14, Design 4.15, Testing 4.17, and flow 5's wireframes.)
 
+## The subject starts AI poses ([#276])
+
+- [Dongje, 11-25] "Can you do #276 in this PR too? Let the subject enter pose generation too. After entering, it can go through the same steps as when the photographer entered." (The agent read the issue, which was a teammate's, and the code. It answered that it can, asked whose task it is, and put up four points with a recommendation each: who takes the scene photo, what happens when the photographer's phone cannot start, the AI agreement on each phone, and the selfie.)
+- [Dongje, 11-25] "It is mine now. Go with all the recommendations." (Built test-first on the same branch: `pose.start` and its answer; the photographer's Camera begins the scene photo through the code its own tile runs, and the photographer takes it; the subject's sheet offers the situations and asks its own consent in its own words; the photographer's phone asks its user when it has no consent, naming the subject. R&S 4.15, Design 4.16, Testing 4.18.)
+
 [#268]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/268
 [#273]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/273
+[#276]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/276
 [#293]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/293
 [#314]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/314

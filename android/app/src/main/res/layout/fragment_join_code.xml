@@ -3,7 +3,6 @@
      code from the photographer's phone, and where it comes from there. #122 adds Scan a QR code under Connect. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:clipChildren="false"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -12,9 +11,12 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="20dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:clipToPadding="false"
         android:gravity="center_vertical"
-        android:minHeight="56dp">
+        android:minHeight="56dp"
+        android:paddingHorizontal="12dp">
 
         <ImageButton
             android:id="@+id/backButton"

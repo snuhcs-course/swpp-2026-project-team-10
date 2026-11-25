@@ -6,12 +6,13 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
+    <!-- The screens' header: 56 dp under 8 dp, which this header pads itself, so Back stands where every screen's does. -->
     <LinearLayout
         android:clipToPadding="false"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:minHeight="56dp"
+        android:minHeight="64dp"
         android:paddingHorizontal="20dp"
         android:paddingTop="8dp">
 

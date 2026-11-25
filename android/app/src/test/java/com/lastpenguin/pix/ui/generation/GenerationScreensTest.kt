@@ -80,7 +80,7 @@ import org.robolectric.shadows.ShadowChoreographer
  * meanwhile), the one button starts a run, of the text or of suggested poses for an empty field (Iter3-A13), and opens
  * Generating poses; the situation named on the photo's card and its options, Auto naming none and offering its own,
  * and a run of an option's words alone (FR-4.15); a tap on the photo showing it large, once however often it is tapped,
- * closed by its Back and by a tap on it (FR-4.15); straight from the shutter, the photo taken as arrived, so it comes
+ * closed by its Back, which is where the screen's own is, and by a tap on it (FR-4.15); straight from the shutter, the photo taken as arrived, so it comes
  * in once, and none to come when the screen opens again from a set (#296; its move is in SceneArrivalTest); Back and system back to the camera to
  * shoot again, the text kept (#296); Back (the photo's review on Camera, the text kept); in a session, the hint, this
  * phone's typing holding the field, the subject's typing shown and holding it, and the subject's Generate 4 poses that
@@ -470,7 +470,15 @@ class GenerationScreensTest {
             val large = checkNotNull(largePhotoOf(fragment)).requireView()
             val photo = large.findViewById<ImageView>(R.id.scenePhotoLarge)
             assertSame(fragment.scenePhoto, (photo.drawable as BitmapDrawable).bitmap)
-            large.findViewById<View>(R.id.scenePhotoBack).performClick()
+            // Its Back exactly over the screen's own, so Back does not move as the photo opens.
+            val back = large.findViewById<View>(R.id.scenePhotoBack)
+            val screens = FragmentDescribePoseBinding.bind(fragment.requireView()).backButton
+            assertEquals(
+                IntArray(2).also(screens::getLocationOnScreen).toList(),
+                IntArray(2).also(back::getLocationOnScreen).toList(),
+            )
+            assertEquals(screens.width, back.width)
+            back.performClick()
         }
         idle()
 

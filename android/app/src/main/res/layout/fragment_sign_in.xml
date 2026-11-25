@@ -7,7 +7,6 @@
     android:fillViewport="true">
 
     <LinearLayout
-        android:clipChildren="false"
         android:clipToPadding="false"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -19,8 +18,12 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginStart="-12dp"
+            android:layout_marginEnd="-12dp"
+            android:clipToPadding="false"
             android:gravity="center_vertical"
-            android:minHeight="56dp">
+            android:minHeight="56dp"
+            android:paddingHorizontal="12dp">
 
             <ImageButton
                 android:id="@+id/backButton"

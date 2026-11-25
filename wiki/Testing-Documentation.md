@@ -134,7 +134,7 @@
 | 4.11 | 2026-11-25 | UAT cycle 2's follow-ups decided in [#298]'s review: the guide is filled in edit mode ([#271]), and no "Go back?" once poses are kept ([#297]) (4.4). |
 | 4.12 | 2026-11-25 | Who is zooming and what the photographer did, on both phones (Iter5-A1, [#292]), and a tap on the zoom readout that glides (Iter5-A10, [#310]): their owner and tests, and added steps on IT-6, IT-10, and US-12 (1.1, 4.3, Appendix A). |
 | 4.13 | 2026-11-25 | The library's situations and memos (Iter5-P6, [#270]): its owner and tests, their partitions in two techniques, and steps on IT-26 (1.1, 2.1.5, 2.1.6, Appendix A). |
-| 4.14 | 2026-11-25 | The library's history, favorites, and selection (Iter5-A6, [#297]): its owner and tests, their partitions in two techniques, steps on IT-26, and what changes in IT-27 and IT-35 (1.1, 2.1.5, 2.1.6, Appendix A). |
+| 4.14 | 2026-11-25 | The library's history, favorites, and selection (Iter5-A6, [#297]): its owner and tests, their partitions in two techniques, steps on IT-26, and what changes in IT-26's older steps, IT-27, IT-28, IT-29, and IT-35 (1.1, 2.1.5, 2.1.6, Appendix A). |
 
 </details>
 
@@ -1697,29 +1697,29 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 2. Save a guide from a gallery photo and one from an AI pose. Kill Pix and open it again.
 3. Open *Guide*, then *All*; choose *AI poses*, then *Photos*; tap a guide.
 4. Open the library again. Long press a guide and tap *Cancel*; long press again and tap *Delete*.
-5. Tap *Add photo*, pick a photo, and go back from *Reference confirm*.
+5. Tap *Add photo*, pick a photo, and go back from *Reference confirm*. *Changed in Iter5-A6 ([#297]): the library has no *Add photo*; skip this step.*
 6. In a session, open the library from Subject view and tap a guide.
 7. *Added in Iter4-A6 ([#243]):* with a guide on the camera, tap *Guide*, then *Choose from the gallery*, and close the picker without a photo. Then open *All*, tap *Add photo*, and close the picker the same way.
 8. *Added in Iter5-P6 ([#270]):* take a *Landmark* scene photo and ♥ a pose. Take a *Selfie* one, *Select* a pose, and tap *Save guide* on Camera. Open the library.
-9. Tap *Landmark*'s chip, then *AI poses*, then *Photos*, then *Landmark*'s chip again.
+9. Tap *Landmark*'s chip, then *Favorites*, then *All*, then *Landmark*'s chip again.
 10. Tap a guide's pencil, type a memo of more than 40 characters, and tap *Save*. Tap another guide's pencil, type a memo, and tap *Cancel*. Kill Pix and open the library again.
 11. Clear the first memo and tap *Save*. Delete the selfie pose.
 12. In a session with a *Full body* scene photo, ♥ a pose on the subject's phone; *Select* another on the photographer's phone and tap *Save guide* on Subject view. Open the library on the subject's phone. Repeat steps 8 to 10 in Korean, with TalkBack on for one cell.
-13. *Added in Iter5-A6 ([#297]):* generate a set of four poses and tap Back on *Pick a pose* without a ♥. Use a guide from a gallery photo. Open the library and tap *Favorites*.
+13. *Added in Iter5-A6 ([#297]):* generate a set of four poses and tap Back on *Pick a pose* without a ♥. Use a guide from a gallery photo. Open the library. Under *All*, tap the ♥ of a pose and of the photo guide. Open the library again, tap *Favorites*, and tap the pose's ♥ there.
 14. Long press a guide, tap two more, tap one of them again, then *Delete*, *Cancel*, and *Delete* again. Long press, tap *Select all*, and tap ✕.
-15. Tap ⋮ › *Select*, then Back. Choose *Photos*, tap ⋮ › *Select all*, then *Delete*, and confirm. Kill Pix and open the library again.
+15. Tap ⋮ › *Select*, then Back. Choose *Favorites*, tap ⋮ › *Select all*, then *Delete*, and confirm. Kill Pix and open the library again.
 
 **Expected result**
 
 - The three guides are listed newest first with their sources' icons, the one saved before the update too.
-- Each filter lists only its source, with the counts of every filter.
+- Each filter lists only its source, with the counts of every filter. *Changed in Iter5-A6 ([#297]): the tabs are *All* and *Favorites* only.*
 - A tap puts the guide on the camera at its reference's place.
 - A deleted guide is gone only after *Delete*, and a guide on the camera stays.
-- Back from *Reference confirm* returns to the library.
+- Back from *Reference confirm* returns to the library. *Changed in Iter5-A6 ([#297]): no longer checked, since the library has no *Add photo*.*
 - From Subject view, the guide shows on both phones.
 - *Added in Iter4-A6 (step 7):* each closed picker returns to the screen that opened it, *Add a pose guide* or the library, and the guide on the camera is unchanged (FR-2.7).
-- *Added in Iter5-A6 (steps 13 to 15):* the four poses and the photo guide are listed with no tap, and *Favorites* lists only the guides marked by ♥ or *Save guide*, each with a heart, those saved before the update included. The long press selects as a gallery app does: the header counts the selected, a tap selects or unselects without opening a guide, *Delete* asks with the count and removes them in one step, *Select all* selects every guide listed, and ✕ or Back stops selecting without leaving. ⋮ › *Select all* selects only the photos listed, and *Delete* removes only them. The deletions hold after the restart, and nothing else went.
-- *Added in Iter5-P6 (steps 8 to 12):* each pose shows its situation under it; a photo guide shows none. The chips read *Landmark 1* and *Selfie 1*, in the sheet's order. A chip shows its guides only, within the kind's filter, and the same chip again shows all. The memo is cut at 40 characters and shows under its guide after the restart; *Cancel* keeps the old memo. A cleared memo is gone. Once the selfie pose is deleted, its chip is gone. On the subject's phone both poses show *Full body*. In Korean the chips and the words fit, and TalkBack reads the kind, the date, the situation, and the memo.
+- *Added in Iter5-A6 (steps 13 to 15):* the tabs read *All*, *Favorites*, and the library opens on *All*; it has no *Add photo*. The four poses and the photo guide are under *All* with no tap. The ♥ fills, and *Favorites* lists only the guides marked by a ♥ or *Save guide*, those saved before the update included. Opened again, the library is on *All*. A ♥ taken out under *Favorites* leaves the guide under *All*. The long press selects as a gallery app does: the header counts the selected, a tap selects or unselects without opening a guide, *Delete* asks with the count and removes them in one step, *Select all* selects every guide listed, and ✕ or Back stops selecting without leaving. ⋮ › *Select all* selects only the favorites listed, and *Delete* removes only them. The deletions hold after the restart, and nothing else went.
+- *Added in Iter5-P6 (steps 8 to 12):* each pose shows its situation under it; a photo guide shows none. The chips read *Landmark 1* and *Selfie 1*, in the sheet's order. A chip shows its guides only, within the tab, and the same chip again shows all. The memo is cut at 40 characters and shows under its guide after the restart; *Cancel* keeps the old memo. A cleared memo is gone. Once the selfie pose is deleted, its chip is gone. On the subject's phone both poses show *Full body*. In Korean the chips and the words fit, and TalkBack reads the kind, the date, the situation, and the memo.
 
 ### IT-27 procedure
 
@@ -1747,7 +1747,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 
 **Steps**
 
-1. *Add photo* each post's screenshot, watch *Reference confirm*, and tap *Use this guide*, then *Save guide*.
+1. *Add photo* each post's screenshot, watch *Reference confirm*, and tap *Use this guide*, then *Save guide*. *Changed in Iter5-A6 ([#297]): the library has no *Add photo*; use *Guide* › *Choose from the gallery*.*
 2. Kill Pix, open it, and open the library.
 3. *Add photo* the story, the grid, and the camera photo.
 4. On one post's *Reference confirm*, tap *Use the whole image*.
@@ -1767,7 +1767,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 
 **Steps**
 
-1. *Add photo* each screenshot and watch *Reference confirm*.
+1. *Add photo* each screenshot and watch *Reference confirm*. *Changed in Iter5-A6 ([#297]): the library has no *Add photo*; use *Guide* › *Choose from the gallery*.*
 2. For one, tap *Use this guide*, then *Save guide*, and open the library.
 
 **Expected result**

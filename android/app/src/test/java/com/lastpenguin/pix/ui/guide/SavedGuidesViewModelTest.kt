@@ -43,14 +43,17 @@ import org.junit.Test
  * the sheet closing before it arrives (the camera's guide kept). A result that comes while no sheet collects waits.
  * A saved guide put on the camera is told once, for the subject's phone (#292), and one that could not open is not.
  * onDeleteSaved: a saved guide (gone from the list) that is also on the camera (it stays there).
- * library (FR-3.11): both kinds saved (every guide by default, each filter's count), a filter (only its kind, newest
- * first, the counts unchanged), a guide saved meanwhile (listed), Add a pose guide opened again (back to every guide).
+ * library (FR-3.11): both kinds saved as history (All by default, each tab's count), a favorite (still opens on All),
+ * Favorites (only the favorites, newest first, the counts unchanged), a guide saved meanwhile (listed), Add a pose guide
+ * opened again (back to All).
+ * onToggleFavorite (#297): a favorite taken out (Favorites empty, the guide kept) and a guide added, a store that
+ * cannot write it (favoriteFailures says so once).
  * onLibrarySituation (#270): a situation (its guides only), the same one again (every situation), another one (it
  * replaces the first), Add a pose guide opened again (no situation chosen).
  * onSaveMemo (#270): a memo (listed), a store that cannot write it (memoFailures says so once).
  * Selection (#297, state-based): a long press (that guide), taps (in and out), Select all (every guide listed), stop
- * (none, and a tap then selects nothing), Select all under ⋮ while not selecting (selecting, with every guide listed), Delete (the selected at once, selecting ends), Add a pose guide opened again
- * (not selecting).
+ * (none, and a tap then selects nothing), Select all under ⋮ while not selecting (selecting, with every guide listed),
+ * Delete (the selected at once, selecting ends), Add a pose guide opened again (not selecting).
  * thumbnail: one shown twice (read from the store once), one the store cannot read (null, read again next time), a
  * deleted guide's (not kept).
  */
@@ -249,26 +252,25 @@ class SavedGuidesViewModelTest {
 
     @Test
     fun library_bothKindsSaved_listsEveryGuideAndCountsEachKind() = runTest(dispatcher) {
-        saved.save(fakeGuide("photo"), GuideState())
-        saved.save(generated("pose"), GuideState())
+        saved.save(fakeGuide("photo"), GuideState(), favorite = false)
+        saved.save(generated("pose"), GuideState(), favorite = false)
 
         val page = model().library.value
 
         assertEquals(LibraryFilter.ALL, page.filter)
         assertEquals(listOf("pose", "photo"), page.guides.map { it.id })
         assertEquals(2, page.count(LibraryFilter.ALL))
-        assertEquals(1, page.count(LibraryFilter.PHOTOS))
-        assertEquals(1, page.count(LibraryFilter.GENERATED))
+        assertEquals(0, page.count(LibraryFilter.FAVORITES))
     }
 
     @Test
-    fun onLibraryFilter_photos_listsOnlyPhotosNewestFirstAndKeepsTheCounts() = runTest(dispatcher) {
+    fun onLibraryFilter_favorites_listsOnlyThemNewestFirstAndKeepsTheCounts() = runTest(dispatcher) {
         saved.save(fakeGuide("photo-1"), GuideState())
-        saved.save(generated("pose"), GuideState())
+        saved.save(generated("pose"), GuideState(), favorite = false)
         saved.save(fakeGuide("photo-2"), GuideState())
         val model = model()
 
-        model.onLibraryFilter(LibraryFilter.PHOTOS)
+        model.onLibraryFilter(LibraryFilter.FAVORITES)
         runCurrent()
 
         assertEquals(listOf("photo-2", "photo-1"), model.library.value.guides.map { it.id })
@@ -278,7 +280,7 @@ class SavedGuidesViewModelTest {
     @Test
     fun library_guideSavedMeanwhile_isListed() = runTest(dispatcher) {
         val model = model()
-        model.onLibraryFilter(LibraryFilter.GENERATED)
+        model.onLibraryFilter(LibraryFilter.FAVORITES)
         runCurrent()
 
         saved.save(generated("pose"), GuideState())
@@ -288,9 +290,54 @@ class SavedGuidesViewModelTest {
     }
 
     @Test
+    fun library_aFavorite_opensOnAllAllTheSame_andAHeartMovesAGuideInAndOutOfFavorites() = runTest(dispatcher) {
+        saved.save(fakeGuide("photo"), GuideState(), favorite = false)
+        saved.save(generated("pose"), GuideState(), favorite = true)
+        val model = model()
+        runCurrent()
+
+        assertEquals(LibraryFilter.ALL, model.library.value.filter)
+        assertEquals(listOf("pose", "photo"), model.library.value.guides.map { it.id })
+
+        model.onLibraryFilter(LibraryFilter.FAVORITES)
+        runCurrent()
+        assertEquals(listOf("pose"), model.library.value.guides.map { it.id })
+
+        // The last favorite taken out: Favorites is empty, and the guide is still kept.
+        model.onToggleFavorite("pose")
+        runCurrent()
+        assertEquals(LibraryFilter.FAVORITES, model.library.value.filter)
+        assertTrue(model.library.value.guides.isEmpty())
+        assertEquals(2, model.library.value.count(LibraryFilter.ALL))
+
+        model.onToggleFavorite("photo")
+        runCurrent()
+        assertEquals(listOf("photo"), model.library.value.guides.map { it.id })
+        assertEquals(1, model.library.value.count(LibraryFilter.FAVORITES))
+    }
+
+    @Test
+    fun onToggleFavorite_aStoreThatCannotWrite_saysSoOnce() = runTest(dispatcher) {
+        val failing = object : SavedGuideStore by saved {
+            override suspend fun setFavorite(id: String, favorite: Boolean): Result<Unit> =
+                Result.failure(IOException("full"))
+        }
+        saved.save(fakeGuide("photo"), GuideState(), favorite = false)
+        val model = model(failing)
+        val failures = mutableListOf<Unit>()
+        backgroundScope.launch { model.favoriteFailures.collect { failures += it } }
+
+        model.onToggleFavorite("photo")
+        runCurrent()
+
+        assertEquals(1, failures.size)
+        assertEquals(false, saved.saved.value.single().favorite)
+    }
+
+    @Test
     fun openFor_addAPoseGuideOpenedAgain_showsEveryGuide() = runTest(dispatcher) {
         val model = model()
-        model.onLibraryFilter(LibraryFilter.GENERATED)
+        model.onLibraryFilter(LibraryFilter.FAVORITES)
         runCurrent()
 
         model.openFor(fromSubject = false)

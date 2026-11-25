@@ -729,7 +729,7 @@ class GenerationScreensTest {
     }
 
     @Test
-    fun describe_posesKeptNotice_saysThePosesAreInTheLibrary_andViewOpensItAtTheAiPoses() {
+    fun describe_posesKeptNotice_saysThePosesAreInTheLibrary_andViewOpensItAtAll() {
         val modules = modules()
         val (s, nav) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) {
             generating(it).apply {
@@ -755,7 +755,7 @@ class GenerationScreensTest {
         assertEquals(R.id.cameraFragment, nav.previousBackStackEntry?.destination?.id)
         s.onFragment {
             val activity = it.requireActivity()
-            assertEquals(LibraryFilter.GENERATED, activity.viewModel<ReferenceViewModel>().library.value.filter)
+            assertEquals(LibraryFilter.ALL, activity.viewModel<ReferenceViewModel>().library.value.filter)
             assertEquals(GenerationUiState(), activity.viewModel<GenerationViewModel>().uiState.value)
         }
     }

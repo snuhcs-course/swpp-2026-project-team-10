@@ -29,8 +29,7 @@ import org.robolectric.annotation.GraphicsMode
  * No person found (R&S 6.2, FR-2.4, #294): the top bar has Back alone, with no action and no picker, and no buttons at
  * the bottom. Partitions on where the reference was chosen, one test each: a photo from the camera's Add a pose guide
  * (the line that says to go back; Back opens that sheet again over the camera, with its gallery, and the guide on the
- * camera is the same one), the same from Subject view (its sheet, over Subject view), a photo from the library's Add
- * photo (the same line; Back is the library, with no gallery), and a generated pose, outside a session (today's line;
+ * camera is the same one), the same from Subject view (its sheet, over Subject view), and a generated pose, outside a session (today's line;
  * Back is Pick a pose) and in one, where the camera is the screen before (Back is the camera, with no sheet). The
  * system's Back does what the top bar's does.
  */
@@ -125,23 +124,6 @@ class NoPersonFoundFragmentTest {
         back()
 
         assertOnTheSheet(below = R.id.subjectFragment, fromSubject = true)
-    }
-
-    @Test
-    fun aPhotoFromTheLibrary_saysToGoBack_andBackIsTheLibrary() {
-        launch(
-            prepare = ::photoPicked,
-            path = { controller ->
-                controller.setCurrentDestination(R.id.libraryFragment)
-                controller.navigate(R.id.action_library_to_referenceConfirm)
-                controller.navigate(R.id.action_referenceConfirm_to_noPersonFound)
-            },
-        )
-
-        onScreen { assertEquals(string(R.string.no_person_photo_message), it.failureMessage.text.toString()) }
-        back()
-
-        assertEquals(R.id.libraryFragment, nav.currentDestination?.id)
     }
 
     @Test

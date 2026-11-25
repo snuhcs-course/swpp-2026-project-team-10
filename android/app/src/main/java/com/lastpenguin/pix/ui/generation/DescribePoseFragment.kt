@@ -40,7 +40,6 @@ import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.partner
 import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.PixViewModels
-import com.lastpenguin.pix.ui.guide.LibraryFilter
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
@@ -197,7 +196,7 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose), ScenePho
 
     /**
      * Back left a set whose poses are in the library (#297): a notice says so, with *View*, which opens the library at
-     * its AI poses and ends the pose flow, so Back there is Camera.
+     * *All*, newest first, and ends the pose flow, so Back there is Camera.
      */
     private fun showPosesKept(view: View) {
         val context = requireContext()
@@ -213,7 +212,6 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose), ScenePho
         val navController = findNavController()
         if (navController.currentDestination?.id != R.id.describePoseFragment) return
         referenceViewModel.openFor(fromSubject = false)
-        referenceViewModel.onLibraryFilter(LibraryFilter.GENERATED)
         // Navigates first, so that this screen does not take the ended flow for a restart.
         navController.navigate(R.id.action_describePose_to_library)
         viewModel.cancel()

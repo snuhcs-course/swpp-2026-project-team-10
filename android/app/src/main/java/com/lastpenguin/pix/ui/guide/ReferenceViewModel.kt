@@ -150,6 +150,11 @@ class ReferenceViewModel(
                 libraryPage(savedGuideStore.saved.value, LibraryFilter.ALL),
             )
 
+    private val _favoriteFailures = Channel<Unit>(Channel.BUFFERED)
+
+    /** Each ♥ in the library the storage could not keep, for the library to say so; read once. */
+    val favoriteFailures: Flow<Unit> = _favoriteFailures.receiveAsFlow()
+
     private val _memoFailures = Channel<Unit>(Channel.BUFFERED)
 
     /** Each memo the storage could not keep, for the library to say so; read once. */
@@ -180,7 +185,7 @@ class ReferenceViewModel(
 
     /**
      * Add a pose guide opened from the Camera screen or, with [fromSubject], from Subject view (FR-6.15). The library
-     * opened from it starts with every guide.
+     * opened from it starts on *All* (#297).
      */
     fun openFor(fromSubject: Boolean) {
         forSubject = fromSubject && subject != null
@@ -375,6 +380,14 @@ class ReferenceViewModel(
     /** The sheet or the library closed: a saved guide still opening must not replace the guide kept on the camera. */
     fun cancelOpening() {
         opening?.cancel()
+    }
+
+    /** The ♥ on a guide in the library (#297): it joins *Favorites*, or leaves it and stays under *All*. */
+    fun onToggleFavorite(id: String) {
+        val guide = savedGuideStore.saved.value.firstOrNull { it.id == id } ?: return
+        viewModelScope.launch {
+            savedGuideStore.setFavorite(id, !guide.favorite).onFailure { _favoriteFailures.trySend(Unit) }
+        }
     }
 
     /** *Delete* on guides, after the library asked; a guide on the camera stays there. Selecting ends. */

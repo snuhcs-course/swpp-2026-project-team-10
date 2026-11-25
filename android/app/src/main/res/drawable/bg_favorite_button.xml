@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The ♥ on a library cell (#297): the kind icon's 26 dp disc (bg_kind_badge) in the middle of its 48 dp touch area. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/bg_kind_badge"
+    android:inset="11dp" />

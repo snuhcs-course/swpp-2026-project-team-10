@@ -95,12 +95,7 @@
     <fragment
         android:id="@+id/libraryFragment"
         android:name="com.lastpenguin.pix.ui.guide.LibraryFragment"
-        android:label="Library">
-        <!-- Add photo; back from Reference confirm returns to the library. -->
-        <action
-            android:id="@+id/action_library_to_referenceConfirm"
-            app:destination="@id/referenceConfirmFragment" />
-    </fragment>
+        android:label="Library" />
 
     <fragment
         android:id="@+id/referenceConfirmFragment"

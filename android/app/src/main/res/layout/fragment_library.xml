@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The library (FR-3.11, R&S 6.2), from All on Add a pose guide's My library: every saved guide, newest first, with its
-     kind, situation, and memo, filtered by kind, favorites, and situation (#270, #297). A tap uses a guide, its pencil
-     edits its memo, and Add photo makes a new one. A long press, or Select under ⋮, selects guides as a gallery app
-     does: the header then says how many, with Select all, and Delete takes Add photo's place (#297). -->
+<!-- The library (FR-3.11, R&S 6.2), from All on Add a pose guide's My library: every guide kept, newest first, with its
+     kind, situation, and memo, under All or Favorites and filtered by situation (#270, #297). A tap uses a guide, its ♥
+     adds it to Favorites, and its pencil edits its memo. A long press, or Select under ⋮, selects guides as a gallery
+     app does: the header then says how many, with Select all, and Delete shows at the bottom (#297). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -85,20 +85,6 @@
             android:layout_weight="1" />
 
         <Button
-            android:id="@+id/filterPhotos"
-            style="@style/Widget.Pix.Button.Segment"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1" />
-
-        <Button
-            android:id="@+id/filterGenerated"
-            style="@style/Widget.Pix.Button.Segment"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1" />
-
-        <Button
             android:id="@+id/filterFavorites"
             style="@style/Widget.Pix.Button.Segment"
             android:layout_width="0dp"
@@ -169,17 +155,6 @@
                 android:text="@string/library_empty_body"
                 android:textAppearance="@style/TextAppearance.Pix.Body" />
         </LinearLayout>
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/addPhotoButton"
-            style="@style/Widget.Pix.Button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom|center_horizontal"
-            android:layout_marginBottom="20dp"
-            android:text="@string/add_photo"
-            app:icon="@drawable/ic_plus"
-            app:iconPadding="6dp" />
 
         <!-- While selecting (#297): deletes the selected guides after asking; off while none is. -->
         <com.google.android.material.button.MaterialButton

@@ -62,8 +62,6 @@
     <string name="library_title">Library</string>
     <string name="library_title_description">Library, saved guides: %1$d</string>
     <string name="library_all">All %1$d</string>
-    <string name="library_photos">Photos %1$d</string>
-    <string name="library_generated">AI poses %1$d</string>
     <string name="library_favorites">Favorites %1$d</string>
     <string name="library_more">More options</string>
     <string name="library_select">Select</string>
@@ -83,16 +81,18 @@
     <string name="poses_kept_notice">The poses are in My library.</string>
     <string name="poses_kept_view">View</string>
     <string name="library_empty">No saved guides yet</string>
-    <string name="library_empty_body">Save a guide on the camera, or add a photo.</string>
-    <string name="library_empty_filter">No guides of this kind yet</string>
+    <string name="library_empty_body">The poses you make and the photo guides you use are kept here.</string>
+    <string name="library_empty_favorites">No favorites yet</string>
+    <string name="library_empty_favorites_body">Tap a guide\'s ♥ to add it here.</string>
     <string name="library_situation_chip" translatable="false">%1$s %2$d</string>
     <string name="library_memo_edit">Edit memo</string>
+    <string name="library_favorite_add">Add to Favorites</string>
+    <string name="library_favorite_remove">Remove from Favorites</string>
     <string name="library_memo_title">Memo</string>
     <string name="library_memo_hint">A note on this guide</string>
     <string name="library_memo_failed">Couldn\'t save the memo.</string>
     <string name="library_guide_situation_description">%1$s, for %2$s</string>
     <string name="library_guide_memo_description">%1$s. Memo: %2$s</string>
-    <string name="add_photo">Add photo</string>
     <string name="saved_photo_guide_description">Photo guide saved %1$s</string>
     <string name="saved_pose_guide_description">AI pose guide saved %1$s</string>
     <string name="guide_offer_failed">Couldn\'t send the guide</string>

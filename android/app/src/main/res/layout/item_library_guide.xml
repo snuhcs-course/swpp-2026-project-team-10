@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One guide in the library (FR-3.11): its thumbnail at 3:4, the icon of its kind, a photo or an AI pose, and a heart
-     for a favorite (#297); while selecting, its mark at the top left; the memo button at its top right (#270); and
+<!-- One guide in the library (FR-3.11): its thumbnail at 3:4, the icon of its kind, a photo or an AI pose, and a ♥ that
+     adds it to Favorites (#297); while selecting, its mark at the top left; the memo button at its top right (#270); and
      under it, the situation a pose was made for and the memo, each only when the guide has one. -->
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -50,20 +50,20 @@
         app:layout_constraintStart_toStartOf="@id/thumbnail"
         app:layout_constraintTop_toTopOf="@id/thumbnail" />
 
-    <!-- A favorite (#297): a small heart beside the kind's icon. -->
-    <ImageView
-        android:id="@+id/favoriteIcon"
-        android:layout_width="26dp"
-        android:layout_height="26dp"
-        android:layout_marginStart="4dp"
-        android:background="@drawable/bg_kind_badge"
-        android:importantForAccessibility="no"
-        android:padding="6dp"
-        android:src="@drawable/ic_heart_filled"
-        android:visibility="gone"
+    <!-- The ♥ (#297): empty, or red for a favorite, beside the kind's icon; a tap adds the guide to Favorites or takes
+         it out. Takes taps on 48 dp (NFR-16) and draws the kind icon's 26 dp disc at its middle; hidden while selecting. -->
+    <ImageButton
+        android:id="@+id/favoriteButton"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="-7dp"
+        android:layout_marginBottom="-11dp"
+        android:background="@drawable/bg_favorite_button"
+        android:padding="17dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_heart"
         app:layout_constraintBottom_toBottomOf="@id/kindIcon"
-        app:layout_constraintStart_toEndOf="@id/kindIcon"
-        app:tint="@color/pix_heart" />
+        app:layout_constraintStart_toEndOf="@id/kindIcon" />
 
     <!-- Takes taps on 48 dp (NFR-16) and draws the kind icon's 26 dp disc at its middle. -->
     <ImageButton

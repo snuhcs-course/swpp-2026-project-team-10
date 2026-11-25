@@ -34,27 +34,20 @@ import kotlinx.coroutines.launch
 
 /**
  * The library (FR-3.11, R&S 6.2), from *All* on Add a pose guide's *My library*: every guide kept, newest first, with
- * its kind, filtered by kind, by favorites (#297), and by the situation a pose was made for (#270). Each guide shows its
+ * its kind, under *All*, which it opens on, or *Favorites* (#297), and filtered by the situation a pose was made for
+ * (#270). Each guide's ♥ adds it to Favorites or takes it out, and it shows its
  * situation and memo; its pencil edits the memo, which is kept and shown only here. A tap puts the guide on the camera
  * as a saved guide does on the sheet, or, opened from Subject view, offers it to the photographer (FR-6.16). A long
  * press, or *Select* under ⋮, selects guides as a gallery app does (#297): a tap then selects one or no longer does,
- * the header says how many with *Select all*, and *Delete* takes *Add photo*'s place and asks first; ✕ or Back stops
- * selecting. *Select all* under ⋮ starts selecting with every guide listed. *Add photo* goes to Reference confirm,
- * whose back returns here. Opened from Subject view, it covers Subject view, so it watches the session itself
+ * the header says how many with *Select all*, and *Delete* shows at the bottom and asks first; ✕ or Back stops
+ * selecting. *Select all* under ⋮ starts selecting with every guide listed. Guides come only from the poses and the
+ * photo guides used, so the library adds none itself. Opened from Subject view, it covers Subject view, so it watches the session itself
  * (`leaveWhenTheSessionEnds`).
  * Owner: the library (#170); situations and memos (#270); favorites and selection (#297).
  */
 class LibraryFragment : Fragment(R.layout.fragment_library) {
 
     private val viewModel: ReferenceViewModel by activityViewModels { PixViewModels.Factory }
-
-    /** A picked photo opens Reference confirm; closing the picker stays here. */
-    private val pickPhoto = registerPhotoPicker { uri ->
-        if (uri != null) {
-            viewModel.onPhotoPicked(uri)
-            findNavController().navigate(R.id.action_library_to_referenceConfirm)
-        }
-    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentLibraryBinding.bind(view)
@@ -63,7 +56,6 @@ class LibraryFragment : Fragment(R.layout.fragment_library) {
         val stopSelecting = requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, false) {
             viewModel.onStopSelecting()
         }
-        binding.addPhotoButton.setOnClickListener { pickPhoto() }
         binding.moreButton.setOnClickListener { showMore(it) }
         binding.selectAllButton.setOnClickListener { viewModel.onSelectAll() }
         binding.deleteSelectedButton.setOnClickListener {
@@ -79,6 +71,7 @@ class LibraryFragment : Fragment(R.layout.fragment_library) {
             onSelect = { viewModel.onStartSelecting(it.id) },
             onToggle = { viewModel.onToggleSelected(it.id) },
             onMemo = ::editMemo,
+            onFavorite = { viewModel.onToggleFavorite(it.id) },
         )
         binding.libraryGrid.layoutManager = GridLayoutManager(requireContext(), COLUMNS)
         binding.libraryGrid.adapter = adapter
@@ -90,6 +83,11 @@ class LibraryFragment : Fragment(R.layout.fragment_library) {
                     viewModel.library.collect { page ->
                         stopSelecting.isEnabled = page.selecting
                         render(binding, adapter, page)
+                    }
+                }
+                launch {
+                    viewModel.favoriteFailures.collect {
+                        Toast.makeText(requireContext(), R.string.guide_save_failed_notice, Toast.LENGTH_LONG).show()
                     }
                 }
                 launch {
@@ -136,13 +134,22 @@ class LibraryFragment : Fragment(R.layout.fragment_library) {
         adapter.submitList(page.guides)
         adapter.selection = page.selection
         binding.emptyState.isVisible = page.guides.isEmpty()
-        binding.emptyTitle.setText(if (total == 0) R.string.library_empty else R.string.library_empty_filter)
-        binding.emptyBody.isVisible = total == 0
+        // Nothing kept yet, or no favorite yet.
+        binding.emptyTitle.setText(if (total == 0) R.string.library_empty else R.string.library_empty_favorites)
+        binding.emptyBody.setText(
+            if (total ==
+                0
+            ) {
+                R.string.library_empty_body
+            } else {
+                R.string.library_empty_favorites_body
+            },
+        )
     }
 
     /**
      * The header: the title and the count with ⋮, or, while selecting (#297), ✕, how many are selected, and *Select
-     * all*; *Delete* in *Add photo*'s place, off while nothing is selected.
+     * all*; *Delete* at the bottom, off while nothing is selected.
      */
     private fun renderHeader(binding: FragmentLibraryBinding, page: LibraryPage, total: Int) {
         val selection = page.selection
@@ -165,7 +172,6 @@ class LibraryFragment : Fragment(R.layout.fragment_library) {
         binding.moreButton.isVisible = selection == null && page.guides.isNotEmpty()
         binding.selectAllButton.isVisible = selection != null
         binding.selectAllButton.isEnabled = selection != null && selection.size < page.guides.size
-        binding.addPhotoButton.isVisible = selection == null
         binding.deleteSelectedButton.isVisible = selection != null
         binding.deleteSelectedButton.isEnabled = !selection.isNullOrEmpty()
     }
@@ -251,16 +257,12 @@ class LibraryFragment : Fragment(R.layout.fragment_library) {
 
     private fun filters(binding: FragmentLibraryBinding): List<Pair<LibraryFilter, Button>> = listOf(
         LibraryFilter.ALL to binding.filterAll,
-        LibraryFilter.PHOTOS to binding.filterPhotos,
-        LibraryFilter.GENERATED to binding.filterGenerated,
         LibraryFilter.FAVORITES to binding.filterFavorites,
     )
 
     private val LibraryFilter.label: Int
         get() = when (this) {
             LibraryFilter.ALL -> R.string.library_all
-            LibraryFilter.PHOTOS -> R.string.library_photos
-            LibraryFilter.GENERATED -> R.string.library_generated
             LibraryFilter.FAVORITES -> R.string.library_favorites
         }
 

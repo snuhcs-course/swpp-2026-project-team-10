@@ -2,22 +2,20 @@
 package com.lastpenguin.pix.ui.guide
 
 import com.lastpenguin.pix.generation.Situation
-import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.SavedGuide
 import com.lastpenguin.pix.ui.generation.SHEET_SITUATIONS
 
-/** The library's filters (FR-3.11): every guide, those of one kind, or the favorites that ♥ and *Save guide* marked. */
+/**
+ * The library's tabs (FR-3.11, #297), in their order: every guide, which every pose and used photo guide joins by
+ * itself, and the favorites that a ♥ or *Save guide* marked.
+ */
 enum class LibraryFilter {
     ALL,
-    PHOTOS,
-    GENERATED,
     FAVORITES,
     ;
 
     fun matches(guide: SavedGuide): Boolean = when (this) {
         ALL -> true
-        PHOTOS -> guide.source == GuideSource.GALLERY
-        GENERATED -> guide.source == GuideSource.GENERATED
         FAVORITES -> guide.favorite
     }
 }

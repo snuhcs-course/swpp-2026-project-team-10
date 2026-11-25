@@ -20,7 +20,7 @@ import org.robolectric.annotation.GraphicsMode
 
 /*
  * The switches' parts take taps on 48 dp, the touch target of NFR-16 (#298), on the Galaxy S22's 360 dp. Partitions:
- * each switch built on `Widget.Pix.Button.Segment` (the library's filters, Settings' guide thickness), whole 48 dp
+ * each switch built on `Widget.Pix.Button.Segment` (the library's tabs, Settings' guide thickness), whole 48 dp
  * shapes; the header's small switch on Generate poses (`Segment.Small`), a 32 dp shape in a 48 dp touch area, on a
  * track that hugs the shapes by 2 dp.
  */
@@ -60,12 +60,12 @@ class SegmentTouchTargetTest {
     @Test
     fun theSegmentSwitches_takeTapsOn48dp_withWholeShapes() {
         val switches = mapOf(
-            "the library's filters" to row(R.layout.fragment_library, R.id.filterRow),
+            "the library's tabs" to row(R.layout.fragment_library, R.id.filterRow),
             "Settings' guide thickness" to row(R.layout.fragment_settings, R.id.thicknessRow),
         )
         for ((name, switch) in switches) {
             val parts = parts(switch)
-            assertTrue("$name: ${parts.size} parts", parts.size >= 3)
+            assertTrue("$name: ${parts.size} parts", parts.size >= 2)
             for (part in parts) {
                 assertTrue("$name: ${dp(part.height)} dp tall", dp(part.height) >= 48)
                 assertEquals("$name: the shape fills the part", 0, part.insetTop + part.insetBottom)

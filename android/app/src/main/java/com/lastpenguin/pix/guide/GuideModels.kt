@@ -1,7 +1,8 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
+import com.lastpenguin.pix.generation.Situation
 import kotlinx.serialization.Serializable
 
 enum class GuideSource { GALLERY, GENERATED }
@@ -38,7 +39,19 @@ data class ReferenceGuide(
      * Stays on this phone: never sent and not saved.
      */
     val crop: PhotoCrop? = null,
+    /**
+     * The situation a generated pose was made for (FR-3.11, FR-4.8), which the library keeps and filters by; null for
+     * a photo guide, and for a pose from an older photographer that did not send it (#270).
+     */
+    val situation: Situation? = null,
 )
+
+/**
+ * This guide for [situation], or this very guide when that changes nothing: the screens tell a guide from its copy by
+ * instance, as `PoseTips` does, so a guide without a situation must stay the one that was made.
+ */
+fun ReferenceGuide.forSituation(situation: Situation?): ReferenceGuide =
+    if (situation == this.situation) this else copy(situation = situation)
 
 /** A picked image and the part of it a guide was made from (FR-2.10). */
 data class PhotoCrop(

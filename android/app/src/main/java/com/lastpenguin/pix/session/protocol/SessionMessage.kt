@@ -53,7 +53,9 @@ sealed interface SessionMessage {
     /**
      * [format] is `mask-png` (Design 2.5.1); [aspect] is the mask's width / height. [anchor] and [source] come from the
      * subject for a guide made on its phone, which the photographer starts at [anchor] (Iter3-P9), and from the
-     * photographer for the subject's *Save guide*, whose guide its `guide.state` still places (Iter3-P16).
+     * photographer for the subject's *Save guide*, whose guide its `guide.state` still places (Iter3-P16), with
+     * [situation], a generated pose's situation by its name on the server, which that save keeps (FR-3.11, #270); a
+     * name this phone does not know reads as none.
      */
     @Serializable
     @SerialName("guide.image.begin")
@@ -67,6 +69,7 @@ sealed interface SessionMessage {
         val aspect: Float? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val anchor: NormalizedRect? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val source: GuideSource? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val situation: String? = null,
     ) : SessionMessage
 
     /** [data] is Base64 of at most 12 KiB, so one message stays under 16 KiB. */
@@ -155,7 +158,10 @@ sealed interface SessionMessage {
      * a server error; none when the user closed it, and none from a photographer of an older version. With GENERATING,
      * [sceneTurn] is how the photographer held the scene photo (`PhoneTurns`: 0, 90, 180, or 270; #206), so a ♥ on the
      * subject's *Pick a pose* saves the guide as it goes on the camera; 0 is left out, and a subject reads anything
-     * else, or none from an older photographer, as 0. A set ends once, with CHOSEN or CLOSED.
+     * else, or none from an older photographer, as 0. With GENERATING, [situation] is the situation the set is made for,
+     * by its `situation` name on the server (FR-4.8, #270), so a ♥ on the subject's *Pick a pose* keeps it in the
+     * library; a string, so a name this phone does not know reads as none, as does none from an older photographer.
+     * A set ends once, with CHOSEN or CLOSED.
      */
     @Serializable
     @SerialName("pose.step")
@@ -167,6 +173,7 @@ sealed interface SessionMessage {
         @EncodeDefault(EncodeDefault.Mode.NEVER) val by: Role? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val failure: String? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val sceneTurn: Int = 0,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val situation: String? = null,
     ) : SessionMessage
 
     /**

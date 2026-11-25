@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.net.Uri
@@ -26,6 +26,7 @@ import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.ReferenceGuide
+import com.lastpenguin.pix.guide.SavedGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.PhotoShare
 import com.lastpenguin.pix.session.PhotographerAction
@@ -55,12 +56,10 @@ enum class CaptureNotice { SAVE_FAILED, STORAGE_FAILED, CAMERA_UNAVAILABLE, PERM
 
 /** What *Save guide* did (FR-3.8), shown as a short notice. */
 enum class GuideSaveNotice {
+    /** The guide is a favorite in the library now (#297). */
     SAVED,
 
-    /** Saved, and the oldest saved guide was deleted to keep [SavedGuideStore.MAX_SAVED]. */
-    SAVED_OLDEST_REMOVED,
-
-    /** A second tap on a saved guide's bookmark took it out of the saved guides again. */
+    /** A second tap on a favorite's bookmark made it history again, still in the library (#297). */
     REMOVED,
     FAILED,
 }
@@ -105,21 +104,30 @@ internal fun nextTip(previous: TipBanner?, guideId: String?, state: TipState?): 
     return previous.copy(state = state, unseen = previous.unseen || arrivedClosed)
 }
 
+/** Whether [guide] is a favorite in [saved] (FR-3.8, #297): what *Save guide*'s bookmark shows. */
+internal fun isFavorite(saved: List<SavedGuide>, guide: ReferenceGuide?): Boolean =
+    guide != null && saved.any { it.id == guide.id && it.favorite }
+
 /**
- * *Save guide* as a toggle (FR-3.8, FR-6.16): saves [guide] with [state], or takes it out of [store] when it is saved
- * already, by its id, which a guide keeps through save and load.
+ * *Save guide* as a toggle (FR-3.8, FR-6.16, #297): marks [guide] a favorite in [store], kept with [state] if the library
+ * has no copy yet, or makes a favorite history again, by its id, which a guide keeps through save and load. Nothing is
+ * deleted: the guide stays in the library either way.
  */
 internal suspend fun toggleSaved(store: SavedGuideStore, guide: ReferenceGuide, state: GuideState): GuideSaveNotice =
     try {
-        if (store.saved.value.any { it.id == guide.id }) {
-            store.delete(guide.id)
-            GuideSaveNotice.REMOVED
-        } else {
-            store.save(guide, state).fold(
-                onSuccess = { if (it.removedOldest) GuideSaveNotice.SAVED_OLDEST_REMOVED else GuideSaveNotice.SAVED },
-                onFailure = { GuideSaveNotice.FAILED },
-            )
-        }
+        val kept = store.saved.value.firstOrNull { it.id == guide.id }
+        when {
+            kept?.favorite == true -> store.setFavorite(guide.id, false).map { GuideSaveNotice.REMOVED }
+
+            kept != null -> store.setFavorite(guide.id, true).map { GuideSaveNotice.SAVED }
+
+            // A photo guide's history entry may be written meanwhile (`keepPhotoGuide`), and `save` keeps an entry as
+            // it is: mark it a favorite then, or the heart would say saved while the library has it as history.
+            else -> store.save(guide, state, favorite = true).mapCatching { saved ->
+                if (!saved.favorite) store.setFavorite(saved.id, true).getOrThrow()
+                GuideSaveNotice.SAVED
+            }
+        }.getOrDefault(GuideSaveNotice.FAILED)
     } catch (error: CancellationException) {
         throw error
     } catch (error: Exception) {
@@ -190,7 +198,7 @@ data class CameraUiState(
      * [referenceExpanded]: hiding makes it small, so its strip is the small one's and it comes back small.
      */
     val referenceHidden: Boolean = false,
-    /** The guide on the camera is one of the saved guides (FR-3.8), so *Save guide* shows it as saved. */
+    /** The guide on the camera is a favorite in the library (FR-3.8, #297), so *Save guide* shows it as saved. */
     val guideSaved: Boolean = false,
     /** *Save guide* is writing the guide; the button waits. */
     val savingGuide: Boolean = false,
@@ -400,7 +408,7 @@ class CameraViewModel(
         viewModelScope.launch {
             // A guide keeps its id when it is saved and loaded again, so the id tells whether it is saved.
             combine(guides.guide, savedGuides.saved) { guide, saved ->
-                guide != null && saved.any { it.id == guide.id }
+                isFavorite(saved, guide)
             }
                 .collect { saved -> _uiState.update { it.copy(guideSaved = saved) } }
         }
@@ -817,9 +825,8 @@ class CameraViewModel(
     }
 
     /**
-     * *Save guide* (FR-3.8): keeps the guide on the camera, to use again from *Add a pose guide*. A saved guide is
-     * not saved twice: another tap takes it out of the saved guides again. When [SavedGuideStore.MAX_SAVED] are saved,
-     * the store deletes the oldest and the notice says so.
+     * *Save guide* (FR-3.8): marks the guide on the camera a favorite in the library, to use again from *Add a pose
+     * guide*; another tap makes it history again, still in the library (#297).
      */
     fun onSaveGuide() {
         val state = _uiState.value

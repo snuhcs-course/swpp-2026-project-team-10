@@ -37,7 +37,6 @@ import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
-import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.PhotographerAction
 import com.lastpenguin.pix.session.SessionState
@@ -78,6 +77,7 @@ import com.lastpenguin.pix.ui.camera.placeReference
 import com.lastpenguin.pix.ui.camera.placeZoomRow
 import com.lastpenguin.pix.ui.camera.previewArea
 import com.lastpenguin.pix.ui.camera.previewAspect
+import com.lastpenguin.pix.ui.camera.saveGuideTint
 import com.lastpenguin.pix.ui.camera.setLabelIcon
 import com.lastpenguin.pix.ui.camera.setReferenceActions
 import com.lastpenguin.pix.ui.camera.showPhotoThumbnails
@@ -395,12 +395,7 @@ class SubjectFragment :
                     viewModel.guideSaveNotices.collect { notice ->
                         val text = when (notice) {
                             GuideSaveNotice.SAVED -> getString(R.string.guide_saved_notice)
-
-                            GuideSaveNotice.SAVED_OLDEST_REMOVED ->
-                                getString(R.string.guide_saved_oldest_removed_notice, SavedGuideStore.MAX_SAVED)
-
                             GuideSaveNotice.REMOVED -> getString(R.string.guide_removed_notice)
-
                             GuideSaveNotice.FAILED -> getString(R.string.guide_save_failed_notice)
                         }
                         showToggleLabel(binding, text, guideSaveIcon(notice), guideSaveTint(notice))
@@ -845,14 +840,18 @@ class SubjectFragment :
         binding.tipText.text = tip?.tip?.text
     }
 
-    /** *Save guide* (FR-6.16): beside the guide-edit toggle while a guide is on the video, filled once saved here. */
+    /**
+     * *Save guide* (FR-6.16): beside the guide-edit toggle while a guide is on the video, a ♥ filled red once a favorite
+     * here (#297).
+     */
     private fun renderSaveGuide(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         val button = binding.saveGuideButton
         button.isVisible = ui.guide != null
-        val icon = if (ui.guideSaved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark
+        val icon = if (ui.guideSaved) R.drawable.ic_heart_filled else R.drawable.ic_heart
         // Setting the same icon again would redraw the button on every state change.
         if (button.tag != icon) {
             button.setIconResource(icon)
+            button.iconTint = requireContext().getColorStateList(saveGuideTint(ui.guideSaved))
             button.tag = icon
         }
         button.contentDescription = getString(if (ui.guideSaved) R.string.guide_saved else R.string.save_guide)

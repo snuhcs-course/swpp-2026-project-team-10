@@ -96,7 +96,7 @@ import org.robolectric.shadows.ShadowDialog
  * changing the guide, opening Add a pose guide, and "Couldn't send the guide" for a guide that did not go; Leave and the
  * back button, which both ask first (#298: confirmed, cancelled), and the session ending by a lost connection (also with Add a pose guide open over it) or
  * the photographer, named or before the name arrived. Save guide (FR-6.16): hidden without a guide, then saving it
- * and filled; the photographer's set (FR-6.15): what the photographer is doing in place of "camera paused", the set's
+ * and filled (an empty ♥, then filled red); the photographer's set (FR-6.15): what the photographer is doing in place of "camera paused", the set's
  * Generating poses opened once per set (Iter3-A13), which goes on to Pick a pose by itself, so after Back each opens by
  * the button, a new set opening its Generating poses again, a set with no copy here, which opens nothing, a set the
  * photographer closes after Back, which says so, and a
@@ -1269,6 +1269,8 @@ class SubjectFragmentRenderTest {
             assertEquals(View.VISIBLE, binding.saveGuideButton.visibility)
             assertTrue(binding.saveGuideButton.isEnabled)
             assertEquals(string(R.string.save_guide), binding.saveGuideButton.contentDescription)
+            assertEquals(R.drawable.ic_heart, shadowOf(binding.saveGuideButton.plainIcon).createdFromResId)
+            assertEquals(binding.root.context.getColor(R.color.pix_text), binding.saveGuideButton.iconTint.defaultColor)
             binding.saveGuideButton.performClick()
         }
         idle()
@@ -1279,12 +1281,18 @@ class SubjectFragmentRenderTest {
             assertTrue(binding.toggleLabel.isShown)
             assertEquals(string(R.string.guide_saved_notice), binding.toggleLabel.text.toString())
             assertEquals(string(R.string.guide_saved), binding.saveGuideButton.contentDescription)
+            // A ♥ filled red, as on Camera (#297).
+            assertEquals(R.drawable.ic_heart_filled, shadowOf(binding.saveGuideButton.plainIcon).createdFromResId)
+            assertEquals(
+                binding.root.context.getColor(R.color.pix_heart),
+                binding.saveGuideButton.iconTint.defaultColor,
+            )
             binding.saveGuideButton.performClick()
         }
         idle()
 
-        // A second tap takes it out of the saved guides again (FR-6.16).
-        assertTrue(modules.saved.saved.value.isEmpty())
+        // A second tap makes it history again, still on this phone (FR-6.16, #297).
+        assertEquals(listOf("guide-1" to false), modules.saved.saved.value.map { it.id to it.favorite })
         onScreen { binding, _ ->
             assertEquals(string(R.string.guide_removed_notice), binding.toggleLabel.text.toString())
             assertEquals(string(R.string.save_guide), binding.saveGuideButton.contentDescription)

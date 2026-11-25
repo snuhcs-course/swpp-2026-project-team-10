@@ -66,7 +66,6 @@ import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.GuideState
-import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.settings.TutorialScreen
@@ -552,12 +551,7 @@ class CameraFragment :
                     viewModel.guideSaveNotices.collect { notice ->
                         val text = when (notice) {
                             GuideSaveNotice.SAVED -> getString(R.string.guide_saved_notice)
-
-                            GuideSaveNotice.SAVED_OLDEST_REMOVED ->
-                                getString(R.string.guide_saved_oldest_removed_notice, SavedGuideStore.MAX_SAVED)
-
                             GuideSaveNotice.REMOVED -> getString(R.string.guide_removed_notice)
-
                             GuideSaveNotice.FAILED -> getString(R.string.guide_save_failed_notice)
                         }
                         showToggleLabel(controls, text, guideSaveIcon(notice), guideSaveTint(notice))
@@ -989,11 +983,12 @@ class CameraFragment :
         controls.hideGuideButton.contentDescription =
             getString(if (hidden) R.string.show_guide else R.string.hide_guide)
         controls.hideGuideButton.isEnabled = guideEditable
-        // Save guide (FR-3.8): filled once saved; another tap takes it out of the saved guides again.
+        // Save guide (FR-3.8): a ♥, filled red once a favorite (#297); another tap takes it out of Favorites again.
         setIconOnce(
             controls.saveGuideButton,
-            if (state.guideSaved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
+            if (state.guideSaved) R.drawable.ic_heart_filled else R.drawable.ic_heart,
         )
+        controls.saveGuideButton.iconTint = requireContext().getColorStateList(saveGuideTint(state.guideSaved))
         controls.saveGuideButton.contentDescription =
             getString(if (state.guideSaved) R.string.guide_saved else R.string.save_guide)
         controls.saveGuideButton.isEnabled = guideEditable && !state.savingGuide

@@ -33,9 +33,25 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 - [Dongje, 11-25] "1 as recommended. For 2, list the lines the photographer's phone shows, and I will think about making Subject view the same. 3 as recommended. For 4, check where the lens changes and tell me exactly what you will do. For 5, go that way first and I will check it myself." (The agent listed the nine lines. It read the S22's cameras with `dumpsys media.camera`: its rear camera reaches 0.6× itself, so only a phone with a separate ultrawide, the S21, changes lens, on the steps to and from the widest zoom. It drew the Camera screen during the subject's pinch and the zoom's curve.)
 - [Dongje, 11-25] "For 2, show the lines on the subject's phone too when the photographer acts, and build it like this." (Built test-first in three parts. The line "… is zooming" from `ZoomHold`, held until the ratio's notice. A new message `camera.did` for what the photographer did, since a state alone cannot tell a brightness set by hand from one a tap put back; *Subject view* says it where its labels show. `CameraController.glideZoom` with `ZoomGlide` for every single change of the zoom, on either phone's request.)
 
+## The library: situations and memos, history, favorites, and selection ([#270], [#297], [#308])
+
+- [Joonhyung, 11-25] "Start #270." (The agent read the issue and the code, and built it test-first: `situation` on the guide, in `pose.step`, `guide.image.begin`, and `meta.json`; a chip per situation in the library; a memo of up to 40 characters, edited with a pencil on each cell.)
+- [Joonhyung, 11-25] "Show me the changed screens so I can check them. This issue goes together with #297." (The agent captured the library on the emulator in Korean.)
+- [Joonhyung, 11-25] "One branch and PR." (The agent built #297 on the same branch: `PoseLibrary` keeps every candidate as history, ♥ and *Save guide* mark favorites, the limit of 100 goes, selection under a long press and ⋮, and Back on *Generating poses* and *Pick a pose* without "Go back?".)
+- [Joonhyung, 11-25] "Commit and open a PR." (#308.)
+- [Joonhyung, 11-25] "Resolve the conflicts with dev now, and check whether the two issues have a task left." (The agent merged dev and checked each issue's tasks against the code. Three were stale and fixed: the shared *Pick a pose* row in R&S 6.5, the tutorial's tip on *Save guide*, and the old "Removed from My library." texts.)
+- [Joonhyung, 11-25] "In this picture, the menu should hold Select and Select all, not Select and Delete all." (⋮'s *Select all* starts selecting with every guide listed; a bulk delete always goes through *Delete* and its question.)
+- [Joonhyung, 11-25] "The library is All / Photos (uploaded from my album) / AI poses / Favorites. Keep the AI poses and the album's photos in All by themselves, and a heart puts one in Favorites. Swap Favorites and All. When generation gives four photos, all four go to All by themselves, and a heart puts one in Favorites." (The agent answered that the keeping was built already, and asked which tab opens first and where the heart goes. Chosen: Favorites first while one exists, and a ♥ on each cell.)
+- [Joonhyung, 11-25] "1. Remove the Add photo button. 2. Remove the Photos and AI poses tabs, keeping only All and Favorites. 3. All, then Favorites, and the library opens on All." (Built with the empty texts for each tab; IT steps that used *Add photo* got a "Changed" note.)
+- [Joonhyung, 11-25] "Change the bookmark button here into a heart, filled in red." (*Save guide* on Camera and Subject view, and its notice, now show the ♥ of *Pick a pose* and the library.)
+- [Joonhyung, 11-25] "Apply this review, then commit and push, and update the PR with the changes." (Codex's review of #308 had five findings. The agent fixed each with a test: a pose can be selected though its history cannot be written, *Save guide* marks a history entry written meanwhile, a ♥ that cannot be emptied fills again, "The poses are in My library." waits for a written pose, and TalkBack names the ♥ by Favorites.)
+
+[#270]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/270
 [#292]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/292
 [#294]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/294
+[#297]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/297
 [#301]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/301
 [#304]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/304
 [#306]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/306
+[#308]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/308
 [#310]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/310

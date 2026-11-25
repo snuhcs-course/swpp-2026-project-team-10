@@ -19,9 +19,9 @@ These files fix the contracts between the module owners. Design 2.1 marks them w
 | File | What it fixes | Design |
 |---|---|---|
 | `camera/CameraController.kt` | Camera interface, `CameraStatus`, `CameraCapabilities`, `CameraState`, `CameraFacing`, `AspectRatio`, `FlashMode`, `FrameSink` | 2.1, 2.3 |
-| `guide/GuideModels.kt` | `ReferenceGuide`, `GuideState`, `NormalizedRect`, `PhotoCrop`, `GuideSource` | 2.3 |
+| `guide/GuideModels.kt` | `ReferenceGuide` (with a pose's `situation` and `forSituation`), `GuideState`, `NormalizedRect`, `PhotoCrop`, `GuideSource` | 2.3 |
 | `guide/GuideRepository.kt`, `guide/ReferenceGuideMaker.kt` | Guide store and reference-to-guide interfaces | 2.1 |
-| `guide/SavedGuideStore.kt` | Saved guides on the phone, the library. `SavedGuideStore` (with `thumbnail`, which a cell reads when it shows), `SavedGuide` (with its source), `GuideSaved`, and `SavedGuideStore.InMemory` for tests. | 2.1, 2.3 |
+| `guide/SavedGuideStore.kt` | Saved guides on the phone, the library. `SavedGuideStore` (with `thumbnail`, which a cell reads when it shows, `setMemo`, `setFavorite`, and `delete(ids)`), `SavedGuide` (with its source, situation, memo, and whether it is a favorite), and `SavedGuideStore.InMemory` for tests. | 2.1, 2.3 |
 | `generation/GenerationModels.kt`, `generation/PoseGenerator.kt` | Pose requests, planned poses, generation and candidate events, generator interface | 2.1, 2.3 |
 | `generation/PoseTipper.kt` | How to take a generated pose: `PoseTipper`, `PoseTip` | 2.1, 2.6.3 |
 | `generation/PersonDetector.kt` | The person check on the phone before the app sends a scene photo: `PersonDetector` | 2.1, 2.6.3 |

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -20,6 +20,7 @@ import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.GenerationEvent
 import com.lastpenguin.pix.generation.GenerationFailedException
 import com.lastpenguin.pix.generation.PoseGenerator
+import com.lastpenguin.pix.generation.PoseLibrary
 import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.PromptEntry
 import com.lastpenguin.pix.generation.PromptHistory
@@ -27,6 +28,11 @@ import com.lastpenguin.pix.generation.SUGGESTED
 import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.planned
 import com.lastpenguin.pix.generation.testBitmap
+import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.guide.NoPersonFoundException
+import com.lastpenguin.pix.guide.ReferenceGuide
+import com.lastpenguin.pix.guide.SavedGuide
+import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.DescriptionRequest
 import com.lastpenguin.pix.session.DescriptionShare
 import com.lastpenguin.pix.session.FakePersonDetector
@@ -34,11 +40,14 @@ import com.lastpenguin.pix.session.PoseShare
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SubjectPick
+import com.lastpenguin.pix.session.fakeGuide
 import com.lastpenguin.pix.telemetry.TelemetryEvent
 import com.lastpenguin.pix.telemetry.TelemetryRecorder
+import com.lastpenguin.pix.ui.TestAppContainer
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -47,6 +56,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -1387,7 +1397,8 @@ class GenerationViewModelTest {
     // ---- situations (FR-4.8, Iter4-P13) ---------------------------------------------------------------------------
     // Partitions: the situation chosen on Add a pose guide, going with every request of the set, Try again included;
     // the camera turned to the chosen situation's; the selfie's tile off without a front camera, refused; a front camera that fails while a selfie is framed, and shooting again after it;
-    // shooting again; the subject's phone told the situation.
+    // shooting again; the subject's phone told the situation, with Generate poses and with the set (#270); the chosen
+    // pose carrying it to Reference confirm, for the library.
 
     @Test
     fun theChosenSituation_goesWithTheScene_toEveryRequestOfTheSet() = runTest {
@@ -1400,6 +1411,21 @@ class GenerationViewModelTest {
 
         assertEquals(Situation.LANDMARK, state.situation)
         assertEquals(listOf(Situation.LANDMARK, Situation.LANDMARK), generator.runs.map { it.situation })
+    }
+
+    @Test
+    fun theSet_tellsTheSubjectsPhoneItsSituation_andTheChosenPoseCarriesIt() = runTest {
+        model.chooseSituation(Situation.LANDMARK)
+        generateFromAPhoto()
+        val run = generator.runs.single()
+        run.plan()
+        run.send(ready("pose-1"))
+        run.finish()
+        runCurrent()
+        model.select("pose-1")
+
+        assertEquals(listOf<Situation?>(Situation.LANDMARK), share.situations)
+        assertEquals(Situation.LANDMARK, model.usePose()?.situation)
     }
 
     @Test
@@ -1637,6 +1663,112 @@ class GenerationViewModelTest {
         assertFalse(model.needsConsent)
         runCurrent()
         assertTrue(consent.given)
+    }
+
+    // Partitions (#297): each ready candidate kept in the library through PoseLibrary, a failed one not; Back from
+    // Pick a pose and from Generating poses with a candidate (posesKept once the library wrote it), Back from Generating
+    // poses before any candidate (nothing said), candidates none of which was kept, for no person or a storage that
+    // cannot write (nothing said), and no library (nothing kept, nothing said).
+
+    private fun keepingModel(maker: TestAppContainer.ScriptedGuideMaker, saved: SavedGuideStore): GenerationViewModel {
+        val library = PoseLibrary(maker, saved, CoroutineScope(dispatcher))
+        return GenerationViewModel(generator, camera, consent, persons, LIMIT_MS, library = library)
+            .also { store.put("keeping", it) }
+    }
+
+    @Test
+    fun eachReadyCandidate_isKeptInTheLibrary_andBackFromPickAPoseSaysSo() = runTest {
+        val maker = TestAppContainer.ScriptedGuideMaker()
+        val saved = SavedGuideStore.InMemory()
+        model = keepingModel(maker, saved)
+        val kept = mutableListOf<Unit>()
+        backgroundScope.launch { model.posesKept.collect { kept += it } }
+        generateFromAPhoto()
+        val run = generator.runs.single()
+        run.plan()
+        run.send(ready("pose-1"), failed("pose-2"), ready("pose-3"))
+        run.finish()
+        runCurrent()
+
+        assertEquals(2, maker.pending.size)
+        repeat(2) { maker.finish(Result.success(fakeGuide("kept-$it"))) }
+        runCurrent()
+        assertEquals(listOf("kept-1", "kept-0"), saved.saved.value.map { it.id })
+        assertTrue(saved.saved.value.none { it.favorite })
+
+        model.describeAgain()
+        runCurrent()
+        assertEquals(1, kept.size)
+    }
+
+    @Test
+    fun backFromGeneratingPoses_saysSoOnlyOnceACandidateWasKept() = runTest {
+        val maker = TestAppContainer.ScriptedGuideMaker()
+        model = keepingModel(maker, SavedGuideStore.InMemory())
+        val kept = mutableListOf<Unit>()
+        backgroundScope.launch { model.posesKept.collect { kept += it } }
+        generateFromAPhoto()
+        model.stopGenerating()
+        runCurrent()
+        assertEquals(0, kept.size)
+
+        model.generate("")
+        runCurrent()
+        generator.runs.last().apply {
+            plan()
+            send(ready("pose-1"))
+        }
+        runCurrent()
+        model.stopGenerating()
+        runCurrent()
+        // Said once the library wrote the pose, which may finish after Back.
+        assertEquals(0, kept.size)
+        maker.finish(Result.success(fakeGuide("kept")))
+        runCurrent()
+        assertEquals(1, kept.size)
+    }
+
+    @Test
+    fun backWithNoCandidateKept_saysNothing_noPersonOrAStorageThatCannotWrite() = runTest {
+        val maker = TestAppContainer.ScriptedGuideMaker()
+        val full = object : SavedGuideStore by SavedGuideStore.InMemory() {
+            override suspend fun save(guide: ReferenceGuide, state: GuideState, favorite: Boolean) =
+                Result.failure<SavedGuide>(IOException("full"))
+        }
+        model = keepingModel(maker, full)
+        val kept = mutableListOf<Unit>()
+        backgroundScope.launch { model.posesKept.collect { kept += it } }
+        generateFromAPhoto()
+        generator.runs.single().apply {
+            plan()
+            send(ready("pose-1"), ready("pose-2"))
+            finish()
+        }
+        runCurrent()
+        maker.finish(Result.failure(NoPersonFoundException()))
+        maker.finish(Result.success(fakeGuide("not-written")))
+        runCurrent()
+
+        model.describeAgain()
+        runCurrent()
+
+        assertEquals(0, kept.size)
+    }
+
+    @Test
+    fun withoutALibrary_nothingIsKept_andBackSaysNothing() = runTest {
+        val kept = mutableListOf<Unit>()
+        backgroundScope.launch { model.posesKept.collect { kept += it } }
+        generateFromAPhoto()
+        generator.runs.single().apply {
+            plan()
+            send(ready("pose-1"))
+        }
+        runCurrent()
+        model.stopGenerating()
+        runCurrent()
+
+        assertEquals(0, kept.size)
     }
 
     @Test
@@ -2144,13 +2276,17 @@ class GenerationViewModelTest {
     private class RecordingShare : PoseShare {
         val calls = mutableListOf<String>()
         val opened = mutableListOf<String>()
+
+        /** The situation each set started with (#270). */
+        val situations = mutableListOf<Situation?>()
         private val sentPicks = MutableSharedFlow<SubjectPick>(extraBufferCapacity = 8)
         override val picks: Flow<SubjectPick> = sentPicks
 
         fun pick(pick: SubjectPick) = check(sentPicks.tryEmit(pick))
 
-        override fun open(setId: String, sceneTurn: Int) {
+        override fun open(setId: String, sceneTurn: Int, situation: Situation?) {
             opened += setId
+            situations += situation
             calls += "open $setId"
         }
 

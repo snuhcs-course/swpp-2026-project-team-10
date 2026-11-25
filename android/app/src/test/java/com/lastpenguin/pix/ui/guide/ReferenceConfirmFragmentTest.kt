@@ -51,8 +51,7 @@ import org.robolectric.shadows.ShadowChoreographer
  * that could not be used (a notice and the camera). Back on a generated pose's guide, or another photo from the
  * gallery in its place, stops the ask for its tip. Back by where the reference was chosen (#294): a photo from the
  * camera's Add a pose guide (that sheet again over the camera, without its gallery, the guide on the camera the same
- * one; the system's Back too), from Subject view's (its sheet over Subject view), from the library (the library), and
- * a generated pose (one step back, no sheet). Opened from Subject view: the session ending goes back to Subject
+ * one; the system's Back too), from Subject view's (its sheet over Subject view), and a generated pose (one step back, no sheet). Opened from Subject view: the session ending goes back to Subject
  * view, which shows what ended it, and stops finding the person; opened from the camera, it stays. A candidate the
  * subject picked says whose pick it is under the title; this phone's own pick and an uploaded photo say nothing. The
  * title: Guide Outline for both an uploaded photo and a generated pose (#204).
@@ -509,19 +508,6 @@ class ReferenceConfirmFragmentTest {
         idle()
 
         assertOnTheSheetAlone(controller, below = R.id.subjectFragment, fromSubject = true)
-    }
-
-    @Test
-    fun backOnAPhotoFromTheLibrary_isTheLibrary() {
-        launch()
-        nav.setCurrentDestination(R.id.libraryFragment)
-        nav.navigate(R.id.action_library_to_referenceConfirm)
-        pickPhoto()
-
-        onScreen { it.backButton.performClick() }
-        idle()
-
-        assertEquals(R.id.libraryFragment, nav.currentDestination?.id)
     }
 
     @Test

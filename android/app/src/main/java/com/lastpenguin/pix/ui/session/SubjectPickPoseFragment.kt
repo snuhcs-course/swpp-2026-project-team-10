@@ -99,7 +99,7 @@ class SubjectPickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         val ui = viewModel.uiState.value
         val setId = ui.setId ?: return
         val image = (slot.event as? CandidateEvent.Ready)?.image ?: return
-        saves.toggle(PoseKey(setId, slot.pose.id), image, ui.sceneTurn)
+        saves.toggle(PoseKey(setId, slot.pose.id), image, ui.sceneTurn, ui.situation)
     }
 
     private fun render(binding: FragmentPickPoseBinding, pages: PosePageAdapter, ui: SubjectPickUiState) {

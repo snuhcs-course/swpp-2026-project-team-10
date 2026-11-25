@@ -72,6 +72,7 @@ object PixViewModels {
                 share = container.poseSyncer,
                 descriptions = container.descriptionSyncer,
                 history = container.promptHistory,
+                library = container.poseLibrary,
                 partner = { container.sessionManager.state.value.partner },
                 phoneTurn = container.phoneTurns.turn,
             )
@@ -114,7 +115,7 @@ object PixViewModels {
         initializer {
             SubjectGeneratingViewModel(container.sessionManager, container.poseSyncer, container.descriptionSyncer)
         }
-        initializer { PoseSaveViewModel(container.referenceGuideMaker, container.savedGuideStore) }
+        initializer { PoseSaveViewModel(container.poseLibrary, container.savedGuideStore) }
         initializer { SubjectConfirmViewModel(container.sessionManager, container.confirmSyncer) }
         initializer {
             SubjectDescribeViewModel(container.sessionManager, container.descriptionSyncer, container.promptHistory)

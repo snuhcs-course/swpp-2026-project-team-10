@@ -125,6 +125,8 @@
 | 4.8 | 2026-11-24 | Camera's hint chip shows only "Guide hidden"; the line about the pinch went (2.6.8; Iter5-A9, [#306]). |
 | 4.9 | 2026-11-25 | Back on *Reference confirm* and *No person found* returns to where the reference was chosen: *Add a pose guide* is opened again, since a sheet cannot stay under a screen (2.6.2; Iter5-A3, [#294]). |
 | 4.10 | 2026-11-25 | Who is zooming, on both phones, and what the photographer did, on the subject's: `camera.did`, `SessionViewModel.subjectZooming`, `SubjectViewModel.photographerLines` (Iter5-A1, [#292]). A single change of the zoom glides: `CameraController.glideZoom`, `ZoomGlide` (Iter5-A10, [#310]) (2.2, 2.5.1, 2.6.5, 2.8). |
+| 4.11 | 2026-11-25 | The library's situations and memos (Iter5-P6, [#270]): `ReferenceGuide.situation`, kept by the ♥, *Select*, and *Save guide* on both phones; `situation` in `pose.step` and `guide.image.begin`; `situation` and `memo` in `meta.json`, `setMemo`; the situation chips and the memo dialog (AD-16, 2.1, 2.3, 2.5.1, 2.6.2, 2.6.3, 2.8). |
+| 4.12 | 2026-11-25 | The library's history, favorites, and selection (Iter5-A6, [#297]): `PoseLibrary` keeps each candidate, and a used photo guide is kept, as history; ♥ and *Save guide* mark favorites (`setFavorite`, `favorite` in `meta.json`); no limit of 100; the tabs *All* and *Favorites*, opening on *All*, with no tab per kind and no *Add photo*, a ♥ on each cell (`onToggleFavorite`), *Save guide* drawn as a ♥, selection, and ⋮; Back on *Generating poses* and *Pick a pose* without asking, with `posesKept` and *View* (AD-16, 2.1, 2.3, 2.4, 2.6.2, 2.6.3, 2.8). |
 
 </details>
 
@@ -363,7 +365,7 @@ App versions are from `android/gradle/libs.versions.toml`; server versions are t
 | AD-13 | **Invitations by Firebase Cloud Messaging, with an invite link as the fallback** | Only a push reaches a friend whose Pix is closed, and a link through any messenger covers a lost push. | WebSocket presence only; KakaoTalk-only invitations |
 | AD-14 | **A managed TURN relay (Cloudflare Realtime TURN), with short-lived credentials from the server** | STUN often fails behind carrier NAT, and the course servers cannot host a relay (port 80 only). Cloudflare's needs no host, fits its free allowance, and also listens on TCP 80 and TLS 443. The key stays on the server, and media stays SRTP-encrypted (NFR-14). | coturn on the server host (no open ports) or on AWS (cost, upkeep); a media server (SFU); no relay |
 | AD-15 | **The guide is an outline only and never shows the reference photo's pixels** | Framing the person matters more than the background, and reference pixels over the live scene confuse; a thumbnail shows the reference (AD-6). | Semi-transparent cutout; a faint background guide |
-| AD-16 | **Saved guides live in the app's private storage** | Reuse with nothing in the gallery or on the server (FR-3.8, NFR-13). The library (FR-3.11) is this store: up to 100 guides, thumbnails read on demand. | Gallery album; server-side guides |
+| AD-16 | **Saved guides live in the app's private storage** | Reuse with nothing in the gallery or on the server (FR-3.8, NFR-13). The library (FR-3.11) is this store, with no limit, thumbnails read on demand ([#297]). Each guide keeps its source, a pose's situation, a memo ([#270]), and whether it is a favorite ([#297]); the others are history. | Gallery album; server-side guides |
 | AD-17 | **Pinch zoom with a guide-edit mode toggle on both phones** | A pinch is the natural zoom, and one toggle decides: on, gestures edit the guide; off, a pinch zooms. The subject moves the guide (FR-7.2) and zooms too. | A zoom slider; deciding by where the finger lands |
 | AD-18 | **Session state lives in a Redis session store, not in the server process** | Workers share the state, and a new copy takes over during a deploy without losing a waiting room (2.8). The small, short-lived state fits Redis's atomic scripts, expiry, and pub/sub (2.7). Cost: one more service and Lua room transitions; NFR-18's 50 sessions fit in one worker. | One process with in-memory state; routing rooms by code; the relational database |
 | AD-19 | **Crash reports and usage events through Firebase Crashlytics and Analytics, behind one `Telemetry` facade** | Pix already uses Firebase for pushes, so no account or server is added. The phones send over HTTPS from any network, which the course servers cannot receive. One facade with typed events keeps personal data out (NFR-13) and lets tests record what is sent. Release builds only, while the user allows it (FR-10.6). | An endpoint on the Pix server (plain HTTP, campus only, our own storage and dashboards); Sentry (another account and SDK) |
@@ -511,13 +513,16 @@ interface GuideRepository {
 
 interface SavedGuideStore {                             // FR-3.8, FR-3.11, AD-16: the library, app-private storage only
     val saved: StateFlow<List<SavedGuide>>              // newest first; empty until the storage is read once
-    suspend fun save(guide: ReferenceGuide, state: GuideState): Result<GuideSaved>   // one copy per guide id
+    suspend fun save(guide: ReferenceGuide, state: GuideState, favorite: Boolean = true): Result<SavedGuide>
+                                                        // one copy per guide id; history when favorite is false
     suspend fun load(id: String): Result<Pair<ReferenceGuide, GuideState>>
     suspend fun thumbnail(id: String): Bitmap?         // read when a cell shows; null for an unknown id or unreadable files
-    suspend fun delete(id: String)                      // an unknown id does nothing
+    suspend fun delete(ids: Collection<String>)         // an unknown id does nothing; delete(id) for one
+    suspend fun setMemo(id: String, memo: String): Result<Unit>   // memoOf(memo); empty removes it (#270)
+    suspend fun setFavorite(id: String, favorite: Boolean): Result<Unit>   // ♥ and Save guide (#297)
     class InMemory : SavedGuideStore                    // for tests and screens that keep no guides
     companion object {
-        const val MAX_SAVED = 100                       // the oldest goes first
+        const val MAX_MEMO = 40                         // characters; memoOf keeps one line, trimmed, cut to it
         const val THUMBNAIL_WIDTH = 384                 // a library cell's 3:4 on a 3x screen, never enlarged
         const val THUMBNAIL_HEIGHT = 512
     }
@@ -763,10 +768,12 @@ classDiagram
   class SavedGuideStore {
     <<interface>>
     +saved StateFlow
-    +save(guide, state) Result~GuideSaved~
+    +save(guide, state, favorite) Result~SavedGuide~
     +load(id)
     +thumbnail(id) Bitmap
-    +delete(id)
+    +delete(ids)
+    +setMemo(id, memo)
+    +setFavorite(id, favorite)
   }
   class FileSavedGuideStore
   class GuideGeometry {
@@ -1353,6 +1360,8 @@ data class ReferenceGuide(
                                           // subject keeps the photographer's in MirrorReference (guide.reference.*)
     val crop: PhotoCrop? = null,          // the screenshot it was cut from (FR-2.10); null for a whole image or a generated
                                           // pose; never sent or saved
+    val situation: Situation? = null,     // a generated pose's situation (FR-4.8), kept in the library (#270); null for
+                                          // a photo guide; forSituation keeps the instance when it changes nothing
 )
 data class PhotoCrop(
     val original: Bitmap,         // the whole picked image, long side ≤ 1024 px, for Reference confirm's cut
@@ -1367,9 +1376,14 @@ data class GuideState(            // places the guide, in frame coordinates (2.6
     val opacity: Float = 0.5f,    // 0.1..0.9, applied to the outline (FR-3.4)
     val visible: Boolean = true,  // false = hidden for a moment (FR-3.6); only the photographer changes it
 )
-data class SavedGuide(val id: String, val savedAt: Long, val source: GuideSource)   // a library entry, no bitmap
-                                                         // (SavedGuideStore.thumbnail); files in app-private storage (2.8)
-data class GuideSaved(val guide: SavedGuide, val removedOldest: Boolean)   // what save did, decided inside the save
+data class SavedGuide(                                   // a library entry, no bitmap (SavedGuideStore.thumbnail);
+    val id: String,                                      // files in app-private storage (2.8)
+    val savedAt: Long,
+    val source: GuideSource,
+    val situation: Situation? = null,                    // a pose's situation (#270)
+    val memo: String = "",                               // the user's memo, shown and edited in the library only
+    val favorite: Boolean = true,                        // ♥ or Save guide marked it; false = history (#297)
+)
 enum class LibraryFilter { ALL, PHOTOS, GENERATED }      // the library's filters (FR-3.11): all, or one GuideSource
 
 // ---- Camera ---------------------------------------------------------------
@@ -1588,10 +1602,10 @@ stateDiagram-v2
   CHECKING --> FRAMING: no person, said on the camera; or Back
   DESCRIBING --> FRAMING: Back, the text kept
   DESCRIBING --> GENERATING: Generate
-  GENERATING --> DESCRIBING: Back, confirmed
+  GENERATING --> DESCRIBING: Back
   GENERATING --> PICKING: a candidate ready
   GENERATING --> FAILED: none ready
-  PICKING --> DESCRIBING: Back, confirmed; the set gone
+  PICKING --> DESCRIBING: Back; the set gone, its poses in the library
   PICKING --> GENERATING: Regenerate
   PICKING --> IDLE: the guide on the camera, or a choice in a session
   FAILED --> DESCRIBING: Back
@@ -1644,7 +1658,7 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `pose.scene.begin` / `.chunk` / `.end` | P→S | reliable | chunks | The scene photo, for the subject's *Generate poses* |
 | `pose.description.edit` | S→P | reliable | `descriptionId`, `holding`, `text` | The subject's field takes or returns the description |
 | `pose.description.go` | S→P | reliable | `descriptionId`, `text`, `suggest` | The subject's *Generate poses* button |
-| `pose.step` | P→S | reliable | `setId`, `step`, `poseIds`, `poseId`, `by`, `failure`, `sceneTurn` | The photographer's set of candidates (FR-6.15), why a closed set failed (FR-4.7), and how its scene photo was held ([#206]) |
+| `pose.step` | P→S | reliable | `setId`, `step`, `poseIds`, `poseId`, `by`, `failure`, `sceneTurn`, `situation` | The photographer's set of candidates (FR-6.15), why a closed set failed (FR-4.7), and how its scene photo was held ([#206]) |
 | `pose.planned` | P→S | reliable | `setId`, `poseIds` | The set's slots in order (Iter3-A13) |
 | `pose.candidate.begin` / `.chunk` / `.end` | P→S | reliable | chunks | One candidate, for *Generating poses* and *Pick a pose* |
 | `pose.candidate.failed` | P→S | reliable | `setId`, `poseId`, `descriptionRejected` (only when true) | A candidate that could not be created (Iter3-A13), and whether the service refused the set's description itself (Iter4-P3) |
@@ -1704,12 +1718,13 @@ Sent when the session connects and at each change. For example, `hasFlash` is fa
 { "v": 3, "t": "guide.image.begin", "seq": 3, "ts": 1759212345702,
   "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "format": "mask-png",
          "width": 540, "height": 720, "bytes": 9120, "chunks": 1, "aspect": 0.75,
-         "anchor": { "left": 0.31, "top": 0.21, "right": 0.69, "bottom": 0.95 }, "source": "GALLERY" } }
+         "anchor": { "left": 0.31, "top": 0.21, "right": 0.69, "bottom": 0.95 }, "source": "GENERATED",
+         "situation": "landmark" } }
 ```
 
-Only the smoothed mask travels, never the reference's pixels (AD-6, AD-15). `MaskPng` writes and reads it losslessly on both phones. `aspect` is the mask's width / height. `anchor` is the mask's box in its reference photo, in fractions, right and bottom exclusive (`ReferenceGuide.anchor`); `source` is `GALLERY` or `GENERATED`. Each goes only when the guide has it.
+Only the smoothed mask travels, never the reference's pixels (AD-6, AD-15). `MaskPng` writes and reads it losslessly on both phones. `aspect` is the mask's width / height. `anchor` is the mask's box in its reference photo, in fractions, right and bottom exclusive (`ReferenceGuide.anchor`); `source` is `GALLERY` or `GENERATED`. `situation` is a generated pose's situation, by its name on the server ([#270]). Each goes only when the guide has it.
 
-- **P→S.** Skipped when `hello` reported the same `haveGuideId` and no `guide.clear` followed. After a drop in the same session the photographer counts the images it has sent instead, because `hello` is not sent again (2.6.7, [#268]). The `guide.state` after every image places the guide, also for a subject that joins late (2.6.2). The subject keeps `anchor` and `source` for *Save guide*.
+- **P→S.** Skipped when `hello` reported the same `haveGuideId` and no `guide.clear` followed. After a drop in the same session the photographer counts the images it has sent instead, because `hello` is not sent again (2.6.7, [#268]). The `guide.state` after every image places the guide, also for a subject that joins late (2.6.2). The subject keeps `anchor`, `source`, and `situation` for *Save guide*. It reads an unknown `situation` as none.
 - **The session's end.** The subject empties what Subject view draws, the mirror and `MirrorReference`, and holds the image and its reference photo for the next `hello`. The next session draws nothing until a `guide.state` names the held guide, which then needs no image ([#268]).
 - **S→P.** The photographer adopts the guide, under the same `guideId`, in place of its own, starting at `anchor` (FR-3.1). It answers with `guide.state` `by: SUBJECT` and no image (2.6.5, *Guide from the subject*). An anchor that is not finite, lies outside 0..1, or has no area starts the guide centered; a missing `source` means `GALLERY`. The guide's reference photo comes just before its image (`guide.reference.*`), and the photographer adopts the guide with it, for its thumbnail (FR-3.9). A refused image leaves the photographer's guide as it was. Without a `guide.state` that names the guide within 5 s, the subject shows the photographer's guide again.
 
@@ -1917,12 +1932,12 @@ Planned (FR-7.5, Could): sent after `hello` and at each change of the photograph
 
 | `step` | When | Fields |
 |----|----|----|
-| `GENERATING` | *Generate poses*' button started a set | `sceneTurn`: how the photographer held the scene photo, 90, 180, or 270; left out when upright ([#206]) |
+| `GENERATING` | *Generate poses*' button started a set | `sceneTurn`: how the photographer held the scene photo, 90, 180, or 270; left out when upright ([#206]). `situation`: the set's situation, by its name on the server, for the subject's ♥ ([#270]) |
 | `PICKING` | The photographer's *Pick a pose* opened | `poseIds`: the candidates whose copy went out, in its order |
 | `CHOSEN` | A *Select* decided | `poseId`, `by` |
 | `CLOSED` | No choice: Back, *Regenerate*, or no candidate | `failure` with no candidate: why, a `GenerationError` by name ([#203]) |
 
-Each set, *Try again* and *Regenerate* included, has a new `setId`. `failure` is a string, not an enum, so a subject that does not know a newer name keeps the message and reads it as `SERVER`. An older photographer sends none, and an older subject ignores it. The subject reads a `sceneTurn` that is not a quarter turn, or none, as upright; an older subject ignores it.
+Each set, *Try again* and *Regenerate* included, has a new `setId`. `failure` is a string, not an enum, so a subject that does not know a newer name keeps the message and reads it as `SERVER`. An older photographer sends none, and an older subject ignores it. The subject reads a `sceneTurn` that is not a quarter turn, or none, as upright; an older subject ignores it. It reads an unknown `situation`, or none, as none.
 
 </details>
 
@@ -2711,9 +2726,9 @@ The clamp (`GuideGeometry.clamp`): the guide's normalized width is `height × as
 
 **Hide, show, and replace (FR-3.6, Iter2-P11).** *Hide* sets `visible = false` with a final update, which `guide.state` carries to the subject; *Show* restores the guide in place. While it is hidden, the edit toggle and the opacity slider are disabled. *Hide* and *Show* also label the image for 3 s (2.8). With a guide on the camera, *Add a pose guide* asks to replace it, and a confirmed reference replaces it through `setGuide`.
 
-**Save guide (FR-3.8, Iter2-P18).** The guide's panel holds *Hide*, the opacity slider, *Save guide*, and *Remove*. *Save guide* is a toggle ([#182]): `toggleSaved`, shared with Subject view, saves a guide the library lacks and deletes one it has, by ID. A guide keeps its ID through save and load, so the bookmark stays filled. Each tap shows one notice for 3 s (`GuideSaveNotice`): saved, saved with the oldest of 100 removed (from the save's own `GuideSaved.removedOldest`), removed, or failed. The guide on the camera stays. The store: 2.8, *Guide store*.
+**Save guide (FR-3.8, Iter2-P18).** The guide's panel holds *Hide*, the opacity slider, *Save guide*, and *Remove*. *Save guide* is a toggle ([#182]): `toggleSaved`, shared with Subject view, marks the guide a favorite, keeping it first if the library lacks it, and makes a favorite history again, by ID; nothing is deleted ([#297]). The button is a ♥, filled red while the guide is a favorite (`isFavorite`, `saveGuideTint`), as on *Pick a pose* and in the library. A used photo guide's history entry can be written while *Save guide* saves it; `save` then returns that entry as history, and `toggleSaved` marks it a favorite. A guide keeps its ID through save and load. Each tap shows one notice for 3 s (`GuideSaveNotice`): saved, removed, or failed. The guide on the camera stays. The store: 2.8, *Guide store*.
 
-**The library (FR-3.8, FR-3.11, It 3, [#170]).** *Add a pose guide* has *Choose from the gallery* and *My library* under "Guide from a photo", after the situations ([#243]). Closing the photo picker without a photo leaves the screen that opened it open, the sheet or the library, with the guide unchanged (FR-2.7). Back on *Reference confirm* and on *No person found* returns to where the reference was chosen (`backToChoosing`, [#294]). The sheet is a dialog destination, which Navigation closes when a screen opens over it, so it cannot wait under these screens: Back opens it again in one move that also closes the screen, with `fromSubject` as it was. After *No person found* the move sets `openGallery`, and the sheet opens its picker at once, only when it first opens and not when it is made anew. A photo from the library goes back to the library, and a generated pose one step back (2.6.3); `ReferenceViewModel.fromPhoto` tells a picked photo from a pose, since in a session the camera is under both. *My library* shows *All N* while guides are saved ([#210]) and opens `LibraryFragment` in the sheet's place, so Back returns to the camera: a grid filtered by kind, newest first, where a tap puts a guide on the camera at its *Starting position* and a long press deletes after asking. Thumbnails load as cells show, through a 24 MB `LruCache`. From Subject view, the library offers the guide to the photographer and leaves when the session ends. The screens: R&S 6.2.
+**The library (FR-3.8, FR-3.11, It 3, [#170]).** *Add a pose guide* has *Choose from the gallery* and *My library* under "Guide from a photo", after the situations ([#243]). Closing the photo picker without a photo leaves the sheet open, with the guide unchanged (FR-2.7). Back on *Reference confirm* and on *No person found* returns to where the reference was chosen (`backToChoosing`, [#294]). The sheet is a dialog destination, which Navigation closes when a screen opens over it, so it cannot wait under these screens: Back opens it again in one move that also closes the screen, with `fromSubject` as it was. After *No person found* the move sets `openGallery`, and the sheet opens its picker at once, only when it first opens and not when it is made anew. A generated pose goes one step back (2.6.3); `ReferenceViewModel.fromPhoto` tells a picked photo from a pose, since in a session the camera is under both. *My library* shows *All N* while guides are saved ([#210]) and opens `LibraryFragment` in the sheet's place, so Back returns to the camera: a grid newest first, where a tap puts a guide on the camera at its *Starting position*. Its tabs are *All* and *Favorites* (`LibraryFilter`, [#297]), and it opens on *All*. Each cell shows its kind's icon; there is no tab per kind. The library adds no guide itself (no *Add photo*): guides come from the poses and the photo guides used. Each cell's ♥ calls `onToggleFavorite`, which `setFavorite` writes; a failed write shows a message. Selection (It 5, [#297]): a long press, or *Select* under ⋮, starts selecting (`ReferenceViewModel.librarySelection`, a set of ids; null while not selecting). A tap then selects or unselects; *Select all* selects every guide listed; *Delete* asks with the count, then deletes them in one `delete(ids)`. Only listed guides stay selected (`libraryPage`), so a tab changed while selecting never deletes what it hides. ✕ or Back ends selecting first. *Select all* under ⋮ starts selecting with every guide the tab lists, as the header's *Select all* does while selecting. A change of selection rebinds only the cells' marks. Thumbnails load as cells show, through a 24 MB `LruCache`. Situations and memos (Iter5-P6, [#270]): a chip row under the tabs has one chip per situation that a saved guide has, in the order of the sheet's tiles, with its count (`LibraryPage.situations`). A chip filters within the tab; the same chip again clears it. A situation whose last guide is deleted is no longer chosen. Under each cell are the guide's situation and memo, each only when it has one. The pencil at the cell's top right opens a dialog with one field of at most 40 characters (`MAX_MEMO`) and its count; *Save* calls `setMemo`, and a failed write shows a message. A new memo rebinds only the cell's words, so its thumbnail does not blink (`LibraryAdapter`'s payload). Opening *Add a pose guide* again clears the chosen situation. From Subject view, the library offers the guide to the photographer and leaves when the session ends. The screens: R&S 6.2.
 
 **Overlay rendering.** `GuideOverlayView` draws the outline with `opacity` as `Paint.alpha`, in this phone's line color and thickness (2.6.8), clipped to the image, and nothing while `visible == false`. The reference thumbnail (FR-3.9) is a separate view, never in the stream or photos. It starts top left with a 72 dp long side; a tap enlarges it to half the preview's width, or less to fit. A drag drops it into the nearest corner (`ReferenceDragController`), which TalkBack offers as actions. The corner persists, and a new guide starts small. Subject view shows the same thumbnail from `MirrorReference`, with its own corner, which is never sent (It 3, [#132]); it stays while the guide is hidden. A guide from the subject has the subject's reference photo, so Camera shows its thumbnail too ([#234]).
 
@@ -2749,11 +2764,11 @@ The server reaches every model through OpenRouter with one key (`OPENROUTER_API_
 
 3.  **Requests.** Without a description, the app asks `POST /pose-suggestions` for four poses, then sends one `POST /poses` per pose. With a description, it sends that description's `POST /poses` at once and asks `POST /pose-suggestions` for three variations, then one `POST /poses` each. A variation missing after 10 s is replaced by the description. Each request (`pose-1` … `pose-4`) gets a `seed` drawn from one seed per set. *Try again* and *Regenerate* on *Pick a pose* repeat the request with a new seed. Back on each screen goes one step back (2.4, Figure 9c; [#199]). On *Generating poses* and *Pick a pose*, where it loses the images the AI service made, it first asks "Go back?", saying they cannot be recovered (`confirmGoingBack`), a dialog that closes with the screen's view, so a set that ends meanwhile leaves no question. *Pick a pose*, *Generating poses*, and *Couldn't create poses* go to *Generate poses* with the photo and the text, the set gone (`describeAgain`, `stopGenerating`); *Generate poses* to the photo's review (`backToReview`). In a session the set is on both phones, so *Pick a pose* has no *Regenerate*. The subject's Back returns to Subject view.
 4.  **Progressive results.** *Generating poses* shows four slots, two by two in the scene's shape, narrower and centered for a 9:16 scene (`CandidateGridFit`), and half the width for a landscape one. A candidate, or its failure, fades in over 200 ms where its spinner was (Iter3-A13). The run ends when all four are done or at 60 s, when open requests are cancelled. With at least one candidate, *Pick a pose* shows each on its own page of a `ViewPager2` (`PosePageAdapter`), in its own shape. The page on screen is the one *Select* takes ([#108]). With none, *Couldn't create poses* opens (FR-4.7). After *Select*, *Pick a pose* stays under *Reference confirm*, whose Back returns to the set (`pickAgain`); the set goes once the screen leaves the back stack. In a session a choice is final, and the set goes at once. The scene photo goes once its tip is asked for.
-5.  **Cancellation.** Back on *Generating poses* cancels the coroutine scope and its HTTP calls. The server sees the closed connection within 0.25 s and cancels its image call, which is then not billed. The course servers' proxy does not pass the cancel on (measured 2026-10-13; 2.8, *Hosting*), so there a cancelled call runs and is billed, bounded by the rate limit.
+5.  **Cancellation.** Back on *Generating poses*, at once since Iteration 5 ([#297]), cancels the coroutine scope and its HTTP calls. Back on it and on *Pick a pose* sends `posesKept` once the library wrote one of the set's candidates, which may be after Back; with none written, for no person or a full storage, nothing is said. *Generate poses* then shows "The poses are in My library." with *View*, which opens the library at *All* and ends the pose flow (`cancel`). The server sees the closed connection within 0.25 s and cancels its image call, which is then not billed. The course servers' proxy does not pass the cancel on (measured 2026-10-13; 2.8, *Hosting*), so there a cancelled call runs and is billed, bounded by the rate limit.
 
 **Prompt history (It 3, FR-4.11, [#124]).** The server keeps no description (NFR-13), so `PromptHistory` keeps them on the phone in DataStore (`prompt_history`), out of backups. It holds one entry per text, newest first, at most 50, each with this phone's role and the friends' account IDs. A set is recorded once the server accepts its description, at its first ready candidate ([#182]), so a description the filter refuses (FR-4.12) is never kept. On the subject, `pose.description`'s `STARTED` step names the set (2.5.1), and `followSubjectSets` records it once that set has a candidate or is `PICKING`. A refused description can still get candidates (Iter4-P3, [#200]). The filter judges each of a set's five requests by itself and lets a request through when it cannot answer in 2 s. One of the description's own requests can pass that way. So can the request for variations, whose variations then pass as other words. The description's own request therefore decides. When a refused pose (`REJECTED`) is the description as written, the set records nothing, and `delete` removes the entry, also one that an earlier set or a build before [#182] kept. A refused variation changes nothing. The photographer's phone says so in `pose.candidate.failed` (`descriptionRejected`, 2.5.1), and the subject's phone then does the same, also when the refusal follows a candidate. When every pose is refused, the refusals and the set's end come as one change. So `PoseSyncer` sends an ended set's refusal before its end, and the subject's history reads a named set from `PoseSyncer.verdicts`, the sets accepted and refused, which keep a set after `mirror` dropped it and after the session ended. A set that is refused and replaced by the next one while the link reconnects sends no refusal (a known gap): an entry the subject's phone kept before then stays. The filter's refusal (`REJECTED`) and the image service's (`DECLINED` since [#203]) both count (decided 2026-11-10). A subject's *Try again* after a set without candidates is not recorded (a known gap). The friend is the invitation's `SessionState.partner`; a room code has none. *Generate poses* lists the entries as chips, which a switch filters to the friend, the name cut at 160 dp. ✕ deletes an entry on this phone only.
 
-**Saving a pose (It 3, FR-4.14, [#171]).** Each page of *Pick a pose*, on either phone, has a ♥. `PoseSaveViewModel`, scoped to the activity, cuts the person out with `ReferenceGuideMaker.make(image, GENERATED)` and saves the guide as an AI pose. Hearts are keyed by set and pose (`PoseKey`): `Saving`, disabled, then `Saved(guideId)` while the library has the guide. A tap on a filled heart deletes the guide. A newly saved ♥ pops to 125 % and back in 200 ms. Whether a save removed the oldest guide is decided under the store's lock (`GuideSaved`): of two hearts tapped at once with 99 saved, only the second removes one. *Select* on a filled heart reuses its saved guide. A candidate of a scene photo held sideways or upside down is saved turned back into the frame (`intoFrameHeldAt`, 2.6.2), as *Select* puts it on the camera, so the library opens it there. *Select* keeps the guide as cut and turns it once. The subject's phone takes the turn from the set's `pose.step` (`sceneTurn`, [#206]). Nothing of a ♥ is sent (2.6.5).
+**Saving a pose (It 3, FR-4.14, [#171]).** Each page of *Pick a pose*, on either phone, has a ♥. History (It 5, [#297]): `PoseLibrary`, one per app (`AppContainer`), keeps each candidate in the library as an AI pose as it arrives, with no tap: `GenerationViewModel` calls `keep` for each `CandidateEvent.Ready` of this phone's sets. It cuts the person out once per candidate (`ReferenceGuideMaker.make(image, GENERATED)`), off the main thread, and saves the guide as history (`favorite = false`). A candidate without a person is not kept. A storage that cannot write leaves the cut usable (`Kept.stored` false), so *Select* still works; the next `keep` of that candidate writes again without cutting. Only the latest set's cuts stay in memory. `PoseSaveViewModel`, scoped to the activity, marks the kept guide a favorite (`setFavorite`); on the subject's phone, which keeps no history, the ♥ keeps it first. Hearts are keyed by set and pose (`PoseKey`): `Saving`, disabled, then `Saved(guideId)` while the library has the guide as a favorite. A tap on a filled heart makes it history again; one the storage cannot change fills again and says it failed. TalkBack names the ♥ *Add this pose to Favorites* or *Remove this pose from Favorites*. A newly saved ♥ pops to 125 % and back in 200 ms. *Select* waits for the kept cut (`keptGuide`) and goes on with it, so a pose is never kept twice; a guide deleted in the library is kept again with its ID. A candidate of a scene photo held sideways or upside down is saved turned back into the frame (`intoFrameHeldAt`, 2.6.2), as *Select* puts it on the camera, so the library opens it there. *Select* keeps the guide as cut and turns it once. The subject's phone takes the turn from the set's `pose.step` (`sceneTurn`, [#206]). The saved guide keeps the set's situation ([#270]); the subject's phone takes it from `pose.step`'s `situation`. *Select* keeps it too, so *Save guide* on Camera keeps it, and the subject's *Save guide* takes it from `guide.image.begin`. Nothing of a ♥ is sent (2.6.5).
 
 **Pose prompt.** Every candidate uses `pose_prompt` with the pose in `{pose}`: the description as written (Korean included), a suggestion, a variation, or a default pose. It changes the pose and the expression. It lets the model move the person, frame closer (knee-up or waist-up), and raise, lower, or tilt the camera a little, but never show more than the scene photo. Its rules follow the pose, so they win: the same person, clothes, place, and light, and nothing new to lean or sit on. *Why:* with a fixed framing, a distant person stays small; with this prompt, 13 of 16 descriptions were followed in all eight test photos. *Known limits:* a description can still add a prop, clothing, or a second person, and walking toward the camera is mostly cut at the knees. The image service did not refuse a violent description in testing.
 
@@ -3213,9 +3228,10 @@ erDiagram
 - `FileSavedGuideStore` keeps each saved guide in `filesDir/guides/<id>/`, never in MediaStore:
   - `mask.png`, as the subject receives it, at most 720 px tall (`mask-png`, 2.5.1);
   - `reference.webp`, the 512 px reference copy;
-  - `meta.json`: `GuideState`, `anchor`, `aspect`, `source`, `savedAt`, and `order`.
-- It keeps at most 100 guides (`MAX_SAVED`); the save that deletes the oldest says so (`GuideSaved.removedOldest`). The increasing `order` sorts the list, so a clock set back cannot reorder it.
+  - `meta.json`: `GuideState`, `anchor`, `aspect`, `source`, `savedAt`, `order`, `favorite` when false ([#297]), and, when the guide has them, `situation` (its name on the server) and `memo` ([#270]). A folder without `favorite` is a favorite: every guide saved before the history was saved by ♥ or *Save guide*. A folder saved before has neither. An unknown `situation` reads as none.
+- It has no limit ([#297]): a guide goes only when the user deletes it, one or several at once (`delete(ids)`). Until Iteration 5 it kept 100 and deleted the oldest. The increasing `order` sorts the list, so a clock set back cannot reorder it.
 - A guide is written to a hidden `.<id>` folder, then renamed. A read deletes half-written folders, folders without a usable `meta.json` or `mask.png`, and any beyond 100. An older folder's `cutout.webp`, whose alpha is the mask, becomes `mask.png` at the first read, and the cutout is deleted.
+- `setMemo` and `setFavorite` write a new `meta.json` beside the old one (`.meta.json`) and rename it over the old one, so a failed write keeps the old values.
 - A start reads only the `meta.json` files, so a full library lists at once. Images are decoded on use or for a thumbnail; an undecodable mask fails the use with a message. A loaded guide's outline is traced again from its mask.
 - `thumbnail(id)` is the middle of the reference, or of the outline without one, cut to 3:4, at most 384 × 512 px, never enlarged.
 - A saved guide starts at its `anchor`, like a new guide, and its stored `GuideState` is not applied (FR-3.1).
@@ -3713,6 +3729,7 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#292]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/292
 [#294]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/294
 [#296]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/296
+[#297]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/297
 [#304]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/304
 [#306]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/306
 [#310]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/310

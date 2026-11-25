@@ -1,9 +1,10 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.PromptEntry
 import com.lastpenguin.pix.generation.PromptHistory
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.followSubjectSets
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
@@ -50,6 +51,8 @@ import org.junit.Test
  * The scene photo's turn (equivalence, #206): a set from a scene held sideways says so with GENERATING, also after a
  * reconnect, and one held upright says nothing; the subject keeps 0, 90, 180, and 270, and reads another value, or none
  * from an older photographer, as upright.
+ * The set's situation (equivalence, #270): a set says it with GENERATING, also after a reconnect, and one without says
+ * nothing; the subject keeps a known name, and reads an unknown one, or none from an older photographer, as none.
  * Subject, a copy (fault injection, boundary): a broken transfer, a header over 1024 px or 1 MiB (both at the limit
  * read), a copy that does not decode, and a copy of a set not shown are let go.
  * Subject, a pick (boundary of the deadline): sent and waiting; answered by its set's end; reported just after 5 s
@@ -517,6 +520,44 @@ class PoseSyncerTest {
         syncer.startAsSender(backgroundScope)
         runCurrent()
         assertEquals(listOf(SessionMessage.PoseStep("set1", PoseSetStep.GENERATING, sceneTurn = 90)), steps())
+    }
+
+    @Test
+    fun `a set says its situation with its start, also after a reconnect`() = runTest {
+        connectedAs(Role.PHOTOGRAPHER)
+        val syncer = syncer()
+        val first = Job()
+        syncer.startAsSender(TestScope(testScheduler + first))
+        runCurrent()
+
+        syncer.open("none")
+        runCurrent()
+        syncer.open("set1", situation = Situation.LANDMARK)
+        runCurrent()
+        assertEquals(listOf(null, "landmark"), steps().map { it.situation })
+
+        first.cancel()
+        session.sent.clear()
+        syncer.startAsSender(backgroundScope)
+        runCurrent()
+        assertEquals(
+            listOf(SessionMessage.PoseStep("set1", PoseSetStep.GENERATING, situation = "landmark")),
+            steps(),
+        )
+    }
+
+    @Test
+    fun `the subject keeps the set's situation, and reads an unknown one or none as none`() = runTest {
+        connectedAs(Role.SUBJECT)
+        val syncer = syncer()
+        syncer.startAsReceiver(backgroundScope)
+        runCurrent()
+
+        for ((sent, kept) in listOf("selfie" to Situation.SELFIE, "underwater" to null, null to null)) {
+            session.deliver(SessionMessage.PoseStep("set$sent", PoseSetStep.GENERATING, situation = sent))
+            runCurrent()
+            assertEquals("$sent", kept, syncer.mirror.value?.situation)
+        }
     }
 
     @Test

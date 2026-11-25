@@ -1,22 +1,22 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.animation.Animator
 import android.animation.ValueAnimator
-import android.content.DialogInterface
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.graphics.drawable.BitmapDrawable
 import android.os.Looper
 import android.view.View
+import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.testing.TestNavHostController
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -38,6 +38,7 @@ import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.fakeGuide
 import com.lastpenguin.pix.session.protocol.DescriptionStep
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
@@ -49,9 +50,11 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
+import com.lastpenguin.pix.ui.guide.LibraryFilter
 import com.lastpenguin.pix.ui.guide.ReferenceUiState
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
 import java.time.Duration
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -66,7 +69,6 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowChoreographer
-import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowToast
 
 /*
@@ -84,12 +86,12 @@ import org.robolectric.shadows.ShadowToast
  * phone's typing holding the field, the subject's typing shown and holding it, and the subject's Generate 4 poses that
  * comes first, which opens Generating poses (Design 2.6.5). Generating poses: the set
  * planned, candidates arriving with the count, all ready (to Pick a pose), none ready (to Couldn't create poses),
- * Back and system back, asked first that the images being created are lost (the run stopped, Generate poses with the
- * photo and the text; Cancel keeps it going). Pick a pose: only the ready
+ * Back and system back, at once (the run stopped, Generate poses with the photo and the text, #297), a pose that came
+ * before Back (kept in the library, and Generate poses told). Pick a pose: only the ready
  * candidates, one per page with a counter; the page on screen is the selected pose, so Select works at once and takes
  * the pose swiped to (to Reference confirm, this screen and the set left under it); a pose selected before the screen
- * opens is the one shown; Back and system back, asked first that the poses are lost (Generate poses with the photo and
- * the description, the set gone; Cancel stays); Back on
+ * opens is the one shown; every ready candidate kept in the library as history with no tap (#297); Back and system
+ * back, at once (Generate poses with the photo and the description, the set gone from the screens); Back on
  * Reference confirm (the set again, another pose selectable); the set let go once this screen leaves the back stack
  * after Select; Regenerate (the same request again, on Generating poses); in a session, the hint that the subject sees
  * the poses too, no Regenerate, Back dropping the set, Select final while the link reconnects, and the subject's pick that comes first, which opens Reference
@@ -152,19 +154,6 @@ class GenerationScreensTest {
     private fun setAnimatorScale(scale: Float) {
         ValueAnimator::class.java.getDeclaredMethod("setDurationScale", Float::class.javaPrimitiveType)
             .invoke(null, scale)
-    }
-
-    /** The dialog Back opened, which asks before going back from Generating poses or Pick a pose. */
-    private fun goingBack(): AlertDialog = ShadowDialog.getLatestDialog() as AlertDialog
-
-    private fun AlertDialog.texts(): Pair<String, String> =
-        findViewById<TextView>(androidx.appcompat.R.id.alertTitle)?.text.toString() to
-            findViewById<TextView>(android.R.id.message)?.text.toString()
-
-    /** Confirms the dialog Back opened. */
-    private fun confirmGoingBack() {
-        goingBack().getButton(DialogInterface.BUTTON_POSITIVE).performClick()
-        idle()
     }
 
     /** The scene photo in each of the app's ratios: 3:4, 9:16, 1:1, and held sideways 4:3 and 16:9 (#206). */
@@ -698,8 +687,8 @@ class GenerationScreensTest {
 
             s.onFragment(press)
             idle()
-            confirmGoingBack()
 
+            // At once, with no question (#297): nothing that came is lost.
             assertTrue(modules.generator.runs.single().cancelled)
             assertEquals(R.id.describePoseFragment, nav.currentDestination?.id)
             s.onFragment {
@@ -714,48 +703,65 @@ class GenerationScreensTest {
     }
 
     @Test
-    fun generating_back_asksFirst_andCancelKeepsTheRunGoing() {
+    fun generating_backWithAPoseThatCame_keepsItInTheLibrary_andGeneratePosesSaysSoWithView() {
         val modules = modules()
         val (s, nav) = launchPrepared<GeneratingFragment>(R.id.generatingFragment) { generating(it) }
         scenario = s
-
-        s.onFragment { FragmentGeneratingBinding.bind(it.requireView()).backButton.performClick() }
-        idle()
-
-        val dialog = goingBack()
-        assertTrue(dialog.isShowing)
-        assertEquals(string(R.string.go_back_title) to string(R.string.go_back_generating), dialog.texts())
-        dialog.getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
-        idle()
-
-        assertFalse(modules.generator.runs.single().cancelled)
-        assertEquals(R.id.generatingFragment, nav.currentDestination?.id)
-        s.onFragment {
-            val state = it.requireActivity().viewModel<GenerationViewModel>().uiState.value
-            assertEquals(GenerationUiState.Phase.GENERATING, state.phase)
-        }
-    }
-
-    @Test
-    fun generating_aSetThatEndsWhileBackAsks_closesTheQuestionWithTheScreen() {
-        val modules = modules()
-        val (s, nav) = launchPrepared<GeneratingFragment>(R.id.generatingFragment) { generating(it) }
-        scenario = s
-        s.onFragment { FragmentGeneratingBinding.bind(it.requireView()).backButton.performClick() }
-        idle()
-
         modules.generator.runs.single().apply {
             plan(poses)
             send(CandidateEvent.Ready("pose-1", bitmap()))
-            finish()
         }
         idle()
-        // Pick a pose took this screen's place, as the app's navigation would.
-        assertEquals(R.id.pickPoseFragment, nav.currentDestination?.id)
-        s.moveToState(Lifecycle.State.CREATED)
+        modules.maker.finish(Result.success(generated))
         idle()
 
-        assertFalse(goingBack().isShowing)
+        s.onFragment { FragmentGeneratingBinding.bind(it.requireView()).backButton.performClick() }
+        idle()
+
+        assertEquals(R.id.describePoseFragment, nav.currentDestination?.id)
+        assertEquals(listOf(generated.id to false), modules.saved.saved.value.map { it.id to it.favorite })
+        val notices = mutableListOf<Unit>()
+        s.onFragment { fragment ->
+            val model = fragment.requireActivity().viewModel<GenerationViewModel>()
+            fragment.lifecycleScope.launch { model.posesKept.collect { notices += it } }
+        }
+        idle()
+        assertEquals(1, notices.size)
+    }
+
+    @Test
+    fun describe_posesKeptNotice_saysThePosesAreInTheLibrary_andViewOpensItAtAll() {
+        val modules = modules()
+        val (s, nav) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) {
+            generating(it).apply {
+                modules.generator.runs.single().apply {
+                    plan(poses)
+                    send(CandidateEvent.Ready("pose-1", bitmap()))
+                }
+                stopGenerating()
+            }
+        }
+        scenario = s
+        idle()
+        // Said once the library wrote the pose.
+        modules.maker.finish(Result.success(fakeGuide("kept")))
+        idle()
+
+        s.onFragment {
+            val root = it.requireView().rootView
+            val text = root.findViewById<TextView>(com.google.android.material.R.id.snackbar_text)
+            assertEquals(string(R.string.poses_kept_notice), text?.text.toString())
+            root.findViewById<Button>(com.google.android.material.R.id.snackbar_action).performClick()
+        }
+        idle()
+
+        assertEquals(R.id.libraryFragment, nav.currentDestination?.id)
+        assertEquals(R.id.cameraFragment, nav.previousBackStackEntry?.destination?.id)
+        s.onFragment {
+            val activity = it.requireActivity()
+            assertEquals(LibraryFilter.ALL, activity.viewModel<ReferenceViewModel>().library.value.filter)
+            assertEquals(GenerationUiState(), activity.viewModel<GenerationViewModel>().uiState.value)
+        }
     }
 
     /** Generating poses for [scene] with its four slots planned and on screen, the first ones filled with [ready]. */
@@ -923,8 +929,8 @@ class GenerationScreensTest {
         idle()
 
         // The chosen image goes through the same step as an uploaded photo (FR-4.6); this screen and the set stay
-        // under it for its Back (#199).
-        assertEquals(listOf(GuideSource.GENERATED), modules.maker.sources)
+        // under it for its Back (#199). Its person was cut out once, by the library, as each ready candidate's (#297).
+        assertEquals(listOf(GuideSource.GENERATED, GuideSource.GENERATED, GuideSource.GENERATED), modules.maker.sources)
         assertEquals(R.id.referenceConfirmFragment, nav.currentDestination?.id)
         assertEquals(R.id.pickPoseFragment, nav.previousBackStackEntry?.destination?.id)
         s.onFragment {
@@ -961,7 +967,8 @@ class GenerationScreensTest {
         idle()
 
         assertEquals(R.id.referenceConfirmFragment, nav.currentDestination?.id)
-        assertEquals(2, modules.maker.sources.size)
+        // No cut of its own for either Select: the library's, one per ready candidate (#297).
+        assertEquals(3, modules.maker.sources.size)
     }
 
     @Test
@@ -1012,18 +1019,17 @@ class GenerationScreensTest {
         heartAt(s, 0).performClick()
         // A page's heart changes as the pages are compared again, off the main thread.
         idleUntil { !heartAt(s, 0).isEnabled }
-        // The person is cut out as for Use this pose; meanwhile the heart takes no second tap.
-        assertEquals(listOf(GuideSource.GENERATED), modules.maker.sources)
+        // The person is cut out as for Use this pose, once per candidate by the library (#297); meanwhile the heart
+        // takes no second tap.
+        assertEquals(listOf(GuideSource.GENERATED, GuideSource.GENERATED, GuideSource.GENERATED), modules.maker.sources)
         assertFalse(heartAt(s, 0).isEnabled)
 
         modules.maker.finish(Result.success(generated))
         idleUntil { heartAt(s, 0).isEnabled }
 
         assertEquals(
-            listOf("saved-pose" to GuideSource.GENERATED),
-            modules.saved.saved.value.map {
-                it.id to it.source
-            },
+            listOf(Triple("saved-pose", GuideSource.GENERATED, true)),
+            modules.saved.saved.value.map { Triple(it.id, it.source, it.favorite) },
         )
         assertTrue(heartAt(s, 0).isEnabled)
         assertEquals(string(R.string.remove_saved_pose), heartAt(s, 0).contentDescription)
@@ -1119,7 +1125,7 @@ class GenerationScreensTest {
     }
 
     @Test
-    fun pick_aFilledHeart_removesThePose() {
+    fun pick_aFilledHeart_makesThePoseHistoryAgain() {
         val modules = modules()
         val (s, _) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { picking(modules, it) }
         scenario = s
@@ -1131,7 +1137,8 @@ class GenerationScreensTest {
         heartAt(s, 0).performClick()
         idleUntil { heartAt(s, 0).contentDescription == string(R.string.save_pose) }
 
-        assertTrue(modules.saved.saved.value.isEmpty())
+        // Still in the library, no longer a favorite (#297).
+        assertEquals(listOf("saved-pose" to false), modules.saved.saved.value.map { it.id to it.favorite })
         assertEquals(string(R.string.save_pose), heartAt(s, 0).contentDescription)
         assertEquals(string(R.string.pose_removed_notice), ShadowToast.getTextOfLatestToast())
     }
@@ -1166,12 +1173,13 @@ class GenerationScreensTest {
         s.onFragment { FragmentPickPoseBinding.bind(it.requireView()).selectButton.performClick() }
         idle()
 
-        // Cut out once, for the heart; Reference confirm has the saved guide, so Camera knows it is saved.
-        assertEquals(listOf(GuideSource.GENERATED), modules.maker.sources)
+        // Cut out once, by the library, which the heart marked; Reference confirm has that guide, so Camera knows it
+        // is saved. It kept the set's situation, Auto's here (#270).
+        assertEquals(listOf(GuideSource.GENERATED, GuideSource.GENERATED, GuideSource.GENERATED), modules.maker.sources)
         assertEquals(R.id.referenceConfirmFragment, nav.currentDestination?.id)
         s.onFragment {
             assertEquals(
-                ReferenceUiState.Ready(generated),
+                ReferenceUiState.Ready(generated.copy(situation = Situation.DEFAULT)),
                 it.requireActivity().viewModel<ReferenceViewModel>().uiState.value,
             )
         }
@@ -1313,7 +1321,6 @@ class GenerationScreensTest {
 
         s.onFragment { FragmentPickPoseBinding.bind(it.requireView()).backButton.performClick() }
         idle()
-        confirmGoingBack()
 
         assertEquals(R.id.describePoseFragment, nav.currentDestination?.id)
         s.onFragment {
@@ -1335,7 +1342,7 @@ class GenerationScreensTest {
         idle()
 
         assertEquals(R.id.referenceConfirmFragment, nav.currentDestination?.id)
-        assertEquals(listOf(GuideSource.GENERATED), modules.maker.sources)
+        assertEquals(listOf(GuideSource.GENERATED, GuideSource.GENERATED, GuideSource.GENERATED), modules.maker.sources)
         val end = modules.session.sent.filterIsInstance<SessionMessage.PoseStep>().last()
         assertEquals(PoseSetStep.CHOSEN, end.step)
         assertEquals("pose-4" to Role.SUBJECT, end.poseId to end.by)
@@ -1368,7 +1375,7 @@ class GenerationScreensTest {
     }
 
     @Test
-    fun pick_backAndSystemBack_askFirst_thenReturnToGeneratePoses_withThePhotoAndTheDescription_withoutTheSet() {
+    fun pick_backAndSystemBack_returnAtOnceToGeneratePoses_withThePhotoAndTheDescription_withoutTheSet() {
         val back: List<(PickPoseFragment) -> Unit> = listOf(
             { FragmentPickPoseBinding.bind(it.requireView()).backButton.performClick() },
             { it.requireActivity().onBackPressedDispatcher.onBackPressed() },
@@ -1386,7 +1393,6 @@ class GenerationScreensTest {
 
             s.onFragment(press)
             idle()
-            confirmGoingBack()
 
             assertEquals(R.id.describePoseFragment, nav.currentDestination?.id)
             assertEquals(R.id.cameraFragment, nav.previousBackStackEntry?.destination?.id)
@@ -1395,7 +1401,7 @@ class GenerationScreensTest {
                 assertEquals(GenerationUiState.Phase.DESCRIBING, state.phase)
                 assertNotNull(state.scene)
                 assertEquals("hands on hips", state.description)
-                // The question said the poses are lost, and they are.
+                // The set is gone from the screens; its poses are in the library (#297).
                 assertTrue(state.poses.isEmpty() && state.candidates.isEmpty())
             }
             assertEquals(1, modules.generator.runs.size)
@@ -1405,26 +1411,20 @@ class GenerationScreensTest {
     }
 
     @Test
-    fun pick_back_asksFirst_thatThePosesAreLost_andCancelStays() {
+    fun pick_everyReadyCandidate_isKeptInTheLibraryAsHistory_withNoTap() {
         val modules = modules()
-        val (s, nav) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { picking(modules, it) }
+        val (s, _) = launchPrepared<PickPoseFragment>(R.id.pickPoseFragment) { picking(modules, it) }
         scenario = s
 
-        s.onFragment { it.requireActivity().onBackPressedDispatcher.onBackPressed() }
+        // The three ready candidates are cut out once each; the failed one is not.
+        assertEquals(3, modules.maker.pending.size)
+        repeat(3) { modules.maker.finish(Result.success(generated.copy(id = "kept-$it"))) }
         idle()
 
-        val dialog = goingBack()
-        assertEquals(string(R.string.go_back_title) to string(R.string.go_back_generated), dialog.texts())
-        dialog.getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
-        idle()
-
-        assertEquals(R.id.pickPoseFragment, nav.currentDestination?.id)
-        s.onFragment {
-            assertEquals(
-                GenerationUiState.Phase.PICKING,
-                it.requireActivity().viewModel<GenerationViewModel>().uiState.value.phase,
-            )
-        }
+        assertEquals(
+            listOf("kept-2", "kept-1", "kept-0").map { it to false },
+            modules.saved.saved.value.map { it.id to it.favorite },
+        )
     }
 
     @Test

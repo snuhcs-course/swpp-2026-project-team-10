@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.animation.ValueAnimator
@@ -27,6 +27,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.chip.Chip
+import com.google.android.material.snackbar.Snackbar
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
 import com.lastpenguin.pix.generation.DESCRIPTION_MAX_LENGTH
@@ -39,6 +40,7 @@ import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.partner
 import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.guide.ReferenceViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
@@ -68,6 +70,7 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose), ScenePho
     private val viewModel: GenerationViewModel by activityViewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
     private val settingsViewModel: SettingsViewModel by activityViewModels { PixViewModels.Factory }
+    private val referenceViewModel: ReferenceViewModel by activityViewModels { PixViewModels.Factory }
     private var form: DescriptionForm? = null
 
     /** The scene photo shrinking into its place, while it does (#296). */
@@ -132,6 +135,7 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose), ScenePho
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 // Its tutorial tips the first time it opens, on either phone (FR-10.4).
                 launch { showTutorialWhenDue(settingsViewModel.tutorialFor(TutorialScreen.GENERATE_POSES)) }
+                launch { viewModel.posesKept.collect { showPosesKept(view) } }
                 combine(viewModel.uiState, sessionViewModel.state, viewModel.usedBefore, ::Triple)
                     .collect { (generation, session, used) ->
                         // In a session the subject writes the description too, one field at a time (FR-6.15).
@@ -188,6 +192,29 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose), ScenePho
     private fun hideKeyboard() {
         val view = view ?: return
         WindowCompat.getInsetsController(requireActivity().window, view).hide(WindowInsetsCompat.Type.ime())
+    }
+
+    /**
+     * Back left a set whose poses are in the library (#297): a notice says so, with *View*, which opens the library at
+     * *All*, newest first, and ends the pose flow, so Back there is Camera.
+     */
+    private fun showPosesKept(view: View) {
+        val context = requireContext()
+        Snackbar.make(view, R.string.poses_kept_notice, Snackbar.LENGTH_LONG)
+            .setBackgroundTint(context.getColor(R.color.pix_surface_3))
+            .setTextColor(context.getColor(R.color.pix_text))
+            .setActionTextColor(context.getColor(R.color.pix_accent))
+            .setAction(R.string.poses_kept_view) { viewPoses() }
+            .show()
+    }
+
+    private fun viewPoses() {
+        val navController = findNavController()
+        if (navController.currentDestination?.id != R.id.describePoseFragment) return
+        referenceViewModel.openFor(fromSubject = false)
+        // Navigates first, so that this screen does not take the ended flow for a restart.
+        navController.navigate(R.id.action_describePose_to_library)
+        viewModel.cancel()
     }
 }
 

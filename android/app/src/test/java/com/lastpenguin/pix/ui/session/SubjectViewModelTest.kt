@@ -6,11 +6,11 @@ import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.generation.PoseTip
-import com.lastpenguin.pix.guide.GuideSaved
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.NormalizedRect
 import com.lastpenguin.pix.guide.ReferenceGuide
+import com.lastpenguin.pix.guide.SavedGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.FakeGuideRepository
@@ -921,8 +921,7 @@ class SubjectViewModelTest {
 
     // ---- Save guide (FR-6.16) and the photographer's set (FR-6.15), Iter3-P16 ---------------------------------------
     // Partitions: Save guide with a guide (saved with the reference copy, the anchor and source its image carried, and
-    // the mirror's state; then filled), already saved, a store another save fills while this one writes (the oldest
-    // removed, as the store's save answers), a store that fails, no guide; the set: none, GENERATING,
+    // the mirror's state; then filled), already saved (history again, still kept, #297), a store that fails, no guide; the set: none, GENERATING,
     // PICKING, ended; Pick a pose opened by itself once per set.
 
     private val box = NormalizedRect(0.3f, 0.2f, 0.7f, 0.9f)
@@ -978,13 +977,14 @@ class SubjectViewModelTest {
         runCurrent()
 
         assertEquals(listOf(GuideSaveNotice.SAVED, GuideSaveNotice.REMOVED), notices)
-        assertTrue(store.saved.value.isEmpty())
+        // History again (#297): still on this phone, no longer a favorite.
+        assertEquals(listOf(false), store.saved.value.map { it.favorite })
     }
 
     @Test
     fun saveGuide_aStoreThatFails_saysSo() = runTest {
         val failing = object : SavedGuideStore by SavedGuideStore.InMemory() {
-            override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<GuideSaved> =
+            override suspend fun save(guide: ReferenceGuide, state: GuideState, favorite: Boolean): Result<SavedGuide> =
                 Result.failure(IOException("Storage full"))
         }
         val model = saving(failing)
@@ -1000,35 +1000,6 @@ class SubjectViewModelTest {
         assertEquals(listOf(GuideSaveNotice.FAILED), notices)
         assertFalse(model.uiState.value.guideSaved)
         assertFalse(model.uiState.value.savingGuide)
-    }
-
-    @Test
-    fun saveGuide_aSaveElsewhereFillsTheStoreFirst_saysTheOldestWasRemoved() = runTest {
-        // 99 kept when Save guide is tapped; a ♥ on this phone's Pick a pose saves the 100th while this one writes.
-        val inner = SavedGuideStore.InMemory()
-        repeat(SavedGuideStore.MAX_SAVED - 1) { inner.save(fakeGuide("old$it"), GuideState()) }
-        val release = CompletableDeferred<Unit>()
-        val slow = object : SavedGuideStore by inner {
-            override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<GuideSaved> {
-                release.await()
-                return inner.save(guide, state)
-            }
-        }
-        val model = saving(slow)
-        val notices = mutableListOf<GuideSaveNotice>()
-        backgroundScope.launch { model.guideSaveNotices.collect { notices += it } }
-        connect()
-        guideOnVideo()
-        runCurrent()
-
-        model.onSaveGuide()
-        runCurrent()
-        inner.save(fakeGuide("pose"), GuideState())
-        release.complete(Unit)
-        runCurrent()
-
-        assertEquals(listOf(GuideSaveNotice.SAVED_OLDEST_REMOVED), notices)
-        assertEquals(SavedGuideStore.MAX_SAVED, inner.saved.value.size)
     }
 
     @Test

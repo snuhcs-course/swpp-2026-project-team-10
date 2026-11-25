@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.os.Build
 import android.util.Log
 import androidx.core.graphics.scale
+import com.lastpenguin.pix.generation.Situation
 import java.io.File
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
@@ -33,8 +34,11 @@ import kotlinx.serialization.json.Json
  * guide is written to a hidden folder and renamed into place, so a half-written one is never listed; a folder that
  * cannot be read back is deleted. The list is ordered by an increasing number kept in `meta.json`, not by the clock.
  * Listing a guide reads only its `meta.json`; its images are read when it is used or its thumbnail shown, so a full
- * library starts as fast as an empty one (FR-3.11). Nothing goes to MediaStore.
- * Owner: Guide controls (#58); the mask (#113); the library (#170).
+ * library starts as fast as an empty one (FR-3.11). The situation and the memo are in `meta.json` too (#270), which a
+ * memo's change writes anew beside the old and renames over it; a folder saved before has neither. So is whether the
+ * guide is a favorite (#297), which a folder saved before the history was is. Nothing goes to MediaStore, and nothing
+ * is deleted but what the user deletes.
+ * Owner: Guide controls (#58); the mask (#113); the library (#170); situations and memos (#270); history (#297).
  */
 class FileSavedGuideStore(
     private val directory: File,
@@ -59,26 +63,22 @@ class FileSavedGuideStore(
         scope.launch { locked { } }
     }
 
-    override suspend fun save(guide: ReferenceGuide, state: GuideState): Result<GuideSaved> = locked { entries ->
-        entries.firstOrNull {
-            it.saved.id == guide.id
-        }?.let { return@locked Result.success(GuideSaved(it.saved, false)) }
-        try {
-            val entry = write(guide, state, order = (entries.maxOfOrNull { it.meta.order } ?: 0L) + 1)
-            val kept = listOf(entry) + entries
-            val removed = kept.drop(SavedGuideStore.MAX_SAVED)
-            removed.forEach { remove(it.saved.id) }
-            publish(kept.take(SavedGuideStore.MAX_SAVED))
-            // Decided under the lock, so two saves that overlap each say whether theirs deleted the oldest.
-            Result.success(GuideSaved(entry.saved, removedOldest = removed.isNotEmpty()))
-        } catch (error: CancellationException) {
-            throw error
-        } catch (error: Exception) {
-            // Any failure, not only a full disk: a bitmap that cannot be encoded must not end the app.
-            Log.w(TAG, "Could not save guide ${guide.id}", error)
-            Result.failure(error)
+    override suspend fun save(guide: ReferenceGuide, state: GuideState, favorite: Boolean): Result<SavedGuide> =
+        locked { entries ->
+            entries.firstOrNull { it.saved.id == guide.id }?.let { return@locked Result.success(it.saved) }
+            try {
+                val order = (entries.maxOfOrNull { it.meta.order } ?: 0L) + 1
+                val entry = write(guide, state, order, favorite)
+                publish(listOf(entry) + entries)
+                Result.success(entry.saved)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                // Any failure, not only a full disk: a bitmap that cannot be encoded must not end the app.
+                Log.w(TAG, "Could not save guide ${guide.id}", error)
+                Result.failure(error)
+            }
         }
-    }
 
     override suspend fun load(id: String): Result<Pair<ReferenceGuide, GuideState>> {
         val read = locked { entries ->
@@ -98,6 +98,7 @@ class FileSavedGuideStore(
             source = meta.source,
             anchor = meta.anchor?.let { NormalizedRect(it.left, it.top, it.right, it.bottom) },
             reference = reference,
+            situation = Situation.named(meta.situation),
         )
         return Result.success(guide to meta.state)
     }
@@ -113,11 +114,47 @@ class FileSavedGuideStore(
         return withContext(compute) { (reference ?: mask?.let { outline(it) })?.let { thumbnail(it) } }
     }
 
-    override suspend fun delete(id: String) {
+    override suspend fun delete(ids: Collection<String>) {
         locked { entries ->
-            if (entries.none { it.saved.id == id }) return@locked
-            remove(id)
-            publish(entries.filterNot { it.saved.id == id })
+            val gone = ids.toSet()
+            if (entries.none { it.saved.id in gone }) return@locked
+            entries.filter { it.saved.id in gone }.forEach { remove(it.saved.id) }
+            publish(entries.filterNot { it.saved.id in gone })
+        }
+    }
+
+    override suspend fun setMemo(id: String, memo: String): Result<Unit> =
+        rewrite(id) { it.copy(memo = SavedGuideStore.memoOf(memo)) }
+
+    override suspend fun setFavorite(id: String, favorite: Boolean): Result<Unit> =
+        rewrite(id) { it.copy(favorite = favorite) }
+
+    /**
+     * The guide [id]'s `meta.json` changed by [change], written beside the old one and renamed over it, so a failed
+     * write keeps it as it was.
+     */
+    private suspend fun rewrite(id: String, change: (Meta) -> Meta): Result<Unit> = locked { entries ->
+        val entry = entries.firstOrNull { it.saved.id == id }
+            ?: return@locked Result.failure(NoSuchElementException("No saved guide $id"))
+        val meta = change(entry.meta)
+        try {
+            val file = File(File(directory, id), META)
+            val unfinished = File(file.parentFile, ".$META")
+            try {
+                unfinished.writeText(json.encodeToString(Meta.serializer(), meta))
+                if (!unfinished.renameTo(file)) throw IOException("Could not move $unfinished to $file")
+            } catch (error: Exception) {
+                unfinished.delete()
+                throw error
+            }
+            val changed = Entry(meta.listed(id), meta)
+            publish(entries.map { if (it.saved.id == id) changed else it })
+            Result.success(Unit)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Log.w(TAG, "Could not write the meta.json of saved guide $id", error)
+            Result.failure(error)
         }
     }
 
@@ -131,7 +168,7 @@ class FileSavedGuideStore(
         _saved.value = next.map { it.saved }
     }
 
-    private fun write(guide: ReferenceGuide, state: GuideState, order: Long): Entry {
+    private fun write(guide: ReferenceGuide, state: GuideState, order: Long, favorite: Boolean): Entry {
         if (!ID.matches(guide.id)) throw IOException("Guide id ${guide.id} cannot name a folder")
         val folder = File(directory, guide.id)
         val unfinished = File(directory, ".${guide.id}")
@@ -144,6 +181,8 @@ class FileSavedGuideStore(
             source = guide.source,
             anchor = guide.anchor?.let { Box(it.left, it.top, it.right, it.bottom) },
             state = state,
+            situation = guide.situation?.apiName,
+            favorite = favorite,
         )
         try {
             writeMask(File(unfinished, MASK), guide.mask.maskPixels())
@@ -155,13 +194,12 @@ class FileSavedGuideStore(
             unfinished.deleteRecursively()
             throw error
         }
-        return Entry(SavedGuide(guide.id, meta.savedAt, guide.source), meta)
+        return Entry(meta.listed(guide.id), meta)
     }
 
     /**
-     * Every finished folder, newest first, and at most [SavedGuideStore.MAX_SAVED] of them. A folder left by a save
-     * that did not finish, one that cannot be read back, and the oldest beyond the limit are deleted, so the folder
-     * and the list stay the same after a delete that stopped halfway.
+     * Every finished folder, newest first. A folder left by a save that did not finish, and one that cannot be read
+     * back, are deleted, so the folder and the list stay the same after a delete that stopped halfway.
      */
     private fun readAll(): List<Entry> {
         val folders = directory.listFiles() ?: return emptyList()
@@ -174,8 +212,7 @@ class FileSavedGuideStore(
                 }
             }
             .sortedWith(compareByDescending<Entry> { it.meta.order }.thenByDescending { it.meta.savedAt })
-        read.drop(SavedGuideStore.MAX_SAVED).forEach { remove(it.saved.id) }
-        return read.take(SavedGuideStore.MAX_SAVED)
+        return read
     }
 
     /**
@@ -198,7 +235,7 @@ class FileSavedGuideStore(
             return null
         }
         if (!File(folder, MASK).isFile) return null
-        return Entry(SavedGuide(folder.name, meta.savedAt, meta.source), meta)
+        return Entry(meta.listed(folder.name), meta)
     }
 
     /**
@@ -275,7 +312,16 @@ class FileSavedGuideStore(
         val source: GuideSource,
         val anchor: Box? = null,
         val state: GuideState,
+        /** The situation's name on the server (`Situation.apiName`), so a name this phone does not know reads as none. */
+        val situation: String? = null,
+        val memo: String = "",
+        /** ♥ or *Save guide* marked it (#297); every guide saved before the history was saved that way. */
+        val favorite: Boolean = true,
     ) {
+        /** The guide [id] as the library lists it. */
+        fun listed(id: String): SavedGuide =
+            SavedGuide(id, savedAt, source, Situation.named(situation), SavedGuideStore.memoOf(memo), favorite)
+
         /** What `GuideGeometry` needs to place the guide: a positive aspect and a real box. */
         fun isUsable(): Boolean = aspect.isFinite() && aspect > 0f && (anchor == null || anchor.isUsable())
     }

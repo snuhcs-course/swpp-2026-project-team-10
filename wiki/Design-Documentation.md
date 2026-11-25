@@ -125,7 +125,7 @@
 | 4.8 | 2026-11-24 | Camera's hint chip shows only "Guide hidden"; the line about the pinch went (2.6.8; Iter5-A9, [#306]). |
 | 4.9 | 2026-11-25 | Back on *Reference confirm* and *No person found* returns to where the reference was chosen: *Add a pose guide* is opened again, since a sheet cannot stay under a screen (2.6.2; Iter5-A3, [#294]). |
 | 4.10 | 2026-11-25 | Who is zooming, on both phones, and what the photographer did, on the subject's: `camera.did`, `SessionViewModel.subjectZooming`, `SubjectViewModel.photographerLines` (Iter5-A1, [#292]). A single change of the zoom glides: `CameraController.glideZoom`, `ZoomGlide` (Iter5-A10, [#310]) (2.2, 2.5.1, 2.6.5, 2.8). |
-| 4.11 | 2026-11-25 | Reconnection tries for 30 s, not 10 s; Camera says who it reconnects with for the whole wait (`SessionViewModel.reconnectingWith`); a photo is given up after 45 s (Iter5-A2, [#293]; 1.1.3, 1.1.4, 2.4, 2.5.1, 2.6.5, 2.6.7, 2.8). |
+| 4.11 | 2026-11-25 | Reconnection tries for 30 s, not 10 s; Camera says who it reconnects with for the whole wait (`SessionViewModel.reconnectingWith`), read from `Reconnecting`'s new `peer` and `role`; a photo's 30 s without word no longer count a drop (Iter5-A2, [#293]; 1.1.3, 1.1.4, 2.3, 2.4, 2.6.7, 2.8). |
 
 </details>
 
@@ -1411,7 +1411,7 @@ sealed interface SessionState {   // 2.4
     data class Inviting(val invitationId: String) : SessionState     // photographer: invitation sent, its place taken
     data class Connecting(val sessionId: String?) : SessionState
     data class Connected(val sessionId: String, val peer: PeerInfo, val role: Role, val partner: SessionPartner? = null) : SessionState
-    data class Reconnecting(val sessionId: String, val since: Long, val partner: SessionPartner? = null) : SessionState
+    data class Reconnecting(val sessionId: String, val since: Long, val partner: SessionPartner? = null, val peer: PeerInfo? = null, val role: Role? = null) : SessionState   // peer and role as Connected said them
     data class Ended(val reason: EndReason) : SessionState
 }
 val SessionState.partner: SessionPartner?   // the friend while Connected or Reconnecting; null over a room code
@@ -2035,7 +2035,7 @@ Sent at each shutter press while connected, not while reconnecting, so the subje
 { "v": 3, "t": "photo.dropped", "seq": 1, "ts": 1759212500410, "b": { "shot": "8d41c2e0-5b7a-4f3e-9c26-1a0f7e5d3b84" } }
 ```
 
-Sent in a live session for a shuttered photo given up before its `photo.begin`: its save failed, or it could not be read or is over 40 MiB ([#271]). The subject stops waiting for that `shot` only, so a drop whose `photo.shutter` was lost ends no other photo's wait (2.6.5). A phone that does not know the type ignores it and waits until its 45 s end, so `protocol` stays 3.
+Sent in a live session for a shuttered photo given up before its `photo.begin`: its save failed, or it could not be read or is over 40 MiB ([#271]). The subject stops waiting for that `shot` only, so a drop whose `photo.shutter` was lost ends no other photo's wait (2.6.5). A phone that does not know the type ignores it and waits until its 30 s end, so `protocol` stays 3.
 
 </details>
 
@@ -2094,7 +2094,7 @@ Sent every 16 chunks.
 { "v": 3, "t": "photo.saved", "seq": 4, "ts": 1759212502300, "b": { "photoId": "3c7e1a52-9f0b-4d68-a1c4-6e2d8b7f0a19", "ok": false, "reason": "STORAGE" } }
 ```
 
-With `ok: false`, `reason` is `TOO_LARGE`, `BROKEN` (a skipped index, a wrong size or CRC, or not a JPEG), or `STORAGE`. A refusal can come before the last chunk, and stops that photo. The photographer sends its next photo after this answer, or after 45 s without progress (2.6.5).
+With `ok: false`, `reason` is `TOO_LARGE`, `BROKEN` (a skipped index, a wrong size or CRC, or not a JPEG), or `STORAGE`. A refusal can come before the last chunk, and stops that photo. The photographer sends its next photo after this answer, or after 30 s without progress (2.6.5).
 
 </details>
 
@@ -2906,7 +2906,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - `PhotoSyncer` sends the saved JPEG itself, with its EXIF rotation, over the encrypted data channel, not through the Pix server (FR-1.5, NFR-13). It sends one photo at a time in shutter order, read from the gallery at its turn.
   - `SessionManager.sendBulk` sends a chunk only while no reliable message waits and under 64 KiB are buffered (2.8, NFR-7). `photo.ack` allows 32 unacknowledged chunks, within the phones' 64- and 256-message buffers.
   - The subject writes chunks to a cache file. At `photo.end`, `PhotoAlbum` saves it to Pictures/Pix through a pending MediaStore row dated `takenAt`. `photo.saved` answers, `ok: true` again for a repeat.
-  - The subject sees "Photo saved to your Pix album" or "Couldn't save Dongje's photo". The photographer sees "Couldn't send a photo to Joonhyung" for an unreadable or refused photo, one over 40 MiB, or one stalled for 45 s.
+  - The subject sees "Photo saved to your Pix album" or "Couldn't save Dongje's photo". The photographer sees "Couldn't send a photo to Joonhyung" for an unreadable or refused photo, one over 40 MiB, or one stalled for 30 s.
   - `PhotoSyncer.sessionPhotos` lists the session's photos on this phone, oldest first: those taken on the photographer's phone, those saved on the subject's. It is null outside a session, empty until the first, and kept through a reconnect, which keeps the session's id ([#235]).
   - In a session, both phones' thumbnails show only the newest of these, so neither shows a photo from before. Both thumbnails are empty until the session's first photo. *Subject view*'s bottom row is Camera's, in thirds: *Guide* in the middle of the left third, where Camera's is, and the thumbnail in the middle of the right third (`showPhotoThumbnails`), on *Guide*'s icon line.
   - In the middle, where Camera's shutter is, *Subject view* says "Dongje's camera" and "Live" once connected, centered on the line of *Guide*'s icon and the thumbnail; a step's button takes the place while it shows ([#271]). A long name, such as a Galaxy's own name "길동의 Galaxy S23 Ultra", makes the text smaller, down to 12 sp; a name still too long is cut short, so "'s camera" stays (`cameraTitle`). Each photo is waited for by its `shot`: from its `photo.shutter`, or its `photo.begin` when the shutter was lost or came during a drop, until it is saved or refused. Meanwhile `PhotoSyncer.receiving` is true, and "Live" becomes "Receiving photo…" with a spinner. A photo the photographer gave up, before its begin (`photo.dropped`) or for the next photo, is not waited for, and each ends only its own wait. A `photo.shutter` that comes after its photo's `photo.dropped` or save, as the realtime channel allows, starts none (`Waits.ended`). A phone before #271 names no `shot`, so its photos are counted instead. 30 s without a photo message, as from a phone that does not send `photo.dropped`, or the session's end, ends the wait (`STALL_MS`).
@@ -2991,6 +2991,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - The subject's video keeps its last frame, dimmed, with "Reconnecting…" (2.6.4). Its controls and shared-step buttons wait (2.6.5).
   - The photographer's live light goes out, *End session* stays, and frames keep flowing. `peer.left` with `CONNECTION_LOST` is ignored then.
   - Camera says "Reconnecting with &lt;name&gt;…" above the shutter for the whole wait (`SessionViewModel.reconnectingWith`, [#293]). The line has no time of its own, like "… is zooming" (2.6.5), and shows before it. Another notice takes its place for its own time.
+  - `Reconnecting` carries `Connected`'s `peer` and `role`, and the line is read from them alone. A state flow shows a reader only its latest value, so a reader can miss the `Connected` before a drop.
   - The reliable channel closes only when the other phone closed its connection. Its closing ends the session: the photographer returns to `Waiting`, the subject to *Connection lost*.
   - If only the realtime channel closes, its messages use the reliable one (`realtimeLost`).
 - **Restart.**
@@ -3005,7 +3006,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - A failure before the server answers keeps the token; a refusal drops it.
   - If the photographer is off the server then, the subject resends `session.join` on `peer.rejoined`, so the photographer still gets `peer.joined`.
   - A refused rejoin (`NOT_FOUND`, `FORBIDDEN`) ends a reconnecting session with "The session has ended". A running session goes on phone to phone.
-- **Photos (FR-6.14).** A photo in flight waits through a drop: the subject keeps its partial file, and `sendBulk` resumes once connected. `PhotoSyncer` runs for the whole session, and gives a photo up only after 45 s without word (`STALL_MS`), longer than the budget. When the budget ends, the photographer says "Couldn't send" (2.6.5).
+- **Photos (FR-6.14).** A photo in flight waits through a drop: the subject keeps its partial file, and `sendBulk` resumes once connected. `PhotoSyncer` runs for the whole session. Its 30 s without word (`STALL_MS`) count only while the link is up, and start over once it is back, on both phones ([#293]): the session alone decides how long a drop may last. When the budget ends, the photographer says "Couldn't send" (2.6.5).
 - **Server deploys and restarts.** To a phone these look like a dropped socket. Sessions and room codes continue, since they live in the session store (AD-18, 2.7; 2.8, Deployment). The photographer restarts ICE once (`peer.rejoined`).
 - **Cellular notice (FR-6.13).** The first time a session's selected pair uses a cellular interface (`SessionManager.path`), the app says "The live view uses mobile data." Camera shows it as a notice, Subject view as a toast. It waits in `SessionViewModel.mobileDataPending` until shown, and only then is recorded in DataStore (`MobileDataNotice`). A session that ends first drops it.
 - **Measurement.** `Timings` marks `ice.connected`, `ice.disconnected`, `ice.restarted`, and the pair type (`host`, `srflx`, `relay`) for NFR-5 and NFR-10. It marks `session.reconnecting`, `signaling.rejoined`, and `session.reconnected <ms>` for NFR-11. `ice.pair` logs each pair, such as `local=relay/tcp remote=srflx network=cellular` (`LinkStatsParser`).
@@ -3245,7 +3246,7 @@ erDiagram
 | Signaling socket dropped in a session or while a room waits | Again after 1 s; every 1 s while reconnecting, otherwise doubling to 30 s |
 | Photographer's app in the background | 60 s, then it leaves the session |
 | Remote requests | 500 ms until an unanswered final request is answered; 5 s in which a late one is still the subject's (2.6.5) |
-| Session photo | Given up after 45 s without word from the subject, longer than a reconnection (2.6.5, 2.6.7) |
+| Session photo | Given up after 30 s without word from the subject, not counting a drop (2.6.5, 2.6.7) |
 | Room code | 10 min |
 | Invitation | 60 s (`PIX_INVITATION_TTL_SECONDS`); after an accept, at least 15 s for the friend's phone to take its place (`PIX_INVITATION_JOIN_SECONDS`); the photographer's phone gives up after 80 s without the server's word |
 | TURN credentials | 4 h (`PIX_TURN_TTL_SECONDS`, 14400) |

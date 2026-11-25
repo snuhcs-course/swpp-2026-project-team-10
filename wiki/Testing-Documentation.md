@@ -229,7 +229,7 @@ One member writes and maintains each component's tests, following the module own
 | *No person found*: Back returns to *Add a pose guide* (Iter5-A3, [#294]) | Views | `ui/guide/` (`NoPersonFoundFragmentTest`, `ReferenceConfirmFragmentTest`, `AddGuideSheetTest`), `ui/` (`ScreenTransitionsTest` on the real navigation, `KoreanScreensTest`); IT-35 and US-2 on phones, where alone the system's photo picker shows | 박동제 |
 | Who is zooming, and the photographer's actions on *Subject view* (Iter5-A1, [#292]) | Models, ViewModels, Views | `session/` (`RemoteControlHandlerTest`, `protocol/RemoteControlMessagesTest`, `protocol/ChannelRouterTest`), `ui/session/` (`SessionViewModelTest`, `SubjectViewModelTest`, `SubjectFragmentRenderTest`), `ui/camera/` (`CameraControlsViewModelTest`, `CameraFragmentInteractionTest`), `ui/guide/` (`ReferenceViewModelTest`, `SavedGuidesViewModelTest`, `ReferenceConfirmFragmentTest`); IT-6 on two phones | 박동제 |
 | A tap on the zoom readout glides (Iter5-A10, [#310]) | Models, ViewModels | `camera/ZoomGlideTest`, `ui/camera/CameraViewModelTest`, `session/RemoteControlHandlerTest`. `CameraXController`'s part needs a camera: IT-10 on the S22 and the S21, by eye and with `zoom_timings.py` | 박동제 |
-| Reconnecting lasts 30 s, and Camera says who it reconnects with (Iter5-A2, [#293]) | Models, ViewModels, Views | `session/` (`RtcSessionManagerTest`, `PhotoSyncerTest`), `ui/session/SessionViewModelTest`, `ui/camera/CameraFragmentInteractionTest`, `ui/KoreanScreensTest`; IT-4 and IT-16 on two phones | 박동제 |
+| Reconnecting lasts 30 s, Camera says who it reconnects with, and a photo's wait does not count the drop (Iter5-A2, [#293]) | Models, ViewModels, Views | `session/` (`RtcSessionManagerTest`, `PhotoSyncerTest`), `ui/session/SessionViewModelTest`, `ui/camera/CameraFragmentInteractionTest`, `ui/KoreanScreensTest`; IT-4 and IT-16 on two phones | 박동제 |
 | The live view after a reconnection, the UI fixes, and the self-timer (Iter5-P5, P7, P8) | Platform, ViewModels, Views | `session/`, `settings/`, `ui/camera/`, `ui/settings/`; the UI fixes also in `guide/`, `ui/session/`, `ui/`: `DataStoreAppSettingsTest`, `SettingsFragmentTest`, `CameraCompositionViewTest`, `CameraFragmentRenderTest`, `CameraLayoutTest`, `SubjectFragmentRenderTest`, `SubjectSessionPhotoTest`, `SessionViewModelTest`, `PhotoSyncerTest`, `MessageCodecTest`, `ChannelRouterTest`, `SessionIdentityTest`, `RtcSessionManagerTest`, `GuideOverlayViewTest`, `GuideLookTest`, `MaskMathTest`, `KoreanScreensTest` | 박재완 |
 | The library's situations and memos, the cutout, and pose generation started by the subject (Iter5-P6, P11, P12) | Managers, ViewModels, Views, the session protocol | `guide/`, `ui/guide/`, `session/`, `ui/session/`, `generation/` | 한준형 |
 | AI module tests: the outline and the person check (Iter5-P16, P17) | The phone's segmentation and person check; the server's person check | 3.1, 3.2 | 박재완 (the outline), 한준형 (the person check) |
@@ -1248,7 +1248,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 
 1. Turn on airplane mode on the subject's phone for 5 s.
 2. Do the same on the photographer's phone.
-3. *Added in Iter5-A2 ([#293]):* turn on airplane mode on the subject's phone for 20 s, and watch the photographer's phone meanwhile.
+3. *Added in Iter5-A2 ([#293]):* turn on airplane mode on the subject's phone for 20 s. Meanwhile, watch the photographer's phone and take a photo on it.
 4. *Added in Iter5-A2:* turn it on again for 40 s. Then turn it off, and tap *Reconnect*.
 
 **Expected result**
@@ -1256,6 +1256,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 - The session recovers within 10 s without a new invitation. *Changed in Iter5-A2 ([#293]): within 30 s. The phones tried for 10 s, which T2 of UAT cycle 2 found too short (4.4).*
 - *Added for Iter3-P14:* `session.reconnected` under 10 000 ms on both phones (2.1.4), and the video and the guide back without a new connection. *Changed in Iter5-A2: under 30 000 ms.*
 - *Added in Iter5-A2:* after the 20 s, the same session is back without a new code. During the wait the subject's phone shows "Reconnecting…", and the photographer's Camera shows "Reconnecting with &lt;name&gt;…" above the shutter, with the live light off.
+- *Added in Iter5-A2:* the photo taken during the 20 s reaches the subject's album once the link is back, with no "Couldn't send".
 - *Added in Iter5-A2:* in the 40 s, about 30 s after the drop, the subject's phone shows *Connection lost* and the photographer's "&lt;name&gt; disconnected" in place of the reconnecting line. *Reconnect* brings the session back with the same code.
 
 ### IT-5 procedure

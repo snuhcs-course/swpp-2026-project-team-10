@@ -129,7 +129,7 @@
 | 4.12 | 2026-11-25 | The library's history, favorites, and selection (Iter5-A6, [#297]): `PoseLibrary` keeps each candidate, and a used photo guide is kept, as history; ♥ and *Save guide* mark favorites (`setFavorite`, `favorite` in `meta.json`); no limit of 100; the tabs *All* and *Favorites*, opening on *All*, with no tab per kind and no *Add photo*, a ♥ on each cell (`onToggleFavorite`), *Save guide* drawn as a ♥, selection, and ⋮; Back on *Generating poses* and *Pick a pose* without asking, with `posesKept` and *View* (AD-16, 2.1, 2.3, 2.4, 2.6.2, 2.6.3, 2.8). |
 | 4.13 | 2026-11-25 | Reconnection tries for 30 s, not 10 s; Camera says who it reconnects with for the whole wait (`SessionViewModel.reconnectingWith`), read from `Reconnecting`'s new `peer` and `role`; a photo's 30 s without word no longer count a drop, which `Connected`'s new `drops` tells of (Iter5-A2, [#293]; 1.1.3, 1.1.4, 2.3, 2.4, 2.6.7, 2.8). |
 | 4.14 | 2026-11-25 | Impeccable's findings: notices as Snackbars through `ui/Notices.kt`, *Undo* after *Remove guide* with the tip kept aside in `PoseTips`, *Leave* and *End session* asked first, and the camera screens at large fonts (2.6.2, 2.6.3, 2.6.7, 2.8; Iter5-A7, [#298]). |
-| 4.15 | 2026-11-25 | The subject's shutter (Iter5-A11, [#314]): `camera.shutter` and `camera.shutter.answer`, taken by the Camera screen alone (`RemoteControlHandler.shutter`, `takeForSubject`), `SubjectViewModel.onShutter` with its wait, and *Subject view*'s row as Camera's, with the camera's name above the shutter and a step's button beside the thumbnail (1.1.4, 2.5.1, 2.6.5, 2.6.8). |
+| 4.15 | 2026-11-25 | The subject's shutter (Iter5-A11, [#314]): `camera.shutter`, a numbered press on the realtime channel, and `camera.shutter.answer`, taken by the Camera screen alone and only in front (`RemoteControlHandler.shutter`, `takeForSubject`), `SubjectViewModel.onShutter` with its wait, and *Subject view*'s row as Camera's, with the camera's name above the shutter and a step's button beside the thumbnail (1.1.4, 2.5.1, 2.6.5, 2.6.8). |
 | 4.16 | 2026-11-25 | The subject starts AI poses (Iter5-P12, [#276]): `pose.start` and `pose.start.answer`, begun by the Camera screen as its own tile begins it (`RemoteControlHandler.poseStarter`, `startPosesForSubject`), consent on each phone, and what each phone says; no longer among the open points (*Still open*, 2.5.1, 2.6.3, 2.6.5, 2.9). |
 
 </details>
@@ -1649,8 +1649,8 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `camera.focus.set` | S→P | reliable | `x`, `y` | The subject's tap to focus, in the photographer's frame (FR-7.7, [#273]); answered with `camera.state` |
 | `camera.focus` | P→S | reliable | `x`, `y` | Where the photographer's own tap focused, in the photographer's frame (FR-7.7, [#273]); not kept |
 | `camera.did` | P→S | reliable | `action`, `zoom`, `exposure`, `flash` | What the photographer did on their own camera, for the subject's line (FR-7.4, [#292]); not kept |
-| `camera.shutter` | S→P | reliable | — | The subject's press of *Subject view*'s shutter (FR-7.8, [#314]); answered with `camera.shutter.answer` |
-| `camera.shutter.answer` | P→S | reliable | `taken` | Whether that press took a photo; the photo itself goes as any other (`photo.shutter`, `photo.begin`) |
+| `camera.shutter` | S→P | realtime | `press` | The subject's press of *Subject view*'s shutter, numbered (FR-7.8, [#314]); answered with `camera.shutter.answer` |
+| `camera.shutter.answer` | P→S | reliable | `taken`, `press` | Whether the press of that number took a photo; the photo itself goes as any other (`photo.shutter`, `photo.begin`) |
 | `pose.start` | S→P | reliable | `situation` | The situation the subject picked on its *Add a pose guide* (FR-6.15, [#276]); answered with `pose.start.answer` |
 | `pose.start.answer` | P→S | reliable | `started` | Whether the photographer's Camera began the scene photo for it; the steps after it go as `pose.*` |
 | `control.permission` | P→S | reliable | `allowed` | Whether remote control is allowed (FR-7.5, dropped at the kickoff of 11/21; never sent) |
@@ -1919,14 +1919,14 @@ What the photographer did on their own camera (FR-7.4, [#292]), once, when the a
 </details>
 
 <details>
-<summary><code>camera.shutter</code>, <code>camera.shutter.answer</code> · reliable · S→P, P→S</summary>
+<summary><code>camera.shutter</code> · realtime · S→P, and <code>camera.shutter.answer</code> · reliable · P→S</summary>
 
 ```json
-{ "v": 3, "t": "camera.shutter", "seq": 9, "ts": 1759212355000, "b": {} }
-{ "v": 3, "t": "camera.shutter.answer", "seq": 4, "ts": 1759212355100, "b": { "taken": true } }
+{ "v": 3, "t": "camera.shutter", "seq": 9, "ts": 1759212355000, "b": { "press": 7 } }
+{ "v": 3, "t": "camera.shutter.answer", "seq": 4, "ts": 1759212355100, "b": { "taken": true, "press": 7 } }
 ```
 
-The subject's press of *Subject view*'s shutter, and what became of it (FR-7.8, [#314]). The photographer's phone takes the photo at once, as at its own shutter, and answers every press. `taken` is false when it took none: its Camera screen is not in front, it frames a pose's scene photo, or its camera still takes the photo before. Nothing is kept for later. A press is reliable, although it is a moment: one lost would look like a button that does nothing. A phone that does not know the types ignores them, so `protocol` stays 3; the subject's shutter then frees itself after 2 s.
+The subject's press of *Subject view*'s shutter, and what became of it (FR-7.8, [#314]). The photographer's phone takes the photo at once, as at its own shutter, and answers every press. `taken` is false when it took none: its Camera screen is not in front, it frames a pose's scene photo, or its camera still takes the photo before. Nothing is kept for later. A press is a moment that is wrong late, so it goes on the realtime channel, at once or not at all: on the reliable one it could wait behind a full buffer or a drop and take a photo after the subject was told that none was taken. A lost press frees the subject's shutter after 2 s, and the subject presses again. `press` numbers the subject's presses, and the answer names its press: an answer that comes after its press was given up is not the next press's. With the realtime channel lost, the press goes on the reliable one like every realtime message (2.6.7). A phone that does not know the types ignores them, so `protocol` stays 3.
 
 </details>
 
@@ -2999,8 +2999,9 @@ Subject view's controls are requests. The photographer's phone applies them in a
 - **Photos.** A photo is taken on the photographer's phone, at either phone's shutter (FR-7.8, [#314]).
   - *Subject view*'s shutter sends `camera.shutter` (`SubjectViewModel.onShutter`). `RemoteControlHandler` asks the Camera screen to take the photo and answers with `camera.shutter.answer`.
   - Only the Camera screen takes it, through its own shutter's code (`CameraFragment.takeForSubject`, `CameraViewModel.onShutter`): the camera is bound there alone, and the photo then has its turn, its order, and its place among the session's photos like any other. The screen gives itself to the handler while it is started (`SessionViewModel.setRemoteShutter`). Without it, the answer is not taken.
+  - Started is not in front: under a sheet, such as *Add a pose guide*, and under its own photos the screen stays started with its camera running. A press is refused then (`cameraInFront`), as a start of AI poses is.
   - A press is refused while a pose's scene photo is framed or held, which is the photographer's own step, and while the camera is not ready or still takes the photo before. Nothing is queued: a press is one moment.
-  - The subject's shutter is held from a press to its answer, or for 2 s without one (`SHUTTER_WAIT_MS`). It is dimmed while the photographer's video does not show (`videoShowing`): before the first frame, while the link reconnects, and during the photographer's pose steps. A press that took no photo says "Can't take a photo right now" where the labels show.
+  - The subject's shutter is held from a press to the answer that names it, or for 2 s without one (`SHUTTER_WAIT_MS`). It is dimmed while the photographer's video does not show (`videoShowing`): before the first frame, while the link reconnects, and during the photographer's pose steps. A press that took no photo says "Can't take a photo right now" where the labels show.
   - The photographer's preview blinks, with "Joonhyung took a photo" (`RemoteAction.Shutter`). The subject's phone needs no line of its own: `photo.shutter` already blinks its video and says "Receiving photo…".
   - A countdown is left to the self-timer ([#272]).
 - **AI poses from the subject's phone (FR-6.15, [#276]).** The subject's *Add a pose guide* offers the situations. A tile sends `pose.start` (`SessionViewModel.askForPoses`) and starts nothing on the subject's phone, whose camera has no part in it.

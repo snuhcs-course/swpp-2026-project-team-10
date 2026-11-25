@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraStatus
@@ -762,6 +762,56 @@ class RemoteControlHandlerTest {
             echoes(),
         )
         focusHandler.stop()
+    }
+
+    @Test
+    fun `the subject's quick step glides the camera, and a pinch's steps are applied as they come`() = runTest {
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        // One final value, as a tap on Subject view's readout sends.
+        handler.handle(SessionMessage.ZoomSet(2f, final = true))
+        runCurrent()
+        assertEquals(listOf(2f), camera.glideRequests)
+
+        handler.handle(SessionMessage.ZoomSet(2.4f, final = false))
+        handler.handle(SessionMessage.ZoomSet(2.8f, final = false))
+        runCurrent()
+        assertEquals(listOf(2f), camera.glideRequests)
+        assertEquals(listOf(false, false), camera.requestFinals.takeLast(2))
+
+        // The pinch's last value settles the same way; the camera shows it at once where the picture already is.
+        handler.handle(SessionMessage.ZoomSet(3f, final = true))
+        runCurrent()
+        assertEquals(listOf(2f, 3f), camera.glideRequests)
+
+        handler.stop()
+    }
+
+    @Test
+    fun `what the photographer did is told to the subject only while the session runs`() = runTest {
+        handler.didHere(PhotographerAction.Zoom(2f))
+        assertTrue(session.sent.isEmpty())
+
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+        handler.didHere(PhotographerAction.Zoom(2f))
+        handler.didHere(PhotographerAction.Flash(FlashMode.ON))
+        assertEquals(
+            listOf<SessionMessage>(
+                SessionMessage.PhotographerDid("zoom", zoom = 2f),
+                SessionMessage.PhotographerDid("flash", flash = FlashMode.ON),
+            ),
+            session.sent.toList(),
+        )
+
+        handler.stop()
+        session.sent.clear()
+        handler.didHere(PhotographerAction.GuideMove)
+        assertTrue(session.sent.isEmpty())
     }
 
     @Test

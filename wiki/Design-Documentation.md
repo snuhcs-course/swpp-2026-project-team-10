@@ -124,6 +124,7 @@
 | 4.7 | 2026-11-24 | A new guide starts with guide-edit mode off on Camera, as on Subject view (2.6.2; Iter5-A8, [#304]). |
 | 4.8 | 2026-11-24 | Camera's hint chip shows only "Guide hidden"; the line about the pinch went (2.6.8; Iter5-A9, [#306]). |
 | 4.9 | 2026-11-25 | Back on *Reference confirm* and *No person found* returns to where the reference was chosen: *Add a pose guide* is opened again, since a sheet cannot stay under a screen (2.6.2; Iter5-A3, [#294]). |
+| 4.10 | 2026-11-25 | Who is zooming, on both phones, and what the photographer did, on the subject's: `camera.did`, `SessionViewModel.subjectZooming`, `SubjectViewModel.photographerLines` (Iter5-A1, [#292]). A single change of the zoom glides: `CameraController.glideZoom`, `ZoomGlide` (Iter5-A10, [#310]) (2.2, 2.5.1, 2.6.5, 2.8). |
 
 </details>
 
@@ -476,6 +477,7 @@ interface CameraController {
     fun setFacing(facing: CameraFacing)               // rebinds after any photo being saved, at 1x and brightness 0;
                                                       // a front camera that fails gives the rear one back
     fun setZoom(ratio: Float, final: Boolean = true)  // clamped to [minZoom, maxZoom]; pinch and remote; newest value once
+    fun glideZoom(ratio: Float)                         // a single change, over 250 ms where the bound lens can show it (#310)
                                                       // per display frame; final = false holds the lens (2.6.5)
     fun setFocusPoint(x: Float, y: Float)             // frame coordinates 0..1 (FR-1.4); also remote focus (FR-7.7)
     fun setExposure(index: Int)                       // within capabilities.exposureRange (FR-1.11)
@@ -1629,6 +1631,7 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `camera.flash.set` | S→P | reliable | `mode` | The subject's flash choice (FR-7.3) |
 | `camera.focus.set` | S→P | reliable | `x`, `y` | The subject's tap to focus, in the photographer's frame (FR-7.7, [#273]); answered with `camera.state` |
 | `camera.focus` | P→S | reliable | `x`, `y` | Where the photographer's own tap focused, in the photographer's frame (FR-7.7, [#273]); not kept |
+| `camera.did` | P→S | reliable | `action`, `zoom`, `exposure`, `flash` | What the photographer did on their own camera, for the subject's line (FR-7.4, [#292]); not kept |
 | `control.permission` | P→S | reliable | `allowed` | Whether remote control is allowed (FR-7.5, dropped at the kickoff of 11/21; never sent) |
 | `guide.image.begin` / `.chunk` / `.end` | both | reliable | chunks | The guide's mask; S→P for a guide made on the subject's phone |
 | `guide.reference.begin` / `.chunk` / `.end` | both | reliable | chunks | The guide's reference photo, for the other phone's thumbnail (FR-3.9); S→P for a guide made on the subject's phone |
@@ -1809,7 +1812,7 @@ The center and height the subject asks for, in frame coordinates. The photograph
 { "v": 3, "t": "camera.zoom.set", "seq": 17, "ts": 1759212352310, "b": { "ratio": 2.0, "final": true } }
 ```
 
-A tap on the readout (a quick step, 2.6.2) and its *Zoom in* / *Zoom out* accessibility actions send one final request. The photographer clamps, applies, and echoes it (2.6.5).
+A tap on the readout (a quick step, 2.6.2) and its *Zoom in* / *Zoom out* accessibility actions send one final request. The photographer clamps, applies, and echoes it (2.6.5). The camera glides to it (`glideZoom`, 2.6.5): the states on the way are echoed as the photographer's, and the one that arrives as the subject's, so the subject's readout keeps its step until then ([#310]).
 
 `cancel: true`, always with `final: true`, ends a pinch that the photographer's hold stopped (2.6.5). The photographer applies no zoom for it; `ratio` is the photographer's zoom as the subject last saw it. As a `camera.zoom.set`, it makes a step sent before it stale. A missing `cancel` means false. Only a photographer that sends `camera.zoom.hold` gets one.
 
@@ -1879,6 +1882,17 @@ The subject's tap on the live video (FR-7.7): `x` and `y` are fractions of the p
 ```
 
 Where the photographer's own tap on Camera focused (FR-7.7, [#273]), in the same coordinates as `camera.focus.set`. The subject shows the focus box there, at 1 − x on the rear camera's mirror. It is sent only for a point the camera took, and never for the subject's own tap, whose box the subject shows itself. Nothing is kept: a subject that connects later gets none. An older subject ignores the type, as any unknown one.
+
+</details>
+
+<details>
+<summary><code>camera.did</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "camera.did", "seq": 8, "ts": 1759212355000, "b": { "action": "zoom", "zoom": 2.0 } }
+```
+
+What the photographer did on their own camera (FR-7.4, [#292]), once, when the action ends. `action` is `zoom` with `zoom`, `brightness` with `exposure`, `flash` with `flash`, `guide.move`, or `guide`; a value that does not belong to the action is left at its default. The subject says it in a line and changes nothing: the camera's values still come as `camera.state`, and the guide as `guide.state`. `action` is a string, so a subject that does not know one drops that line alone. The photographer's own focus has `camera.focus`, since the subject draws its box too. Nothing is kept: a subject that connects later gets none.
 
 </details>
 
@@ -2843,6 +2857,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - `CameraViewModel` takes it for the photographer's pinch. `RemoteControlHandler` takes it for the subject's, and frees it 2 s after the subject's last request when the final value never comes; the camera then settles its lens, as in `stop()`.
   - While one phone holds it, the other's pinch changes nothing until its own fingers lift. A quick step or a zoom action never takes it, and changes nothing while the other phone holds it. The photographer drops the subject's requests and answers a final one with the current zoom.
   - A subject's pinch with a request dropped stays dropped up to its final value or its cancel, even once the zoom is free, since an older subject keeps sending its steps.
+  - Each phone says who is zooming from the other's first step ([#292]). On Camera, `SessionViewModel.subjectZooming` names the subject while their pinch holds the zoom, and for 1 s after a pinch that ended without an applied value (`ZOOMING_LINGER_MS`), so the line holds until the ratio's notice. On Subject view, `SubjectViewModel.photographerZooming` follows `peerZoomHolder`. Both lines have no time of their own and go when the ratio's line takes their place. Another notice or label that comes meanwhile keeps its own time, and the line is back after it while the pinch still runs.
   - Each change of the holder goes to the subject as `camera.zoom.hold`, and again when the session connects. The subject's session keeps it, so a screen that opens late knows it. Subject view then sends nothing, ends a pinch that is running with a cancel (`camera.zoom.set` with `cancel`), which changes no zoom, and its readout follows the echo.
   - The phone held back says who is zooming in its toggle label (2.8).
 - **Unanswered requests.** `RemoteControlHandler` gives a final zoom, brightness, or flash request 500 ms, and longer while the camera is `STARTING`. It then confirms a request the camera holds, or answers with the current state, `by: PHOTOGRAPHER`, so the control snaps back. A request applied within 5 s still counts as the subject's.
@@ -2920,6 +2935,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
 - **Ultrawide routing.** `CameraZoomPlan` prefers the primary camera's native sub-1× zoom. A separate rear ultrawide extends the range only when its range reaches the primary's. The controller converts each request to the bound camera's native `setZoomRatio`, and `ZoomState` back, so every ratio is primary-relative.
 - **Zoom without stutter (It 2, Must, NFR-19).**
   - `CameraXController.setZoom` applies only the newest request, once per `Choreographer` frame, and skips a native ratio already asked for. This is a precaution: the S23 Ultra showed no stutter either way.
+  - **A single change glides (It 5, FR-1.3, [#310]).** A tap on the readout, a zoom action, and a pinch's last value go through `CameraController.glideZoom`, on either phone's request. `ZoomGlide` gives the ratio for each display frame: 250 ms, fastest at the tap and slow into the step, along the logarithm of the ratio, so the picture grows evenly to the eye. From the request on, the controller reports the step as the zoom, not the ratios on the way, until the camera is asked for the step itself (`heldZoom`), so the readout and the subject's phone say where the zoom is going. That holds where the step does not glide too, as behind a lens that opens or a photo being saved. A glide starts from the ratio last asked for, not the one last applied, which a pinch has left some steps behind when its fingers lift. The camera shows a requested zoom only some frames later: on the S22 the first frame with a new zoom was done 246 ms after its request (11/25, `zoom.apply` to `zoom.frame`). A readout that followed the requests ran ahead of the picture, and a slow start added to that wait. The controller asks for each as a pinch's step and for the last as the final value, from the same frame callback as a pinch. It applies the step at once instead where a glide cannot show: another lens has to open (a held frame covers the rebind), the picture is already there, a photo is being saved, the camera is opening, or the phone's animations are off. A second tap starts from where the first glide is. A pinch's step, and so the other phone's pinch, takes a glide over; the shutter ends it at its step, so the photo has the zoom the tap asked for. A quick step never takes `ZoomHold`.
   - A pinch holds the bound lens until the ratio is 5 % past the primary's minimum, 0.95× to 1.05× (`CameraZoomPlan.lensFor`, `HOLD_BAND`). The final value picks the lens. `RemoteControlHandler.stop` ends a pinch whose final value never came.
   - A new binding publishes its zoom only after restoring the kept one, so no phone shows the new lens's own 1×.
   - `PreviewHold` keeps the last frame, without a spinner, from `READY` → `STARTING` until `READY` with the preview streaming, at most 2 s. The grid and the guide stay over it (2.6.2, *Changes on screen*).
@@ -2935,7 +2951,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - *The shutter is free while a photo is saved.* `takePhoto` calls `onCaptured` when the camera has taken the picture (CameraX's `onCaptureStarted`), and `CameraViewModel` frees the shutter then. CameraX takes the photos asked for meanwhile in order, but it can finish saving a later one first: it saves one at a time only on low-memory phones. `CameraViewModel` therefore publishes each result after the one of the press before, so the thumbnail is the newest photo and the session sends the photos as they were taken (`PhotoSyncer`). Saving takes 0.2 s to 0.5 s more at 3:4. At 9:16 and 1:1 CameraX decodes, crops, and encodes the photo again, 0.2 s more on a plain scene; asking the camera for a 16:9 size does not avoid it, since that size is not exactly 16:9.
   - Not done yet: the photos against the phone's own camera on the same scenes, CameraX Extensions (`HDR`, `NIGHT`), and the S21.
 - **Photos.** Only the photographer takes photos.
-- **Notices.** Camera shows each final remote action for 3 s, named from `hello` (FR-7.4, 2.5.1): "Joonhyung set zoom to 2×", "… moved the guide", "… set brightness to +1.0", "… turned the flash on" or "off", "… set the flash to auto", or "… set a pose guide".
+- **Notices.** Camera shows each final remote action for 3 s, named from `hello` (FR-7.4, 2.5.1): "Joonhyung set zoom to 2×", "… moved the guide", "… set brightness to +1.0", "… turned the flash on" or "off", "… set the flash to auto", or "… set a pose guide". Subject view shows the same lines about the photographer, where its labels show ([#292]). The photographer's phone knows its own user's actions exactly, so it tells each once, when it ends, as `camera.did` (`RemoteControlHandler.didHere`, called by `CameraViewModel` and, for a guide set from a photo or the library, by `ReferenceViewModel`): a state alone would not say whether a brightness was set by hand or put back by a tap to focus. A chosen pose's guide is not told, since its Reference confirm ends with "… used this guide" on the subject's phone. The focus's line comes with `camera.focus`, as rarely as Camera's.
   - Camera says "Joonhyung is watching your camera" for 3 s when a subject connects, not after a drop (`SessionNotice.Watching`, [#271]); a new subject after the room waited alone is a new start. Subject view has no such notice: its shutter slot names the camera for the whole session.
 - **The subject gone.** "Joonhyung left" or "… disconnected" (FR-6.10, FR-6.11) stays 10 s (`CameraViewModel.PEER_GONE_NOTICE_MS`), since the photographer may not be looking. It goes once the subject is back. A "Couldn't send" notice waits for it (FR-6.14).
 
@@ -3694,7 +3710,9 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#283]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/283
 [#284]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/284
 [#285]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/285
+[#292]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/292
 [#294]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/294
 [#296]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/296
 [#304]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/304
 [#306]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/306
+[#310]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/310

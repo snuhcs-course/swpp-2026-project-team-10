@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -115,6 +115,9 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         private set
     private var previewLogged = false
     private var noticeJob: Job? = null
+
+    /** The text of a notice shown without a time of its own ([holdNotice]), until it is let go. */
+    private var heldNotice: String? = null
 
     /** The notice that the subject left or dropped, while it shows; a photo not sent waits for it (#238). */
     private var peerGoneNotice: Job? = null
@@ -255,7 +258,7 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         // Brightness beside the focus (FR-1.11): each step of a drag is applied as it comes, and the bar stays up while
         // a finger is on it.
         controls.exposureBar.describe = ::formatEv
-        controls.exposureBar.onChange = { index, _ -> viewModel.onExposureChange(index) }
+        controls.exposureBar.onChange = viewModel::onExposureChange
         focusBrightness = FocusBrightness(controls.focusRing, controls.exposureBar, viewLifecycleOwner.lifecycleScope) {
             viewModel.setBrightnessOpen(false)
         }
@@ -490,6 +493,16 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
                     }
                 }
                 launch { sessionViewModel.remoteFocus.collect { showRemoteFocus(controls, it) } }
+                launch {
+                    // The subject's pinch is named from its first step to its end (#292); the ratio's notice replaces it.
+                    sessionViewModel.subjectZooming.collect { name ->
+                        if (name != null) {
+                            holdNotice(controls, getString(R.string.zoom_held_label, name))
+                        } else {
+                            letHeldNoticeGo(controls)
+                        }
+                    }
+                }
                 launch {
                     sessionViewModel.photosNotSent.collect { notSent ->
                         val text = if (notSent.count == 1) {
@@ -1823,8 +1836,29 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         noticeJob?.cancel()
         return viewLifecycleOwner.lifecycleScope.launch {
             delay(durationMs)
-            controls.noticeText.isVisible = false
+            // A pinch of the subject's that still goes on has its line back, which this notice took the place of.
+            val held = heldNotice
+            if (held != null) controls.noticeText.text = held else controls.noticeText.isVisible = false
         }.also { noticeJob = it }
+    }
+
+    /**
+     * A notice that stays while what it says goes on, as while the subject pinches (#292): it has no time of its own,
+     * and goes with [letHeldNoticeGo] or when another notice takes its place.
+     */
+    private fun holdNotice(controls: FragmentCameraBinding, text: String) {
+        controls.noticeText.text = text
+        controls.noticeText.isVisible = true
+        noticeJob?.cancel()
+        heldNotice = text
+    }
+
+    /** What the held notice said is over: it goes, unless another notice has taken its place and keeps its own time. */
+    private fun letHeldNoticeGo(controls: FragmentCameraBinding) {
+        val held = heldNotice ?: return
+        heldNotice = null
+        if (noticeJob?.isActive == true || controls.noticeText.text.toString() != held) return
+        controls.noticeText.isVisible = false
     }
 
     /** The subject is back before the notice that it left ended, so the notice no longer holds. */

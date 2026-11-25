@@ -27,7 +27,15 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 - [Dongje, 11-25] "1. Put the gallery over the sheet. But Back on the confirm screen opens the sheet alone, and from the library it goes to the library. 2. Keep 1 and 2 as they are; would it be awkward to remove only the button on 3, with the line kept?" (The agent answered that it is acceptable, and asked which line "kept" means.)
 - [Dongje, 11-25] "The AI pose's path keeps 'Pick a photo where one person is clearly visible.' as it is, and the other paths get 'Go back'. Show it as a picture again, then start building." (Second draft, then built test-first: `backToChoosing` for both screens, `openGallery` on the sheet, the line by `ReferenceViewModel.fromPhoto`, and a test on the real navigation. R&S 4.8, Design 4.9, Testing 4.10, the flow 1 wireframe.)
 
+## Who is zooming, the photographer's actions on *Subject view*, and a zoom step that glides ([#292], [#310])
+
+- [Dongje, 11-25] "Assign issue #292 to me and go on as before. Also: a tap on the zoom button changes the picture to that ratio at once, and the iPhone's camera shows the zoom gliding. Check whether that is possible; if it is, open an issue, assign it, and let us do the two together." (Possible: the camera already applies one zoom per display frame for a pinch. The agent opened #310, and put five points up with recommendations: where the line shows, the same on *Subject view*, the subject's tap, a step that needs another lens, and the length.)
+- [Dongje, 11-25] "1 as recommended. For 2, list the lines the photographer's phone shows, and I will think about making Subject view the same. 3 as recommended. For 4, check where the lens changes and tell me exactly what you will do. For 5, go that way first and I will check it myself." (The agent listed the nine lines. It read the S22's cameras with `dumpsys media.camera`: its rear camera reaches 0.6× itself, so only a phone with a separate ultrawide, the S21, changes lens, on the steps to and from the widest zoom. It drew the Camera screen during the subject's pinch and the zoom's curve.)
+- [Dongje, 11-25] "For 2, show the lines on the subject's phone too when the photographer acts, and build it like this." (Built test-first in three parts. The line "… is zooming" from `ZoomHold`, held until the ratio's notice. A new message `camera.did` for what the photographer did, since a state alone cannot tell a brightness set by hand from one a tap put back; *Subject view* says it where its labels show. `CameraController.glideZoom` with `ZoomGlide` for every single change of the zoom, on either phone's request.)
+
+[#292]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/292
 [#294]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/294
 [#301]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/301
 [#304]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/304
 [#306]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/306
+[#310]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/310

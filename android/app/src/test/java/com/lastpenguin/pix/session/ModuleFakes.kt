@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -175,6 +175,14 @@ class FakeCameraController(
         requests += ratio
         requestFinals += final
         if (applies) _zoom.value = ratio
+    }
+
+    /** The ratios asked for as a glide (#310); the fake is there at once, as a camera with animations off. */
+    val glideRequests = mutableListOf<Float>()
+
+    override fun glideZoom(ratio: Float) {
+        glideRequests += ratio
+        setZoom(ratio, final = true)
     }
 
     /** The photographer changed the zoom on their own phone, or a request the camera held was applied. */

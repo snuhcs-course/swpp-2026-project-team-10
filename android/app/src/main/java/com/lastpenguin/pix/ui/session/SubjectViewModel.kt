@@ -1,8 +1,9 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.SystemClock
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -27,6 +28,7 @@ import com.lastpenguin.pix.session.ConfirmSyncer
 import com.lastpenguin.pix.session.DescriptionEnd
 import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.MirrorReference
+import com.lastpenguin.pix.session.PhotographerAction
 import com.lastpenguin.pix.session.PoseSetEnd
 import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteControlHandler
@@ -38,6 +40,7 @@ import com.lastpenguin.pix.session.SharedTip
 import com.lastpenguin.pix.session.TipSyncer
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import com.lastpenguin.pix.session.toAction
 import com.lastpenguin.pix.ui.camera.GuideSaveNotice
 import com.lastpenguin.pix.ui.camera.ReferenceCorner
 import com.lastpenguin.pix.ui.camera.ReferenceDrop
@@ -50,13 +53,16 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -182,6 +188,15 @@ data class SubjectUiState(
         get() = connected && !guideEditing && (supportsFocusPoint || hasBrightness)
 }
 
+/** A line Subject view shows about what the photographer did on their own camera (FR-7.4, #292). */
+sealed interface PhotographerLine {
+    /** An action told as `camera.did`: the zoom, the brightness, the flash, the guide moved, or a guide set. */
+    data class Did(val action: PhotographerAction) : PhotographerLine
+
+    /** The photographer's own tap to focus (`camera.focus`), whose box shows at every tap and this line less often. */
+    data object Focused : PhotographerLine
+}
+
 /**
  * Subject view (Design 2.2, Figure 7). [video] is where the screen attaches its renderer.
  *
@@ -212,6 +227,8 @@ class SubjectViewModel(
     private val receivingPhoto: Flow<Boolean> = flowOf(false),
     /** How this phone is held, which its own controls' icons turn with; nothing is sent (FR-1.15). */
     private val phoneTurns: PhoneTurns = PhoneTurns.Fixed(),
+    /** For the time between two lines about the photographer's focus (#292). */
+    private val clock: () -> Long = SystemClock::elapsedRealtime,
 ) : ViewModel() {
 
     /** Follows how this phone is held while [owner], Subject view, is in front (FR-1.15). */
@@ -240,6 +257,25 @@ class SubjectViewModel(
      * shows that point, so turned to the mirror for the rear camera.
      */
     val photographerFocus: SharedFlow<RemoteFocus> = _photographerFocus.asSharedFlow()
+
+    private val _photographerLines = MutableSharedFlow<PhotographerLine>(extraBufferCapacity = 16)
+
+    /**
+     * What the photographer did on their own camera (FR-7.4, #292), for a line where this screen's labels show, as
+     * Camera says what the subject did. A line the screen is not there to read is not kept.
+     */
+    val photographerLines: SharedFlow<PhotographerLine> = _photographerLines.asSharedFlow()
+
+    /** When the line about the photographer's focus was last said, on [clock]; null before the first. */
+    private var focusLineAt: Long? = null
+
+    /**
+     * Whether the photographer's pinch is changing the zoom now (FR-7.6, #292): from its first step to its end, the
+     * screen says who is zooming, and the ratio's line follows.
+     */
+    val photographerZooming: StateFlow<Boolean> = session.peerZoomHolder
+        .map { it == Role.PHOTOGRAPHER }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val _toggleLabels = Channel<ToggleLabel>(Channel.CONFLATED)
 
@@ -277,7 +313,7 @@ class SubjectViewModel(
     private var zoomHeldBack = false
 
     // Kept by the session from the last `camera.zoom.hold`, so a screen that opens late still knows it.
-    private val photographerZooming: Boolean get() = session.peerZoomHolder.value == Role.PHOTOGRAPHER
+    private val photographerHolds: Boolean get() = session.peerZoomHolder.value == Role.PHOTOGRAPHER
 
     private val exposureSender = StepSender<Int>(viewModelScope, SEND_INTERVAL_MS) { index, final ->
         session.send(SessionMessage.ExposureSet(index, final))
@@ -371,7 +407,12 @@ class SubjectViewModel(
                     val (x, y) = message
                     if (x.isFinite() && y.isFinite() && x in 0f..1f && y in 0f..1f) {
                         _photographerFocus.tryEmit(RemoteFocus(if (_uiState.value.mirrored) 1f - x else x, y))
+                        sayFocused()
                     }
+                    return@collect
+                }
+                if (message is SessionMessage.PhotographerDid) {
+                    message.toAction()?.let { _photographerLines.tryEmit(PhotographerLine.Did(it)) }
                     return@collect
                 }
                 if (message !is SessionMessage.CameraStateUpdate) return@collect
@@ -643,11 +684,27 @@ class SubjectViewModel(
             if (final) zoomHeldBack = false
             return
         }
-        if (photographerZooming) {
+        if (photographerHolds) {
             holdBack(gestureGoesOn = !final)
             return
         }
         zoomTo(ratio, final)
+    }
+
+    /**
+     * The line about the photographer's focus, as rarely as Camera's notice about the subject's (FR-7.7): none for a
+     * tap while it shows or in the quiet time after it, so taps in a row do not keep saying the same line.
+     */
+    private fun sayFocused() {
+        val now = clock()
+        val last = focusLineAt
+        if (last != null &&
+            now - last < SessionViewModel.FOCUS_NOTICE_MS + SessionViewModel.FOCUS_NOTICE_QUIET_MS
+        ) {
+            return
+        }
+        focusLineAt = now
+        _photographerLines.tryEmit(PhotographerLine.Focused)
     }
 
     /**
@@ -683,7 +740,7 @@ class SubjectViewModel(
     fun onZoomTap() {
         val ui = _uiState.value
         val step = nextZoomStep(quickZoomSteps(ui.minZoom, ui.maxZoom), ui.zoom) ?: return
-        if (photographerZooming) {
+        if (photographerHolds) {
             holdBack(gestureGoesOn = false)
             return
         }

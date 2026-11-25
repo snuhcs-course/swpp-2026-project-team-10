@@ -125,7 +125,7 @@
 | 4.8 | 2026-11-24 | Camera's hint chip shows only "Guide hidden"; the line about the pinch went (2.6.8; Iter5-A9, [#306]). |
 | 4.9 | 2026-11-25 | Back on *Reference confirm* and *No person found* returns to where the reference was chosen: *Add a pose guide* is opened again, since a sheet cannot stay under a screen (2.6.2; Iter5-A3, [#294]). |
 | 4.10 | 2026-11-25 | Who is zooming, on both phones, and what the photographer did, on the subject's: `camera.did`, `SessionViewModel.subjectZooming`, `SubjectViewModel.photographerLines` (Iter5-A1, [#292]). A single change of the zoom glides: `CameraController.glideZoom`, `ZoomGlide` (Iter5-A10, [#310]) (2.2, 2.5.1, 2.6.5, 2.8). |
-| 4.11 | 2026-11-25 | Reconnection tries for 30 s, not 10 s; Camera says who it reconnects with for the whole wait (`SessionViewModel.reconnectingWith`), read from `Reconnecting`'s new `peer` and `role`; a photo's 30 s without word no longer count a drop (Iter5-A2, [#293]; 1.1.3, 1.1.4, 2.3, 2.4, 2.6.7, 2.8). |
+| 4.11 | 2026-11-25 | Reconnection tries for 30 s, not 10 s; Camera says who it reconnects with for the whole wait (`SessionViewModel.reconnectingWith`), read from `Reconnecting`'s new `peer` and `role`; a photo's 30 s without word no longer count a drop, which `Connected`'s new `drops` tells of (Iter5-A2, [#293]; 1.1.3, 1.1.4, 2.3, 2.4, 2.6.7, 2.8). |
 
 </details>
 
@@ -1410,7 +1410,7 @@ sealed interface SessionState {   // 2.4
     data class Waiting(val code: String) : SessionState              // photographer: code shown, waiting for the subject
     data class Inviting(val invitationId: String) : SessionState     // photographer: invitation sent, its place taken
     data class Connecting(val sessionId: String?) : SessionState
-    data class Connected(val sessionId: String, val peer: PeerInfo, val role: Role, val partner: SessionPartner? = null) : SessionState
+    data class Connected(val sessionId: String, val peer: PeerInfo, val role: Role, val partner: SessionPartner? = null, val drops: Int = 0) : SessionState   // drops this session came back from
     data class Reconnecting(val sessionId: String, val since: Long, val partner: SessionPartner? = null, val peer: PeerInfo? = null, val role: Role? = null) : SessionState   // peer and role as Connected said them
     data class Ended(val reason: EndReason) : SessionState
 }
@@ -3006,7 +3006,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - A failure before the server answers keeps the token; a refusal drops it.
   - If the photographer is off the server then, the subject resends `session.join` on `peer.rejoined`, so the photographer still gets `peer.joined`.
   - A refused rejoin (`NOT_FOUND`, `FORBIDDEN`) ends a reconnecting session with "The session has ended". A running session goes on phone to phone.
-- **Photos (FR-6.14).** A photo in flight waits through a drop: the subject keeps its partial file, and `sendBulk` resumes once connected. `PhotoSyncer` runs for the whole session. Its 30 s without word (`STALL_MS`) count only while the link is up, and start over once it is back, on both phones ([#293]): the session alone decides how long a drop may last. When the budget ends, the photographer says "Couldn't send" (2.6.5).
+- **Photos (FR-6.14).** A photo in flight waits through a drop: the subject keeps its partial file, and `sendBulk` resumes once connected. `PhotoSyncer` runs for the whole session. Its 30 s without word (`STALL_MS`) count only while the link is up, and start over once it is back, on both phones ([#293]): the session alone decides how long a drop may last. `Connected.drops` counts the drops a session came back from, so the time also starts over after a drop too short for a reader to see its `Reconnecting`. When the budget ends, the photographer says "Couldn't send" (2.6.5).
 - **Server deploys and restarts.** To a phone these look like a dropped socket. Sessions and room codes continue, since they live in the session store (AD-18, 2.7; 2.8, Deployment). The photographer restarts ICE once (`peer.rejoined`).
 - **Cellular notice (FR-6.13).** The first time a session's selected pair uses a cellular interface (`SessionManager.path`), the app says "The live view uses mobile data." Camera shows it as a notice, Subject view as a toast. It waits in `SessionViewModel.mobileDataPending` until shown, and only then is recorded in DataStore (`MobileDataNotice`). A session that ends first drops it.
 - **Measurement.** `Timings` marks `ice.connected`, `ice.disconnected`, `ice.restarted`, and the pair type (`host`, `srflx`, `relay`) for NFR-5 and NFR-10. It marks `session.reconnecting`, `signaling.rejoined`, and `session.reconnected <ms>` for NFR-11. `ice.pair` logs each pair, such as `local=relay/tcp remote=srflx network=cellular` (`LinkStatsParser`).

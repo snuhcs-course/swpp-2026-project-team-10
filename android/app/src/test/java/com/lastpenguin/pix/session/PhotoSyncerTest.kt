@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.net.Uri
@@ -174,6 +174,12 @@ class PhotoSyncerTest {
 
     private fun deliverSaved(photoId: String, ok: Boolean = true, reason: PhotoRefusal? = null) {
         session.deliver(SessionMessage.PhotoSaved(photoId, ok, reason))
+    }
+
+    @Test
+    fun `the wait for a photo outlasts the wait for a link that dropped`() {
+        // A photo on its way through a drop is not given up before the link had its whole time to come back (#293).
+        assertTrue(PhotoSyncer.STALL_MS >= RtcSessionManager.RECONNECT_BUDGET_MS + 10_000)
     }
 
     @Test

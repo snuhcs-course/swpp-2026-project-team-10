@@ -156,6 +156,15 @@ class SessionViewModel(
      */
     val subjectZooming: StateFlow<String?> = _subjectZooming.asStateFlow()
 
+    private val _reconnectingWith = MutableStateFlow<String?>(null)
+
+    /**
+     * Photographer: the subject's name while the link that dropped is tried again (FR-6.12, #293), for Camera's line
+     * "Reconnecting with …". It has no time of its own: null again once the link is back or the session gave the
+     * wait up, which [SessionNotice.PeerGone] then says.
+     */
+    val reconnectingWith: StateFlow<String?> = _reconnectingWith.asStateFlow()
+
     private val _remoteFocus = MutableSharedFlow<RemoteFocus>(extraBufferCapacity = 16)
 
     /**
@@ -244,6 +253,10 @@ class SessionViewModel(
 
     /** Whether the last state was Connected, so another Connected of the same connection says nothing new. */
     private var wasConnected = false
+
+    /** This phone's role in the session that runs or reconnects, as its last Connected said it. */
+    private var liveRole: Role? = null
+
     private var connectedJob: Job? = null
 
     /** When this session's last "set the focus" notice began, by [clock]; null before the first. */
@@ -409,6 +422,13 @@ class SessionViewModel(
         if (state !is SessionState.Connected && !reconnecting) _mobileDataPending.value = false
         val connected = state as? SessionState.Connected
         if (connected != null) peerName = connected.peer.displayName
+        // Reconnecting says no role, so the one of the session it goes on is kept through the drop.
+        if (connected != null) {
+            liveRole = connected.role
+        } else if (!reconnecting) {
+            liveRole = null
+        }
+        _reconnectingWith.value = peerName.takeIf { reconnecting && liveRole == Role.PHOTOGRAPHER }
         val inSession = state is SessionState.Connecting || connected != null || reconnecting
 
         // Frames start while the peer connection is still being set up, so the first video arrives sooner, and go on

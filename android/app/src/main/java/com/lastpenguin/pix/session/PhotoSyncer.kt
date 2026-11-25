@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.content.ContentResolver
@@ -211,7 +211,7 @@ class PhotoSyncer(
 
     /**
      * The subject waits for each photo from its `photo.shutter` on (#271): one that will not come after all, before its
-     * `photo.begin`, is said by its [shot], or Subject view would say a photo is on its way until its 30 s end.
+     * `photo.begin`, is said by its [shot], or Subject view would say a photo is on its way until its wait ends ([STALL_MS]).
      */
     private fun dropped(shot: String) {
         if (currentSession() != null) session.send(SessionMessage.PhotoDropped(shot))
@@ -572,8 +572,11 @@ class PhotoSyncer(
         const val WINDOW_CHUNKS = 32
         const val ACK_EVERY = 16
 
-        /** No word from the subject for this long gives the photo up. Longer than a reconnect's 10 s. */
-        const val STALL_MS = 30_000L
+        /**
+         * No word from the subject for this long gives the photo up. Longer than the 30 s a dropped link has to come
+         * back ([RtcSessionManager.RECONNECT_BUDGET_MS]), so a photo on its way through a drop is still sent (#293).
+         */
+        const val STALL_MS = 45_000L
 
         /** How many ended shots the subject keeps against a late `photo.shutter`, more than a burst of photos. */
         private const val ENDED_KEPT = 16

@@ -1886,7 +1886,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 - Camera has no brightness button. The bar stands beside the focus box, inside the image, and starts at +1.0. It changes the brightness as a drag on the preview or on the bar moves. It goes after 3 s untouched, but not while TalkBack's focus is on it, and is back at +1.0 at the next tap.
 - A drag with the bar gone focuses where it started and moves from +1.0. A sideways drag changes nothing.
 - The horizon bar runs along the long side when the phone is on its side, and is gone past 20°.
-- The second tap closes the tip. The second *Save guide* says "Removed from My library." and empties the bookmark; the third saves again. *Changed in Iter5-A6 ([#297]): it says "Removed from Favorites. It stays in My library."*
+- The second tap closes the tip. The second *Save guide* says "Removed from My library." and empties the bookmark; the third saves again. *Changed in Iter5-A6 ([#297]): it says "Removed from Favorites. It stays in My library.", and the button is a ♥, red while filled.*
 - The button reads *Suggest 4 poses*, then *Generate 4 poses from this*. Back opens *Generate poses* with the photo and the description; the ✕ opens the camera. *Changed in Iter4-P2 ([#199]): *Suggest*, then *Generate*; Back asks first and drops the set (IT-35).* *Changed in Iter5-P10 ([#274]): *Generate* for both, since the empty field says *Auto*.*
 - The refused description is not among *Used before*, and the accepted one is, on both phones.
 - The lines stay visible on both scenes.

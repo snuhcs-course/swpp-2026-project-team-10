@@ -75,6 +75,7 @@ import com.lastpenguin.pix.ui.camera.placeReference
 import com.lastpenguin.pix.ui.camera.placeZoomRow
 import com.lastpenguin.pix.ui.camera.previewArea
 import com.lastpenguin.pix.ui.camera.previewAspect
+import com.lastpenguin.pix.ui.camera.saveGuideTint
 import com.lastpenguin.pix.ui.camera.setLabelIcon
 import com.lastpenguin.pix.ui.camera.setReferenceActions
 import com.lastpenguin.pix.ui.camera.showPhotoThumbnails
@@ -829,14 +830,18 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         binding.tipText.text = tip?.tip?.text
     }
 
-    /** *Save guide* (FR-6.16): beside the guide-edit toggle while a guide is on the video, filled once saved here. */
+    /**
+     * *Save guide* (FR-6.16): beside the guide-edit toggle while a guide is on the video, a ♥ filled red once a favorite
+     * here (#297).
+     */
     private fun renderSaveGuide(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         val button = binding.saveGuideButton
         button.isVisible = ui.guide != null
-        val icon = if (ui.guideSaved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark
+        val icon = if (ui.guideSaved) R.drawable.ic_heart_filled else R.drawable.ic_heart
         // Setting the same icon again would redraw the button on every state change.
         if (button.tag != icon) {
             button.setIconResource(icon)
+            button.iconTint = requireContext().getColorStateList(saveGuideTint(ui.guideSaved))
             button.tag = icon
         }
         button.contentDescription = getString(if (ui.guideSaved) R.string.guide_saved else R.string.save_guide)

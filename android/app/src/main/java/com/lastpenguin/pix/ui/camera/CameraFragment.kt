@@ -955,11 +955,12 @@ class CameraFragment : Fragment(R.layout.fragment_camera) {
         controls.hideGuideButton.contentDescription =
             getString(if (hidden) R.string.show_guide else R.string.hide_guide)
         controls.hideGuideButton.isEnabled = guideEditable
-        // Save guide (FR-3.8): filled once saved; another tap takes it out of the saved guides again.
+        // Save guide (FR-3.8): a ♥, filled red once a favorite (#297); another tap takes it out of Favorites again.
         setIconOnce(
             controls.saveGuideButton,
-            if (state.guideSaved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
+            if (state.guideSaved) R.drawable.ic_heart_filled else R.drawable.ic_heart,
         )
+        controls.saveGuideButton.iconTint = requireContext().getColorStateList(saveGuideTint(state.guideSaved))
         controls.saveGuideButton.contentDescription =
             getString(if (state.guideSaved) R.string.guide_saved else R.string.save_guide)
         controls.saveGuideButton.isEnabled = guideEditable && !state.savingGuide

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.net.Uri
@@ -76,6 +76,10 @@ import org.robolectric.RobolectricTestRunner
  * photo's wait; a shutter that comes after its photo's drop or save, which starts none; one the photographer gave up for the next; a photographer's phone before #271, whose messages name no
  * shot, counted by its shutters; 30 s without a photo message (just before and just after), a chunk starting that time
  * again; and the session's end.
+ * Both, a drop (boundary; #293): the time the link is down does not count toward giving a photo up or ending its wait,
+ * for the subject's answer, an ack, and the subject's own wait, with the drop late in the wait and as long as the
+ * session tries; once the link is back the time starts over (just before its end / at its end), also after a drop so
+ * short that no reader saw its Reconnecting, which only the state after it tells.
  * Both, the session's photos (state-based; Iter4-A2): none outside a session and an empty list at its start; on the
  * subject's phone each saved photo joins them in order, and a refused or broken photo, one the album fails to save, and
  * one saved before do not, nor one whose save ends after its session ended and another started; on the photographer's
@@ -131,8 +135,14 @@ class PhotoSyncerTest {
     private fun TestScope.syncer(partDir: File = parts) =
         PhotoSyncer(session, reader, album, partDir, StandardTestDispatcher(testScheduler))
 
-    private fun connectedAs(role: Role) {
-        session.setState(SessionState.Connected("s_1", PeerInfo("Dongje", null), role))
+    private fun connectedAs(role: Role, drops: Int = 0) {
+        session.setState(SessionState.Connected("s_1", PeerInfo("Dongje", null), role, drops = drops))
+    }
+
+    /** A drop over before any reader runs: a state flow shows only its latest value, the state after it (#293). */
+    private fun dropTooShortToSee(role: Role) {
+        session.setState(SessionState.Reconnecting("s_1", since = 0))
+        connectedAs(role, drops = 1)
     }
 
     private fun uri(name: String): Uri = Uri.parse("content://media/$name")
@@ -174,6 +184,81 @@ class PhotoSyncerTest {
 
     private fun deliverSaved(photoId: String, ok: Boolean = true, reason: PhotoRefusal? = null) {
         session.deliver(SessionMessage.PhotoSaved(photoId, ok, reason))
+    }
+
+    /** The link drops late in a photo's wait and stays down for all but the last millisecond of its own wait (#293). */
+    private fun TestScope.dropLateInTheWait() {
+        advanceTimeBy(PhotoSyncer.STALL_MS - 1_000)
+        session.setState(SessionState.Reconnecting("s_1", since = 0))
+        runCurrent()
+        advanceTimeBy(RtcSessionManager.RECONNECT_BUDGET_MS - 1)
+        runCurrent()
+    }
+
+    @Test
+    fun `a drop's time does not count toward giving a photo up, and the time starts over once the link is back`() =
+        runTest {
+            val (syncer, failed) = sender()
+            syncer.shoot(photo("1", 10), takenAt = 1)
+            runCurrent()
+
+            dropLateInTheWait()
+            assertEquals(0, failed())
+
+            connectedAs(Role.PHOTOGRAPHER)
+            runCurrent()
+            advanceTimeBy(PhotoSyncer.STALL_MS - 1)
+            runCurrent()
+            assertEquals(0, failed())
+            advanceTimeBy(2)
+            runCurrent()
+            assertEquals(1, failed())
+        }
+
+    @Test
+    fun `a drop too short to be seen starts the time over all the same`() = runTest {
+        val (syncer, failed) = sender()
+        syncer.shoot(photo("1", 10), takenAt = 1)
+        runCurrent()
+        advanceTimeBy(PhotoSyncer.STALL_MS - 1_000)
+
+        dropTooShortToSee(Role.PHOTOGRAPHER)
+        runCurrent()
+
+        advanceTimeBy(PhotoSyncer.STALL_MS - 1)
+        runCurrent()
+        assertEquals(0, failed())
+        advanceTimeBy(2)
+        runCurrent()
+        assertEquals(1, failed())
+    }
+
+    @Test
+    fun `a photo that waited through a drop is sent when the subject answers after it`() = runTest {
+        val (syncer, failed) = sender()
+        syncer.shoot(photo("1", 10), takenAt = 1)
+        runCurrent()
+        dropLateInTheWait()
+
+        connectedAs(Role.PHOTOGRAPHER)
+        runCurrent()
+        deliverSaved(begins[0].photoId)
+        advanceTimeBy(PhotoSyncer.STALL_MS + 1)
+        runCurrent()
+
+        assertEquals(0, failed())
+    }
+
+    @Test
+    fun `a drop's time does not count toward the wait for an ack either`() = runTest {
+        val (syncer, failed) = sender()
+        syncer.shoot(photo("1", (PhotoSyncer.WINDOW_CHUNKS + 1) * PhotoSyncer.CHUNK_BYTES), takenAt = 1)
+        runCurrent()
+
+        dropLateInTheWait()
+
+        assertEquals(0, failed())
+        assertTrue(ends.isEmpty())
     }
 
     @Test
@@ -1078,6 +1163,43 @@ class PhotoSyncerTest {
         runCurrent()
         assertTrue(syncer.isReceiving())
 
+        advanceTimeBy(2)
+        runCurrent()
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `a drop's time does not end the wait for a photo, which starts over once the link is back`() = runTest {
+        val (syncer, _, _) = receiver()
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        runCurrent()
+
+        dropLateInTheWait()
+        assertTrue(syncer.isReceiving())
+
+        connectedAs(Role.SUBJECT)
+        runCurrent()
+        advanceTimeBy(PhotoSyncer.STALL_MS - 1)
+        runCurrent()
+        assertTrue(syncer.isReceiving())
+        advanceTimeBy(2)
+        runCurrent()
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `a drop too short to be seen starts the wait for a photo over all the same`() = runTest {
+        val (syncer, _, _) = receiver()
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        runCurrent()
+        advanceTimeBy(PhotoSyncer.STALL_MS - 1_000)
+
+        dropTooShortToSee(Role.SUBJECT)
+        runCurrent()
+
+        advanceTimeBy(PhotoSyncer.STALL_MS - 1)
+        runCurrent()
+        assertTrue(syncer.isReceiving())
         advanceTimeBy(2)
         runCurrent()
         assertFalse(syncer.isReceiving())

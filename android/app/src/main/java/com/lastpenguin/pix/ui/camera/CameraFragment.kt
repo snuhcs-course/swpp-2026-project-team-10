@@ -89,6 +89,7 @@ import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
 import com.lastpenguin.pix.ui.showNotice
 import com.lastpenguin.pix.ui.showNoticeOnScreen
 import java.text.DecimalFormat
+import java.util.EnumMap
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
@@ -128,8 +129,11 @@ class CameraFragment :
     private var previewLogged = false
     private var noticeJob: Job? = null
 
-    /** The text of a notice shown without a time of its own ([holdNotice]), until it is let go. */
-    private var heldNotice: String? = null
+    /** The notices shown without a time of their own ([holdNotice]), each until it is let go. */
+    private val heldNotices = EnumMap<HeldNotice, String>(HeldNotice::class.java)
+
+    /** The held notice that shows: the first of [HeldNotice] that is held. */
+    private val heldNotice: String? get() = HeldNotice.entries.firstNotNullOfOrNull { heldNotices[it] }
 
     /** The notice that the subject left or dropped, while it shows; a photo not sent waits for it (#238). */
     private var peerGoneNotice: Job? = null
@@ -520,9 +524,20 @@ class CameraFragment :
                     // The subject's pinch is named from its first step to its end (#292); the ratio's notice replaces it.
                     sessionViewModel.subjectZooming.collect { name ->
                         if (name != null) {
-                            holdNotice(controls, getString(R.string.zoom_held_label, name))
+                            holdNotice(controls, HeldNotice.ZOOMING, getString(R.string.zoom_held_label, name))
                         } else {
-                            letHeldNoticeGo(controls)
+                            letHeldNoticeGo(controls, HeldNotice.ZOOMING)
+                        }
+                    }
+                }
+                launch {
+                    // A dropped link is named for as long as the session tries to restore it (#293); "… disconnected"
+                    // replaces it when the session gives up.
+                    sessionViewModel.reconnectingWith.collect { name ->
+                        if (name != null) {
+                            holdNotice(controls, HeldNotice.RECONNECTING, getString(R.string.peer_reconnecting, name))
+                        } else {
+                            letHeldNoticeGo(controls, HeldNotice.RECONNECTING)
                         }
                     }
                 }
@@ -1886,29 +1901,36 @@ class CameraFragment :
         noticeJob?.cancel()
         return viewLifecycleOwner.lifecycleScope.launch {
             delay(durationMs)
-            // A pinch of the subject's that still goes on has its line back, which this notice took the place of.
+            // What still goes on, a wait for the link or the subject's pinch, has its line back, which this notice
+            // took the place of.
             val held = heldNotice
             if (held != null) controls.noticeText.text = held else controls.noticeText.isVisible = false
         }.also { noticeJob = it }
     }
 
     /**
-     * A notice that stays while what it says goes on, as while the subject pinches (#292): it has no time of its own,
-     * and goes with [letHeldNoticeGo] or when another notice takes its place.
+     * A notice that stays while what it says goes on, as while the subject pinches (#292) or the link is tried again
+     * (#293): it has no time of its own, and goes with [letHeldNoticeGo] or when another notice takes its place. One
+     * that comes later in [HeldNotice] waits under an earlier one.
      */
-    private fun holdNotice(controls: FragmentCameraBinding, text: String) {
+    private fun holdNotice(controls: FragmentCameraBinding, kind: HeldNotice, text: String) {
+        heldNotices[kind] = text
+        if (HeldNotice.entries.first { it in heldNotices } != kind) return
         controls.noticeText.text = text
         controls.noticeText.isVisible = true
         noticeJob?.cancel()
-        heldNotice = text
     }
 
-    /** What the held notice said is over: it goes, unless another notice has taken its place and keeps its own time. */
-    private fun letHeldNoticeGo(controls: FragmentCameraBinding) {
-        val held = heldNotice ?: return
-        heldNotice = null
-        if (noticeJob?.isActive == true || controls.noticeText.text.toString() != held) return
-        controls.noticeText.isVisible = false
+    /**
+     * What a held notice said is over: it goes, and one that waited under it shows, unless another notice has taken its
+     * place and keeps its own time.
+     */
+    private fun letHeldNoticeGo(controls: FragmentCameraBinding, kind: HeldNotice) {
+        val shown = heldNotice
+        heldNotices.remove(kind) ?: return
+        if (noticeJob?.isActive == true || controls.noticeText.text.toString() != shown) return
+        val next = heldNotice
+        if (next != null) controls.noticeText.text = next else controls.noticeText.isVisible = false
     }
 
     /** The subject is back before the notice that it left ended, so the notice no longer holds. */
@@ -1930,6 +1952,9 @@ class CameraFragment :
         viewModel.setAspectsOpen(false)
         viewModel.openPhotos()
     }
+
+    /** What a notice without a time of its own says, the one that shows first when several are held. */
+    private enum class HeldNotice { RECONNECTING, ZOOMING }
 
     companion object {
         private const val PERMISSION_REQUESTED = "camera.permissionRequested"

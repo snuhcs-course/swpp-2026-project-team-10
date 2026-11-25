@@ -39,6 +39,7 @@ import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.IcePath
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.RtcSessionManager
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.session.shoot
@@ -103,6 +104,9 @@ import org.robolectric.shadows.ShadowDialog
  * held under a finger, where nothing moves.
  * The subject's pinch (#292): who is zooming from its first step, for as long as it, replaced by the ratio's notice;
  * taken back, the line goes after a little; another notice meanwhile keeps its own time, and the line is back after it.
+ * A dropped link (#293, FR-6.12): who the phone reconnects with, for the whole wait, gone when the link is back;
+ * replaced by "… disconnected" when the wait ends, and not back after it; another notice meanwhile keeps its own time,
+ * and the line is back after it; a drop during the subject's pinch, where the pinch's end must not take the line down.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -472,6 +476,110 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.noticeText.visibility) }
         idleFor(SessionViewModel.ZOOMING_LINGER_MS + 100)
 
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+    }
+
+    /** The photographer's drop as the session says it: with the subject's name and this phone's role (#293). */
+    private val dropped =
+        SessionState.Reconnecting("s1", 0L, peer = PeerInfo("Joonhyung"), role = Role.PHOTOGRAPHER)
+
+    @Test
+    fun aDroppedLink_saysWhoThePhoneReconnectsWith_forTheWholeWait_untilTheLinkIsBack() {
+        val modules = launch(FakeCameraController())
+        val connected = SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER)
+        modules.session.setState(connected)
+        idle()
+        idleFor(CameraViewModel.NOTICE_MS)
+
+        modules.session.setState(dropped)
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.peer_reconnecting, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+        // Far beyond a notice's own time: it stays as long as the session tries.
+        idleFor(RtcSessionManager.RECONNECT_BUDGET_MS - 1_000)
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.peer_reconnecting, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+
+        modules.session.setState(connected)
+        idle()
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+    }
+
+    @Test
+    fun aLinkThatStaysDown_saysDisconnected_inPlaceOfTheReconnectingLine() {
+        val modules = launch(FakeCameraController())
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        idleFor(CameraViewModel.NOTICE_MS)
+        modules.session.setState(dropped)
+        idle()
+
+        // The session gives the wait up as it does: the subject is gone, then the room waits again.
+        modules.session.deliver(SessionMessage.Leave(EndReason.CONNECTION_LOST))
+        modules.session.setState(SessionState.Waiting("482915"))
+        idle()
+
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.peer_disconnected, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+        idleFor(CameraViewModel.PEER_GONE_NOTICE_MS + 100)
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+    }
+
+    @Test
+    fun anotherNoticeDuringTheWait_keepsItsOwnTime_andThenTheReconnectingLineIsBack() {
+        val modules = launch()
+        onScreen { _, fragment -> fragment.requireActivity().viewModel<SessionViewModel>().startRoom() }
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        idleFor(CameraViewModel.NOTICE_MS)
+        modules.session.setState(dropped)
+        idle()
+
+        // A photo taken meanwhile that cannot be read is not sent, and says so.
+        modules.photos.shoot(Uri.parse("content://media/external/images/media/1"), takenAt = 1)
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.session_photo_not_sent, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+        idleFor(CameraViewModel.NOTICE_MS + 100)
+
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.peer_reconnecting, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+    }
+
+    @Test
+    fun aDropDuringTheSubjectsPinch_keepsTheReconnectingLine_whenThePinchEndsWithIt() {
+        val modules = launch(FakeCameraController())
+        val connected = SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER)
+        modules.session.setState(connected)
+        idle()
+        idleFor(CameraViewModel.NOTICE_MS)
+        modules.session.deliver(SessionMessage.ZoomSet(1.5f, final = false))
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.zoom_held_label, "Joonhyung"), controls.noticeText.text.toString())
+        }
+
+        // The drop ends the pinch too, whose line going must not take this one down.
+        modules.session.setState(dropped)
+        idle()
+        idleFor(SessionViewModel.ZOOMING_LINGER_MS + 100)
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.peer_reconnecting, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+
+        modules.session.setState(connected)
+        idle()
         onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
     }
 

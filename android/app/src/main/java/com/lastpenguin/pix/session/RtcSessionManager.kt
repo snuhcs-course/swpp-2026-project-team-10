@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.os.SystemClock
@@ -54,7 +54,7 @@ internal fun signalingUrl(serverUrl: String): String =
  * 3. **Run the session.** hello, ping, messages on the two channels, reconnecting after a drop, and leaving.
  *
  * Every signaling and WebRTC callback hops onto one serial scope, so the fields below are only touched there
- * (Design 2.8, Concurrency). A link that drops while connected puts both phones in `Reconnecting` for up to 10 s:
+ * (Design 2.8, Concurrency). A link that drops while connected puts both phones in `Reconnecting` for up to 30 s:
  * each takes its place on the server again over a new socket with its rejoin token, and the photographer restarts ICE
  * on the same peer connection (Design 2.6.7). After that, or when the subject leaves, the photographer keeps a room
  * code's room and goes back to `Waiting(code)`, so the subject's *Reconnect* can take its place again (FR-6.10 to
@@ -120,6 +120,9 @@ class RtcSessionManager(
 
     /** The link that dropped while connected, still open, for its one `session_drop` event (Design 2.8, Telemetry). */
     private var drop: DropStart? = null
+
+    /** How many drops the running session came back from, told in [SessionState.Connected.drops]. */
+    private var dropsOver = 0
     private var role: Role? = null
 
     /** The last round trips of this phone's pings, newest last, for [latencyMs]. */
@@ -776,6 +779,7 @@ class RtcSessionManager(
         if (_state.value !is SessionState.Connecting || openChannels.size != 2) return
         connectTimeout?.cancel()
         connectTimeout = null
+        dropsOver = 0
         _state.value = SessionState.Connected(checkNotNull(sessionId), peerInfo(hello), checkNotNull(role), partner)
         Timings.mark("session.connected")
         reportAttempt(failure = null)
@@ -792,12 +796,14 @@ class RtcSessionManager(
     /**
      * The link dropped while connected: both phones try for [RECONNECT_BUDGET_MS] to restore it (Design 2.6.7, NFR-11).
      * The socket is opened again even if it looks open, since one on a network without internet would take OkHttp's
-     * pings longer than the budget to fail; its `session.join` answer starts the photographer's ICE restart.
+     * pings most of the budget to fail; its `session.join` answer starts the photographer's ICE restart.
      */
     private fun startReconnecting() {
         val id = sessionId ?: return
         val since = clock()
-        _state.value = SessionState.Reconnecting(id, since, partner)
+        // What Connected said goes on with the state, for a reader that never saw that Connected (#293).
+        val connected = _state.value as? SessionState.Connected
+        _state.value = SessionState.Reconnecting(id, since, partner, connected?.peer, connected?.role ?: role)
         if (drop == null) drop = role?.let { DropStart(it, elapsed()) }
         Timings.mark("session.reconnecting")
         clearLatency()
@@ -829,7 +835,10 @@ class RtcSessionManager(
         if (Channel.RELIABLE !in openChannels) return
         reconnectBudget?.cancel()
         reconnectBudget = null
-        _state.value = SessionState.Connected(state.sessionId, peerInfo(hello), checkNotNull(role), partner)
+        // Counted, so this state differs from the one before the drop for a reader that never saw Reconnecting (#293).
+        dropsOver++
+        _state.value =
+            SessionState.Connected(state.sessionId, peerInfo(hello), checkNotNull(role), partner, dropsOver)
         Timings.mark("session.reconnected", "${clock() - state.since} ms")
         reportDrop(recovered = true)
     }
@@ -1148,7 +1157,7 @@ class RtcSessionManager(
     }
 
     /**
-     * Ends the open drop with its one event (NFR-11): recovered when the link came back, and not when the 10 s ran out
+     * Ends the open drop with its one event (NFR-11): recovered when the link came back, and not when the 30 s ran out
      * or the session, or the photographer's subject, ended first.
      */
     private fun reportDrop(recovered: Boolean) {
@@ -1171,7 +1180,7 @@ class RtcSessionManager(
         val iceServers: List<IceServer>,
     )
 
-    private companion object {
+    internal companion object {
         const val TAG = "PixSession"
         const val CONNECT_TIMEOUT_MS = 15_000L
 
@@ -1182,7 +1191,7 @@ class RtcSessionManager(
         const val ANSWER_WAIT_MS = 2_000L
 
         /** How long both phones try to restore a dropped link before giving up (FR-6.12, NFR-11). */
-        const val RECONNECT_BUDGET_MS = 10_000L
+        const val RECONNECT_BUDGET_MS = 30_000L
 
         /** A dropped socket is opened again after 1 s, every second while reconnecting, and otherwise doubling to 30 s. */
         const val SOCKET_RETRY_MS = 1_000L

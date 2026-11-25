@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-03, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.signaling.IceServer
@@ -73,19 +73,33 @@ sealed interface SessionState {
 
     data class Connecting(val sessionId: String?) : SessionState
 
-    /** [partner] is the friend of an invitation's session (Design 2.6.6); null in a room code's. */
+    /**
+     * [partner] is the friend of an invitation's session (Design 2.6.6); null in a room code's. [drops] counts the drops
+     * this session came back from, so the state after a drop never equals the one before it: a state flow shows a
+     * reader only its latest value, and a reader that missed the `Reconnecting` between still sees that the link came
+     * back (#293).
+     */
     data class Connected(
         val sessionId: String,
         val peer: PeerInfo,
         val role: Role,
         val partner: SessionPartner? = null,
+        val drops: Int = 0,
     ) : SessionState
 
     /**
-     * Both phones: the link dropped while connected, and the session tries to restore it for up to 10 s from [since],
-     * a time on the session's clock (Design 2.4, 2.6.7; NFR-11). [partner] stays the friend of `Connected`.
+     * Both phones: the link dropped while connected, and the session tries to restore it for up to 30 s from [since],
+     * a time on the session's clock (Design 2.4, 2.6.7; NFR-11). [partner] stays the friend of `Connected`, and [peer]
+     * and [role] stay its too, so a reader that missed that `Connected`, as a state flow's reader can, still knows
+     * whose session reconnects (#293).
      */
-    data class Reconnecting(val sessionId: String, val since: Long, val partner: SessionPartner? = null) : SessionState
+    data class Reconnecting(
+        val sessionId: String,
+        val since: Long,
+        val partner: SessionPartner? = null,
+        val peer: PeerInfo? = null,
+        val role: Role? = null,
+    ) : SessionState
 
     data class Ended(val reason: EndReason) : SessionState
 }

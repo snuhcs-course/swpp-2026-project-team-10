@@ -345,6 +345,22 @@ class KoreanScreensTest {
     }
 
     @Test
+    fun camera_whileTheLinkReconnects_isInKorean() {
+        val modules = camera()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        idle()
+        modules.session.setState(
+            SessionState.Reconnecting("s1", 0L, peer = PeerInfo("Test Account 2"), role = Role.PHOTOGRAPHER),
+        )
+        idle()
+        val root = screen()
+        val notice = FragmentCameraBinding.bind(root).noticeText
+        assertEquals(true, notice.isShown)
+        assertEquals(root.context.getString(R.string.peer_reconnecting, "Test Account 2"), notice.text.toString())
+        assertKorean(root, *people)
+    }
+
+    @Test
     fun camera_inASessionWhileTheSubjectPinches_isInKorean() {
         val modules = camera()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))

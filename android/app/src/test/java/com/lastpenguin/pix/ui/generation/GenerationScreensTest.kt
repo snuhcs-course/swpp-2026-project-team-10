@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.animation.Animator
@@ -84,8 +84,8 @@ import org.robolectric.shadows.ShadowChoreographer
  * in once, and none to come when the screen opens again from a set (#296; its move is in SceneArrivalTest); Back and system back to the camera to
  * shoot again, the text kept (#296); Back (the photo's review on Camera, the text kept); in a session, the hint, this
  * phone's typing holding the field, the subject's typing shown and holding it, and the subject's Generate 4 poses that
- * comes first, which opens Generating poses (Design 2.6.5). Generating poses: the set
- * planned, candidates arriving with the count, all ready (to Pick a pose), none ready (to Couldn't create poses),
+ * comes first, which opens Generating poses (Design 2.6.5). Generating poses: the situation named on the photo's card
+ * as on Generate poses, Auto naming none; the set planned, candidates arriving with the count, all ready (to Pick a pose), none ready (to Couldn't create poses),
  * Back and system back, at once (the run stopped, Generate poses with the photo and the text, #297), a pose that came
  * before Back (kept in the library, and Generate poses told). Pick a pose: only the ready
  * candidates, one per page with a counter; the page on screen is the selected pose, so Select works at once and takes
@@ -602,6 +602,21 @@ class GenerationScreensTest {
     // ---- Generating poses ------------------------------------------------------------
 
     @Test
+    fun generating_namesTheSituationOnThePhotosCard_asGeneratePosesDoes() {
+        modules()
+        val (s, _) = launchPrepared<GeneratingFragment>(R.id.generatingFragment) {
+            describing(it, Situation.FULL_BODY).apply { generate("hands on hips") }
+        }
+        scenario = s
+
+        s.onFragment {
+            val binding = FragmentGeneratingBinding.bind(it.requireView())
+            assertEquals(View.VISIBLE, binding.situationTag.visibility)
+            assertEquals(string(R.string.situation_full_body), binding.situationTag.text.toString())
+        }
+    }
+
+    @Test
     fun generating_countsTheCandidatesAsTheyArrive_andOpensPickAPoseWhenDone() {
         val modules = modules()
         val (s, nav) = launchPrepared<GeneratingFragment>(R.id.generatingFragment) { generating(it) }
@@ -612,6 +627,8 @@ class GenerationScreensTest {
             val binding = FragmentGeneratingBinding.bind(fragment.requireView())
             assertNotNull(binding.sceneImage.drawable)
             assertEquals(string(R.string.creating_pose), binding.readyCount.text.toString())
+            // Auto, as Generate poses has it: no situation named.
+            assertEquals(View.GONE, binding.situationTag.visibility)
         }
 
         run.plan(poses)

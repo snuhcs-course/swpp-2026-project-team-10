@@ -1,7 +1,8 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.guide
 
 import android.content.DialogInterface
+import android.view.View
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.EditText
 import android.widget.TextView
@@ -11,6 +12,7 @@ import androidx.core.view.children
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.testing.TestNavHostController
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.android.material.chip.Chip
 import com.lastpenguin.pix.R
@@ -41,13 +43,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
-import org.robolectric.shadows.ShadowPopupMenu
 
 /*
  * The library (FR-3.11, R&S 6.2), on the real screen. Partitions: nothing saved (the empty state and how guides come,
@@ -65,7 +67,9 @@ import org.robolectric.shadows.ShadowPopupMenu
  * names *Select* (selecting with that guide: the count, its mark, Select all, Delete at the bottom, no pencil or ♥), a tap while selecting (selects another, never uses it; on a selected one, takes it out), Select all,
  * none selected (Delete off), Delete (asks with the count: Cancel keeps them, Delete removes them and stops selecting),
  * ✕ and Back (stop selecting, the library stays); ⋮ with Select (selecting with none) and Select all (selecting with
- * every guide the tab lists, which Delete then removes after asking).
+ * every guide the tab lists, which Delete then removes after asking). Another tab (its list at its top the first time,
+ * and where it was left when it comes back, in place of the last list rather than moving its guides, the grid's own
+ * motion back for a change within the list).
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -510,10 +514,51 @@ class LibraryFragmentTest {
         assertEquals("All 3", onScreen { it.filterAll.text.toString() })
     }
 
-    /** Taps [id] in the ⋮ menu that is open. */
+    @Test
+    fun anotherTab_showsItsListAtItsTop_andAListComesBackWhereItWasLeft() {
+        val store = SavedGuideStore.InMemory()
+        runBlocking {
+            for (i in 1..12) store.save(saved("photo-$i"), GuideState(), favorite = i % 6 == 0)
+        }
+        launch(TestAppContainer(saved = store))
+        idleUntil { itemCount() == 12 }
+        val motion = onScreen { it.libraryGrid.itemAnimator }
+        assertNotNull(motion)
+        // Down All's list.
+        onScreen { it.libraryGrid.scrollToPosition(11) }
+        idle()
+        val left = firstShown()
+        assertTrue("$left", left > 0)
+
+        // Favorites: at its top, not under All's scroll.
+        onScreen { it.filterFavorites.performClick() }
+        idleUntil { itemCount() == 2 }
+        idle()
+        assertEquals(0, firstShown())
+
+        // All again: where it was left, and the grid moves its guides again for a change within the list.
+        onScreen { it.filterAll.performClick() }
+        idleUntil { itemCount() == 12 }
+        idle()
+        assertEquals(left, firstShown())
+        assertSame(motion, onScreen { it.libraryGrid.itemAnimator })
+        assertEquals(1f, onScreen { it.libraryGrid.alpha }, 0f)
+    }
+
+    /** The first guide the grid shows, by its place in the list. */
+    private fun firstShown(): Int =
+        onScreen { (it.libraryGrid.layoutManager as GridLayoutManager).findFirstVisibleItemPosition() }
+
+    /** Taps [id] in the ⋮ menu that is open, a card in the screens' look, which the tap closes. */
     private fun clickMenuItem(id: Int) {
-        val menu = ShadowPopupMenu.getLatestPopupMenu()
-        shadowOf(menu).onMenuItemClickListener.onMenuItemClick(menu.menu.findItem(id))
+        scenario!!.onFragment { fragment ->
+            val menu = checkNotNull(fragment.moreMenu)
+            assertTrue(menu.isShowing)
+            assertEquals(R.drawable.bg_menu_card, shadowOf(menu.background).createdFromResId)
+            menu.contentView.findViewById<View>(id).performClick()
+            assertFalse(menu.isShowing)
+            assertNull(fragment.moreMenu)
+        }
         idle()
     }
 

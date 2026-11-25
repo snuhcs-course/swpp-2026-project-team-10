@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A thumbnail under a touch, such as a guide in the library or an album on the gallery's Albums tab: the light in the
+     thumbnail's own rounded shape, 16 dp at the corners as ShapeAppearance.Pix.Thumbnail, not a square over it. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/colorControlHighlight">
+    <item android:id="@android:id/mask">
+        <shape android:shape="rectangle">
+            <corners android:radius="16dp" />
+            <solid android:color="@color/pix_text" />
+        </shape>
+    </item>
+</ripple>

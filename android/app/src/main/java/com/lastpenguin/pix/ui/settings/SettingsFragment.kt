@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.content.ActivityNotFoundException
@@ -80,7 +80,10 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         binding.notificationsRow.settingTitle.setText(R.string.settings_notifications)
         binding.notificationsRow.root.setOnClickListener { openNotificationSettings() }
         binding.consentRow.settingTitle.setText(R.string.settings_ai_consent)
-        binding.consentRow.root.setOnClickListener { confirmWithdrawal() }
+        // The row and its text are one tap target, which lights whole (consentItem); the row draws no light of its own,
+        // which its item's press would light too.
+        binding.consentRow.root.background = null
+        binding.consentItem.setOnClickListener { confirmWithdrawal() }
         binding.privacyPolicyRow.settingTitle.setText(R.string.settings_privacy_policy)
         binding.privacyPolicyRow.settingValue.isVisible = false
         binding.privacyPolicyRow.root.setOnClickListener { openPrivacyPolicy(R.id.settingsFragment) }
@@ -106,7 +109,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
                 launch { viewModel.shareUsage.collect { renderUsage(binding, it) } }
                 launch { viewModel.account.collect { renderAccount(binding.accountRow, it) } }
                 // Followed, not read once: Android may restore Pix straight to this screen before the answer loads.
-                launch { generationViewModel.consentGiven.collect { renderConsent(binding.consentRow, it) } }
+                launch { generationViewModel.consentGiven.collect { renderConsent(binding, it) } }
             }
         }
     }
@@ -215,11 +218,12 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
 
     // ---- AI consent (FR-4.2) ------------------------------------------------------------------------------------
 
-    private fun renderConsent(row: ItemSettingRowBinding, given: Boolean) {
+    private fun renderConsent(binding: FragmentSettingsBinding, given: Boolean) {
+        val row = binding.consentRow
         row.settingValue.setText(if (given) R.string.settings_consent_given else R.string.settings_consent_not_given)
         // Only an agreement can be taken back; without one, Pix asks before it sends anything.
         row.settingChevron.isVisible = given
-        row.root.isClickable = given
+        binding.consentItem.isClickable = given
         // The row's end padding leaves room for the chevron, whose tip is 16 dp from the edge; without it, the value
         // ends there itself.
         row.settingValue.updateLayoutParams<ViewGroup.MarginLayoutParams> {

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Pix ID setup, for an account made with Google (R&S 6.8; FR-5.2, FR-5.3, FR-5.15, US-6). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:clipChildren="false"
+    android:clipToPadding="false"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"

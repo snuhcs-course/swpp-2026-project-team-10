@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.animation.ValueAnimator
@@ -39,6 +39,7 @@ import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.partner
 import com.lastpenguin.pix.settings.TutorialScreen
+import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
@@ -91,14 +92,18 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose), ScenePho
             viewModel.sceneArrived()
             if (savedInstanceState == null) {
                 binding.root.doOnLayout {
-                    // As the camera held it: a photo taken sideways turns upright on its way.
+                    // This screen starts as the camera looked and unfolds as the photo moves, the bar growing into the
+                    // header (#210). As the camera held it: a photo taken sideways turns upright on its way.
+                    val unfold = SceneHandOff.take()?.takeIf { Motion.on() }?.let { HeaderUnfold(binding, it) }
                     val arrival =
                         binding.root.showArriving(
                             state.scene,
                             binding.sceneImage,
                             binding.flowProgress,
                             state.sceneTurn,
+                            unfold?.photo,
                         )
+                    if (arrival != null) unfold?.follow(arrival) else unfold?.finish()
                     sceneArrival = arrival?.animator?.also { it.doOnEnd { sceneArrival = null } }
                 }
             }

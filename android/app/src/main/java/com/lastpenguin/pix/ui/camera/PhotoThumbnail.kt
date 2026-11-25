@@ -1,9 +1,10 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
+import android.media.ThumbnailUtils
 import android.net.Uri
 import android.util.Size
 import android.view.View
@@ -27,6 +28,17 @@ private const val THUMBNAIL_START_SCALE = 0.6f
 /** A saved photo's thumbnail, from MediaStore; off the main thread. */
 internal fun Context.photoThumbnail(uri: Uri): Bitmap =
     contentResolver.loadThumbnail(uri, Size(THUMBNAIL_PX, THUMBNAIL_PX), null)
+
+/**
+ * A square of a saved photo for the viewer's grid, [px] on each side, cut from its middle (FR-1.6); off the main
+ * thread. MediaStore is asked for twice the size, since it shrinks its own thumbnail by whole steps down to the size
+ * asked for, and the asked square of a wide photo would come smaller than the square cut from it; the cut then keeps
+ * only the pixels the square shows.
+ */
+internal fun Context.photoCell(uri: Uri, px: Int): Bitmap {
+    val thumbnail = contentResolver.loadThumbnail(uri, Size(px * 2, px * 2), null)
+    return ThumbnailUtils.extractThumbnail(thumbnail, px, px, ThumbnailUtils.OPTIONS_RECYCLE_INPUT)
+}
 
 /**
  * A saved photo at most as large as the screen's long side, turned as its EXIF says, for a viewer to show whole; off

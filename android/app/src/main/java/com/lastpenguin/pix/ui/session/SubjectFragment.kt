@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.animation.Animator
@@ -42,6 +42,7 @@ import com.lastpenguin.pix.session.PhotographerAction
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.settings.TutorialScreen
+import com.lastpenguin.pix.ui.FlowProgressView
 import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.NoticeAnchor
 import com.lastpenguin.pix.ui.NoticeLength
@@ -263,6 +264,8 @@ class SubjectFragment :
             viewModel.setBrightnessOpen(false)
         }
         setupMenu(binding)
+        // The pose flow's bar starts empty on the subject's first step (#210), whatever this phone showed before.
+        FlowProgressView.shownStep = 0
         // The session's photos open over the video, inside Pix, so the session goes on (FR-6.14).
         binding.galleryButton.setOnClickListener { viewModel.openPhotos() }
         val photoViewer =
@@ -273,6 +276,7 @@ class SubjectFragment :
                 thumbnail = { thumbnailOf(it) },
                 onBack = viewModel::closePhotos,
                 onDelete = viewModel::deletePhoto,
+                opensFrom = binding.galleryButton,
             )
         this.photoViewer = photoViewer
         binding.guideButton.setOnClickListener { findNavController().navigate(R.id.action_subject_to_addGuide) }

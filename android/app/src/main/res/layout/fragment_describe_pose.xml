@@ -6,12 +6,15 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/pix_ground"
     android:fillViewport="true">
 
     <LinearLayout
+        android:clipChildren="false"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
+        android:clipToPadding="false"
         android:paddingHorizontal="20dp"
         android:paddingTop="8dp"
         android:paddingBottom="20dp">
@@ -29,6 +32,7 @@
                 android:contentDescription="@string/back" />
 
             <TextView
+                android:id="@+id/describeTitle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
@@ -50,7 +54,8 @@
         </LinearLayout>
 
         <!-- Where this screen is in the pose flow (R&S 6.3, #210): Generate poses, 2 of 4. Across the screen, past this
-             layout's padding. -->
+             layout's padding. The layout draws past its padding, so the bar reaches the edges on
+             screen too. -->
         <com.lastpenguin.pix.ui.FlowProgressView
             android:id="@+id/flowProgress"
             android:layout_width="match_parent"

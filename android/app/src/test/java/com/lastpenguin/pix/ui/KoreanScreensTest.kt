@@ -134,7 +134,7 @@ import org.robolectric.shadows.ShadowDialog
 /*
  * Every screen in Korean (FR-10.2, Iter3-P7; Testing Documentation 2.1.6): the real Fragments on the fakes, with the
  * phone in Korean, at the Galaxy S22's app area of 360 x 705 dp. Each screen in the states that show its texts: Camera
- * without camera access, without a guide, with one, with a generated guide's tip being asked for and with the longest
+ * without camera access, without a guide, with the camera menu open, with the timer counting down (FR-1.17), with one, with a generated guide's tip being asked for and with the longest
  * Korean tip the server writes, taking and reviewing the scene photo, a scene photo without a person, and in a
  * session; Add a pose
  * guide with a saved guide; Reference confirm with the person found, with a screenshot cut to its photo, and with the
@@ -146,7 +146,8 @@ import org.robolectric.shadows.ShadowDialog
  * with Google;
  * Pix ID setup; Account, with
  * "Delete your Pix account?"; the room code; See their
- * camera; Session not found; Subject view, with whose camera it is and its notice, with a photo on its way (#271),
+ * camera; Session not found; Subject view, with whose camera it is and its notice, with the camera menu open and with
+ * the photographer's countdown (FR-1.17), with a photo on its way (#271),
  * with the brightness bar up after a tap on the video (FR-7.7), with the photographer's tip closed and open,
  * and while the photographer picks a pose, with a guide to save, and with the session's photos open in the viewer,
  * readable or not (Iter4-A2); the subject's Pick a pose; Connection lost; Camera in a session with its photos open in the
@@ -211,6 +212,27 @@ class KoreanScreensTest {
     fun camera_withTheRatiosOpen_isInKorean() {
         camera()
         scenario!!.onFragment { FragmentCameraBinding.bind(it.requireView()).aspectButton.performClick() }
+        assertKorean(screen())
+    }
+
+    @Test
+    fun camera_withTheMenuOpen_isInKorean() {
+        camera()
+        scenario!!.onFragment { FragmentCameraBinding.bind(it.requireView()).cameraMenuButton.performClick() }
+        idle()
+        // The timer chosen, for its notice.
+        scenario!!.onFragment { FragmentCameraBinding.bind(it.requireView()).menuTimer.performClick() }
+        assertKorean(screen())
+    }
+
+    @Test
+    fun camera_whileTheTimerCountsDown_isInKorean() {
+        camera()
+        scenario!!.onFragment { FragmentCameraBinding.bind(it.requireView()).cameraMenuButton.performClick() }
+        idle()
+        scenario!!.onFragment { FragmentCameraBinding.bind(it.requireView()).menuTimer.performClick() }
+        idle()
+        scenario!!.onFragment { FragmentCameraBinding.bind(it.requireView()).shutterButton.performClick() }
         assertKorean(screen())
     }
 
@@ -985,6 +1007,26 @@ class KoreanScreensTest {
             // The brightness's value is a number with its sign, as on the bar.
             assertKorean(root, *people, "+1.0")
         }
+    }
+
+    @Test
+    @Config(shadows = [ShadowSurfaceViewRenderer::class], instrumentedPackages = ["org.webrtc"])
+    fun subjectView_withTheMenuOpen_andWithThePhotographersCountdown_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.SUBJECT))
+        modules.video.deliverFrame()
+        modules.session.deliver(
+            SessionMessage.Capabilities(CameraCapabilities(0.6f, 10f, listOf(1f, 2f), -4..4, 0.5f, true)),
+        )
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        scenario!!.onFragment { FragmentSubjectBinding.bind(it.requireView()).cameraMenuButton.performClick() }
+        assertKorean(screen(), *people)
+
+        scenario!!.onFragment { FragmentSubjectBinding.bind(it.requireView()).cameraMenuButton.performClick() }
+        modules.session.deliver(SessionMessage.Countdown(3))
+        assertKorean(screen(), *people)
     }
 
     @Test

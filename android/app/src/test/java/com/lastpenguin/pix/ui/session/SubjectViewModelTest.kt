@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -69,7 +69,10 @@ import org.junit.Test
  * each action a line, and none for an action this phone does not know or a ratio that is no number; the
  * photographer's own focus a line at the first tap, not at a tap while it shows or in the quiet time after it (just
  * before its end / at its end), with its box at every tap; the photographer's pinch holding the zoom (zooming here),
- * free again, and this phone's own pinch holding it (not the photographer's).
+ * free again, and this phone's own pinch holding it (not the photographer's). The photographer's countdown
+ * (`camera.timer`, FR-1.17): each second shown, 0 ending it, a second whose next never comes gone after its wait (1 ms
+ * before / at it), and the session dropping; the flash while it runs (nothing sent) and after its 0. The camera menu:
+ * open and closed.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SubjectViewModelTest {
@@ -138,6 +141,64 @@ class SubjectViewModelTest {
 
     private fun exposures(): List<SessionMessage.ExposureSet> =
         session.sent.filterIsInstance<SessionMessage.ExposureSet>()
+
+    // ---- The photographer's countdown (FR-1.17) ----------------------------------------------------------------
+
+    @Test
+    fun `the photographer's countdown shows each second, and 0 ends it`() = runTest(dispatcher) {
+        connect()
+        runCurrent()
+
+        val shown = listOf(3, 2, 1, 0).map { left ->
+            session.deliver(SessionMessage.Countdown(left))
+            runCurrent()
+            viewModel.uiState.value.countdown
+        }
+
+        assertEquals(listOf(3, 2, 1, null), shown)
+    }
+
+    @Test
+    fun `a second of the countdown whose next never comes goes after its wait`() = runTest(dispatcher) {
+        connect()
+        runCurrent()
+        session.deliver(SessionMessage.Countdown(2))
+        runCurrent()
+
+        advanceTimeBy(SubjectViewModel.COUNTDOWN_STALE_MS - 1)
+        runCurrent()
+        assertEquals(2, viewModel.uiState.value.countdown)
+        advanceTimeBy(1)
+        runCurrent()
+
+        assertNull(viewModel.uiState.value.countdown)
+    }
+
+    @Test
+    fun `the countdown goes when the session drops`() = runTest(dispatcher) {
+        connect()
+        runCurrent()
+        session.deliver(SessionMessage.Countdown(3))
+        runCurrent()
+
+        session.setState(SessionState.Reconnecting("s_1", since = 0L))
+        runCurrent()
+
+        assertNull(viewModel.uiState.value.countdown)
+    }
+
+    @Test
+    fun `the camera menu opens and closes`() = runTest(dispatcher) {
+        connect()
+        runCurrent()
+
+        viewModel.setMenuOpen(true)
+        val open = viewModel.uiState.value.menuOpen
+        viewModel.setMenuOpen(false)
+
+        assertTrue(open)
+        assertFalse(viewModel.uiState.value.menuOpen)
+    }
 
     @Test
     fun `connecting fills the name and the zoom range, and enables remote zoom`() = runTest(dispatcher) {
@@ -917,6 +978,26 @@ class SubjectViewModelTest {
         session.deliver(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, flash = FlashMode.AUTO))
         runCurrent()
         assertEquals(FlashMode.AUTO, viewModel.uiState.value.flash)
+    }
+
+    @Test
+    fun `the flash waits while the photographer's countdown runs`() = runTest(dispatcher) {
+        connectWithControls()
+        runCurrent()
+        session.deliver(SessionMessage.Countdown(3))
+        runCurrent()
+
+        viewModel.onFlashTap()
+        assertEquals(FlashMode.OFF, viewModel.uiState.value.flash)
+        assertTrue(session.sent.none { it is SessionMessage.FlashSet })
+
+        session.deliver(SessionMessage.Countdown(0))
+        runCurrent()
+        viewModel.onFlashTap()
+        assertEquals(
+            listOf(SessionMessage.FlashSet(FlashMode.AUTO)),
+            session.sent.filterIsInstance<SessionMessage.FlashSet>(),
+        )
     }
 
     // ---- Save guide (FR-6.16) and the photographer's set (FR-6.15), Iter3-P16 ---------------------------------------

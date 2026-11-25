@@ -25,6 +25,20 @@
         <item name="android:textColor">@color/pix_text</item>
     </style>
 
+    <!-- The shutter's countdown over the image (FR-1.17): large enough to read from where the people in the photo stand,
+         with a shadow so it shows on a bright scene. Its size is the view's, in dp (#298): a larger font would not fit
+         the number's square. -->
+    <style name="TextAppearance.Pix.Countdown" parent="TextAppearance.Material3.DisplayLarge">
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_extrabold</item>
+        <item name="fontFamily">@font/pix_extrabold</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textColor">@color/pix_text</item>
+        <item name="android:shadowColor">@color/camera_dim</item>
+        <item name="android:shadowDy">4</item>
+        <item name="android:shadowRadius">24</item>
+    </style>
+
     <style name="TextAppearance.Pix.Header" parent="TextAppearance.Material3.TitleMedium">
         <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
         <item name="android:fontFamily">@font/pix_bold</item>
@@ -308,27 +322,38 @@
         <item name="strokeWidth">1dp</item>
     </style>
 
-    <!-- The top bar's flash: an icon without a shape, like the brightness button, in the middle of the bar's 44 dp,
-         with a 48 x 48 dp touch area whose last 4 dp reach over the image's top edge. -->
+    <!-- An icon in the top bar, such as the camera menu's button and the camera switch: no shape at rest, and under a
+         touch, or while its panel is open, the bar's 32 dp tall pill, as the ratio's, centered on the bar's line above
+         its last 4 dp, which reach over the image's top edge. A TurningButton's pill and touch area are 50 dp wide. The padding is 0 above and
+         below, or the insets would make the bar taller. -->
     <style name="Widget.Pix.Button.Icon.TopBar">
         <item name="android:minWidth">48dp</item>
         <item name="android:minHeight">52dp</item>
-        <item name="android:insetTop">0dp</item>
-        <item name="android:insetBottom">4dp</item>
+        <item name="android:insetTop">@dimen/top_bar_pill_inset_top</item>
+        <item name="android:insetBottom">@dimen/top_bar_pill_inset_bottom</item>
+        <item name="android:paddingTop">0dp</item>
+        <item name="android:paddingBottom">0dp</item>
+        <!-- It has no text, but a button measures a line of it: in dp, the empty line fits the pill at any font, or at
+             200 % it would make the button and the bar 2 dp taller. -->
+        <item name="android:textSize" tools:ignore="SpUsage">12dp</item>
         <item name="android:paddingStart">13dp</item>
         <item name="android:paddingEnd">13dp</item>
         <item name="iconSize">16dp</item>
     </style>
 
-    <!-- The top bar's aspect ratio: its label alone, without a shape, the size of the top bar's other text, in a 48 x 52 dp
-         touch area that adds 8 dp after the label and 4 dp below the bar, so the label stays where it was. -->
+    <!-- The top bar's aspect ratio: its label alone, the size of the top bar's other text, in a 50 x 52 dp touch area.
+         Under a touch, or while the ratios are open, the bar's pill around the label, 50 x 32 dp as the icons' are, wider
+         only for a label at a large font. -->
     <style name="Widget.Pix.Button.Text.TopBar">
-        <item name="android:minWidth">48dp</item>
+        <item name="android:minWidth">50dp</item>
         <item name="android:minHeight">52dp</item>
-        <item name="android:paddingStart">8dp</item>
-        <item name="android:paddingEnd">16dp</item>
-        <item name="android:paddingTop">6dp</item>
-        <item name="android:paddingBottom">10dp</item>
+        <item name="android:insetTop">@dimen/top_bar_pill_inset_top</item>
+        <item name="android:insetBottom">@dimen/top_bar_pill_inset_bottom</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:paddingTop">0dp</item>
+        <item name="android:paddingBottom">0dp</item>
+        <item name="backgroundTint">@color/camera_top_bar_button_background</item>
         <item name="android:textColor">@color/button_secondary_text</item>
         <item name="rippleColor">@color/pix_ripple_strong</item>
         <item name="android:textSize">12sp</item>
@@ -359,6 +384,48 @@
         <item name="fontFamily">@font/pix_semibold</item>
         <item name="android:textColor">@color/aspect_option</item>
         <item name="android:textSize">8sp</item>
+    </style>
+
+    <!-- An item of the camera menu under the top bar (FR-1.17): its icon over a one-word label, in a 48 dp wide, 64 dp
+         tall touch area (NFR-16); both in the accent while what it sets is on (activated). -->
+    <style name="Widget.Pix.CameraMenuOption" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">64dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:minWidth">48dp</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:gravity">center</item>
+        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <style name="Widget.Pix.CameraMenuOption.Icon" parent="">
+        <item name="android:layout_width">24dp</item>
+        <item name="android:layout_height">24dp</item>
+        <item name="android:duplicateParentState">true</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="tint">@color/camera_menu_option</item>
+    </style>
+
+    <!-- The item's label, 11 sp in the medium face, shrinking toward 8 dp only where a large font would not fit it on
+         its line (#298). -->
+    <style name="Widget.Pix.CameraMenuOption.Label" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">16dp</item>
+        <item name="android:layout_marginTop">6dp</item>
+        <item name="android:autoSizeMaxTextSize">11sp</item>
+        <item name="android:autoSizeMinTextSize">8dp</item>
+        <item name="android:autoSizeTextType">uniform</item>
+        <item name="android:duplicateParentState">true</item>
+        <item name="android:gravity">center</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Caption</item>
+        <item name="android:fontFamily">@font/pix_medium</item>
+        <item name="fontFamily">@font/pix_medium</item>
+        <item name="android:textColor">@color/camera_menu_option</item>
     </style>
 
     <!-- One part of a switch, such as the library's filters or Thin / Normal / Thick; selection is View.isSelected.

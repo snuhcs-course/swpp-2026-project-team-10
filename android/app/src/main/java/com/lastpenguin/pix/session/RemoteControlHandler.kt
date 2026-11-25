@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraController
@@ -70,7 +70,7 @@ sealed interface RemoteAction {
  *
  * **Focus (It 5, FR-7.7).** `camera.focus.set` is the subject's tap, in fractions of the photographer's frame as the
  * photographer's preview shows it. It does what a tap on Camera does (FR-1.4): the camera focuses and meters there
- * when it can focus on a point, and the brightness goes back to the photographer's base ([baseBrightness], FR-1.11).
+ * when it can focus on a point, and the brightness goes back to the base, 0 EV (FR-1.11).
  * The point has no echo, since focus has no lasting state. The tap is answered with the `camera.state` that carries
  * the base, as the subject's and marked `focused`, so the subject's bar knows where a drag starts from and takes no
  * other echo for it: at once when the camera has the base already, and otherwise when the camera reports it, or
@@ -94,8 +94,6 @@ class RemoteControlHandler(
     private val clock: () -> Long = System::currentTimeMillis,
     /** Who holds the zoom; `CameraViewModel` takes it for the photographer's own pinch. */
     val zoomHold: ZoomHold = ZoomHold(),
-    /** The photographer's base brightness from Settings, in EV (FR-1.11), which a remote tap to focus sets again. */
-    private val baseBrightness: StateFlow<Float> = MutableStateFlow(0f),
 ) {
     private val _actions = MutableSharedFlow<RemoteAction>(extraBufferCapacity = 16)
 
@@ -119,6 +117,9 @@ class RemoteControlHandler(
     private var zoomSettled = true
     private var pendingExposure: PendingValue<Int>? = null
     private var pendingFlash: PendingValue<FlashMode>? = null
+
+    // True while the photographer's timer counts down (countdownHere): the subject's flash waits, as theirs does.
+    private var photographerCounting = false
 
     // The base brightness a tap to focus asked for, until the camera reports it: its echo is the subject's, without
     // the notice of a brightness the subject chose.
@@ -192,6 +193,17 @@ class RemoteControlHandler(
         if (scope == null) return
         session.send(action.toMessage())
         Timings.mark("did.told", action.toMessage().action)
+    }
+
+    /**
+     * The photographer's timer has [left] seconds before its photo, or 0 as it ends (FR-1.17): the subject's phone
+     * shows the countdown too. Only while a session runs.
+     */
+    fun countdownHere(left: Int) {
+        photographerCounting = left > 0
+        if (scope == null) return
+        session.send(SessionMessage.Countdown(left))
+        Timings.mark("timer.told", "$left")
     }
 
     /** Handles the subject's requests; other messages are ignored. */
@@ -348,10 +360,13 @@ class RemoteControlHandler(
         }
     }
 
-    /** `camera.flash.set`: applied when the camera has a flash; otherwise ignored with an unchanged echo. */
+    /**
+     * `camera.flash.set`: applied when the camera has a flash; otherwise ignored with an unchanged echo, and so while
+     * the photographer's timer counts down, as their own Flash waits then (FR-1.17).
+     */
     private fun handleFlash(request: SessionMessage.FlashSet) {
         Timings.mark("flash.received", "${request.mode}")
-        if (camera.capabilities.value?.hasFlash != true) {
+        if (camera.capabilities.value?.hasFlash != true || photographerCounting) {
             send(camera.zoom.value, Role.PHOTOGRAPHER, final = true)
             return
         }
@@ -390,9 +405,9 @@ class RemoteControlHandler(
         if (camera.status.value != CameraStatus.READY) return
         val caps = camera.capabilities.value ?: return
         // The subject's phone asks only of a camera that focuses on a point or has a brightness range.
-        if (!caps.supportsFocusPoint && caps.baseExposureIndex(baseBrightness.value) == null) return
+        if (!caps.supportsFocusPoint && caps.baseExposureIndex() == null) return
         if (caps.supportsFocusPoint) camera.setFocusPoint(x, y)
-        val base = caps.baseExposureIndex(baseBrightness.value)
+        val base = caps.baseExposureIndex()
         if (base == null || (pendingExposure == null && camera.state.value.exposure == base)) {
             // No brightness to set, or already there with nothing outstanding, so the camera will not emit again:
             // answered now.

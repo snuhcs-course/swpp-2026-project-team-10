@@ -75,7 +75,8 @@
     <!-- The shutter while the scene photo for poses is framed (R&S 6.3, #210), and its disc while pressed. -->
     <color name="camera_shutter_scene">#F2C14E</color>
     <color name="camera_shutter_scene_pressed">#D6A93F</color>
-    <!-- The panels over the image (the ratios, the guide's controls) and their edge, 12,12,14 at 62%. -->
+    <!-- The panels over the image (the ratios, the camera menu, the guide's controls) and their edge, 12,12,14 at
+         62%. -->
     <color name="camera_panel">#9E0C0C0E</color>
     <color name="camera_panel_stroke">#1FFFFFFF</color>
     <!-- The inside of the chosen ratio's shape. -->

@@ -459,6 +459,16 @@ sealed interface SessionMessage {
     data class Focused(val x: Float, val y: Float) : SessionMessage
 
     /**
+     * P→S: the photographer's shutter timer (FR-1.17): the seconds [left] while it counts down, one message a second
+     * from the timer's seconds to 1, then 0 as it ends, with its photo or cancelled. The subject's phone shows the
+     * number. Not kept: a phone that connects during a countdown sees it from its next second, and an older subject
+     * ignores the type.
+     */
+    @Serializable
+    @SerialName("camera.timer")
+    data class Countdown(val left: Int) : SessionMessage
+
+    /**
      * What the photographer did on their own camera (P → S, #292): the subject's phone says it in a line, as the
      * photographer's phone says the subject's (FR-7.4). [action] is a name, kept a string so that a phone that does
      * not know one drops only that line: `zoom` with [zoom], `brightness` with [exposure], `flash` with [flash],

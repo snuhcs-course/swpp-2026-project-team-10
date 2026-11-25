@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -1208,28 +1208,23 @@ class CameraFragmentInteractionTest {
     }
 
     @Test
-    fun theBaseBrightnessFromSettings_isWhereTheCameraStarts_andEachTapToFocusGoesBackToIt() {
-        // 0.5 EV per index: +1 EV is index 2.
+    fun theCameraStartsAt0Ev_andEachTapToFocusGoesBackToIt() {
         val camera = FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true)
-        val modules = launch(camera)
+        launch(camera)
         assertEquals(0, camera.exposureRequests.last())
-
-        runBlocking { modules.appSettings.setBaseBrightness(1f) }
-        idle()
-        assertEquals(2, camera.exposureRequests.last())
 
         onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 3f) }
         idle()
         onScreen { controls, _ -> drag(controls.exposureBar, steps = 2) }
         idle()
-        assertEquals(4, camera.exposureRequests.last())
+        assertEquals(2, camera.exposureRequests.last())
 
-        // A new focus drops what the drag added, and keeps the base; past the double-tap time, or the detector would take
-        // the two taps for one double tap.
+        // A new focus drops what the drag added; past the double-tap time, or the detector would take the two taps for
+        // one double tap.
         shadowOf(Looper.getMainLooper()).idleFor(ViewConfiguration.getDoubleTapTimeout() + 100L, TimeUnit.MILLISECONDS)
         onScreen { controls, _ -> tapPreview(controls, controls.previewView.width / 2f) }
         idle()
-        assertEquals(2, camera.exposureRequests.last())
+        assertEquals(0, camera.exposureRequests.last())
         assertEquals(2, camera.focusPoints.size)
     }
 

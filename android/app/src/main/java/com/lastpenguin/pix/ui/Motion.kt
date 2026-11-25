@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui
 
 import android.animation.Animator
@@ -8,6 +8,7 @@ import android.animation.PropertyValuesHolder
 import android.animation.ValueAnimator
 import android.view.View
 import android.view.animation.PathInterpolator
+import androidx.core.view.isVisible
 import com.lastpenguin.pix.R
 
 /**
@@ -48,6 +49,9 @@ internal object Motion {
 
     /** A situation's tile dimming and shrinking under the finger, and back (#243). */
     const val PRESS_MS = 100L
+
+    /** A panel under the camera's top bar, the camera menu or the ratios, coming in as it opens (#272). */
+    const val PANEL_MS = 150L
 
     /** Material's standard curve: quick to start, slow to settle. */
     val STANDARD = PathInterpolator(0.4f, 0f, 0.2f, 1f)
@@ -95,6 +99,27 @@ internal fun View.unpop() {
     scaleX = 1f
     scaleY = 1f
 }
+
+/**
+ * Shows or hides a panel under the camera's top bar, the camera menu or the ratios (#272). Opening, it fades in as it
+ * comes down [PANEL_DROP_DP] from under the bar, in [Motion.PANEL_MS]; closing, it goes at once, so the other panel or
+ * the image is there with the tap. While animations are off, it opens at once too. Called at every render: a panel
+ * already open is left as it is, so an opening under way plays on.
+ */
+internal fun View.reveal(show: Boolean) {
+    if (show == isVisible) return
+    animate().cancel()
+    alpha = 1f
+    translationY = 0f
+    isVisible = show
+    if (!show || !Motion.on()) return
+    alpha = 0f
+    translationY = -PANEL_DROP_DP * resources.displayMetrics.density
+    animate().alpha(1f).translationY(0f).setDuration(Motion.PANEL_MS).setInterpolator(Motion.STANDARD).start()
+}
+
+/** How far a panel under the top bar comes down as it opens. */
+private const val PANEL_DROP_DP = 8f
 
 /** How large a ♥ grows, and how far into its pop it is largest. */
 private const val POP_SCALE = 1.25f

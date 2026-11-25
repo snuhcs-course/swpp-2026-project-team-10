@@ -88,7 +88,6 @@
     <string name="tip_failed">이 포즈의 팁을 받지 못했어요</string>
     <string name="show_tip">팁 보기</string>
     <string name="close_tip">팁 닫기</string>
-    <string name="hint_pinch_zoom">두 손가락으로 확대·축소</string>
     <string name="flash_off">플래시 끔</string>
     <string name="flash_auto">플래시 자동</string>
     <string name="flash_on">플래시 켬</string>

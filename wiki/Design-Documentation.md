@@ -122,6 +122,7 @@
 | 4.5 | 2026-11-24 | UI fixes: switches for the grid and the horizon bar, the guide-edit toggle and the guide's tint, whose camera each phone shows, by the account's name in `hello`, and the photo on its way to the subject, with `photo.dropped` and each photo's `shot` (2.5.1, 2.6.2, 2.6.5, 2.6.8; Iter5-P7, [#271]). |
 | 4.6 | 2026-11-24 | Remote focus as built (Iter5-P9, [#273]): `camera.focus.set` handled and answered with `camera.state`, the base brightness at a remote tap, the focus box and the brightness bar on Subject view (`FocusBrightness`), no tap in guide-edit mode, the notice that does not repeat, `camera.focus` for the photographer's own focus, `focused` on the `camera.state` that answers a tap, TalkBack's action on the video, and the tutorial's tip on the video (2.2, 2.5.1, 2.6.5, 2.6.8, 2.8, 2.9). |
 | 4.7 | 2026-11-24 | A new guide starts with guide-edit mode off on Camera, as on Subject view (2.6.2; Iter5-A8, [#304]). |
+| 4.8 | 2026-11-24 | Camera's hint chip shows only "Guide hidden"; the line about the pinch went (2.6.8; Iter5-A9, [#306]). |
 
 </details>
 
@@ -3033,7 +3034,7 @@ Each section's rows share one card, without dividers.
   - The guide's tips include *Remove*, "Take the guide off", below its ✕ since *Save guide*'s caption is above ([#204]).
   - `showTutorialWhenDue` waits until the screen is in front, checking every 250 ms (`RECHECK_MS`). Camera's tips come 0.8 s after the preview streams, outside a session (FR-1.1, NFR-1); the guide's once a visible guide is drawn, also in a session. Subject view's come 0.8 s after the video shows.
   - `AppSettings.tutorialSeen` (DataStore `tutorial_seen_screens`) is null until read, so seen tips never flash. *Show the tutorial again* clears it (`resetTutorial`).
-- **Fewer words on the screens (FR-10.4).** The screens drop what the tutorial covers: the guide and scene-photo hints, the bodies of *Add a pose guide*, *Generate poses*, and *Pick a pose*, and Subject view's caption. Camera's hint chip shows only "Guide hidden", or "Pinch to zoom" once guide-edit mode is off. Consent, failures, waiting, and TalkBack descriptions stay (NFR-13). NFR-16's hallway test checks the screens without the tutorial.
+- **Fewer words on the screens (FR-10.4).** The screens drop what the tutorial covers: the guide and scene-photo hints, the bodies of *Add a pose guide*, *Generate poses*, and *Pick a pose*, and Subject view's caption. Camera's hint chip shows only "Guide hidden". Its line "Pinch to zoom" went: the tutorial shows the pinch, and Camera without a guide never said it ([#306]). Consent, failures, waiting, and TalkBack descriptions stay (NFR-13). NFR-16's hallway test checks the screens without the tutorial.
 
 ### 2.7 Database
 
@@ -3694,3 +3695,4 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#285]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/285
 [#296]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/296
 [#304]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/304
+[#306]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/306

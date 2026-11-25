@@ -90,7 +90,6 @@
     <string name="tip_failed">Couldn\'t get a tip for this pose</string>
     <string name="show_tip">Show tip</string>
     <string name="close_tip">Close tip</string>
-    <string name="hint_pinch_zoom">Pinch to zoom</string>
     <string name="flash_off">Flash off</string>
     <string name="flash_auto">Flash auto</string>
     <string name="flash_on">Flash on</string>

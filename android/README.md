@@ -31,7 +31,7 @@ These files fix the contracts between the module owners. Design 2.1 marks them w
 | `session/signaling/SignalMessage.kt` | WebSocket signaling messages | 2.5.2 |
 | `core/network/PixApi.kt`, `core/network/ApiModels.kt` | The REST API that the app uses: `PixApi` (poses and pose tips), `PixAuthApi` (sign-in), `PixAccountApi` (endpoints with a token) | 2.5.3 |
 | `account/AccountModels.kt`, `account/AuthRepository.kt`, `account/FriendsRepository.kt` | `Account`, `AuthState`, friends and requests, invitations, `AccountError`, and `AccountException`. The sign-in and friends interfaces. | 2.1, 2.3 |
-| `settings/AppSettings.kt`, `settings/AppLanguage.kt`, `guide/GuideLook.kt` | The settings screen's choices. `AppSettings` holds the guide's look, the latency indicator, the base brightness, and the tutorial tips seen. `AppLanguage`, `GuideLook`, `GuideColor`, `GuideThickness`. `AppSettings` and `AppLanguage` each have an `InMemory` for tests. | 2.1, 2.6.8 |
+| `settings/AppSettings.kt`, `settings/AppLanguage.kt`, `guide/GuideLook.kt` | The settings screen's choices. `AppSettings` holds the guide's look, the latency indicator, the grid and the horizon bar (from the camera menu), and the tutorial tips seen. `AppLanguage`, `GuideLook`, `GuideColor`, `GuideThickness`. `AppSettings` and `AppLanguage` each have an `InMemory` for tests. | 2.1, 2.6.8 |
 
 ### Screens
 

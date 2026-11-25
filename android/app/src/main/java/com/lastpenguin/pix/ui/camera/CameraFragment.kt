@@ -79,6 +79,7 @@ import com.lastpenguin.pix.ui.fadeTo
 import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.generation.framingHint
+import com.lastpenguin.pix.ui.reveal
 import com.lastpenguin.pix.ui.session.RemoteFocus
 import com.lastpenguin.pix.ui.session.SessionNotice
 import com.lastpenguin.pix.ui.session.SessionViewModel
@@ -283,9 +284,11 @@ class CameraFragment :
         // The flash button shows only while the scene photo is taken, and turns the phone's light on and off (FR-4.1).
         controls.flashButton.setOnClickListener { generationViewModel.toggleLight() }
         setupMenu(controls)
-        // The bar's pill keeps its line beside the bar's icons at every font size (#298).
+        // The bar's texts keep their line beside the bar's icons at every font size (#298), and the ratio's pill the
+        // icons' height (#272).
         capPillText(controls.shootTogetherButton)
         capPillText(controls.endSessionButton)
+        capPillText(controls.aspectButton)
         // The ratios open under the top bar (FR-1.13); a touch anywhere else closes them (setupTip), and so does Back.
         controls.aspectButton.setOnClickListener {
             viewModel.setAspectsOpen(!viewModel.uiState.value.aspectsOpen)
@@ -1306,7 +1309,8 @@ class CameraFragment :
             val light = !held && camera.hasFlash
             controls.cameraSettings.isVisible = !held
             if (held) {
-                controls.aspectPanel.isVisible = false
+                controls.aspectPanel.reveal(false)
+                controls.aspectButton.isActivated = false
                 aspectsBack?.isEnabled = false
             }
             controls.flashButton.isVisible = light
@@ -1486,8 +1490,10 @@ class CameraFragment :
         // counts down (FR-1.17).
         val choosable = ready && !state.isSaving && state.countdown == null
         controls.aspectButton.isEnabled = choosable
-        // The ratios under the top bar, the chosen one selected (FR-1.13).
-        controls.aspectPanel.isVisible = state.aspectsOpen
+        // The ratios under the top bar, the chosen one selected (FR-1.13), with the ratio in the bar's pill while they
+        // are open, as the camera menu's button.
+        controls.aspectPanel.reveal(state.aspectsOpen)
+        controls.aspectButton.isActivated = state.aspectsOpen
         aspectsBack?.isEnabled = state.aspectsOpen
         // The ratios cover the top of the image, where a toggle's label shows: opening them takes the label down.
         if (state.aspectsOpen && controls.toggleLabel.isVisible) {
@@ -1548,7 +1554,7 @@ class CameraFragment :
         setImageOnce(controls.flashIndicator, flashIcon(state.flash))
         setImageOnce(controls.timerIndicator, timerIcon(state.timer))
         val open = state.menuOpen && !scene
-        controls.cameraMenu.isVisible = open
+        controls.cameraMenu.reveal(open)
         menuBack?.isEnabled = open
         // The flash only on a camera with one (FR-1.12).
         controls.menuFlash.isVisible = state.hasFlash
@@ -1576,8 +1582,9 @@ class CameraFragment :
     }
 
     /**
-     * The top bar's pill, *Shoot together* or *End session*, whose label grows with the phone's font only up to
-     * [PILL_MAX_FONT_SCALE]: larger, it would reach the ratio and the camera menu's icons, at 200 % (#298, #272).
+     * A text in the top bar's pills, *Shoot together*, *End session*, or the ratio, which grows with the phone's font only
+     * up to [PILL_MAX_FONT_SCALE]. Larger, at 200 %, *Shoot together* would reach the ratio and the camera menu's icons,
+     * and the ratio's label would make its pill and the bar taller than the icons' (#298, #272).
      */
     private fun capPillText(pill: TextView) {
         val scale = resources.configuration.fontScale

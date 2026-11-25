@@ -87,7 +87,8 @@ private val LARGE_FONTS = listOf(1.3f, 1.5f, 2f)
  * Ratios: 4:3, 16:9, and 1:1, each with the preview right below the top bar, the shutter's row in one place, and the
  * zoom row at the bottom of the image; 16:9 with every control of that row above the image's bottom edge. States of
  * the top bar: no guide, a guide with a pose tip, a session, and the flash and the timer on beside the camera menu's
- * button (FR-1.17), at font scale 1, 1.3, 1.5, and 2 (#298), none overlapping. The camera switch in the top bar
+ * button (FR-1.17), at font scale 1, 1.3, 1.5, and 2 (#298), none overlapping; the camera menu's button, the ratio,
+ * and the camera switch drawing one 32 dp pill on one line at each of those scales, 50 dp wide at 1 (#272). The camera switch in the top bar
  * (FR-1.14), and the gallery button as far right of the shutter as Guide is left of it. The camera menu under the top
  * bar, each item taking taps on 48 dp, with its labels whole at font scale 1.3, 1.5, and 2 (FR-1.17; in Korean:
  * KoreanScreensTest). A guide's
@@ -343,8 +344,9 @@ class CameraLayoutTest {
         idle()
         val back = screen.controls.sceneBackButton as MaterialButton
         val density = back.resources.displayMetrics.density
-        // Back draws in the bar above its inset bottom, the 4 dp that lie over the image.
-        val backMiddle = (back.box().top + back.box().bottom - back.insetBottom / density) / 2f
+        // Back draws its pill between its insets, centered on the bar above the 4 dp that lie over the image.
+        val backMiddle =
+            (back.box().top + back.insetTop / density + back.box().bottom - back.insetBottom / density) / 2f
         assertEquals(24f, backMiddle, 1f)
         assertEquals("framing", backMiddle, screen.controls.sceneTitle.middle(), 1f)
 
@@ -762,6 +764,36 @@ class CameraLayoutTest {
             screen.flashAndTimerOn()
             screen.assertTopBarFits("the flash and the timer on, in a session, font $scale")
         }
+    }
+
+    @Test
+    fun theTopBarsButtons_drawOnePill_32DpTall_onOneLine_atEveryFont_50DpWideAtFont1() {
+        for (scale in listOf(1f) + LARGE_FONTS) {
+            val screen = camera(fontScale = scale)
+            val buttons = listOf(
+                screen.controls.cameraMenuButton,
+                screen.controls.aspectButton,
+                screen.controls.switchCameraButton,
+            )
+            val pills = buttons.map { it.resources.getResourceEntryName(it.id) to it.pill() }
+            for ((name, pill) in pills) assertEquals("font $scale: $name's pill $pill", 32, pill.height())
+            assertEquals("font $scale: $pills", 1, pills.map { it.second.top }.distinct().size)
+            if (scale == 1f) {
+                for ((name, pill) in pills) assertEquals("$name's pill $pill", 50, pill.width())
+            }
+        }
+    }
+
+    /** What a top bar button draws under a touch, or while its panel is open: its background inside the insets, in dp. */
+    private fun MaterialButton.pill(): Rect {
+        val box = box()
+        val density = resources.displayMetrics.density
+        return Rect(
+            box.left,
+            box.top + (insetTop / density).roundToInt(),
+            box.right,
+            box.bottom - (insetBottom / density).roundToInt(),
+        )
     }
 
     /** The flash on and the timer at 10 s through the camera menu (FR-1.17), which then closes. */

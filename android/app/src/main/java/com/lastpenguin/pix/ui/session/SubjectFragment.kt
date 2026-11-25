@@ -85,6 +85,7 @@ import com.lastpenguin.pix.ui.camera.showPinchModeLabel
 import com.lastpenguin.pix.ui.camera.showReference
 import com.lastpenguin.pix.ui.camera.showReferenceHandle
 import com.lastpenguin.pix.ui.fadeTo
+import com.lastpenguin.pix.ui.reveal
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.TutorialFragment
 import com.lastpenguin.pix.ui.settings.followLook
@@ -1076,7 +1077,7 @@ class SubjectFragment :
      */
     private fun renderMenu(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         binding.cameraMenuButton.isActivated = ui.menuOpen
-        binding.cameraMenu.isVisible = ui.menuOpen
+        binding.cameraMenu.reveal(ui.menuOpen)
         binding.menuFlash.isVisible = ui.hasFlash
         binding.menuFlash.isEnabled = ui.connected
         binding.menuFlash.isActivated = ui.flash != FlashMode.OFF

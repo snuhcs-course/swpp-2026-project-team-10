@@ -68,11 +68,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:contentDescription="@string/camera_menu"
-                android:insetTop="8dp"
-                android:insetBottom="12dp"
-                android:paddingTop="0dp"
-                android:paddingBottom="0dp"
-                app:backgroundTint="@color/camera_menu_button_background"
+                app:backgroundTint="@color/camera_top_bar_button_background"
                 app:icon="@drawable/ic_tune" />
 
             <!-- The flash while it is on or auto, and the timer while it is on (FR-1.12, FR-1.17): what the shutter will

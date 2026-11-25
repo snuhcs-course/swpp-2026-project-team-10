@@ -66,6 +66,11 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 - [Jaewan, 11-25] "i've checked the screens so also update the docs. but before that, there's also changes to dev so merge it and resolve conflicts. especially pr #312 applies some ui fixes, and check if we have anything conflicting with their rules"
 - [Jaewan, 11-25] "when it's done, commit and push everything"
 - [Jaewan, 11-25] "remove the grid and horizontal line part from the settings. and can we just remove the 'base brightness' part? so the scrolling up or down on focus click is the only part that controls exposure"
+- [Jaewan, 11-25] "when clicking on the three buttons on the top bar, the background coloring that show up have different sizes. can you match those? and also i want a slight animation when opening the panels (setting or ratio)"
+- [Jaewan, 11-25] "start the emulator so i can check it"
+- [Jaewan, 11-25] "when will the check stop?"
+- [Jaewan, 11-25] "close the emulator. it seems good"
+- [Jaewan, 11-25] "do it. just don't run the check we'll check what runs on the pr. are the docs updated?"
 
 [#270]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/270
 [#272]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/272

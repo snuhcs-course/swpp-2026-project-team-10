@@ -322,27 +322,38 @@
         <item name="strokeWidth">1dp</item>
     </style>
 
-    <!-- The top bar's flash: an icon without a shape, like the brightness button, in the middle of the bar's 44 dp,
-         with a 48 x 48 dp touch area whose last 4 dp reach over the image's top edge. -->
+    <!-- An icon in the top bar, such as the camera menu's button and the camera switch: no shape at rest, and under a
+         touch, or while its panel is open, the bar's 32 dp tall pill, as the ratio's, centered on the bar's line above
+         its last 4 dp, which reach over the image's top edge. A TurningButton's pill and touch area are 50 dp wide. The padding is 0 above and
+         below, or the insets would make the bar taller. -->
     <style name="Widget.Pix.Button.Icon.TopBar">
         <item name="android:minWidth">48dp</item>
         <item name="android:minHeight">52dp</item>
-        <item name="android:insetTop">0dp</item>
-        <item name="android:insetBottom">4dp</item>
+        <item name="android:insetTop">@dimen/top_bar_pill_inset_top</item>
+        <item name="android:insetBottom">@dimen/top_bar_pill_inset_bottom</item>
+        <item name="android:paddingTop">0dp</item>
+        <item name="android:paddingBottom">0dp</item>
+        <!-- It has no text, but a button measures a line of it: in dp, the empty line fits the pill at any font, or at
+             200 % it would make the button and the bar 2 dp taller. -->
+        <item name="android:textSize" tools:ignore="SpUsage">12dp</item>
         <item name="android:paddingStart">13dp</item>
         <item name="android:paddingEnd">13dp</item>
         <item name="iconSize">16dp</item>
     </style>
 
-    <!-- The top bar's aspect ratio: its label alone, without a shape, the size of the top bar's other text, in a 48 x 52 dp
-         touch area that adds 8 dp after the label and 4 dp below the bar, so the label stays where it was. -->
+    <!-- The top bar's aspect ratio: its label alone, the size of the top bar's other text, in a 50 x 52 dp touch area.
+         Under a touch, or while the ratios are open, the bar's pill around the label, 50 x 32 dp as the icons' are, wider
+         only for a label at a large font. -->
     <style name="Widget.Pix.Button.Text.TopBar">
-        <item name="android:minWidth">48dp</item>
+        <item name="android:minWidth">50dp</item>
         <item name="android:minHeight">52dp</item>
-        <item name="android:paddingStart">8dp</item>
-        <item name="android:paddingEnd">16dp</item>
-        <item name="android:paddingTop">6dp</item>
-        <item name="android:paddingBottom">10dp</item>
+        <item name="android:insetTop">@dimen/top_bar_pill_inset_top</item>
+        <item name="android:insetBottom">@dimen/top_bar_pill_inset_bottom</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:paddingTop">0dp</item>
+        <item name="android:paddingBottom">0dp</item>
+        <item name="backgroundTint">@color/camera_top_bar_button_background</item>
         <item name="android:textColor">@color/button_secondary_text</item>
         <item name="rippleColor">@color/pix_ripple_strong</item>
         <item name="android:textSize">12sp</item>

@@ -33,7 +33,8 @@ import org.robolectric.annotation.GraphicsMode
 /*
  * The camera menu and the shutter's timer on the Camera screen (FR-1.17, R&S 6.2), on the real Fragment under
  * FragmentScenario with a container of fakes. Partitions: the menu opened by its button and closed by Back, by a touch
- * on the preview, and by its button again; the timer chosen in the menu (its icon beside the menu's button, its notice,
+ * on the preview, and by its button again; the ratio's button and the menu's each in the bar's pill while its own panel
+ * is open, the menu taking the ratios' place; the timer chosen in the menu (its icon beside the menu's button, its notice,
  * the shutter's spoken label) and off again (both gone); the countdown on the screen (the seconds over the preview,
  * the hint, the other controls dimmed and waiting, the shutter's label for cancelling), its end (one photo, all back),
  * the shutter's second tap (no photo), and the screen stopping (no photo); in a session, each second and the end told
@@ -93,6 +94,26 @@ class CameraTimerScreenTest {
     }
 
     // ---- The menu ------------------------------------------------------------------------------------------------
+
+    @Test
+    fun theRatio_isInTheBarsPill_whileTheRatiosAreOpen_asTheMenusButtonIsWhileTheMenuIs() {
+        launch()
+
+        onScreen { controls, _ -> controls.aspectButton.performClick() }
+        onScreen { controls, _ ->
+            assertTrue(controls.aspectPanel.isShown)
+            assertTrue(controls.aspectButton.isActivated)
+            assertFalse(controls.cameraMenuButton.isActivated)
+            controls.cameraMenuButton.performClick()
+        }
+        // The menu takes the ratios' place, and its button the pill.
+        onScreen { controls, _ ->
+            assertFalse(controls.aspectPanel.isShown)
+            assertFalse(controls.aspectButton.isActivated)
+            assertTrue(controls.cameraMenu.isShown)
+            assertTrue(controls.cameraMenuButton.isActivated)
+        }
+    }
 
     @Test
     fun theMenu_opensUnderTheBar_andClosesAtBack_atATouchOnThePreview_andAtItsButton() {

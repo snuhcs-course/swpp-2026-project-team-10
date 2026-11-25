@@ -21,8 +21,10 @@ import org.w3c.dom.Element
  * Back stays put from screen to screen (R&S 6.9): every layout's header Back (`Widget.Pix.Header.Back`), inflated on
  * the Galaxy S22's app area, stands 8 dp from the screen's left edge with its 48 dp button's top 12 dp down, in the
  * middle of a 56 dp header under the screen's 8 dp, as on the pose steps; a photo opened over a screen, such as the
- * large scene photo and the photo viewer, has its Back over the screen's own. Partitions: a header in a screen that
- * pads it, a header that pads itself, a header with margins of its own, and a Back placed alone over a photo.
+ * large scene photo and the photo viewer, has its Back over the screen's own. And to the pixel at the S22's own density,
+ * 2.8125 px per dp, where each dimension rounds on its own: a Back placed by another sum of dp, such as one 8 dp
+ * margin, stands a pixel off. Partitions: a header in a screen that pads it, a header that pads itself, a header in a
+ * frame that pads it alone, and a Back over a photo; at a whole and at a fractional density.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -44,14 +46,12 @@ class HeaderBackPlaceTest {
         }
         .toMap()
 
-    @Test
-    fun everyHeadersBack_standsWhereThePoseStepsBackDoes() {
+    /** Where each layout's Back stands, in px from the screen's top left, and how wide it is. */
+    private fun places(): Map<String, List<Int>> {
         val activity = activities.start(R.style.Theme_Pix)
-        val density = activity.resources.displayMetrics.density
         val backs = backs()
         assertTrue("${backs.keys}", backs.size > 15)
-        val wrong = mutableListOf<String>()
-        for ((layout, id) in backs) {
+        return backs.mapValues { (layout, id) ->
             val root = activity.layoutInflater.inflate(
                 activity.resources.getIdentifier(layout, "layout", activity.packageName),
                 null,
@@ -72,14 +72,26 @@ class HeaderBackPlaceTest {
             root.layout(0, 0, root.measuredWidth, root.measuredHeight)
             val at = IntArray(2).also(back::getLocationInWindow)
             val from = IntArray(2).also(root::getLocationInWindow)
-            val left = (at[0] - from[0]) / density
-            val top = (at[1] - from[1]) / density
-            val wide = back.width / density
-            if (abs(left - IN_DP) > 0.5f || abs(top - DOWN_DP) > 0.5f || abs(wide - WIDE_DP) > 0.5f) {
-                wrong += "$layout: $left dp in, $top dp down, $wide dp wide"
-            }
+            listOf(at[0] - from[0], at[1] - from[1], back.width)
         }
-        assertEquals(emptyList<String>(), wrong)
+    }
+
+    @Test
+    fun everyHeadersBack_standsWhereThePoseStepsBackDoes() {
+        val density = activities.start(R.style.Theme_Pix).resources.displayMetrics.density
+        val wrong = places().filterValues { (left, top, wide) ->
+            abs(left / density - IN_DP) > 0.5f || abs(top / density - DOWN_DP) > 0.5f ||
+                abs(wide / density - WIDE_DP) > 0.5f
+        }
+        assertEquals(emptyMap<String, List<Int>>(), wrong)
+    }
+
+    @Test
+    @Config(qualifiers = "w384dp-h823dp-450dpi")
+    fun atTheS22sOwnDensity_everyBack_standsOnThePoseStepsPixel() {
+        val places = places()
+        val poseSteps = places.getValue("fragment_describe_pose")
+        assertEquals(emptyMap<String, List<Int>>(), places.filterValues { it != poseSteps })
     }
 
     private companion object {

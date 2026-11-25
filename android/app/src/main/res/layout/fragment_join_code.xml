@@ -8,29 +8,40 @@
     android:orientation="vertical"
     android:paddingTop="8dp">
 
-    <LinearLayout
+    <!-- The screens' 20 dp sides, around the header alone, since the list under it reaches the edges: Back is placed
+         from the same dimensions as every screen's, so it stands on the same pixel at any density; one margin in place
+         of this frame would round on its own (HeaderBackPlaceTest). -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_marginEnd="8dp"
         android:clipToPadding="false"
-        android:gravity="center_vertical"
-        android:minHeight="56dp"
-        android:paddingHorizontal="12dp">
+        android:paddingHorizontal="20dp"
+        tools:ignore="UselessParent">
 
-        <ImageButton
-            android:id="@+id/backButton"
-            style="@style/Widget.Pix.Header.Back"
-            android:contentDescription="@string/back_to_camera" />
-
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:accessibilityHeading="true"
-            android:text="@string/join_title"
-            android:textAppearance="@style/TextAppearance.Pix.Header" />
-    </LinearLayout>
+            android:layout_marginStart="-12dp"
+            android:layout_marginEnd="-12dp"
+            android:clipToPadding="false"
+            android:gravity="center_vertical"
+            android:minHeight="56dp"
+            android:paddingHorizontal="12dp">
+
+            <ImageButton
+                android:id="@+id/backButton"
+                style="@style/Widget.Pix.Header.Back"
+                android:contentDescription="@string/back_to_camera" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:accessibilityHeading="true"
+                android:text="@string/join_title"
+                android:textAppearance="@style/TextAppearance.Pix.Header" />
+        </LinearLayout>
+    </FrameLayout>
 
     <!-- Fills the screen, so the note stays at the bottom, and scrolls when invitations and the keyboard need more. -->
     <ScrollView

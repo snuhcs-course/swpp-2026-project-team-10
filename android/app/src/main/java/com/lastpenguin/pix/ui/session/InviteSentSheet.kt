@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.content.ClipData
@@ -10,7 +10,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.annotation.IdRes
 import androidx.core.content.getSystemService
 import androidx.fragment.app.activityViewModels
@@ -24,8 +23,11 @@ import com.lastpenguin.pix.account.SentInvitation
 import com.lastpenguin.pix.databinding.SheetInviteSentBinding
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.ui.NoticeLength
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.account.avatarInitial
+import com.lastpenguin.pix.ui.showNotice
+import com.lastpenguin.pix.ui.showNoticeInDialog
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
@@ -97,7 +99,7 @@ class InviteSentSheet : BottomSheetDialogFragment() {
                 EndReason.CANCELLED, EndReason.LEFT -> Unit
 
                 else -> {
-                    Toast.makeText(requireContext(), R.string.couldnt_connect, Toast.LENGTH_LONG).show()
+                    showNotice(R.string.couldnt_connect, NoticeLength.LONG)
                     leaving = true
                     dismiss()
                 }
@@ -126,7 +128,7 @@ class InviteSentSheet : BottomSheetDialogFragment() {
         clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.share_invite_link), sent.link))
         // Android 13 and later confirm a copy themselves.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            Toast.makeText(requireContext(), R.string.link_copied, Toast.LENGTH_SHORT).show()
+            showNoticeInDialog(R.string.link_copied)
         }
     }
 }

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -25,6 +25,7 @@ import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import java.time.Duration
@@ -37,13 +38,13 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import org.robolectric.shadows.ShadowToast
 
 /*
  * The subject's Pick a pose (R&S 6.6, FR-6.15, Design 2.6.5) on the real Fragment, with the photographer's set
@@ -189,7 +190,7 @@ class SubjectPickPoseFragmentTest {
         step(modules, PoseSetStep.CHOSEN, poseId = "pose-1", by = Role.PHOTOGRAPHER)
 
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
-        assertEquals(string(R.string.peer_chose_pose, "Dongje"), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.peer_chose_pose, "Dongje"), shownNotice())
     }
 
     @Test
@@ -200,7 +201,7 @@ class SubjectPickPoseFragmentTest {
         step(modules, PoseSetStep.CLOSED)
 
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
-        assertEquals(string(R.string.peer_closed_poses, "Dongje"), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.peer_closed_poses, "Dongje"), shownNotice())
     }
 
     @Test
@@ -213,7 +214,7 @@ class SubjectPickPoseFragmentTest {
         step(modules, PoseSetStep.CHOSEN, poseId = "pose-1", by = Role.SUBJECT)
 
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
-        assertEquals(0, ShadowToast.shownToastCount())
+        assertNull(shownNotice())
     }
 
     @Test
@@ -233,7 +234,7 @@ class SubjectPickPoseFragmentTest {
         val nav = launch()
 
         assertEquals(R.id.subjectPickPoseFragment, nav.currentDestination?.id)
-        assertEquals(0, ShadowToast.shownToastCount())
+        assertNull(shownNotice())
         assertTrue(onScreen { it.selectButton.isEnabled })
     }
 
@@ -246,7 +247,7 @@ class SubjectPickPoseFragmentTest {
 
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(PoseSyncer.PICK_TIMEOUT_MS + 100))
 
-        assertEquals(string(R.string.pose_pick_failed), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.pose_pick_failed), shownNotice())
         onScreen { binding ->
             assertTrue(binding.selectButton.isEnabled)
             binding.selectButton.performClick()
@@ -328,7 +329,7 @@ class SubjectPickPoseFragmentTest {
                 it.id to it.source
             },
         )
-        assertEquals(string(R.string.pose_saved_notice), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.pose_saved_notice), shownNotice())
         // Neither a pick nor anything else: the ♥ stays on this phone, and the first Select still decides.
         assertEquals(sent, modules.session.sent.size)
     }

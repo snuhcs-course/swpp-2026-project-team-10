@@ -4,6 +4,8 @@
 <resources>
     <!-- Common -->
     <string name="cancel">취소</string>
+    <!-- A notice's action that takes back what was just done (#298). -->
+    <string name="undo">되돌리기</string>
     <string name="back">뒤로</string>
     <string name="back_to_camera">카메라로 돌아가기</string>
     <string name="try_again">다시 시도</string>
@@ -102,6 +104,8 @@
     <string name="show_reference">다시 보기</string>
     <string name="reference_hidden">숨김</string>
     <string name="edit_guide">가이드 편집</string>
+    <!-- After Remove guide, with Undo for a few seconds (FR-3.6, #298). -->
+    <string name="guide_removed_from_camera">가이드를 지웠어요</string>
     <!-- Pose tips (FR-4.10): the banner over the bottom of the preview and the button in the top bar. -->
     <string name="tip_preparing">팁 준비 중…</string>
     <string name="tip_failed">이 포즈의 팁을 받지 못했어요</string>
@@ -117,6 +121,7 @@
     <string name="brightness">밝기</string>
     <string name="live_badge">실시간 · %1$s님과 연결됨</string>
     <string name="end_session">공유 종료</string>
+    <string name="end_session_title">카메라 공유를 끝낼까요?</string>
     <string name="peer_left">%1$s님이 나갔어요</string>
     <string name="peer_disconnected">%1$s님의 연결이 끊겼어요</string>
     <string name="peer_reconnecting">%1$s님과 다시 연결하는 중…</string>

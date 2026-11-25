@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Dongje Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -32,6 +32,8 @@ import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.ScreenTestSupport.noticeAction
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
@@ -43,6 +45,8 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,6 +59,8 @@ import org.robolectric.annotation.GraphicsMode
  * camera status STARTING, READY; the grid and the horizon bar on by default, and each off from Settings (#271); a
  * guide added, with the guide-edit toggle unlit and the guide not filled (#304), the toggle tapped on (lit, the guide
  * filled) and off again (unlit, the same icon, no fill; #271), hidden, removed by the shutter's end of edit mode; the
+ * tip and guide-edit buttons on glass, the toggle's tinted while on (#298); Remove guide's notice above the zoom row
+ * with Undo, which puts the guide back, and taken down by another guide (#298); the
  * hint chip with no line for the pinch, and "Guide hidden" for a hidden guide (#306); a photo saved or
  * failed; the flash and brightness controls with and without the capability; the aspect ratio 4:3 and 16:9; the
  * scene photo step framing and reviewing, with Back at the top left of each (out to the camera, and from the review back
@@ -319,6 +325,71 @@ class CameraFragmentRenderTest {
             assertTrue(controls.opacitySlider.isEnabled)
             assertEquals(string(R.string.hide_guide), controls.hideGuideButton.contentDescription)
         }
+    }
+
+    @Test
+    fun theButtonsOverTheImage_areOnGlass_theToggleTintedWhileOn() {
+        launch()
+        onScreen { controls, _ ->
+            for (button in listOf(controls.tipButton, controls.editGuideButton)) {
+                val name = button.resources.getResourceEntryName(button.id)
+                assertEquals(name, activityColor(R.color.pix_glass), button.backgroundTintList?.defaultColor)
+                assertEquals(name, activityColor(R.color.pix_glass_stroke), button.strokeColor?.defaultColor)
+            }
+            val on = intArrayOf(android.R.attr.state_checked)
+            assertEquals(
+                activityColor(R.color.pix_guide_glass),
+                controls.editGuideButton.backgroundTintList?.getColorForState(on, 0),
+            )
+            assertEquals(
+                activityColor(R.color.pix_guide_stroke),
+                controls.editGuideButton.strokeColor?.getColorForState(on, 0),
+            )
+        }
+    }
+
+    @Test
+    fun removeGuide_offersUndo_aboveTheZoomRow_whichPutsTheGuideBack() {
+        val modules = launch()
+        val guide = guide()
+        modules.guides.setGuide(guide)
+        idle()
+
+        onScreen { controls, _ -> controls.removeGuideButton.performClick() }
+        idle()
+
+        assertNull(modules.guides.guide.value)
+        assertEquals(string(R.string.guide_removed_from_camera), shownNotice())
+        val undo = checkNotNull(noticeAction())
+        assertEquals(string(R.string.undo), undo.text.toString())
+        onScreen { controls, _ ->
+            val notice = IntArray(2).also { (undo.parent.parent as View).getLocationInWindow(it) }
+            val row = IntArray(2).also { controls.zoomRow.getLocationInWindow(it) }
+            assertTrue("the notice above the zoom row", notice[1] + (undo.parent.parent as View).height <= row[1])
+        }
+
+        undo.performClick()
+        idle()
+
+        assertSame(guide, modules.guides.guide.value)
+        assertNull(shownNotice())
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.guideControls.visibility) }
+    }
+
+    @Test
+    fun removeGuide_thenAnotherGuide_takesTheUndoDown() {
+        val modules = launch()
+        modules.guides.setGuide(guide())
+        idle()
+        onScreen { controls, _ -> controls.removeGuideButton.performClick() }
+        idle()
+        assertNotNull(noticeAction())
+
+        modules.guides.setGuide(guide().copy(id = "guide-2"))
+        idle()
+
+        assertNull(shownNotice())
+        assertEquals("guide-2", modules.guides.guide.value?.id)
     }
 
     @Test

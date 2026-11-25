@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
@@ -6,7 +6,6 @@ import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import android.widget.Toast
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
@@ -24,9 +23,11 @@ import com.lastpenguin.pix.databinding.ItemIncomingInvitationBinding
 import com.lastpenguin.pix.push.PushNotifications
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.ui.NoticeLength
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.account.accountMessage
 import com.lastpenguin.pix.ui.account.avatarInitial
+import com.lastpenguin.pix.ui.showNotice
 import kotlinx.coroutines.launch
 
 /**
@@ -165,7 +166,7 @@ class JoinCodeFragment : Fragment(R.layout.fragment_join_code) {
             if (sessionViewModel.endWaitingRoom()) {
                 incoming.accept(invitation)
             } else {
-                toast(getString(R.string.invitation_in_session))
+                notice(getString(R.string.invitation_in_session))
             }
         }
     }
@@ -177,7 +178,7 @@ class JoinCodeFragment : Fragment(R.layout.fragment_join_code) {
                 if (sessionViewModel.joinAccepted(event.invitationId, event.place, event.from)) {
                     incoming.joining = true
                 } else {
-                    toast(getString(R.string.invitation_in_session))
+                    notice(getString(R.string.invitation_in_session))
                 }
             }
 
@@ -188,10 +189,10 @@ class JoinCodeFragment : Fragment(R.layout.fragment_join_code) {
 
             is IncomingInvitationEvent.Gone -> {
                 PushNotifications.cancelInvitation(requireContext(), event.invitationId)
-                toast(getString(R.string.invitation_gone_title))
+                notice(getString(R.string.invitation_gone_title))
             }
 
-            is IncomingInvitationEvent.AnswerFailed -> toast(requireContext().accountMessage(event.error))
+            is IncomingInvitationEvent.AnswerFailed -> notice(requireContext().accountMessage(event.error))
         }
     }
 
@@ -207,9 +208,9 @@ class JoinCodeFragment : Fragment(R.layout.fragment_join_code) {
                 }
             }
 
-            InvitationJoin.GONE -> toast(getString(R.string.invitation_gone_title))
+            InvitationJoin.GONE -> notice(getString(R.string.invitation_gone_title))
 
-            InvitationJoin.FAILED -> toast(getString(R.string.couldnt_connect))
+            InvitationJoin.FAILED -> notice(getString(R.string.couldnt_connect))
 
             InvitationJoin.CLOSED -> Unit
         }
@@ -265,8 +266,8 @@ class JoinCodeFragment : Fragment(R.layout.fragment_join_code) {
             binding.codeInput.text?.length == CODE_LENGTH
     }
 
-    private fun toast(text: String) {
-        Toast.makeText(requireContext(), text, Toast.LENGTH_LONG).show()
+    private fun notice(text: String) {
+        showNotice(text, NoticeLength.LONG)
     }
 
     private companion object {

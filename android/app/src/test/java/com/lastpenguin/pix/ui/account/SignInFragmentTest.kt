@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.content.DialogInterface
@@ -17,6 +17,7 @@ import com.lastpenguin.pix.account.AccountException
 import com.lastpenguin.pix.account.GoogleSignIn
 import com.lastpenguin.pix.databinding.FragmentSignInBinding
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
@@ -28,7 +29,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
-import org.robolectric.shadows.ShadowToast
 
 /*
  * Sign in on the real Fragment (R&S 6.4, 6.8; FR-5.2, FR-5.13), with the account fakes behind the ViewModel;
@@ -176,7 +176,7 @@ class SignInFragmentTest {
 
         assertEquals(
             string(R.string.google_not_added, string(R.string.google_in_use)),
-            ShadowToast.getTextOfLatestToast(),
+            shownNotice(),
         )
         assertEquals(R.id.friendsFragment, nav.currentDestination?.id)
     }

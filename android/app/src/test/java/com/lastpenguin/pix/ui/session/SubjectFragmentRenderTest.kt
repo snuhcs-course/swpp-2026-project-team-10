@@ -1,6 +1,7 @@
 // AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
+import android.content.DialogInterface
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.os.Looper
@@ -9,6 +10,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.core.view.ViewCompat
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragmentInContainer
@@ -37,6 +40,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.camera.ExposureBarView
@@ -66,7 +70,6 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadow.api.Shadow
 import org.robolectric.shadows.ShadowChoreographer
 import org.robolectric.shadows.ShadowDialog
-import org.robolectric.shadows.ShadowToast
 
 /*
  * Subject view's render paths (R&S 6.6, Testing Documentation 2.1.6), on the real Fragment under FragmentScenario
@@ -90,8 +93,8 @@ import org.robolectric.shadows.ShadowToast
  * finger, where nothing moves; while a drag still waits for its tap's answer, which ends that drag); TalkBack's action
  * on the video (the focus at the image's middle and the bar, and nothing in guide-edit mode); a tap and TalkBack's
  * action while the photographer's camera is paused (nothing), and once frames come again; the live view on mobile data (FR-6.13); the Guide button (FR-6.15) disabled until connected, adding or
- * changing the guide, opening Add a pose guide, and "Couldn't send the guide" for a guide that did not go; Leave, the
- * back button's question, and the session ending by a lost connection (also with Add a pose guide open over it) or
+ * changing the guide, opening Add a pose guide, and "Couldn't send the guide" for a guide that did not go; Leave and the
+ * back button, which both ask first (#298: confirmed, cancelled), and the session ending by a lost connection (also with Add a pose guide open over it) or
  * the photographer, named or before the name arrived. Save guide (FR-6.16): hidden without a guide, then saving it
  * and filled (an empty ♥, then filled red); the photographer's set (FR-6.15): what the photographer is doing in place of "camera paused", the set's
  * Generating poses opened once per set (Iter3-A13), which goes on to Pick a pose by itself, so after Back each opens by
@@ -106,7 +109,8 @@ import org.robolectric.shadows.ShadowToast
  * the photographer's pinch holds the zoom: nothing sent, and the label names the photographer (FR-7.6, #236).
  * The UAT's opinions (#271): the slot where Camera's shutter is empty until connected, then whose camera this is and
  * "Live", given up to a step's button, with no notice saying it as well; *Leave* red; the guide-edit toggle one person icon, unlit with the guide plain and lit with it
- * filled. The grid on by default and off from Settings.
+ * filled. The grid on by default and off from Settings. The tip, Save guide, and guide-edit buttons on glass, the
+ * toggle's tinted while on (#298).
  * What the photographer did (#292): each action a line with their name where the labels show, for a label's time and
  * the focus's for its shorter one; the photographer's pinch named for as long as it, replaced by the ratio's line, gone
  * when it ends without one; another label meanwhile keeps its own time, and the line is back after it.
@@ -641,6 +645,24 @@ class SubjectFragmentRenderTest {
 
         // The danger style's text; its outline is an app attribute, which this test's host does not apply.
         onScreen { binding, _ -> assertEquals(color(R.color.pix_danger_text), binding.leaveButton.currentTextColor) }
+    }
+
+    @Test
+    fun theButtonsOverTheVideo_areOnGlass_theToggleTintedWhileOn() {
+        launch()
+
+        onScreen { binding, _ ->
+            for (button in listOf(binding.tipButton, binding.saveGuideButton, binding.editGuideButton)) {
+                val name = button.resources.getResourceEntryName(button.id)
+                assertEquals(name, color(R.color.pix_glass), button.backgroundTintList?.defaultColor)
+                assertEquals(name, color(R.color.pix_glass_stroke), button.strokeColor?.defaultColor)
+            }
+            val on = intArrayOf(android.R.attr.state_checked)
+            assertEquals(
+                color(R.color.pix_guide_glass),
+                binding.editGuideButton.backgroundTintList?.getColorForState(on, 0),
+            )
+        }
     }
 
     @Test
@@ -1414,7 +1436,7 @@ class SubjectFragmentRenderTest {
         // The same reason as on the photographer's phone, though the subject left its Generating poses (#203).
         assertEquals(
             string(R.string.peer_poses_failed, "Dongje") + "\n" + string(R.string.generation_offline_message),
-            ShadowToast.getTextOfLatestToast(),
+            shownNotice(),
         )
     }
 
@@ -1432,7 +1454,7 @@ class SubjectFragmentRenderTest {
 
         poseStep(modules, PoseSetStep.CLOSED)
 
-        assertEquals(string(R.string.peer_closed_poses, "Dongje"), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.peer_closed_poses, "Dongje"), shownNotice())
         onScreen { binding, _ ->
             assertEquals(View.GONE, binding.pickPoseButton.visibility)
             assertEquals(View.GONE, binding.connectingText.visibility)
@@ -1538,7 +1560,7 @@ class SubjectFragmentRenderTest {
 
         confirmStep(modules, ConfirmStep.USED, Role.PHOTOGRAPHER)
 
-        assertEquals(string(R.string.peer_used_guide, "Dongje"), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.peer_used_guide, "Dongje"), shownNotice())
         onScreen { binding, _ ->
             assertEquals(View.GONE, binding.pickPoseButton.visibility)
             assertEquals(View.GONE, binding.connectingText.visibility)
@@ -1630,7 +1652,7 @@ class SubjectFragmentRenderTest {
 
         describeStep(modules, DescriptionStep.CLOSED)
 
-        assertEquals(string(R.string.peer_closed_describe, "Dongje"), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.peer_closed_describe, "Dongje"), shownNotice())
         onScreen { binding, _ ->
             assertEquals(View.GONE, binding.pickPoseButton.visibility)
             assertEquals(View.GONE, binding.connectingText.visibility)
@@ -1645,19 +1667,50 @@ class SubjectFragmentRenderTest {
         modules.syncer.offer(guide(withReference = false))
         idle()
 
-        assertEquals(string(R.string.guide_offer_failed), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.guide_offer_failed), shownNotice())
     }
 
     @Test
-    fun leave_returnsToTheCamera() {
+    fun leave_asksFirst_thenReturnsToTheCamera() {
         val modules = launch()
         val nav = scenario!!.attachNav(R.id.subjectFragment)
         connect(modules)
 
         onScreen { binding, _ -> binding.leaveButton.performClick() }
         idle()
+        assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
+        leaveQuestion().getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idle()
 
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
+        assertEquals(listOf(EndReason.LEFT), modules.session.leaves)
+    }
+
+    @Test
+    fun leave_cancelled_staysInTheSession() {
+        val modules = launch()
+        val nav = scenario!!.attachNav(R.id.subjectFragment)
+        connect(modules)
+
+        onScreen { binding, _ -> binding.leaveButton.performClick() }
+        idle()
+        val question = leaveQuestion()
+        assertEquals(
+            string(R.string.leave_session_title),
+            question.findViewById<TextView>(androidx.appcompat.R.id.alertTitle)?.text.toString(),
+        )
+        question.getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
+        idle()
+
+        assertFalse(question.isShowing)
+        assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
+        assertEquals(emptyList<EndReason>(), modules.session.leaves)
+    }
+
+    private fun leaveQuestion(): AlertDialog {
+        val dialog = ShadowDialog.getLatestDialog() as AlertDialog
+        assertTrue(dialog.isShowing)
+        return dialog
     }
 
     @Test
@@ -1681,7 +1734,7 @@ class SubjectFragmentRenderTest {
         modules.session.setPath(IcePath("relay", "srflx", "cellular", "udp"))
         idle()
 
-        assertEquals(string(R.string.mobile_data_notice), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.mobile_data_notice), shownNotice())
         assertTrue(runBlocking { modules.mobileData.wasShown() })
     }
 
@@ -1693,7 +1746,7 @@ class SubjectFragmentRenderTest {
         scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix)
         idle()
 
-        assertEquals(string(R.string.mobile_data_notice), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.mobile_data_notice), shownNotice())
         assertTrue(runBlocking { modules.mobileData.wasShown() })
     }
 
@@ -1733,7 +1786,7 @@ class SubjectFragmentRenderTest {
         modules.session.setState(SessionState.Ended(EndReason.PEER_LEFT))
         idle()
 
-        assertEquals(string(R.string.peer_ended_session, "Dongje"), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.peer_ended_session, "Dongje"), shownNotice())
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
     }
 
@@ -1745,7 +1798,7 @@ class SubjectFragmentRenderTest {
         modules.session.setState(SessionState.Ended(EndReason.PEER_LEFT))
         idle()
 
-        assertEquals(string(R.string.peer_ended_session_unnamed), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.peer_ended_session_unnamed), shownNotice())
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
     }
 }

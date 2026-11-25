@@ -29,6 +29,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.idleUntil
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
@@ -47,7 +48,6 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowPopupMenu
-import org.robolectric.shadows.ShadowToast
 
 /*
  * The library (FR-3.11, R&S 6.2), on the real screen. Partitions: nothing saved (the empty state and how guides come,
@@ -292,7 +292,7 @@ class LibraryFragmentTest {
         memoDialog().getButton(DialogInterface.BUTTON_POSITIVE).performClick()
         idle()
 
-        assertEquals(string(R.string.library_memo_failed), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.library_memo_failed), shownNotice())
     }
 
     @Test
@@ -327,7 +327,7 @@ class LibraryFragmentTest {
         cell(0).thumbnail.performClick()
         idle()
 
-        assertEquals(string(R.string.saved_guide_open_failed), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.saved_guide_open_failed), shownNotice())
         assertEquals(R.id.libraryFragment, nav.currentDestination?.id)
         assertNull(modules.guides.guide.value)
     }

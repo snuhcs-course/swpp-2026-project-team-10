@@ -1,10 +1,9 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
 import android.os.Bundle
 import android.view.View
-import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -25,6 +24,7 @@ import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.fadeTo
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.showOutline
+import com.lastpenguin.pix.ui.showNotice
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -68,14 +68,14 @@ class SubjectConfirmFragment : Fragment(R.layout.fragment_reference_confirm) {
                         val ui = viewModel.uiState.value
                         if (end.confirmId != ui.confirmId) return@collect
                         confirmEndNotice(requireContext(), end, ui.photographerName)?.let {
-                            Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show()
+                            showNotice(it)
                         }
                         backToSubject()
                     }
                 }
                 launch {
                     viewModel.useFailed.collect {
-                        Toast.makeText(requireContext(), R.string.guide_use_failed, Toast.LENGTH_SHORT).show()
+                        showNotice(R.string.guide_use_failed)
                     }
                 }
                 launch {

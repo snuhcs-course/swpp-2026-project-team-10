@@ -97,7 +97,7 @@ class ContentPhotoReader(private val resolver: ContentResolver) : PhotoReader {
  * reach the album says so in [sendFailed], and the next one goes on. [drop] ends it all with the session.
  *
  * Subject ([startAsReceiver]): writes the chunks to one file in [partDir], not to memory, saves it to [album] at
- * `photo.end`, and answers `photo.saved`. [received] says how each ended, for the subject's toast, [shutters] when each
+ * `photo.end`, and answers `photo.saved`. [received] says how each ended, for the subject's notice, [shutters] when each
  * was taken, for Subject view's blink (Iter3-A12), and [receiving] whether one is on its way, for its sign (#271).
  *
  * Both: [sessionPhotos] are the session's photos on this phone, taken or received, for the thumbnail and the viewer

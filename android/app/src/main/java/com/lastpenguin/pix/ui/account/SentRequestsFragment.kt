@@ -1,10 +1,9 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
-import android.widget.Toast
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -17,7 +16,9 @@ import com.lastpenguin.pix.account.AuthState
 import com.lastpenguin.pix.account.SentRequest
 import com.lastpenguin.pix.databinding.FragmentSentRequestsBinding
 import com.lastpenguin.pix.databinding.ItemSentRequestBinding
+import com.lastpenguin.pix.ui.NoticeLength
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.showNotice
 import kotlinx.coroutines.launch
 
 /**
@@ -55,7 +56,7 @@ class SentRequestsFragment : Fragment(R.layout.fragment_sent_requests) {
                             FriendsEvent.SignedOutByServer -> getString(R.string.signed_out_expired)
                             is FriendsEvent.Failed -> requireContext().accountMessage(event.error)
                         }
-                        Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+                        showNotice(message, NoticeLength.LONG)
                     }
                 }
             }

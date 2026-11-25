@@ -292,6 +292,14 @@ class CameraViewModel(
     /** One per photo the viewer could not delete, for its notice; kept until the screen reads it. */
     val photoNotDeleted: Flow<Unit> = _photoNotDeleted.receiveAsFlow()
 
+    private val _guideRemoved = Channel<Unit>(Channel.CONFLATED)
+
+    /** Remove guide took a guide off, for the notice whose Undo puts it back (#298). */
+    val guideRemoved: Flow<Unit> = _guideRemoved.receiveAsFlow()
+
+    /** The guide Remove guide took off, and where it was, until it is put back or another guide goes on. */
+    private var removed: Pair<ReferenceGuide, GuideState>? = null
+
     // The thumbnail's and the viewer's sources (FR-1.6): outside a session Pix's album, with the photo just saved here
     // before MediaStore tells of it; in a session the session's photos alone.
     private var album: List<Uri> = emptyList()
@@ -373,6 +381,8 @@ class CameraViewModel(
         }
         viewModelScope.launch {
             guides.guide.collect { guide ->
+                // Another guide on the camera: nothing is left for Undo to put back.
+                if (guide != null && guide !== removed?.first) removed = null
                 _uiState.update {
                     // A new guide starts with the camera's gestures, which are used more than the guide's (#304): the
                     // mode holds only for the guide it was turned on for; no guide, no mode.
@@ -834,9 +844,28 @@ class CameraViewModel(
         }
     }
 
-    /** Removes the guide; a connected subject gets `guide.clear` through GuideSyncer (#9). */
+    /**
+     * Removes the guide; a connected subject gets `guide.clear` through GuideSyncer (#9). It is kept, with where it
+     * was, for [onUndoRemoveGuide] (#298).
+     */
     fun onRemoveGuide() {
+        val guide = guides.guide.value ?: return
+        removed = guide to guides.state.value
         guides.setGuide(null)
+        _guideRemoved.trySend(Unit)
+    }
+
+    /**
+     * Puts back the guide [onRemoveGuide] took off, at its place, size, and opacity, unless another guide went on since
+     * (#298). It is the same guide, so it stays saved, PoseTips gives back its tip, and GuideSyncer sends it to a
+     * connected subject again.
+     */
+    fun onUndoRemoveGuide() {
+        val (guide, state) = removed ?: return
+        removed = null
+        if (guides.guide.value != null) return
+        guides.setGuide(guide)
+        guides.update(final = true) { state }
     }
 
     override fun onCleared() {

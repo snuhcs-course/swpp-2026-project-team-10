@@ -136,6 +136,7 @@
 | 4.13 | 2026-11-25 | The library's situations and memos (Iter5-P6, [#270]): its owner and tests, their partitions in two techniques, and steps on IT-26 (1.1, 2.1.5, 2.1.6, Appendix A). |
 | 4.14 | 2026-11-25 | The library's history, favorites, and selection (Iter5-A6, [#297]): its owner and tests, their partitions in two techniques, steps on IT-26, and what changes in IT-26's older steps, IT-27, IT-28, IT-29, and IT-35 (1.1, 2.1.5, 2.1.6, Appendix A). |
 | 4.15 | 2026-11-25 | Reconnection for 30 s, with Camera's line during the wait (Iter5-A2, [#293]): its owner and tests, the moved boundary, NFR-11's target, and changed and added steps on IT-4 and IT-16 (1.1, 2.1.5, 2.1.6, 2.2.3, Appendix A). |
+| 4.16 | 2026-11-25 | Impeccable's findings built (Iter5-A7, [#298]): their owner and tests, notices read through `shownNotice`, the layout at font scales 1.5 and 2, what changes in IT-5, IT-20, IT-33, and IT-34, and Impeccable's result (1.1, 2.1.8, 4.4, Appendix A). |
 
 </details>
 
@@ -232,6 +233,7 @@ One member writes and maintains each component's tests, following the module own
 | Who is zooming, and the photographer's actions on *Subject view* (Iter5-A1, [#292]) | Models, ViewModels, Views | `session/` (`RemoteControlHandlerTest`, `protocol/RemoteControlMessagesTest`, `protocol/ChannelRouterTest`), `ui/session/` (`SessionViewModelTest`, `SubjectViewModelTest`, `SubjectFragmentRenderTest`), `ui/camera/` (`CameraControlsViewModelTest`, `CameraFragmentInteractionTest`), `ui/guide/` (`ReferenceViewModelTest`, `SavedGuidesViewModelTest`, `ReferenceConfirmFragmentTest`); IT-6 on two phones | 박동제 |
 | A tap on the zoom readout glides (Iter5-A10, [#310]) | Models, ViewModels | `camera/ZoomGlideTest`, `ui/camera/CameraViewModelTest`, `session/RemoteControlHandlerTest`. `CameraXController`'s part needs a camera: IT-10 on the S22 and the S21, by eye and with `zoom_timings.py` | 박동제 |
 | Reconnecting lasts 30 s, Camera says who it reconnects with, and a photo's wait does not count the drop (Iter5-A2, [#293]) | Models, ViewModels, Views | `session/` (`RtcSessionManagerTest`, `PhotoSyncerTest`), `ui/session/SessionViewModelTest`, `ui/camera/CameraFragmentInteractionTest`, `ui/KoreanScreensTest`; IT-4 and IT-16 on two phones | 박동제 |
+| Impeccable's findings: glass behind the icons over the image, *Leave* and *End session* asked first, 48 dp switches, labels that grow with large fonts, notices, and *Undo* (Iter5-A7, [#298]) | Views, ViewModels, Managers | `ui/` (`SegmentTouchTargetTest`, `NoToastTest`; each screen's notices through `ScreenTestSupport.shownNotice`), `ui/camera/` (`CameraLayoutTest` at font scales 1.3, 1.5, and 2, `CameraFragmentRenderTest`, `CameraFragmentInteractionTest`, `GuideControlsViewModelTest`, `CameraViewModelTest`), `ui/session/SubjectFragmentRenderTest`, `generation/PoseTipsTest`, `MainActivityPhotoNoticeTest`; IT-5, IT-20, IT-33, and IT-34 on phones | 조성민 |
 | The live view after a reconnection, the UI fixes, and the self-timer (Iter5-P5, P7, P8) | Platform, ViewModels, Views | `session/`, `settings/`, `ui/camera/`, `ui/settings/`; the UI fixes also in `guide/`, `ui/session/`, `ui/`: `DataStoreAppSettingsTest`, `SettingsFragmentTest`, `CameraCompositionViewTest`, `CameraFragmentRenderTest`, `CameraLayoutTest`, `SubjectFragmentRenderTest`, `SubjectSessionPhotoTest`, `SessionViewModelTest`, `PhotoSyncerTest`, `MessageCodecTest`, `ChannelRouterTest`, `SessionIdentityTest`, `RtcSessionManagerTest`, `GuideOverlayViewTest`, `GuideLookTest`, `MaskMathTest`, `KoreanScreensTest` | 박재완 |
 | The library's history, favorites, and selection (Iter5-A6, [#297]) | Repositories, Managers, ViewModels, Views | `guide/` (`FileSavedGuideStoreTest`), `ui/generation/` (`PoseSaveViewModelTest`, `GenerationScreensTest`), `ui/camera/` (`SaveGuideViewModelTest`), `ui/session/` (`SubjectViewModelTest`), `ui/guide/` (`LibraryPageTest`, `SavedGuidesViewModelTest`, `ReferenceViewModelTest`, `LibraryFragmentTest`, `PoseGuideTurnTest`), `ui/` (`KoreanScreensTest`); IT-26, IT-27, and IT-35 on phones | 한준형 |
 | The library's situations and memos (Iter5-P6, [#270]) | Repositories, Models, ViewModels, Views, the session protocol | `guide/` (`FileSavedGuideStoreTest`), `ui/guide/` (`LibraryPageTest`, `SavedGuidesViewModelTest`, `ReferenceViewModelTest`, `LibraryFragmentTest`), `ui/generation/` (`PoseSaveViewModelTest`, `GenerationViewModelTest`), `session/` (`PoseSyncerTest`, `GuideSyncerTest`), `ui/` (`KoreanScreensTest`); IT-26 on phones | 한준형 |
@@ -582,6 +584,8 @@ The repository's `CLAUDE.md` files keep the short form.
 
 **Pitfalls: Android screens**
 
+- Read a notice with `ScreenTestSupport.shownNotice()` and its action with `noticeAction()`, not `ShadowToast` ([#298]). A notice is a Snackbar posted to the activity, so `idle()` after what shows it; it is gone once the clock passes its length.
+- Check a layout at a large font with `RuntimeEnvironment.setFontScale` before the activity starts, at 1.3, 1.5, and 2 (`CameraLayoutTest`).
 - Call `shadowOf(getMainLooper()).idle()` after each state change or click, `idleFor` for a `delay` loop, and a short real sleep before `idle()` for `Dispatchers.IO` work; otherwise updates never arrive.
 - Wait with `ScreenTestSupport.idleUntil` before counting items after a second list; a `ListAdapter` diffs it on a background thread.
 - Check the bitmap, not the drawable; `setImageBitmap(null)` leaves a drawable.
@@ -1144,7 +1148,20 @@ UAT cycle 2, held in class on 11/23 (Iter5-P3, [#267]). A student of another tea
 | The guide-edit button is not clear | US-10, US-12 · 7 · T2 · 4 | *Iteration 5:* one person icon, lit while the guide can be edited, and a light teal fill inside the guide meanwhile (Iter5-P7, [#271]) |
 | "Saved the photo" comes late, with nothing shown meanwhile | US-10, US-12 · 11 · T2 · 4 | *Iteration 5:* Subject view shows that the photo is saving (Iter5-P7, [#271]) |
 | Airplane mode did not turn Wi-Fi off | US-10, US-12 · 13 · T1 · 5 | No change to Pix: the comment is about the sheet's step |
-| The UI needs work: fewer screens to go through, and what a wrong tap keeps or loses | T2's overall comment | The rows above for [#294], [#296], and [#297]. *Iteration 5:* Impeccable is checked on Pix's screens and applied (Iter5-A7, [#298]) |
+| The UI needs work: fewer screens to go through, and what a wrong tap keeps or loses | T2's overall comment | The rows above for [#294], [#296], and [#297]. *Iteration 5:* Impeccable is checked on Pix's screens and applied (Iter5-A7, [#298]; below) |
+
+**Impeccable on Pix's screens (Iter5-A7, [#298]).**
+
+- **How:** Claude Code ran Impeccable's design review and audit on 11/23 over Camera, *Add a pose guide*, *Generate poses*, the library, and Subject view, from the ONE store screenshots and the source. Its detector checks web pages only, so it did not run. The review scored 27 of 40 (Acceptable), the audit 15 of 20 (Good).
+- **Changed:**
+  - In [#271]: the subject's role where Camera's shutter would be, and the guide filled in guide-edit mode.
+  - In [#297]: no "Go back?" once poses are kept.
+  - In [#298]: glass behind the icons over the image; *Undo* for 5 s after *Remove guide*; notices as Snackbars, above the camera screens' zoom row; *Leave* and *End session* ask first; switches 48 dp tall; labels that grow with large fonts, checked at font scales 1.5 and 2.
+- **Not changed:**
+  - The ratio labels at 8 sp, and moving the guide with TalkBack: dropped on 11/24.
+  - R8: too risky before ONE store's update.
+  - One step fewer for an AI pose: both confirmations stay, as *Use* on *Reference confirm* does above.
+  - The minor findings, such as thumbnails decoded at full size and missing TalkBack roles, are listed in [#298].
 
 ---
 
@@ -1271,12 +1288,14 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 
 1. Add a guide, and drag it on each phone in turn. *Changed in Iter5-A8 ([#304]): on the photographer's phone too, tap the guide-edit toggle first; a new guide no longer starts in guide-edit mode.*
 2. Hide and show it on the photographer's phone, then replace it through *Guide*.
+3. *Added in Iter5-A7 ([#298]):* with an AI pose's guide moved off its start, tap *Remove guide* on the photographer's phone, then *Undo*. Remove it again and let 5 s pass.
 
 **Expected result**
 
 - Same position on both phones within 0.3 s; offset ≤ 3 % of the frame width.
 - The subject's guide starts where the photographer's does, and disappears and comes back at the same place.
 - A replacement starts at its own reference's place on both phones.
+- *Added in Iter5-A7:* "Guide removed" with *Undo* shows above the zoom row. *Undo* brings the guide back on both phones where it was, with its tip button. After 5 s the notice goes, and the guide stays removed.
 
 ### IT-6 procedure
 
@@ -1574,7 +1593,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 1. The photographer takes a photo at 4:3, one at 16:9, and one at 1:1, the last two right after each other.
 2. The photographer takes a photo and drags the guide on the camera while it goes.
 3. Take a photo with the subject's Wi-Fi off for 5 s while it goes, and one during that drop.
-4. Take a photo and tap *End session* while it goes.
+4. Take a photo and tap *End session* while it goes. *Changed in Iter5-A7 ([#298]): *End session* asks first; confirm at once.*
 5. Repeat on cellular data.
 6. *Added in Iter4-A2 ([#235]):* in a new session, the photographer takes two photos. On each phone, tap the thumbnail after the second, swipe to the first, wait 70 s, then tap Back. On the subject's phone, tap *Leave*, then the thumbnail on Camera, and swipe. Close Pix, open it again, and look at the thumbnail.
 7. *Added in Iter4-A7 ([#247]):* on the subject's phone, open the thumbnail on Camera. Tap a thumbnail in the strip, tap the photo twice, pinch, double-tap, and swipe while zoomed. Drag the photo down a little and let go, then far. Open it again, *Share* to a messaging app, then *Delete* and *Cancel*, then *Delete* and *Delete*.
@@ -1856,7 +1875,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 3. Go Back from each screen and from the sheet.
 4. Invite the subject while it is signed out, open the notification, and sign in from *Invitation*.
 5. Leave and invite again. Dismiss the notification on the subject's phone. Within the minute, tap *Shoot together* there, then *I'll be in the photo* and *Accept*.
-6. *Added in Iter5-P7 ([#271]):* connect with a room code, the photographer signed in and the subject signed out, and look at both phones for 5 s. Turn the subject's Wi-Fi off for 5 s and on again. Then tap *Leave*, and connect again.
+6. *Added in Iter5-P7 ([#271]):* connect with a room code, the photographer signed in and the subject signed out, and look at both phones for 5 s. Turn the subject's Wi-Fi off for 5 s and on again. Then tap *Leave*, then *Leave* again to confirm, and connect again.
 
 **Expected result**
 
@@ -1885,6 +1904,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 8. Generate once from a description the filter refuses and once from one it accepts, then open *Generate poses* again.
 9. Repeat the labels, *Save guide*, and the history from Subject view.
 10. *Added in Iter5-P7 ([#271]):* with a guide on both phones, tap the guide-edit toggle on and off on Camera, then on Subject view, with the guide's color white and then yellow.
+11. *Added in Iter5-A7 ([#298]):* point both cameras at a white wall with a guide and a tip on. Then set the phone's font size to its largest, and look at Camera and Subject view in a session.
 
 **Expected result**
 
@@ -1897,7 +1917,8 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 - The button reads *Suggest 4 poses*, then *Generate 4 poses from this*. Back opens *Generate poses* with the photo and the description; the ✕ opens the camera. *Changed in Iter4-P2 ([#199]): *Suggest*, then *Generate*; Back asks first and drops the set (IT-35).* *Changed in Iter5-P10 ([#274]): *Generate* for both, since the empty field says *Auto*.*
 - The refused description is not among *Used before*, and the accepted one is, on both phones.
 - The lines stay visible on both scenes.
-- *Added in Iter5-P7:* in step 10, the toggle is one person icon: white while off, and in the guide's color on a tinted tile while on. While it is on, the inside of the guide is a light teal, also under a yellow line; off, the guide is an outline only. Each phone tints the guide for its own mode only.
+- *Added in Iter5-P7:* in step 10, the toggle is one person icon: white while off, and in the guide's color on a teal-tinted glass circle while on. While it is on, the inside of the guide is a light teal, also under a yellow line; off, the guide is an outline only. Each phone tints the guide for its own mode only.
+- *Added in Iter5-A7:* in step 11, the tip and guide-edit buttons, and *Save guide* on Subject view, each show on a dark glass circle against the wall. At the largest font, no label is cut, *Guide*'s label stays whole under its icon, and the shutter stays in its place.
 
 ### IT-35 procedure
 

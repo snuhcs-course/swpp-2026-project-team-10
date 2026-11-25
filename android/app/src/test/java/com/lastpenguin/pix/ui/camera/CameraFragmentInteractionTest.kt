@@ -47,6 +47,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
@@ -69,14 +70,13 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowChoreographer
 import org.robolectric.shadows.ShadowDialog
-import org.robolectric.shadows.ShadowToast
 
 /*
  * The Camera screen's interactions, beyond the render paths of CameraFragmentRenderTest (R&S 6.2, 6.3; FR-1.4, FR-1.5,
  * FR-1.7, FR-3.9, FR-4.1, FR-6.8, FR-7.1–7.4): the permission flow (denied, kept across a recreation, the request's
  * answer binding the camera; Open settings and Try again); the clicks that navigate (Add a guide, Shoot together, Use
  * this photo, which opens nothing for a photo without a person) and system back during the scene photo step; End
- * session; the gallery button: outside a session the album's newest, which opens Pix's album in Pix's viewer at the
+ * session, which asks first (#298): confirmed, cancelled, and the question gone once the subject left; the gallery button: outside a session the album's newest, which opens Pix's album in Pix's viewer at the
  * newest, a swipe to an older one and a tap on the strip of thumbnails, and system Back, and a photo just taken there
  * at once; a photo deleted there, once asked, leaves it and the thumbnail, and one that cannot be deleted stays with a
  * notice; in a session as the
@@ -640,7 +640,53 @@ class CameraFragmentInteractionTest {
         idle()
         onScreen { controls, _ -> controls.endSessionButton.performClick() }
         idle()
+        assertEquals(emptyList<EndReason>(), modules.session.leaves)
+        endSessionQuestion().getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idle()
         assertEquals(listOf(EndReason.LEFT), modules.session.leaves)
+    }
+
+    @Test
+    fun endSession_cancelled_keepsTheSession() {
+        val modules = launch()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+
+        onScreen { controls, _ -> controls.endSessionButton.performClick() }
+        idle()
+        val question = endSessionQuestion()
+        assertEquals(
+            string(R.string.end_session_title),
+            question.findViewById<TextView>(androidx.appcompat.R.id.alertTitle)?.text.toString(),
+        )
+        question.getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
+        idle()
+
+        assertFalse(question.isShowing)
+        assertEquals(emptyList<EndReason>(), modules.session.leaves)
+        onScreen { controls, _ -> assertTrue(controls.endSessionButton.isVisible) }
+    }
+
+    @Test
+    fun endSessionQuestion_goesWhenTheSubjectLeavesFirst() {
+        val modules = launch()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        onScreen { controls, _ -> controls.endSessionButton.performClick() }
+        idle()
+        val question = endSessionQuestion()
+
+        modules.session.setState(SessionState.Waiting("123456"))
+        idle()
+
+        assertFalse(question.isShowing)
+        assertEquals(emptyList<EndReason>(), modules.session.leaves)
+    }
+
+    private fun endSessionQuestion(): AlertDialog {
+        val dialog = ShadowDialog.getLatestDialog() as AlertDialog
+        assertTrue(dialog.isShowing)
+        return dialog
     }
 
     // ---- The gallery button and capture failures ------------------------------------------
@@ -752,7 +798,7 @@ class CameraFragmentInteractionTest {
         idle()
         (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_POSITIVE).performClick()
         settleReads()
-        assertEquals(string(R.string.photo_not_deleted), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.photo_not_deleted), shownNotice())
         onScreen { controls, _ -> assertEquals(2, photoViewerOn(controls.root).stripCount()) }
 
         modules.deleteFails = false

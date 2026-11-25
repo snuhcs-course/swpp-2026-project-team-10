@@ -1,10 +1,9 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.View
-import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -17,8 +16,10 @@ import androidx.navigation.fragment.findNavController
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentFailureBinding
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.ui.NoticeLength
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.account.accountMessage
+import com.lastpenguin.pix.ui.showNotice
 import kotlinx.coroutines.launch
 
 /**
@@ -45,7 +46,7 @@ class InvitationFragment : Fragment(R.layout.fragment_failure) {
                         when (event) {
                             is InvitationEvent.Accepted -> join(event)
                             InvitationEvent.Declined -> backToCamera()
-                            is InvitationEvent.AnswerFailed -> toast(requireContext().accountMessage(event.error))
+                            is InvitationEvent.AnswerFailed -> notice(requireContext().accountMessage(event.error))
                         }
                     }
                 }
@@ -65,7 +66,7 @@ class InvitationFragment : Fragment(R.layout.fragment_failure) {
             if (sessionViewModel.endWaitingRoom()) {
                 viewModel.accept()
             } else {
-                toast(
+                notice(
                     getString(R.string.invitation_in_session),
                 )
             }
@@ -77,7 +78,7 @@ class InvitationFragment : Fragment(R.layout.fragment_failure) {
             viewModel.joining = true
             return
         }
-        toast(getString(R.string.invitation_in_session))
+        notice(getString(R.string.invitation_in_session))
         viewModel.gone()
     }
 
@@ -89,7 +90,7 @@ class InvitationFragment : Fragment(R.layout.fragment_failure) {
             return
         }
         viewModel.joining = false
-        if (join == InvitationJoin.FAILED) toast(getString(R.string.couldnt_connect))
+        if (join == InvitationJoin.FAILED) notice(getString(R.string.couldnt_connect))
         if (join != InvitationJoin.CLOSED) viewModel.gone()
     }
 
@@ -168,8 +169,8 @@ class InvitationFragment : Fragment(R.layout.fragment_failure) {
         findNavController().popBackStack(R.id.cameraFragment, false)
     }
 
-    private fun toast(text: String) {
-        Toast.makeText(requireContext(), text, Toast.LENGTH_LONG).show()
+    private fun notice(text: String) {
+        showNotice(text, NoticeLength.LONG)
     }
 
     companion object {

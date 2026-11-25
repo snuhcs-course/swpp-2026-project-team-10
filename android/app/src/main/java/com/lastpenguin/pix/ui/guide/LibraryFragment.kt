@@ -8,7 +8,6 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.PopupMenu
-import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
@@ -27,8 +26,10 @@ import com.lastpenguin.pix.databinding.FragmentLibraryBinding
 import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.SavedGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
+import com.lastpenguin.pix.ui.NoticeLength
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.generation.title
+import com.lastpenguin.pix.ui.showNotice
 import java.text.NumberFormat
 import kotlinx.coroutines.launch
 
@@ -87,13 +88,11 @@ class LibraryFragment : Fragment(R.layout.fragment_library) {
                 }
                 launch {
                     viewModel.favoriteFailures.collect {
-                        Toast.makeText(requireContext(), R.string.guide_save_failed_notice, Toast.LENGTH_LONG).show()
+                        showNotice(R.string.guide_save_failed_notice, NoticeLength.LONG)
                     }
                 }
                 launch {
-                    viewModel.memoFailures.collect {
-                        Toast.makeText(requireContext(), R.string.library_memo_failed, Toast.LENGTH_LONG).show()
-                    }
+                    viewModel.memoFailures.collect { showNotice(R.string.library_memo_failed, NoticeLength.LONG) }
                 }
                 launch {
                     viewModel.savedGuideResults.collect { result ->
@@ -101,11 +100,7 @@ class LibraryFragment : Fragment(R.layout.fragment_library) {
                             SavedGuideResult.USED -> backToShooting(viewModel)
 
                             SavedGuideResult.FAILED ->
-                                Toast.makeText(
-                                    requireContext(),
-                                    R.string.saved_guide_open_failed,
-                                    Toast.LENGTH_LONG,
-                                ).show()
+                                showNotice(R.string.saved_guide_open_failed, NoticeLength.LONG)
                         }
                     }
                 }

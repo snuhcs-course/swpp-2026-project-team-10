@@ -71,7 +71,8 @@
 
         <!-- The title replaces Shoot together while the scene photo for poses is taken (R&S 6.3), in the size of the
              bar's own action, since the bar stays the camera's (#231), and smaller where a long title at a large font
-             would not fit on its line beside the light and the ratio. Like the bar's other controls, it centers on the
+             would not fit on its line beside the light and the ratio: down to 11 dp, not sp, so it fits at any font
+             scale, 200 % included (#298). Like the bar's other controls, it centers on the
              bar above its last 4 dp, which lie over the image (#204). -->
         <TextView
             android:id="@+id/sceneTitle"
@@ -83,7 +84,7 @@
             android:accessibilityHeading="true"
             android:accessibilityLiveRegion="polite"
             android:autoSizeMaxTextSize="14sp"
-            android:autoSizeMinTextSize="11sp"
+            android:autoSizeMinTextSize="11dp"
             android:autoSizeTextType="uniform"
             android:gravity="center_vertical"
             android:maxLines="1"
@@ -648,8 +649,8 @@
 
     <!-- The applied zoom (FR-1.3), which a pinch on the preview changes, the pose tip's button, and the guide-edit
          mode toggle, over the bottom of the image whatever the ratio, above the panels below when they reach into it
-         (placed in code); the same row as Subject view, which has no tip and keeps a brightness button, since the base
-         brightness is in Settings here (FR-1.11). The readout keeps the Zoom in / Zoom out accessibility actions. -->
+         (placed in code); the same row as Subject view, which adds Save guide. The readout and the buttons are on glass,
+         so they show on a bright scene (#298). The readout keeps the Zoom in / Zoom out accessibility actions. -->
     <FrameLayout
         android:id="@+id/zoomRow"
         android:layout_width="0dp"
@@ -672,7 +673,7 @@
             android:importantForAccessibility="yes"
             android:minWidth="48dp"
             android:paddingHorizontal="12dp"
-            android:paddingVertical="10dp"
+            android:paddingVertical="8dp"
             android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
             android:textColor="@color/zoom_readout_text"
             android:textSize="11sp"
@@ -696,7 +697,7 @@
 
                 <com.lastpenguin.pix.ui.camera.TurningButton
                     android:id="@+id/tipButton"
-                    style="@style/Widget.Pix.Button.Icon"
+                    style="@style/Widget.Pix.Button.Icon.OnPhoto"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:contentDescription="@string/show_tip"
@@ -720,13 +721,14 @@
                  outline, lit in the guide's color while checked (#271). -->
             <com.lastpenguin.pix.ui.camera.TurningButton
                 android:id="@+id/editGuideButton"
-                style="@style/Widget.Pix.Button.Icon"
+                style="@style/Widget.Pix.Button.Icon.OnPhoto"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checkable="true"
                 android:contentDescription="@string/edit_guide"
                 android:visibility="gone"
                 app:backgroundTint="@color/edit_guide_background"
+                app:strokeColor="@color/edit_guide_stroke"
                 app:icon="@drawable/ic_guide_mode"
                 app:iconTint="@color/edit_guide_icon"
                 tools:visibility="visible" />
@@ -765,18 +767,20 @@
 
         <!-- Guide, shutter, and the last photo, in thirds and on one center line; the Guide label hangs below. The
              shutter keeps its size and place whatever the ratio (R&S 6.2). The panel around it gives the preview's
-             place its height (previewArea), so it stays even with this row alone in it. -->
+             place its height (previewArea), so it stays even with this row alone in it. The row is 88 dp, the shutter
+             and the last photo centered in that, and grows below them only for a Guide label taller than 16 dp, at a
+             large font, as Subject view's row does (#298). -->
         <LinearLayout
             android:id="@+id/captureControls"
             android:layout_width="match_parent"
-            android:layout_height="88dp"
+            android:layout_height="wrap_content"
             android:baselineAligned="false"
-            android:gravity="center_vertical"
+            android:minHeight="88dp"
             tools:ignore="UselessParent">
 
             <FrameLayout
                 android:layout_width="0dp"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:layout_weight="1">
 
                 <LinearLayout
@@ -785,6 +789,7 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="top|center_horizontal"
                     android:layout_marginTop="24dp"
+                    android:layout_marginBottom="4dp"
                     android:clickable="true"
                     android:contentDescription="@string/guide_add_description"
                     android:focusable="true"
@@ -807,7 +812,7 @@
 
                     <TextView
                         android:layout_width="wrap_content"
-                        android:layout_height="16dp"
+                        android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:duplicateParentState="true"
                         android:gravity="center"
@@ -821,7 +826,7 @@
 
             <FrameLayout
                 android:layout_width="0dp"
-                android:layout_height="match_parent"
+                android:layout_height="88dp"
                 android:layout_weight="1">
 
                 <ImageButton
@@ -837,7 +842,7 @@
                  gallery button; the gallery button alone keeps the middle on a phone without a front camera. -->
             <FrameLayout
                 android:layout_width="0dp"
-                android:layout_height="match_parent"
+                android:layout_height="88dp"
                 android:layout_weight="1"
                 tools:ignore="UselessParent">
 

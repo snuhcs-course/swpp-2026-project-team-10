@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.animation.Animator
@@ -47,6 +47,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.idleUntil
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
@@ -69,7 +70,6 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowChoreographer
-import org.robolectric.shadows.ShadowToast
 
 /*
  * The four generation screens (R&S 6.3, FR-4.4–4.8, US-5; Testing Documentation 2.1.6) on the real Fragments,
@@ -1035,7 +1035,7 @@ class GenerationScreensTest {
         assertEquals(string(R.string.remove_saved_pose), heartAt(s, 0).contentDescription)
         // Filled in red, so a saved pose shows at a glance.
         assertEquals(color(heartAt(s, 0), R.color.pix_heart), heartAt(s, 0).iconTint.defaultColor)
-        assertEquals(string(R.string.pose_saved_notice), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.pose_saved_notice), shownNotice())
         // The next page's pose is not saved.
         s.onFragment { FragmentPickPoseBinding.bind(it.requireView()).candidatePager.setCurrentItem(1, false) }
         idle()
@@ -1140,7 +1140,7 @@ class GenerationScreensTest {
         // Still in the library, no longer a favorite (#297).
         assertEquals(listOf("saved-pose" to false), modules.saved.saved.value.map { it.id to it.favorite })
         assertEquals(string(R.string.save_pose), heartAt(s, 0).contentDescription)
-        assertEquals(string(R.string.pose_removed_notice), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.pose_removed_notice), shownNotice())
     }
 
     @Test
@@ -1157,7 +1157,7 @@ class GenerationScreensTest {
         assertTrue(modules.saved.saved.value.isEmpty())
         assertEquals(string(R.string.save_pose), heartAt(s, 0).contentDescription)
         assertTrue(heartAt(s, 0).isEnabled)
-        assertEquals(string(R.string.pose_no_person_notice), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.pose_no_person_notice), shownNotice())
     }
 
     @Test

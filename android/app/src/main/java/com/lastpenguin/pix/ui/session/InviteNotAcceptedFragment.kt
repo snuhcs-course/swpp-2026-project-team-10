@@ -1,9 +1,8 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
 import android.view.View
-import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
@@ -13,8 +12,10 @@ import androidx.navigation.fragment.findNavController
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.account.AccountError
 import com.lastpenguin.pix.databinding.FragmentFailureBinding
+import com.lastpenguin.pix.ui.NoticeLength
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.account.accountMessage
+import com.lastpenguin.pix.ui.showNotice
 import kotlinx.coroutines.launch
 
 /**
@@ -57,7 +58,7 @@ class InviteNotAcceptedFragment : Fragment(R.layout.fragment_failure) {
                             } else {
                                 requireContext().accountMessage(result.error)
                             }
-                            Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+                            showNotice(message, NoticeLength.LONG)
                         }
                     }
                 }

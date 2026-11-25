@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.content.ClipboardManager
@@ -20,6 +20,7 @@ import com.lastpenguin.pix.ui.OwnActivities
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.inviteFromFriends
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import org.junit.After
@@ -32,7 +33,6 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
-import org.robolectric.shadows.ShadowToast
 
 /*
  * Invite sent's render paths (R&S 6.5; FR-6.1–6.3; Testing Documentation 2.1.6), on the real bottom sheet. Partitions
@@ -159,7 +159,7 @@ class InviteSentSheetTest {
         modules.session.setState(SessionState.Ended(EndReason.ERROR))
         idle()
 
-        assertEquals(string(R.string.couldnt_connect), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.couldnt_connect), shownNotice())
         assertFalse(sheet.isAdded)
     }
 

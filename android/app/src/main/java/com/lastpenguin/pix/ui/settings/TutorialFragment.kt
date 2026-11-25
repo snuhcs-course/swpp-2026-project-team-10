@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.settings
 
 import android.app.Dialog
@@ -182,11 +182,12 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
     TutorialScreen.CAMERA to TutorialTips(
         title = null,
         tips = listOf(
-            TutorialTip(R.string.tutorial_settings, CaptionSide.BELOW, locate = control(R.id.settingsButton)),
+            // The camera menu holds the flash, the timer, the grid, the horizon bar, and Settings (FR-1.17).
+            TutorialTip(R.string.tutorial_menu, CaptionSide.BELOW, locate = control(R.id.cameraMenuButton)),
+            TutorialTip(R.string.tutorial_switch, CaptionSide.BELOW, locate = control(R.id.switchCameraButton)),
             TutorialTip(R.string.tutorial_together, CaptionSide.BELOW, locate = control(R.id.shootTogetherButton)),
             // Rings around the button's icon, not its label, so the closing line fits below it (#204).
             TutorialTip(R.string.tutorial_guide, CaptionSide.ABOVE, locate = control(R.id.guideButtonIcon)),
-            TutorialTip(R.string.tutorial_switch, CaptionSide.ABOVE, locate = control(R.id.switchCameraButton)),
             TutorialTip(R.string.tutorial_shutter, CaptionSide.ABOVE, locate = control(R.id.shutterButton)),
         ),
     ),

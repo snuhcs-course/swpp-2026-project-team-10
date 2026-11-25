@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -222,35 +222,27 @@ class CameraControlsViewModelTest {
     }
 
     @Test
-    fun theBaseBrightness_isSetWhenTheRangeIsKnown_whenItChanges_andAtEachTapToFocus() = runTest(dispatcher) {
-        // 1/6 EV per index.
-        val base = MutableStateFlow(1f)
-        model = CameraViewModel(camera, guides, settings, baseBrightness = base)
+    fun theBaseBrightness_0Ev_isSetWhenTheRangeIsKnown_atEachTapToFocus_andForANewRange() = runTest(dispatcher) {
+        model = CameraViewModel(camera, guides, settings)
         store.put("camera", model)
         runCurrent()
-        assertEquals(listOf(6), camera.exposureRequests)
+        assertEquals(listOf(0), camera.exposureRequests)
 
-        // A drag adds to it, and a tap to focus takes that away again.
+        // A drag changes it, and a tap to focus takes that away again.
         model.onExposureChange(9)
         model.onFocusTap(0.5f, 0.5f)
-        assertEquals(listOf(6, 9, 6), camera.exposureRequests)
+        assertEquals(listOf(0, 9, 0), camera.exposureRequests)
 
-        base.value = -0.5f
+        // Another camera's range, without 0: the base again, clamped to it.
+        camera.capabilities.value = capabilities(exposureRange = 2..8)
         runCurrent()
-        assertEquals(-3, camera.exposureRequests.last())
-
-        // Another camera's range: the base again, clamped to it.
-        base.value = 2f
-        runCurrent()
-        camera.capabilities.value = capabilities(exposureRange = -4..4)
-        runCurrent()
-        assertEquals(4, camera.exposureRequests.last())
+        assertEquals(2, camera.exposureRequests.last())
     }
 
     @Test
     fun aTapOnACameraThatCannotFocusOnAPoint_stillTakesTheBrightnessBackToTheBase() = runTest(dispatcher) {
         camera.capabilities.value = capabilities(supportsFocusPoint = false)
-        model = CameraViewModel(camera, guides, settings, baseBrightness = MutableStateFlow(0.5f))
+        model = CameraViewModel(camera, guides, settings)
         store.put("camera", model)
         runCurrent()
         model.onExposureChange(8)
@@ -258,13 +250,13 @@ class CameraControlsViewModelTest {
         model.onFocusTap(0.5f, 0.5f)
 
         assertTrue(camera.focusRequests.isEmpty())
-        assertEquals(listOf(3, 8, 3), camera.exposureRequests)
+        assertEquals(listOf(0, 8, 0), camera.exposureRequests)
     }
 
     @Test
     fun theBaseBrightness_withoutExposureCompensation_setsNothing() = runTest(dispatcher) {
         camera.capabilities.value = capabilities(exposureRange = 0..0)
-        model = CameraViewModel(camera, guides, settings, baseBrightness = MutableStateFlow(1f))
+        model = CameraViewModel(camera, guides, settings)
         store.put("camera", model)
         runCurrent()
         model.onFocusTap(0.5f, 0.5f)

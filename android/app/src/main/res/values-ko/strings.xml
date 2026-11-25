@@ -116,6 +116,19 @@
     <string name="flash_on">플래시 켬</string>
     <string name="scene_light_off">조명 끔</string>
     <string name="scene_light_on">조명 켬</string>
+    <string name="camera_menu">카메라 메뉴</string>
+    <string name="menu_flash">플래시</string>
+    <string name="menu_timer">타이머</string>
+    <string name="menu_level">수평계</string>
+    <string name="timer_off">타이머 끔</string>
+    <string name="timer_seconds">타이머 %1$d초</string>
+    <string name="grid_on">격자선 켬</string>
+    <string name="grid_off">격자선 끔</string>
+    <string name="level_on">수평계 켬</string>
+    <string name="level_off">수평계 끔</string>
+    <string name="shutter_timer">셔터, 타이머 %1$d초</string>
+    <string name="shutter_cancel_timer">타이머 취소</string>
+    <string name="countdown_cancel_hint">셔터를 누르면 취소돼요</string>
     <string name="aspect_ratio_description">화면 비율 %1$s</string>
     <string name="aspect_ratios">화면 비율</string>
     <string name="brightness">밝기</string>
@@ -139,6 +152,7 @@
     <string name="photo_not_deleted">사진을 삭제하지 못했어요.</string>
     <string name="remote_zoom_notice">%1$s님이 배율을 %2$s×에 맞췄어요</string>
     <string name="zoom_held_label">%1$s님이 배율을 바꾸고 있어요</string>
+    <string name="photographer_timer_label">%1$s님이 사진을 찍고 있어요</string>
     <string name="remote_guide_move_notice">%1$s님이 가이드를 옮겼어요</string>
     <string name="remote_guide_notice">%1$s님이 포즈 가이드를 정했어요</string>
     <string name="peer_watching_notice">%1$s님이 내 카메라를 보고 있어요</string>
@@ -503,13 +517,7 @@
 
     <!-- Settings, How to use Pix, About Pix -->
     <string name="settings">설정</string>
-    <string name="settings_section_camera">카메라</string>
-    <string name="settings_base_brightness">기본 밝기</string>
-    <string name="settings_base_brightness_body">모든 사진이 이 밝기에서 시작해요. 화면을 눌러 초점을 맞춘 뒤 위아래로 밀면 다음에 누를 때까지 더 밝거나 어둡게 바뀌어요.</string>
     <string name="settings_grid">격자선</string>
-    <string name="settings_grid_body">화면을 가로세로 3등분하는 선이에요.</string>
-    <string name="settings_level">수평계</string>
-    <string name="settings_level_body">가운데 막대가 수평이 맞으면 노란색으로 바뀌어요.</string>
     <string name="settings_section_guide">가이드</string>
     <string name="settings_guide_color">색</string>
     <string name="settings_guide_thickness">두께</string>
@@ -567,7 +575,7 @@
     <string name="settings_tutorial">튜토리얼 다시 보기</string>
     <string name="settings_tutorial_reset">화면마다 튜토리얼이 다시 나와요.</string>
     <string name="tutorial_close_hint">아무 곳이나 누르면 닫혀요</string>
-    <string name="tutorial_settings">언어와 가이드 모양을 바꿔요</string>
+    <string name="tutorial_menu">플래시, 타이머, 격자선, 설정</string>
     <string name="tutorial_together">다른 폰과 카메라 화면을 실시간으로 공유해요</string>
     <string name="tutorial_guide">사진이나 AI 포즈로 가이드를 더해요</string>
     <string name="tutorial_shutter">가이드 없이 사진만 저장돼요</string>

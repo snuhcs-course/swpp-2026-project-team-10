@@ -46,7 +46,36 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 - [Joonhyung, 11-25] "Change the bookmark button here into a heart, filled in red." (*Save guide* on Camera and Subject view, and its notice, now show the ♥ of *Pick a pose* and the library.)
 - [Joonhyung, 11-25] "Apply this review, then commit and push, and update the PR with the changes." (Codex's review of #308 had five findings. The agent fixed each with a test: a pose can be selected though its history cannot be written, *Save guide* marks a history entry written meanwhile, a ♥ that cannot be emptied fills again, "The poses are in My library." waits for a written pose, and TalkBack names the ♥ by Favorites.)
 
+## The self-timer and the camera menu ([#272], [#315])
+
+- [Jaewan, 11-25] "let's add a timer to the shutter (#272). can you first give me ui mockups for candidates?"
+- [Jaewan, 11-25] "in A, why not just put the number 3 or 10 inside the icon? and i think showing a short notice vs the number 3s in the shutter in design C are an orthogonal choices to A/B/C. can you draw the artifact again"
+- [Jaewan, 11-25] "[Image #1] where's the number?"
+- [Jaewan, 11-25] "i think the shallow version was better instead of filled yellow"
+- [Jaewan, 11-25] "i'll choose a different option. first move the selfie button to the current settings button position, and make the below area only have the guide button on left and gallery button on the right (like the subject view). and then on the current flash button's position, merge flash/timer/grid onoff (from settings)/horizontal line onoff (from settings)/settings into one button that opens a panel. the timer button here should behave like option A. and for the extra choices for timer, i'll choose 'notice after each change' and 'X (big number over the preview)'. can you redraw the ui mockup for this? also the subject view too."
+- [Jaewan, 11-25] "expanding the panel veritcally consumes too much space, can we do this horizontally only using icons + a short text beneath it? and give me both in english and korean"
+- [Jaewan, 11-25] "what happens if the flash is on? does that also show on the bar like the timer?"
+- [Jaewan, 11-25] "let's do it this way. implement this in a new branch"
+- [Jaewan, 11-25] "the settings panel is too ugly.. i was thinking of this style [Image #2] can you make it more closer to this"
+- [Jaewan, 11-25] "i want the transparency and overall rounded borders similar to the ratio panel. and can we make the height slightly shorter?"
+- [Jaewan, 11-25] "i think we should make the icons and text there slightly more thinner, and maybe the text can be slightly smaller?"
+- [Jaewan, 11-25] "this is good, but i think we can place the icons slightly lower (and make the text slightly smaller, if needed)"
+- [Jaewan, 11-25] "can we make them more thinner"
+- [Jaewan, 11-25] "when placing icons on the top-bar, make them thick as before, to match the other icons next to it. especially it should aligned well"
+- [Jaewan, 11-25] "is everything done except for the tests? then push this and create a pr first. we'll just look at the test results there"
+- [Jaewan, 11-25] "i've checked the screens so also update the docs. but before that, there's also changes to dev so merge it and resolve conflicts. especially pr #312 applies some ui fixes, and check if we have anything conflicting with their rules"
+- [Jaewan, 11-25] "when it's done, commit and push everything"
+- [Jaewan, 11-25] "remove the grid and horizontal line part from the settings. and can we just remove the 'base brightness' part? so the scrolling up or down on focus click is the only part that controls exposure"
+- [Jaewan, 11-25] "when clicking on the three buttons on the top bar, the background coloring that show up have different sizes. can you match those? and also i want a slight animation when opening the panels (setting or ratio)"
+- [Jaewan, 11-25] "start the emulator so i can check it"
+- [Jaewan, 11-25] "when will the check stop?"
+- [Jaewan, 11-25] "close the emulator. it seems good"
+- [Jaewan, 11-25] "do it. just don't run the check we'll check what runs on the pr. are the docs updated?"
+- [Jaewan, 11-25] "codex left reviews. check them"
+- [Jaewan, 11-25] "push, update the pr description, and respond to the review and resolve them."
+
 [#270]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/270
+[#272]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/272
 [#292]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/292
 [#294]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/294
 [#297]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/297
@@ -55,3 +84,4 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 [#306]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/306
 [#308]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/308
 [#310]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/310
+[#315]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/315

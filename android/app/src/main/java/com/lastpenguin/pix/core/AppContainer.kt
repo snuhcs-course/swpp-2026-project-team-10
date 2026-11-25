@@ -339,7 +339,6 @@ class AppContainer(
                     cameraController,
                     guideRepository,
                     attributeGuideChanges = guideSyncer::attribute,
-                    baseBrightness = appSettings.baseBrightness,
                 ),
                 mobileDataNotice = DataStoreMobileDataNotice(appContext),
                 appSettings = appSettings,

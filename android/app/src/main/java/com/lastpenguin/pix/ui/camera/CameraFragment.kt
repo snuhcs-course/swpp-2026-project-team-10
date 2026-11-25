@@ -17,6 +17,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -78,6 +79,7 @@ import com.lastpenguin.pix.ui.fadeTo
 import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.generation.framingHint
+import com.lastpenguin.pix.ui.reveal
 import com.lastpenguin.pix.ui.session.RemoteFocus
 import com.lastpenguin.pix.ui.session.SessionNotice
 import com.lastpenguin.pix.ui.session.SessionViewModel
@@ -111,6 +113,7 @@ class CameraFragment :
     private var binding: FragmentCameraBinding? = null
     private var sceneBack: OnBackPressedCallback? = null
     private var aspectsBack: OnBackPressedCallback? = null
+    private var menuBack: OnBackPressedCallback? = null
     private var photosBack: OnBackPressedCallback? = null
     private var photoViewer: PhotoViewer? = null
     private var endSessionDialog: AlertDialog? = null
@@ -278,10 +281,14 @@ class CameraFragment :
         focusBrightness = FocusBrightness(controls.focusRing, controls.exposureBar, viewLifecycleOwner.lifecycleScope) {
             viewModel.setBrightnessOpen(false)
         }
-        // While the scene photo is taken, the flash button turns the phone's light on and off instead (FR-4.1).
-        controls.flashButton.setOnClickListener {
-            if (isScenePhotoActive()) generationViewModel.toggleLight() else viewModel.onFlashTap()
-        }
+        // The flash button shows only while the scene photo is taken, and turns the phone's light on and off (FR-4.1).
+        controls.flashButton.setOnClickListener { generationViewModel.toggleLight() }
+        setupMenu(controls)
+        // The bar's texts keep their line beside the bar's icons at every font size (#298), and the ratio's pill the
+        // icons' height (#272).
+        capPillText(controls.shootTogetherButton)
+        capPillText(controls.endSessionButton)
+        capPillText(controls.aspectButton)
         // The ratios open under the top bar (FR-1.13); a touch anywhere else closes them (setupTip), and so does Back.
         controls.aspectButton.setOnClickListener {
             viewModel.setAspectsOpen(!viewModel.uiState.value.aspectsOpen)
@@ -296,15 +303,16 @@ class CameraFragment :
         setupZoomAccessibility(controls.zoomReadout)
         setupCompositionLevel(controls.compositionOverlay)
         viewModel.watchPhoneTurn(viewLifecycleOwner)
-        // The icons turn with the phone (FR-1.15), and so do the ratio, the zoom readout, and Guide with its label; the
-        // other texts, the shutter, and the layout stay.
+        // The icons turn with the phone (FR-1.15), and so do the ratio, the zoom readout, the countdown, Guide with its
+        // label, and the menu's items with theirs; the other texts, the shutter, and the layout stay.
         controls.aspectButton.turnsLabel = true
         turningIcons = TurningIcons(
             controls = listOf(
                 controls.sceneBackButton,
                 controls.flashButton,
+                controls.cameraMenuButton,
                 controls.aspectButton,
-                controls.settingsButton,
+                controls.switchCameraButton,
                 controls.shootTogetherButton,
                 controls.hideGuideButton,
                 controls.saveGuideButton,
@@ -312,8 +320,19 @@ class CameraFragment :
                 controls.tipButton,
                 controls.editGuideButton,
                 controls.zoomReadout,
+                controls.countdownNumber,
             ),
-            views = listOf(controls.guideButton, controls.switchCameraIcon, controls.galleryThumbnail),
+            views = listOf(
+                controls.flashIndicator,
+                controls.timerIndicator,
+                controls.menuFlash,
+                controls.menuTimer,
+                controls.menuGrid,
+                controls.menuLevel,
+                controls.menuSettings,
+                controls.guideButton,
+                controls.galleryThumbnail,
+            ),
         )
         controls.cameraActionButton.setOnClickListener {
             if (hasCameraPermission()) {
@@ -333,9 +352,6 @@ class CameraFragment :
         // Who takes the photo? first, then that phone's ways to connect (FR-5.2, R&S 6.7).
         controls.shootTogetherButton.setOnClickListener {
             findNavController().navigate(R.id.action_camera_to_shootTogether)
-        }
-        controls.settingsButton.setOnClickListener {
-            findNavController().navigate(R.id.action_camera_to_settings)
         }
         controls.shutterButton.setOnClickListener {
             // While the scene photo for poses is framed, the shutter takes that photo and saves nothing.
@@ -392,6 +408,18 @@ class CameraFragment :
                     }
                 }
                 launch { generationViewModel.uiState.collect { render(viewModel.uiState.value) } }
+                // The menu's grid and horizon bar are the settings' (FR-1.9, FR-1.10).
+                launch {
+                    combine(settingsViewModel.showGrid, settingsViewModel.showLevel) { _, _ -> }
+                        .collect { renderMenu(controls, viewModel.uiState.value) }
+                }
+                // The timer's photo blinks the preview as the shutter's does (FR-1.5, FR-1.17).
+                launch { viewModel.timedShots.collect { blinkPreview(controls.previewScrim) } }
+                launch {
+                    viewModel.menuNotices.collect { notice ->
+                        showNotice(controls, menuNoticeText(notice))
+                    }
+                }
                 launch {
                     viewModel.guideRemoved.collect {
                         undoNotice = showNoticeOnScreen(
@@ -459,8 +487,6 @@ class CameraFragment :
                         // The scene photo's top bar has only Back, the light, the ratio, its title, and Use.
                         controls.endSessionButton.isVisible = live && !isScenePhotoActive()
                         controls.shootTogetherButton.isVisible = !live && !isScenePhotoActive()
-                        // Settings stays in a session too (#204); only the scene photo hides it.
-                        controls.settingsButton.isVisible = !isScenePhotoActive()
                         view.keepScreenOn = live
                     }
                 }
@@ -644,6 +670,13 @@ class CameraFragment :
         super.onPause()
     }
 
+    override fun onStop() {
+        // Leaving the screen, for another or for the background, cancels the timer's countdown (FR-1.17): the photo
+        // would be taken with nobody looking, or not at all once the camera stops.
+        viewModel.cancelCountdown()
+        super.onStop()
+    }
+
     override fun onDestroyView() {
         dismissEndSession()
         dismissUndo()
@@ -679,6 +712,7 @@ class CameraFragment :
         binding = null
         sceneBack = null
         aspectsBack = null
+        menuBack = null
         previewLogged = false
         super.onDestroyView()
     }
@@ -1047,18 +1081,42 @@ class CameraFragment :
         controls.cameraProgress.isVisible = granted && !ready && !unavailable && previewHold?.holding != true
         // Free again once the camera took the photo, while it is saved (NFR-19); the ways off Camera and the camera's
         // changes wait for the save, since leaving or rebinding would lose the photo.
-        controls.shutterButton.isEnabled = ready && !state.shutterBusy
-        controls.guideButton.isEnabled = !state.isSaving
-        controls.shootTogetherButton.isEnabled = !state.isSaving
-        controls.galleryButton.isEnabled = state.lastPhoto != null
+        // While the timer counts down, the shutter cancels it, and the other ways off the camera and its changes wait,
+        // dimmed (FR-1.17); zoom and focus still work.
+        val counting = state.countdown != null
+        controls.shutterButton.isEnabled = (ready && !state.shutterBusy) || counting
+        controls.shutterButton.contentDescription = when {
+            counting -> getString(R.string.shutter_cancel_timer)
+            state.timer != ShutterTimer.OFF -> getString(R.string.shutter_timer, state.timer.seconds)
+            else -> getString(R.string.shutter)
+        }
+        controls.guideButton.isEnabled = !state.isSaving && !counting
+        controls.shootTogetherButton.isEnabled = !state.isSaving && !counting
+        // In a session End session takes Shoot together's place, and waits as well: ended during the count, the session
+        // would be gone before the photo it was counting for.
+        controls.endSessionButton.isEnabled = !counting
+        controls.galleryButton.isEnabled = state.lastPhoto != null && !counting
+        val dim = if (counting) COUNTDOWN_DIM else 1f
+        for (control in listOf(
+            controls.cameraSettings,
+            controls.switchCameraButton,
+            controls.shootTogetherButton,
+            controls.endSessionButton,
+            controls.guideButton,
+            controls.galleryButton,
+        )) {
+            control.alpha = dim
+        }
         photoViewer?.render(state.viewerPhotos, state.photosOpen)
         photosBack?.isEnabled = state.photosOpen
-        // On any phone with a front camera, in a session too, and while the scene photo for poses is framed.
+        // On any phone with a front camera, in a session too; not while the scene photo for poses is framed.
         controls.switchCameraButton.isVisible = state.canSwitchCamera
-        controls.switchCameraButton.isEnabled = granted && !state.isSaving
+        controls.switchCameraButton.isEnabled = granted && !state.isSaving && !counting
         controls.switchCameraButton.contentDescription = getString(
             if (state.facing == CameraFacing.BACK) R.string.switch_to_front_camera else R.string.switch_to_rear_camera,
         )
+        controls.countdownPanel.isVisible = counting
+        if (counting) controls.countdownNumber.text = state.countdown.toString()
 
         renderCameraSettings(controls, state, ready)
 
@@ -1101,6 +1159,12 @@ class CameraFragment :
             // new ratio keeps the guide, so choosing one leaves its tip open too.
             if (!controls.tipButtonFrame.isUnder(event, controls.root) && !onRatios) viewModel.onAnyTouch()
             if (!onRatios) viewModel.setAspectsOpen(false)
+            // So does the camera menu (FR-1.17), whose button and the icons beside it open and close it.
+            if (!controls.cameraSettings.isUnder(event, controls.root) &&
+                !controls.cameraMenu.isUnder(event, controls.root)
+            ) {
+                viewModel.setMenuOpen(false)
+            }
             // The scene photo's panel goes at a touch anywhere, which still does what it does there (#231).
             generationViewModel.dismissSceneHint()
         }
@@ -1225,12 +1289,12 @@ class CameraFragment :
         controls.shootTogetherButton.isVisible = !active && !live
         // End session too leaves the scene photo's bar to its title, and comes back after the step.
         controls.endSessionButton.isVisible = !active && live
-        controls.settingsButton.isVisible = !active
         // Guide and the thumbnail keep their place, so the shutter stays where it is. The camera is the situation's (FR-4.8):
-        // the front one for a selfie, the rear one otherwise, so the switch waits too.
+        // the front one for a selfie, the rear one otherwise, so the switch waits too. The camera menu gives way to the
+        // light (renderMenu).
         controls.guideButton.isInvisible = active
         controls.galleryButton.isInvisible = active
-        if (active) controls.switchCameraButton.isInvisible = true
+        if (active) controls.switchCameraButton.isVisible = false
         controls.sceneStill.isVisible = held
         // As the preview showed it and where it showed it, so the image seems to stop, also for a photo taken sideways.
         val photo = scene.framed.takeIf { held }
@@ -1248,7 +1312,8 @@ class CameraFragment :
             val light = !held && camera.hasFlash
             controls.cameraSettings.isVisible = !held
             if (held) {
-                controls.aspectPanel.isVisible = false
+                controls.aspectPanel.reveal(false)
+                controls.aspectButton.isActivated = false
                 aspectsBack?.isEnabled = false
             }
             controls.flashButton.isVisible = light
@@ -1414,35 +1479,26 @@ class CameraFragment :
         }
     }
 
-    /** Flash, aspect ratio, and brightness (FR-1.11–1.13). */
+    /** The camera menu with the flash, aspect ratio, and brightness (FR-1.11–1.13, FR-1.17). */
     private fun renderCameraSettings(controls: FragmentCameraBinding, state: CameraUiState, ready: Boolean) {
         controls.cameraSettings.isVisible = true
         controls.aspectButton.isVisible = true
-        controls.flashButton.isVisible = state.hasFlash
-        controls.flashButton.isEnabled = ready
-        controls.flashButton.setIconResource(
-            when (state.flash) {
-                FlashMode.OFF -> R.drawable.ic_flash_off
-                FlashMode.AUTO -> R.drawable.ic_flash_auto
-                FlashMode.ON -> R.drawable.ic_flash_on
-            },
-        )
-        controls.flashButton.contentDescription = getString(
-            when (state.flash) {
-                FlashMode.OFF -> R.string.flash_off
-                FlashMode.AUTO -> R.string.flash_auto
-                FlashMode.ON -> R.string.flash_on
-            },
-        )
+        // The light shows only while the scene photo is taken (renderScenePhoto); the flash is in the menu.
+        controls.flashButton.isVisible = false
+        renderMenu(controls, state)
         val aspect = aspectLabel(state.aspect)
         controls.aspectButton.text = aspect
         controls.aspectButton.contentDescription = getString(R.string.aspect_ratio_description, aspect)
-        // A rebind waits for a photo being saved, so the ratio cannot change under the shutter; nor while the scene
-        // photo's shutter waits for its frame, which a rebind would take away.
-        val choosable = ready && !state.isSaving && !generationViewModel.uiState.value.shooting
+        // A rebind waits for a photo being saved, so the ratio cannot change under the shutter; nor while the timer
+        // counts down (FR-1.17), nor while the scene photo's shutter waits for its frame, which a rebind would take
+        // away.
+        val choosable = ready && !state.isSaving && state.countdown == null &&
+            !generationViewModel.uiState.value.shooting
         controls.aspectButton.isEnabled = choosable
-        // The ratios under the top bar, the chosen one selected (FR-1.13).
-        controls.aspectPanel.isVisible = state.aspectsOpen
+        // The ratios under the top bar, the chosen one selected (FR-1.13), with the ratio in the bar's pill while they
+        // are open, as the camera menu's button.
+        controls.aspectPanel.reveal(state.aspectsOpen)
+        controls.aspectButton.isActivated = state.aspectsOpen
         aspectsBack?.isEnabled = state.aspectsOpen
         // The ratios cover the top of the image, where a toggle's label shows: opening them takes the label down.
         if (state.aspectsOpen && controls.toggleLabel.isVisible) {
@@ -1460,6 +1516,143 @@ class CameraFragment :
         controls.exposureBar.render(range, state.exposureStep, state.exposure, enabled = ready && hasBrightness)
         focusBrightness?.place(imageFrame(controls, state))
         focusBrightness?.show(state.brightnessOpen && hasBrightness)
+    }
+
+    /**
+     * The camera menu (FR-1.17): its button and the icons beside it open and close it. The flash and the timer go to
+     * their next choice at each tap and the grid and the horizon bar on or off, leaving the menu open; Settings closes it
+     * and opens that screen. Back closes it, and so does a touch anywhere else (setupTip).
+     */
+    private fun setupMenu(controls: FragmentCameraBinding) {
+        val toggle = View.OnClickListener { viewModel.setMenuOpen(!viewModel.uiState.value.menuOpen) }
+        controls.cameraMenuButton.setOnClickListener(toggle)
+        controls.flashIndicator.setOnClickListener(toggle)
+        controls.timerIndicator.setOnClickListener(toggle)
+        controls.menuFlash.setOnClickListener { viewModel.onFlashTap() }
+        controls.menuTimer.setOnClickListener { viewModel.onTimerTap() }
+        controls.menuGrid.setOnClickListener { settingsViewModel.toggleShowGrid() }
+        controls.menuLevel.setOnClickListener { settingsViewModel.toggleShowLevel() }
+        controls.menuSettings.setOnClickListener {
+            viewModel.setMenuOpen(false)
+            findNavController().navigate(R.id.action_camera_to_settings)
+        }
+        menuBack = requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, enabled = false) {
+            viewModel.setMenuOpen(false)
+        }
+    }
+
+    /**
+     * The camera menu's button, the flash and the timer beside it while either is on, and the menu's items, each in the
+     * accent while what it sets is on (FR-1.17). The scene photo has none of it: its light is a button of its own.
+     */
+    private fun renderMenu(controls: FragmentCameraBinding, state: CameraUiState) {
+        val scene = isScenePhotoActive()
+        val counting = state.countdown != null
+        val ready = hasCameraPermission() && state.cameraStatus == CameraStatus.READY
+        val flashOn = state.hasFlash && state.flash != FlashMode.OFF
+        val timerOn = state.timer != ShutterTimer.OFF
+        controls.cameraMenuButton.isVisible = !scene
+        controls.cameraMenuButton.isActivated = state.menuOpen
+        controls.cameraMenuButton.isEnabled = !counting
+        controls.flashIndicator.isVisible = !scene && flashOn
+        controls.timerIndicator.isVisible = !scene && timerOn
+        setImageOnce(controls.flashIndicator, flashIcon(state.flash))
+        setImageOnce(controls.timerIndicator, timerIcon(state.timer))
+        val open = state.menuOpen && !scene
+        controls.cameraMenu.reveal(open)
+        menuBack?.isEnabled = open
+        // The flash only on a camera with one (FR-1.12).
+        controls.menuFlash.isVisible = state.hasFlash
+        controls.menuFlash.isEnabled = ready
+        controls.menuFlash.isActivated = flashOn
+        setImageOnce(controls.menuFlashIcon, menuFlashIcon(state.flash))
+        controls.menuFlash.contentDescription = getString(flashDescription(state.flash))
+        controls.menuTimer.isActivated = timerOn
+        setImageOnce(controls.menuTimerIcon, menuTimerIcon(state.timer))
+        controls.menuTimer.contentDescription = timerText(state.timer)
+        val grid = settingsViewModel.showGrid.value
+        controls.menuGrid.isActivated = grid
+        controls.menuGrid.contentDescription = getString(if (grid) R.string.grid_on else R.string.grid_off)
+        val level = settingsViewModel.showLevel.value
+        controls.menuLevel.isActivated = level
+        controls.menuLevel.contentDescription = getString(if (level) R.string.level_on else R.string.level_off)
+        // Settings leaves Camera, which waits for a photo being saved.
+        controls.menuSettings.isEnabled = !state.isSaving
+        // The menu covers the top of the image, where a toggle's label shows: opening it takes the label down.
+        if (open && controls.toggleLabel.isVisible) {
+            toggleLabelJob?.cancel()
+            controls.toggleLabel.isVisible = false
+            renderReference(controls, state)
+        }
+    }
+
+    /**
+     * A text in the top bar's pills, *Shoot together*, *End session*, or the ratio, which grows with the phone's font only
+     * up to [PILL_MAX_FONT_SCALE]. Larger, at 200 %, *Shoot together* would reach the ratio and the camera menu's icons,
+     * and the ratio's label would make its pill and the bar taller than the icons' (#298, #272).
+     */
+    private fun capPillText(pill: TextView) {
+        val scale = resources.configuration.fontScale
+        if (scale > PILL_MAX_FONT_SCALE) {
+            pill.setTextSize(TypedValue.COMPLEX_UNIT_PX, pill.textSize / scale * PILL_MAX_FONT_SCALE)
+        }
+    }
+
+    /** What a choice in the camera menu changed, in its notice (FR-1.17). */
+    private fun menuNoticeText(notice: MenuNotice): String = when (notice) {
+        is MenuNotice.Flash -> getString(flashDescription(notice.mode))
+        is MenuNotice.Timer -> timerText(notice.timer)
+    }
+
+    private fun timerText(timer: ShutterTimer): String =
+        if (timer ==
+            ShutterTimer.OFF
+        ) {
+            getString(R.string.timer_off)
+        } else {
+            getString(R.string.timer_seconds, timer.seconds)
+        }
+
+    @DrawableRes
+    private fun flashIcon(mode: FlashMode): Int = when (mode) {
+        FlashMode.OFF -> R.drawable.ic_flash_off
+        FlashMode.AUTO -> R.drawable.ic_flash_auto
+        FlashMode.ON -> R.drawable.ic_flash_on
+    }
+
+    /** The flash in the camera menu, in the menu's thinner line. */
+    @DrawableRes
+    private fun menuFlashIcon(mode: FlashMode): Int = when (mode) {
+        FlashMode.OFF -> R.drawable.ic_menu_flash_off
+        FlashMode.AUTO -> R.drawable.ic_menu_flash_auto
+        FlashMode.ON -> R.drawable.ic_menu_flash_on
+    }
+
+    @StringRes
+    private fun flashDescription(mode: FlashMode): Int = when (mode) {
+        FlashMode.OFF -> R.string.flash_off
+        FlashMode.AUTO -> R.string.flash_auto
+        FlashMode.ON -> R.string.flash_on
+    }
+
+    /** The timer beside the camera menu's button, at the weight of the top bar's icons; never off, which shows none. */
+    @DrawableRes
+    private fun timerIcon(timer: ShutterTimer): Int =
+        if (timer == ShutterTimer.TEN) R.drawable.ic_timer_10 else R.drawable.ic_timer_3
+
+    /** The timer in the camera menu, in the menu's thinner line. */
+    @DrawableRes
+    private fun menuTimerIcon(timer: ShutterTimer): Int = when (timer) {
+        ShutterTimer.OFF -> R.drawable.ic_menu_timer_off
+        ShutterTimer.THREE -> R.drawable.ic_menu_timer_3
+        ShutterTimer.TEN -> R.drawable.ic_menu_timer_10
+    }
+
+    /** Sets [image]'s drawable only when it changes, which the tag remembers: a render comes with every zoom step. */
+    private fun setImageOnce(image: ImageView, @DrawableRes icon: Int) {
+        if (image.tag == icon) return
+        image.tag = icon
+        image.setImageResource(icon)
     }
 
     /** The camera's image in the preview, in the chosen ratio (AD-10). */
@@ -1966,6 +2159,12 @@ class CameraFragment :
         private const val HALF_TURN = 180f
         private const val FLIP_CAMERA_DISTANCE = 8_000f
         private const val CHIP_ICON_DP = 14f
+
+        /** The controls that wait while the timer counts down, dimmed this much (FR-1.17). */
+        private const val COUNTDOWN_DIM = 0.35f
+
+        /** The largest font scale the top bar's pill follows (capPillText). */
+        private const val PILL_MAX_FONT_SCALE = 1.3f
 
         /** The pose flow's step while the scene photo is framed, and while the photo taken is held (FlowProgressView, #210). */
         private const val SCENE_STEP = 1

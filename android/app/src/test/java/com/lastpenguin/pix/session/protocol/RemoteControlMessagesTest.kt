@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.FlashMode
@@ -20,6 +20,7 @@ import org.junit.Test
  * a round trip keeps every field; `final` left out means a step; `guide.state` from a phone without `by` means the
  * photographer, and the echo of a `guide.move` carries `by: SUBJECT`; `camera.zoom.hold` naming a holder, null, or no
  * holder at all, the last two meaning a free zoom, and a `camera.zoom.set` with `cancel`, which is false when left out (#236).
+ * The photographer's countdown (`camera.timer`, FR-1.17): the Design's example decodes, and a round trip keeps it.
  */
 class RemoteControlMessagesTest {
     private val codec = MessageCodec(clock = { 1_759_212_345_678L })
@@ -129,6 +130,13 @@ class RemoteControlMessagesTest {
     }
 
     @Test
+    fun thePhotographersCountdown_designExample_decodes() {
+        val text = """{ "v": 3, "t": "camera.timer", "seq": 10, "ts": 1759212355000, "b": { "left": 3 } }"""
+
+        assertEquals(SessionMessage.Countdown(3), decode(text))
+    }
+
+    @Test
     fun anActionThisPhoneDoesNotKnow_isNoAction_andStillDecodes() {
         val newer = """{ "v": 3, "t": "camera.did", "seq": 8, "ts": 1759212355000,
             "b": { "action": "timer", "seconds": 3 } }"""
@@ -146,6 +154,7 @@ class RemoteControlMessagesTest {
             SessionMessage.FlashSet(FlashMode.ON),
             SessionMessage.FocusSet(0.62f, 0.4f),
             SessionMessage.Focused(0.38f, 0.4f),
+            SessionMessage.Countdown(3),
             SessionMessage.ControlPermission(true),
         )
 

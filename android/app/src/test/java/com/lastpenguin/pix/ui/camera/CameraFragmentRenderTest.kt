@@ -56,13 +56,14 @@ import org.robolectric.annotation.GraphicsMode
 /*
  * The Camera screen's render paths (R&S 6.2, Testing Documentation 2.1.6), on the real Fragment under
  * FragmentScenario with a container of fakes. Partitions, one test each: camera permission denied or granted;
- * camera status STARTING, READY; the grid and the horizon bar on by default, and each off from Settings (#271); a
+ * camera status STARTING, READY; the grid and the horizon bar on by default, and each kept off (#271); a
  * guide added, with the guide-edit toggle unlit and the guide not filled (#304), the toggle tapped on (lit, the guide
  * filled) and off again (unlit, the same icon, no fill; #271), hidden, removed by the shutter's end of edit mode; the
  * tip and guide-edit buttons on glass, the toggle's tinted while on (#298); Remove guide's notice above the zoom row
  * with Undo, which puts the guide back, and taken down by another guide (#298); the
  * hint chip with no line for the pinch, and "Guide hidden" for a hidden guide (#306); a photo saved or
- * failed; the flash and brightness controls with and without the capability; the aspect ratio 4:3 and 16:9; the
+ * failed; the camera menu's flash and the brightness controls with and without the capability; the aspect ratio 4:3
+ * and 16:9; the
  * scene photo step framing and reviewing, with Back at the top left of each (out to the camera, and from the review back
  * to framing) and Use at the top right of the review (#199), the flow's bar at its first and second step, the panel
  * with what to frame and the accent shutter while framing only, all gone after the step (#210), its review while the
@@ -157,7 +158,10 @@ class CameraFragmentRenderTest {
             assertEquals(View.GONE, controls.guideControls.visibility)
             assertEquals(View.GONE, controls.editGuideButton.visibility)
             assertEquals(View.INVISIBLE, controls.hintText.visibility)
-            // No flash and no exposure range in the capabilities: neither the flash nor brightness shows (FR-1.11, FR-1.12).
+            // No flash and no exposure range in the capabilities: neither the menu's flash nor brightness shows
+            // (FR-1.11, FR-1.12), nor the flash beside the menu's button.
+            assertEquals(View.GONE, controls.menuFlash.visibility)
+            assertEquals(View.GONE, controls.flashIndicator.visibility)
             assertEquals(View.GONE, controls.flashButton.visibility)
             assertEquals(View.GONE, controls.exposureBar.visibility)
             assertFalse(controls.galleryButton.isEnabled)
@@ -450,27 +454,39 @@ class CameraFragmentRenderTest {
     // ---- Flash, brightness, and the aspect ratio ------------------------------------
 
     @Test
-    fun flashCapability_showsTheButtonAndATapCyclesTheMode() {
+    fun flashCapability_showsTheMenusFlash_andATapCyclesTheMode_shownBesideTheMenusButton() {
         val camera = FakeCameraController(hasFlash = true)
         launch(camera)
 
         onScreen { controls, _ ->
-            assertEquals(View.VISIBLE, controls.flashButton.visibility)
-            assertEquals(string(R.string.flash_off), controls.flashButton.contentDescription)
-            controls.flashButton.performClick()
+            controls.cameraMenuButton.performClick()
+            assertEquals(View.GONE, controls.flashIndicator.visibility)
+        }
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(View.VISIBLE, controls.menuFlash.visibility)
+            assertEquals(string(R.string.flash_off), controls.menuFlash.contentDescription)
+            assertFalse(controls.menuFlash.isActivated)
+            controls.menuFlash.performClick()
         }
         idle()
 
         onScreen { controls, _ ->
             assertEquals(listOf(FlashMode.AUTO), camera.flashRequests)
-            assertEquals(string(R.string.flash_auto), controls.flashButton.contentDescription)
+            assertEquals(string(R.string.flash_auto), controls.menuFlash.contentDescription)
+            assertTrue(controls.menuFlash.isActivated)
+            assertEquals(View.VISIBLE, controls.flashIndicator.visibility)
+            assertEquals(R.drawable.ic_flash_auto, controls.flashIndicator.tag)
+            // The change is said in a notice (FR-1.17).
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+            assertEquals(string(R.string.flash_auto), controls.noticeText.text.toString())
         }
     }
 
     @Test
     fun aBarUpWithoutATapToFocus_asAfterTheScreenIsMadeAgain_standsAtTheRightEdge() {
         launch(FakeCameraController(exposureRange = -4..4))
-        // No button opens it: the base brightness is in Settings (FR-1.11), and a tap to focus brings the bar.
+        // No button opens it: a tap to focus brings the bar (FR-1.11).
         onScreen { controls, _ -> assertEquals(View.GONE, controls.exposureBar.visibility) }
 
         onScreen { _, fragment ->
@@ -536,6 +552,8 @@ class CameraFragmentRenderTest {
             assertEquals(View.VISIBLE, controls.flashButton.visibility)
             assertEquals(string(R.string.scene_light_off), controls.flashButton.contentDescription)
             assertEquals(View.VISIBLE, controls.aspectButton.visibility)
+            // The camera menu gives way to the light (FR-1.17).
+            assertEquals(View.GONE, controls.cameraMenuButton.visibility)
             assertEquals(View.GONE, controls.exposureBar.visibility)
             assertEquals(View.GONE, controls.guideOverlay.visibility)
             assertEquals(View.GONE, controls.guideControls.visibility)
@@ -589,7 +607,8 @@ class CameraFragmentRenderTest {
             assertEquals(View.VISIBLE, controls.referenceThumbnail.visibility)
             assertEquals(View.VISIBLE, controls.cameraSettings.visibility)
             assertEquals(View.VISIBLE, controls.aspectButton.visibility)
-            assertEquals(string(R.string.flash_off), controls.flashButton.contentDescription)
+            assertEquals(View.GONE, controls.flashButton.visibility)
+            assertEquals(View.VISIBLE, controls.cameraMenuButton.visibility)
             // The camera as it was: no flow bar, no panel, the white shutter.
             assertEquals(View.GONE, controls.sceneProgress.visibility)
             assertEquals(View.GONE, controls.sceneGuide.visibility)
@@ -742,7 +761,7 @@ class CameraFragmentRenderTest {
 
         // The situation chose the camera (FR-4.8); the shutter keeps its place.
         onScreen { controls, _ ->
-            assertEquals(View.INVISIBLE, controls.switchCameraButton.visibility)
+            assertEquals(View.GONE, controls.switchCameraButton.visibility)
             assertEquals(View.INVISIBLE, controls.galleryButton.visibility)
             controls.sceneBackButton.performClick()
         }

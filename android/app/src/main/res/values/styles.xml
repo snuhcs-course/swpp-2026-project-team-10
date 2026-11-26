@@ -360,12 +360,13 @@
     </style>
 
     <!-- A ratio in the ratios under the top bar (FR-1.13): a touch area as tall as the panel, sharing its width with the
-         other ratios, around the ratio's shape. Selection is View.isSelected. -->
+         other ratios, around the ratio's shape, lit inside itself under a touch (bg_panel_option). Selection is
+         View.isSelected. -->
     <style name="Widget.Pix.AspectOption" parent="">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">48dp</item>
         <item name="android:layout_weight">1</item>
-        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+        <item name="android:background">@drawable/bg_panel_option</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
     </style>
@@ -387,7 +388,8 @@
     </style>
 
     <!-- An item of the camera menu under the top bar (FR-1.17): its icon over a one-word label, in a 48 dp wide, 64 dp
-         tall touch area (NFR-16); both in the accent while what it sets is on (activated). -->
+         tall touch area (NFR-16), lit inside itself under a touch (bg_panel_option); both in the accent while what it
+         sets is on (activated). -->
     <style name="Widget.Pix.CameraMenuOption" parent="">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">64dp</item>
@@ -395,7 +397,7 @@
         <item name="android:minWidth">48dp</item>
         <item name="android:orientation">vertical</item>
         <item name="android:gravity">center</item>
-        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+        <item name="android:background">@drawable/bg_panel_option</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
     </style>

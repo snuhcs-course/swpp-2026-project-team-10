@@ -83,16 +83,18 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:contentDescription="@string/scene_photo_description"
-                android:foreground="?attr/selectableItemBackgroundBorderless"
                 android:minWidth="48dp">
 
-                <!-- 72 dp high and as wide as the photo's shape (showScene): 54 dp for 3:4, 9:16 narrower, 1:1 square. -->
+                <!-- 72 dp high and as wide as the photo's shape (showScene): 54 dp for 3:4, 9:16 narrower, 1:1 square.
+                     A tap on the frame lights the photo in its own corners. -->
                 <com.google.android.material.imageview.ShapeableImageView
                     android:id="@+id/sceneImage"
                     android:layout_width="54dp"
                     android:layout_height="72dp"
                     android:layout_gravity="center"
                     android:background="@color/pix_surface_2"
+                    android:duplicateParentState="true"
+                    android:foreground="@drawable/fg_small_thumbnail_press"
                     android:importantForAccessibility="no"
                     android:scaleType="centerCrop"
                     app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.SmallThumbnail" />

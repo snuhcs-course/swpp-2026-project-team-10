@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -72,7 +72,9 @@ import org.junit.Test
  * free again, and this phone's own pinch holding it (not the photographer's). The photographer's countdown
  * (`camera.timer`, FR-1.17): each second shown, 0 ending it, a second whose next never comes gone after its wait (1 ms
  * before / at it), and the session dropping; the flash while it runs (nothing sent) and after its 0. The camera menu:
- * open and closed.
+ * open and closed. A guide gesture that ends without a last value (state-based): the link dropping under it and the
+ * mode going off under it (the photographer's guide again), and the mode going off after its last value (left for the
+ * echo).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SubjectViewModelTest {
@@ -628,6 +630,50 @@ class SubjectViewModelTest {
         assertEquals(1, moves().size)
         assertEquals("g2", viewModel.uiState.value.guide?.id)
     }
+
+    @Test
+    fun `a guide gesture the link drops under goes back to the photographer's guide`() = runTest(dispatcher) {
+        connectWithControls()
+        mirror.setGuide(fakeGuide("g1"))
+        runCurrent()
+        viewModel.setGuideEditing(true)
+        viewModel.onGuideGesture(0.1f, 0f, 1f, final = false)
+        assertEquals(0.6f, viewModel.uiState.value.guideState.cx, EPSILON)
+
+        // No last value goes out, so no echo will settle the guide; and the mirror does not change, so it says nothing.
+        session.setState(SessionState.Reconnecting("s_1", since = 0L))
+        runCurrent()
+        assertEquals(mirror.state.value, viewModel.uiState.value.guideState)
+
+        session.setState(SessionState.Connected("s_1", PeerInfo("Dongje"), Role.SUBJECT, drops = 1))
+        runCurrent()
+        advanceTimeBy(60)
+        assertEquals(0.5f, viewModel.uiState.value.guideState.cx, EPSILON)
+        assertEquals(1, moves().size)
+    }
+
+    @Test
+    fun `guide-edit mode going off under a gesture puts the guide back, and after its last value leaves it`() =
+        runTest(dispatcher) {
+            connectWithControls()
+            mirror.setGuide(fakeGuide("g1"))
+            runCurrent()
+            viewModel.setGuideEditing(true)
+            viewModel.onGuideGesture(0.1f, 0f, 1f, final = false)
+            viewModel.onGuideGesture(0.1f, 0f, 1f, final = false)
+
+            // The step that waited is not sent, and the gesture has no last value.
+            viewModel.setGuideEditing(false)
+            advanceTimeBy(60)
+            assertEquals(1, moves().size)
+            assertEquals(mirror.state.value, viewModel.uiState.value.guideState)
+
+            // A gesture that ended with its value waits for the echo where the finger left it.
+            viewModel.setGuideEditing(true)
+            viewModel.onGuideGesture(0.2f, 0f, 1f, final = true)
+            viewModel.setGuideEditing(false)
+            assertEquals(0.7f, viewModel.uiState.value.guideState.cx, EPSILON)
+        }
 
     @Test
     fun `guide gestures do nothing without the mode, a guide, or a connection`() = runTest(dispatcher) {

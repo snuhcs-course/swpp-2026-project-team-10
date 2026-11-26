@@ -1,8 +1,9 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.ChannelRouter
 import com.lastpenguin.pix.session.protocol.ChannelRouter.Channel
+import com.lastpenguin.pix.session.protocol.DescriptionStep
 import com.lastpenguin.pix.session.protocol.MessageCodec
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.session.signaling.IceCandidate
@@ -12,6 +13,7 @@ import com.lastpenguin.pix.session.signaling.SignalMessage
 import com.lastpenguin.pix.telemetry.TelemetryEvent.SessionConnect
 import com.lastpenguin.pix.telemetry.TelemetryEvent.SessionDrop
 import com.lastpenguin.pix.telemetry.TelemetryRecorder
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -727,6 +729,84 @@ class RtcSessionManagerTest {
 
         assertEquals(listOf(1f, 3f), incoming.filterIsInstance<SessionMessage.ZoomSet>().map { it.ratio })
         manager.leave(EndReason.LEFT)
+    }
+
+    // The readers of `incoming` (Design 2.8, Backpressure), state-based: a reader that stands still, as on a busy main
+    // thread, while a photo's chunks and a step's end arrive (it loses none, nor does another reader); boundary: a
+    // reader one queue behind, and further (its own newest are lost, no other reader's).
+    @Test
+    fun `a reader that stands still loses no message, and costs the other readers none`() = runTest {
+        val (manager, peer) = connectedSubject()
+        val gate = CompletableDeferred<Unit>()
+        val still = mutableListOf<SessionMessage>()
+        backgroundScope.launch {
+            manager.incoming.collect {
+                gate.await()
+                still += it
+            }
+        }
+        runCurrent()
+
+        repeat(200) {
+            peer.deliver(otherPhone.encode(SessionMessage.PhotoChunk("p1", it, "data")))
+            runCurrent()
+        }
+        val end = SessionMessage.PoseDescription("d1", DescriptionStep.CLOSED)
+        peer.deliver(otherPhone.encode(end))
+        runCurrent()
+
+        assertEquals(200, incoming.count { it is SessionMessage.PhotoChunk })
+        assertEquals(end, incoming.last())
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(200, still.count { it is SessionMessage.PhotoChunk })
+        assertEquals(end, still.last())
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `a reader further behind than its queue loses its own newest messages only`() = runTest {
+        val fanout = MessageFanout<Int>()
+        val gate = CompletableDeferred<Unit>()
+        val still = mutableListOf<Int>()
+        val running = mutableListOf<Int>()
+        backgroundScope.launch {
+            fanout.flow.collect {
+                gate.await()
+                still += it
+            }
+        }
+        backgroundScope.launch { fanout.flow.collect { running += it } }
+        runCurrent()
+
+        val sent = MessageFanout.READER_QUEUE + 10
+        repeat(sent) {
+            fanout.send(it)
+            runCurrent()
+        }
+        gate.complete(Unit)
+        runCurrent()
+
+        assertEquals((0 until sent).toList(), running)
+        // The message it stood on, and a full queue behind it.
+        assertEquals((0..MessageFanout.READER_QUEUE).toList(), still)
+    }
+
+    @Test
+    fun `a reader gets what comes after it started, and is forgotten once it stops`() = runTest {
+        val fanout = MessageFanout<Int>()
+        fanout.send(1)
+        val read = mutableListOf<Int>()
+        val reader = backgroundScope.launch { fanout.flow.collect { read += it } }
+        runCurrent()
+        fanout.send(2)
+        runCurrent()
+        reader.cancel()
+        runCurrent()
+        fanout.send(3)
+        runCurrent()
+
+        assertEquals(listOf(2), read)
     }
 
     @Test

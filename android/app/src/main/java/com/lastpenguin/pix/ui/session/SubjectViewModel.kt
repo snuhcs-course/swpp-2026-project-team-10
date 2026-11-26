@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -461,7 +461,7 @@ class SubjectViewModel(
                     )
                 }
                 // A gesture never crosses guide identities (Design 2.6.2): a removed or replaced guide ends it.
-                if (guide?.id != previous?.id) guideSender.cancel()
+                if (guide?.id != previous?.id) endGuideGesture()
             }
         }
         viewModelScope.launch {
@@ -660,7 +660,17 @@ class SubjectViewModel(
             // The video's touches are the guide's then, so the bar that a tap brought goes (FR-7.7).
             it.copy(guideEditing = editing, brightnessOpen = it.brightnessOpen && !editing)
         }
-        if (!on) guideSender.cancel()
+        if (!on) endGuideGesture()
+    }
+
+    /**
+     * Ends this phone's guide gesture without a last value to send. No echo settles the guide then, so when [settle]
+     * it goes back to the mirror's state at once: after a gesture that was still running, or always when the link
+     * dropped, where a last value that was sent may not arrive either (Design 2.6.5).
+     */
+    private fun endGuideGesture(settle: Boolean = guideSender.adjusting) {
+        guideSender.cancel()
+        if (settle) _uiState.update { it.copy(guideState = mirror.state.value) }
     }
 
     /**
@@ -672,7 +682,7 @@ class SubjectViewModel(
         val ui = _uiState.value
         val guide = ui.guide
         if (guide == null || !ui.guideEditing || !ui.connected) {
-            if (final) guideSender.cancel()
+            if (final) endGuideGesture()
             return
         }
         if (!dx.isFinite() || !dy.isFinite() || !scale.isFinite() || scale <= 0f) return
@@ -883,7 +893,7 @@ class SubjectViewModel(
         zoomHeldBack = false
         zoomSender.cancel()
         exposureSender.cancel()
-        guideSender.cancel()
+        endGuideGesture(settle = true)
     }
 
     companion object {

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.content.Context
@@ -24,6 +24,9 @@ import org.robolectric.annotation.Config
  * A value not known yet (Subject view after a tap to focus, #273), state-based: a touch and TalkBack's change while it
  * is awaited (nothing changes), and the same touch once it is known (a drag from the value shown then, by the finger's
  * way from there); a waiting touch on a bar that is disabled before the finger lifts, which holds it no longer.
+ * The end of a drag (FR-7.6), state-based: a finger lifted without moving the sun, also after the other phone changed
+ * the brightness under it (no value goes out, and the bar shows the new one); a drag back to where it began, which
+ * still ends with its value.
  */
 @RunWith(AndroidJUnit4::class)
 @Config(qualifiers = "xxhdpi")
@@ -77,6 +80,42 @@ class ExposureBarViewTest {
         assertEquals(2, bar.index)
         assertEquals(listOf(2 to false, 2 to true), reported)
         assertFalse(bar.isHeld)
+    }
+
+    @Test
+    fun aFingerLiftedWithoutMovingTheSun_sendsNothing_andTheBarShowsTheBrightnessAsItIsNow() {
+        val reported = mutableListOf<Pair<Int, Boolean>>()
+        val touching = mutableListOf<Boolean>()
+        val bar = bar(-4..4, 0.5f, value = 3).apply {
+            onChange = { index, final -> reported += index to final }
+            onTouching = { touching += it }
+        }
+
+        bar.touch(MotionEvent.ACTION_DOWN, 600f)
+        // The other phone changed the brightness under the finger: the held bar keeps its own value meanwhile.
+        bar.render(-4..4, 0.5f, 1, enabled = true)
+        assertEquals(3, bar.index)
+        bar.touch(MotionEvent.ACTION_UP, 600f)
+
+        // The old value would have gone out over the other phone's newer one.
+        assertTrue(reported.isEmpty())
+        assertEquals(1, bar.index)
+        assertEquals(listOf(true, false), touching)
+        assertFalse(bar.isHeld)
+    }
+
+    @Test
+    fun aDragBackToWhereItBegan_stillEndsWithItsValue() {
+        val reported = mutableListOf<Pair<Int, Boolean>>()
+        val bar = bar(-4..4, 0.5f, value = 3).apply { onChange = { index, final -> reported += index to final } }
+
+        bar.startDrag()
+        bar.dragTo(75f * density)
+        bar.dragTo(0f)
+        bar.finishDrag()
+
+        // Its steps went out, so the other phone waits for the value they end on.
+        assertEquals(listOf(4 to false, 3 to false, 3 to true), reported)
     }
 
     @Test

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.DescriptionStep
@@ -37,6 +37,10 @@ import org.junit.Test
  * another description's start.
  * Subject, the photo (fault injection, boundary): a broken transfer, a header over 1024 px or 1 MiB (at the limit read),
  * and a photo that does not decode are let go.
+ * Subject, the field across a drop only one phone saw (state-based, Design 2.6.7): a release that could not be sent,
+ * sent once the link is back; a field the photographer's phone freed while this one still holds it, held again with
+ * its newest text; a hold the photographer's own field did not allow, and one of an earlier description, not asked for
+ * again; a description that says what the field asked for, which sends nothing.
  * Subject, the requests (boundary of the deadline): an edit sent only with a description and a session; a Generate 4
  * poses or Skip sent and waiting, answered by the end, reported just after 5 s and not just before, and refused
  * without a description, while the photographer's field holds it, or without a session.
@@ -492,6 +496,78 @@ class DescriptionSyncerTest {
             listOf(SessionMessage.PoseDescriptionEdit("d1", holding = true, text = "jump")),
             session.sent.filterIsInstance<SessionMessage.PoseDescriptionEdit>(),
         )
+    }
+
+    private fun edits() = session.sent.filterIsInstance<SessionMessage.PoseDescriptionEdit>()
+
+    @Test
+    fun `a release the link was down for goes out once the link is back`() = runTest {
+        val syncer = open()
+        syncer.edit(holding = true, text = "jump")
+        deliver(DescriptionStep.OPEN, "jump", Role.SUBJECT)
+        runCurrent()
+
+        // Only this phone saw the drop: the photographer's phone frees no field, and the release cannot be sent.
+        session.setState(SessionState.Reconnecting("s_1", 0L))
+        runCurrent()
+        assertFalse(syncer.edit(holding = false, text = "jump high"))
+        assertEquals(1, edits().size)
+
+        session.setState(SessionState.Connected("s_1", PeerInfo("Dongje", null), Role.SUBJECT, drops = 1))
+        runCurrent()
+        assertEquals(SessionMessage.PoseDescriptionEdit("d1", holding = false, text = "jump high"), edits().last())
+        assertEquals(2, edits().size)
+
+        // The photographer's phone says so: nothing more to ask.
+        deliver(DescriptionStep.OPEN, "jump high")
+        runCurrent()
+        assertEquals(2, edits().size)
+    }
+
+    @Test
+    fun `a field the photographer's phone freed under this phone's typing is held again, with its text`() = runTest {
+        val syncer = open()
+        syncer.edit(holding = true, text = "jump")
+        deliver(DescriptionStep.OPEN, "jump", Role.SUBJECT)
+        runCurrent()
+        syncer.edit(holding = true, text = "jump high")
+        assertEquals(2, edits().size)
+
+        // Only the photographer's phone saw a drop: it freed the field, and says so once the link is back.
+        deliver(DescriptionStep.OPEN, "jump")
+        runCurrent()
+        assertEquals(SessionMessage.PoseDescriptionEdit("d1", holding = true, text = "jump high"), edits().last())
+        assertEquals(3, edits().size)
+
+        deliver(DescriptionStep.OPEN, "jump high", Role.SUBJECT)
+        runCurrent()
+        assertEquals(3, edits().size)
+    }
+
+    @Test
+    fun `a hold the photographer's own field did not allow is not asked for again`() = runTest {
+        val syncer = open()
+        syncer.edit(holding = true, text = "jump")
+
+        // Both fields took focus at once: the photographer's phone decided for its own (AD-7).
+        deliver(DescriptionStep.OPEN, "sit", Role.PHOTOGRAPHER)
+        deliver(DescriptionStep.OPEN, "sit down")
+        runCurrent()
+
+        // This phone's old text would have replaced the photographer's.
+        assertEquals(1, edits().size)
+    }
+
+    @Test
+    fun `what the field asked for of an earlier description is not asked of the next`() = runTest {
+        val syncer = open()
+        syncer.edit(holding = true, text = "jump")
+
+        deliver(DescriptionStep.OPEN, "wave", id = "d2")
+        session.setState(SessionState.Connected("s_1", PeerInfo("Dongje", null), Role.SUBJECT, drops = 1))
+        runCurrent()
+
+        assertEquals(1, edits().size)
     }
 
     @Test

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.os.SystemClock
@@ -18,6 +18,7 @@ import com.lastpenguin.pix.session.signaling.SignalMessage
 import com.lastpenguin.pix.telemetry.Telemetry
 import com.lastpenguin.pix.telemetry.TelemetryEvent
 import java.util.EnumSet
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -27,13 +28,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -90,8 +90,8 @@ class RtcSessionManager(
     private val _state = MutableStateFlow<SessionState>(SessionState.Idle)
     override val state: StateFlow<SessionState> = _state.asStateFlow()
 
-    private val _incoming = MutableSharedFlow<SessionMessage>(extraBufferCapacity = 64)
-    override val incoming: Flow<SessionMessage> = _incoming.asSharedFlow()
+    private val _incoming = MessageFanout<SessionMessage>()
+    override val incoming: Flow<SessionMessage> = _incoming.flow
 
     private val _peerCapabilities = MutableStateFlow<CameraCapabilities?>(null)
     override val peerCapabilities: StateFlow<CameraCapabilities?> = _peerCapabilities.asStateFlow()
@@ -876,7 +876,7 @@ class RtcSessionManager(
                     return
                 }
                 peerHello = message
-                _incoming.tryEmit(message)
+                _incoming.send(message)
                 maybeConnected()
             }
 
@@ -895,27 +895,27 @@ class RtcSessionManager(
             }
 
             is SessionMessage.Leave -> {
-                _incoming.tryEmit(message)
+                _incoming.send(message)
                 onPeerGone(message.reason)
             }
 
             is SessionMessage.Capabilities -> {
                 _peerCapabilities.value = message.capabilities
-                _incoming.tryEmit(message)
+                _incoming.send(message)
             }
 
             is SessionMessage.CameraStateUpdate -> {
                 _peerCamera.value =
                     CameraState(message.zoom, message.exposure, message.flash, message.aspect, facing = message.facing)
-                _incoming.tryEmit(message)
+                _incoming.send(message)
             }
 
             is SessionMessage.ZoomHoldUpdate -> {
                 _peerZoomHolder.value = message.by
-                _incoming.tryEmit(message)
+                _incoming.send(message)
             }
 
-            else -> _incoming.tryEmit(message)
+            else -> _incoming.send(message)
         }
     }
 
@@ -1049,7 +1049,7 @@ class RtcSessionManager(
 
     /** Tells the photographer's screen that the subject is gone, as if the subject had sent `session.leave`. */
     private fun notifyPeerGone(reason: EndReason) {
-        if (peerHello != null) _incoming.tryEmit(SessionMessage.Leave(reason))
+        if (peerHello != null) _incoming.send(SessionMessage.Leave(reason))
     }
 
     private fun startConnectTimeout() {
@@ -1209,5 +1209,39 @@ class RtcSessionManager(
 
         /** A bulk chunk waits below this, so that a control message sent next waits for this much at most. */
         const val BULK_BYTES = 64L * 1024
+    }
+}
+
+/**
+ * Hands each message from the other phone to every reader of [SessionManager.incoming] (Design 2.8, *Backpressure*).
+ * Each reader has a queue of its own, so one that falls behind delays only itself: with one buffer for all, a main
+ * thread that stood still while a photo's chunks came in filled it, and the next messages were dropped for every
+ * reader, the end of a pose step among them. A reader more than [READER_QUEUE] messages behind loses its own newest
+ * ones. Like a shared flow it does not replay: a reader gets what comes after it started to collect.
+ */
+internal class MessageFanout<T : Any> {
+    private val readers = CopyOnWriteArrayList<kotlinx.coroutines.channels.Channel<T>>()
+
+    /** Every message sent while it is collected, in order. */
+    val flow: Flow<T> = flow {
+        val queue = kotlinx.coroutines.channels.Channel<T>(READER_QUEUE)
+        readers += queue
+        try {
+            for (message in queue) emit(message)
+        } finally {
+            readers -= queue
+        }
+    }
+
+    /** From any thread; never waits. */
+    fun send(message: T) {
+        for (queue in readers) {
+            if (queue.trySend(message).isFailure) Log.w(RtcSessionManager.TAG, "A reader is behind: message dropped")
+        }
+    }
+
+    internal companion object {
+        /** About 12 MB of a photo's chunks, more than a reader that still runs falls behind. */
+        const val READER_QUEUE = 1024
     }
 }

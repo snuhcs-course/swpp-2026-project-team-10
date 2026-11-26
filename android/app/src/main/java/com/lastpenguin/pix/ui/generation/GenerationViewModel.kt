@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -690,13 +690,13 @@ class GenerationViewModel(
     }
 
     /**
-     * Pick a pose shows again after Back on Reference confirm: this phone's choice is undone, so another pose can be
-     * selected (#199). The subject's choice stays, since the subject's phone went on with it.
+     * Pick a pose shows again after Back on Reference confirm, which only happens outside a session: the choice is
+     * undone, so another pose can be selected (#199). So is the choice of a subject who left right after it: kept, it
+     * would send this screen on to Reference confirm again at every Back.
      */
     fun pickAgain() {
         _uiState.update {
-            val mine = it.phase == GenerationUiState.Phase.PICKING && it.chosenBy == Role.PHOTOGRAPHER
-            if (mine) it.copy(chosenBy = null) else it
+            if (it.phase == GenerationUiState.Phase.PICKING && it.chosenBy != null) it.copy(chosenBy = null) else it
         }
     }
 

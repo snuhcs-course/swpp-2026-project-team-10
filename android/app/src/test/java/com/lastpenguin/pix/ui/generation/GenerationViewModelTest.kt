@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -932,14 +932,18 @@ class GenerationViewModelTest {
     }
 
     @Test
-    fun pickAgain_keepsTheSubjectsChoice() = runTest {
+    fun aSubjectsChoiceLeftOnReferenceConfirmAfterTheyLeft_canBeChosenAgain() = runTest {
         pickFromWave()
         share.pick(SubjectPick(share.opened.single(), "pose-1"))
         runCurrent()
+        assertEquals(Role.SUBJECT, state.chosenBy)
 
+        // Pick a pose shows again only outside a session: kept, the choice would send it on again at every Back.
         model.pickAgain()
 
-        assertEquals(Role.SUBJECT, state.chosenBy)
+        assertNull(state.chosenBy)
+        model.select("pose-2")
+        assertNotNull(model.usePose())
     }
 
     @Test

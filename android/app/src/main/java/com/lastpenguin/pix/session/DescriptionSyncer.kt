@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -118,7 +118,9 @@ data class StartedDescription(val text: String, val partner: SessionPartner?, va
  * Subject ([startAsReceiver]): keeps the description in [mirror], in memory only, through a reconnect, and drops it at
  * its end, at another description, and when the session ends, saying in [ended] how it ended and in [started] what
  * description a set was made from, for the prompt history (FR-4.11). [edit] sends the field's text, and [go] sends
- * *Generate 4 poses* or *Skip* and waits [GO_TIMEOUT_MS] for the description's end; otherwise [goFailed].
+ * *Generate 4 poses* or *Skip* and waits [GO_TIMEOUT_MS] for the description's end; otherwise [goFailed]. What the
+ * field asked for last is kept, sent or not, and sent again whenever the photographer's phone says otherwise or the
+ * link is back ([reassert]): a drop that only one phone saw loses the field's hold or its release (Design 2.6.7).
  * Owner: Shared steps (Iter3-P16).
  */
 class DescriptionSyncer(
@@ -314,9 +316,19 @@ class DescriptionSyncer(
     private var receiver: CoroutineScope? = null
     private var deadline: Job? = null
 
+    /** Subject: what this phone's field last asked for of a description, whether it could be sent or not. */
+    private data class Asked(val descriptionId: String, val holding: Boolean, val text: String)
+
+    @Volatile
+    private var asked: Asked? = null
+
     /** Subject: keeps the photographer's description in [mirror] while [scope] is active. */
     fun startAsReceiver(scope: CoroutineScope) {
         receiver = scope
+        scope.launch {
+            // The link is back: what the field asked for while it was down was not sent.
+            session.state.collect { _mirror.value?.let(::reassert) }
+        }
         scope.launch {
             var assembler: SceneAssembler? = null
             try {
@@ -359,6 +371,7 @@ class DescriptionSyncer(
                     _going.value = null
                     _mirror.value = null
                     _startedScene.value = null
+                    asked = null
                 }
             }
         }
@@ -388,7 +401,7 @@ class DescriptionSyncer(
                     answer()
                     _startedScene.value = null
                 }
-                _mirror.value = MirrorDescription(
+                val description = MirrorDescription(
                     message.descriptionId,
                     message.text.orEmpty(),
                     message.writer,
@@ -396,6 +409,8 @@ class DescriptionSyncer(
                     current?.takeIf { it.descriptionId == message.descriptionId }?.scene,
                     message.situation,
                 )
+                _mirror.value = description
+                reassert(description)
             }
 
             DescriptionStep.STARTED, DescriptionStep.CLOSED -> when {
@@ -437,13 +452,31 @@ class DescriptionSyncer(
 
     /**
      * Subject: this phone's field [holding] the description, with its [text]; false, and nothing sent, without an open
-     * description or a session.
+     * description or a session. It is kept either way, for [reassert].
      */
     fun edit(holding: Boolean, text: String): Boolean {
         val description = _mirror.value ?: return false
+        asked = Asked(description.descriptionId, holding, text)
         if (!connected()) return false
         session.send(SessionMessage.PoseDescriptionEdit(description.descriptionId, holding, text))
         return true
+    }
+
+    /**
+     * Subject: sends what this phone's field asked for last again when [description], as the photographer's phone has
+     * it, says otherwise: held by nobody while this field holds it, as after a drop only the photographer's phone
+     * saw, which frees the field ([DescriptionRequest.Gone]); or held by this phone after its field let go, as after
+     * a drop only this phone saw, where the release was not sent. The photographer's own field holding it settles it
+     * the other way: this phone's hold was not taken, and is not asked for again.
+     */
+    private fun reassert(description: MirrorDescription) {
+        val mine = asked?.takeIf {
+            it.descriptionId == description.descriptionId && description.writer != Role.PHOTOGRAPHER
+        }
+        asked = mine
+        if (mine == null || mine.holding == (description.writer == Role.SUBJECT) || !connected()) return
+        session.send(SessionMessage.PoseDescriptionEdit(mine.descriptionId, mine.holding, mine.text))
+        Timings.mark("pose.sent", "description edit again ${mine.descriptionId} holding=${mine.holding}")
     }
 
     /**

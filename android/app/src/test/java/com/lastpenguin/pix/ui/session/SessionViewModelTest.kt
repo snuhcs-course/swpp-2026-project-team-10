@@ -95,8 +95,9 @@ import org.junit.runner.RunWith
  * The subject's tap to focus (FR-7.7, FR-7.4): its box at every tap; its notice at the first tap, not at a tap while
  * the notice shows or in the quiet time after it (just before its end / at its end), again at the first tap of the
  * next session, and not again after a reconnect within that time.
- * Who watches the camera (#271): a subject connecting is a notice on the photographer's phone, not again after a drop,
- * again for the next subject once the room waited alone; none on the subject's phone.
+ * The subject's guide panel (FR-7.2, FR-7.4): hiding, showing, the opacity's last value, and removing are each a notice
+ * with the subject's name, and the subject's Undo too; the removal, with the guide and where it was for Undo, kept until
+ * the Camera screen reads it.
  * The subject's pinch (#292, FR-7.4): named from its first step, through its steps, until its last value is applied,
  * when the notice with the ratio follows; a pinch that ends without a last value (a cancel) stays named for
  * ZOOMING_LINGER_MS (just before its end / at its end); a quick step, one final value, names no one; a session that
@@ -537,34 +538,56 @@ class SessionViewModelTest {
         session.deliver(image.end())
         runCurrent()
 
-        assertEquals(listOf(SessionNotice.Watching("Joonhyung"), SessionNotice.RemoteGuide("Joonhyung")), notices)
+        assertEquals(listOf(SessionNotice.RemoteGuide("Joonhyung")), notices)
     }
 
     @Test
-    fun aSubjectConnecting_isNoticed_notAgainAfterADrop_butAgainForTheNextSubject() = runTest(dispatcher) {
+    fun theSubjectsGuidePanel_isNoticedWithTheirName_andTheRemovalKeepsTheGuideForUndo() = runTest(dispatcher) {
+        val guides = InMemoryGuideRepository()
+        val guide = fakeGuide("g1")
+        guides.setGuide(guide)
+        val model = SessionViewModel(
+            session,
+            camera,
+            GuideSyncer(
+                session,
+                InMemoryGuideRepository(),
+                InMemoryGuideRepository(),
+                codec,
+                FakeGuideReferenceCodec(),
+                MirrorReference(),
+                dispatcher,
+            ),
+            RemoteControlHandler(session, camera, guides),
+            mobileData,
+            invitations,
+        )
+        store.put("panel", model)
         val notices = mutableListOf<SessionNotice>()
         backgroundScope.launch { model.notices.collect { notices += it } }
-
-        session.setState(SessionState.Connected("s_1", PeerInfo("Test Account 1"), Role.PHOTOGRAPHER))
-        runCurrent()
-        assertEquals(listOf(SessionNotice.Watching("Test Account 1")), notices)
-
-        // The link drops and comes back: the same live view goes on.
-        session.setState(SessionState.Reconnecting("s_1", 0L))
-        runCurrent()
-        session.setState(SessionState.Connected("s_1", PeerInfo("Test Account 1"), Role.PHOTOGRAPHER))
-        runCurrent()
-        assertEquals(listOf(SessionNotice.Watching("Test Account 1")), notices)
-
-        // The subject left and the room waited alone: the next one starts a live view of its own.
-        session.setState(SessionState.Waiting("ABC123"))
-        runCurrent()
         session.setState(SessionState.Connected("s_1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
         runCurrent()
+
+        session.deliver(SessionMessage.GuideVisibleSet("g1", visible = false))
+        session.deliver(SessionMessage.GuideVisibleSet("g1", visible = true))
+        session.deliver(SessionMessage.GuideOpacitySet("g1", 0.7f, final = true))
+        runCurrent()
+        val before = guides.state.value
+        session.deliver(SessionMessage.GuideRemove("g1"))
+        session.deliver(SessionMessage.GuideRestore("g1"))
+        runCurrent()
+
         assertEquals(
-            listOf(SessionNotice.Watching("Test Account 1"), SessionNotice.Watching("Test Account 2")),
+            listOf(
+                SessionNotice.RemoteGuideVisible("Test Account 2", visible = false),
+                SessionNotice.RemoteGuideVisible("Test Account 2", visible = true),
+                SessionNotice.RemoteGuideOpacity("Test Account 2", 0.7f),
+                SessionNotice.RemoteGuideRestore("Test Account 2"),
+            ),
             notices,
         )
+        // The removal waits for the Camera screen, read here only now, as by a Camera that was stopped meanwhile.
+        assertEquals(SubjectRemovedGuide("Test Account 2", guide, before), model.guideRemovals.first())
     }
 
     @Test

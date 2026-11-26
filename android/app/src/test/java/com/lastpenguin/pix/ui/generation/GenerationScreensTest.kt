@@ -31,6 +31,7 @@ import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.Situation
+import com.lastpenguin.pix.generation.poseGuideId
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.NoPersonFoundException
 import com.lastpenguin.pix.session.FakeCameraController
@@ -740,12 +741,13 @@ class GenerationScreensTest {
         idle()
         modules.maker.finish(Result.success(generated))
         idle()
+        val id = keptId(s)
 
         s.onFragment { FragmentGeneratingBinding.bind(it.requireView()).backButton.performClick() }
         idle()
 
         assertEquals(R.id.describePoseFragment, nav.currentDestination?.id)
-        assertEquals(listOf(generated.id to false), modules.saved.saved.value.map { it.id to it.favorite })
+        assertEquals(listOf(id to false), modules.saved.saved.value.map { it.id to it.favorite })
         val notices = mutableListOf<Unit>()
         s.onFragment { fragment ->
             val model = fragment.requireActivity().viewModel<GenerationViewModel>()
@@ -1056,6 +1058,19 @@ class GenerationScreensTest {
 
     private val generated = guide().copy(id = "saved-pose", source = GuideSource.GENERATED)
 
+    /**
+     * The id the library keeps the candidate [poseId] of the set on screen under: named for its set and pose, whatever
+     * the cut's own id, as the other phone of a session names it too (#329).
+     */
+    private fun keptId(s: FragmentScenario<*>, poseId: String = "pose-1"): String {
+        var id: String? = null
+        s.onFragment {
+            val set = checkNotNull(it.requireActivity().viewModel<GenerationViewModel>().uiState.value.setId)
+            id = poseGuideId(set, poseId)
+        }
+        return id!!
+    }
+
     private fun color(view: View, id: Int) = view.context.getColor(id)
 
     @Test
@@ -1079,7 +1094,7 @@ class GenerationScreensTest {
         idleUntil { heartAt(s, 0).isEnabled }
 
         assertEquals(
-            listOf(Triple("saved-pose", GuideSource.GENERATED, true)),
+            listOf(Triple(keptId(s), GuideSource.GENERATED, true)),
             modules.saved.saved.value.map { Triple(it.id, it.source, it.favorite) },
         )
         assertTrue(heartAt(s, 0).isEnabled)
@@ -1118,7 +1133,7 @@ class GenerationScreensTest {
         idleUntil { heartAt(s, 0).isEnabled }
 
         // Turned back into the camera's portrait frame, as *Use this pose* puts it there.
-        val (kept, _) = runBlocking { modules.saved.load("saved-pose") }.getOrThrow()
+        val (kept, _) = runBlocking { modules.saved.load(keptId(s)) }.getOrThrow()
         assertEquals(30 to 40, kept.mask.width to kept.mask.height)
     }
 
@@ -1189,7 +1204,7 @@ class GenerationScreensTest {
         idleUntil { heartAt(s, 0).contentDescription == string(R.string.save_pose) }
 
         // Still in the library, no longer a favorite (#297).
-        assertEquals(listOf("saved-pose" to false), modules.saved.saved.value.map { it.id to it.favorite })
+        assertEquals(listOf(keptId(s) to false), modules.saved.saved.value.map { it.id to it.favorite })
         assertEquals(string(R.string.save_pose), heartAt(s, 0).contentDescription)
         assertEquals(string(R.string.pose_removed_notice), shownNotice())
     }
@@ -1230,7 +1245,7 @@ class GenerationScreensTest {
         assertEquals(R.id.referenceConfirmFragment, nav.currentDestination?.id)
         s.onFragment {
             assertEquals(
-                ReferenceUiState.Ready(generated.copy(situation = Situation.DEFAULT)),
+                ReferenceUiState.Ready(generated.copy(id = keptId(s), situation = Situation.DEFAULT)),
                 it.requireActivity().viewModel<ReferenceViewModel>().uiState.value,
             )
         }
@@ -1251,7 +1266,7 @@ class GenerationScreensTest {
         modules.maker.finish(Result.success(generated))
         idle()
 
-        assertEquals(listOf("saved-pose"), modules.saved.saved.value.map { it.id })
+        assertEquals(listOf(keptId(s)), modules.saved.saved.value.map { it.id })
     }
 
     @Test
@@ -1473,7 +1488,7 @@ class GenerationScreensTest {
         idle()
 
         assertEquals(
-            listOf("kept-2", "kept-1", "kept-0").map { it to false },
+            listOf("pose-4", "pose-2", "pose-1").map { keptId(s, it) to false },
             modules.saved.saved.value.map { it.id to it.favorite },
         )
     }

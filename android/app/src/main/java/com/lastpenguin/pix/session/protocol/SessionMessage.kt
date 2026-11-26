@@ -27,8 +27,8 @@ const val PROTOCOL_VERSION = 3
  * Data channel messages between the two phones (Design 2.5.1).
  * The @SerialName goes into `t`, the class discriminator; the other fields form the body `b` of the
  * JSON envelope in Design 2.5.1. Photos are taken on the photographer's phone; the subject sends requests (zoom,
- * brightness, flash, guide moves, the shutter, a start of AI poses), which the photographer applies and echoes or
- * answers (AD-7).
+ * brightness, flash, the guide's moves, hiding, opacity, and removal, the shutter, a start of AI poses), which the
+ * photographer applies and echoes or answers (AD-7).
  */
 @OptIn(ExperimentalSerializationApi::class)
 @JsonClassDiscriminator("t")
@@ -133,6 +133,39 @@ sealed interface SessionMessage {
         val height: Float,
         val final: Boolean = false,
     ) : SessionMessage
+
+    /**
+     * The subject's *Hide* or *Show* for the guide [guideId] (FR-7.2): the photographer applies it, and the echo is a
+     * `guide.state` with `by: SUBJECT`. Dropped for a guide the photographer no longer shows, as a `guide.move`.
+     */
+    @Serializable
+    @SerialName("guide.visible.set")
+    data class GuideVisibleSet(val guideId: String, val visible: Boolean) : SessionMessage
+
+    /**
+     * The subject's opacity slider for the guide [guideId] (FR-7.2): realtime while the drag runs and reliable when
+     * [final], as a `guide.move`. The photographer keeps it within 10–90 % and echoes it as `guide.state`; a hidden guide
+     * keeps its opacity.
+     */
+    @Serializable
+    @SerialName("guide.opacity.set")
+    data class GuideOpacitySet(val guideId: String, val opacity: Float, val final: Boolean = false) : SessionMessage
+
+    /**
+     * The subject's ✕ for the guide [guideId] (FR-7.2): the photographer removes it, as its own ✕ does, and sends
+     * `guide.clear`.
+     */
+    @Serializable
+    @SerialName("guide.remove")
+    data class GuideRemove(val guideId: String) : SessionMessage
+
+    /**
+     * The subject's *Undo* after the guide [guideId] was removed, by either phone (FR-7.2): the photographer puts it
+     * back where it was, as its own *Undo* does, unless another guide went on since.
+     */
+    @Serializable
+    @SerialName("guide.restore")
+    data class GuideRestore(val guideId: String) : SessionMessage
 
     @Serializable
     @SerialName("guide.clear")
@@ -523,7 +556,8 @@ sealed interface SessionMessage {
      * What the photographer did on their own camera (P → S, #292): the subject's phone says it in a line, as the
      * photographer's phone says the subject's (FR-7.4). [action] is a name, kept a string so that a phone that does
      * not know one drops only that line: `zoom` with [zoom], `brightness` with [exposure], `flash` with [flash],
-     * `guide.move`, and `guide` (`PhotographerAction`). The photographer's own focus goes as `camera.focus`.
+     * `timer` with [seconds], `guide.move`, `guide`, `guide.hide`, `guide.show`, `guide.opacity` with [opacity],
+     * `guide.remove`, and `guide.restore` (`PhotographerAction`). The photographer's own focus goes as `camera.focus`.
      */
     @Serializable
     @SerialName("camera.did")
@@ -533,6 +567,7 @@ sealed interface SessionMessage {
         val exposure: Int = 0,
         val flash: FlashMode = FlashMode.OFF,
         val seconds: Int = 0,
+        val opacity: Float = 0f,
     ) : SessionMessage
 
     /** Whether the photographer allows remote control (FR-7.5, Could). */

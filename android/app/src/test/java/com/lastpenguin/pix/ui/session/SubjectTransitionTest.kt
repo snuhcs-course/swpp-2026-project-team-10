@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.animation.ValueAnimator
@@ -36,11 +36,12 @@ import org.robolectric.shadows.ShadowChoreographer
 /*
  * Subject view's changes (Design 2.6.4, Iter3-A12) on the Galaxy S22's app area, 360 x 705 dp, with the display's
  * frames paused where a test looks inside a fade, since idle() plays each to its end (Testing 2.1.8). Frames come in
- * the photographer's shape, 720 x 960 for 4:3 and 720 x 1280 for 16:9.
+ * the photographer's shape, 720 x 960 for 4:3 and 1:1, which comes in its 4:3 (CameraFrameSource.streamCrop), and
+ * 720 x 1280 for 16:9.
  * The first frame: the video clears at once, without waiting for the next check of the video. A text over the video
  * (reconnecting, the camera paused) dims it, and it clears when the video is back. The photographer's new ratio: the
  * area moves to it, the video dims, and the grid and the guide wait for a frame of the new shape, or for the time
- * limit. The photographer's shutter: a blink, but none over a dimmed video. With the phone's animations off, each
+ * limit; between 4:3 and 1:1 the frames already have it, so they wait for none. The photographer's shutter: a blink, but none over a dimmed video. With the phone's animations off, each
  * change is at its end at once. Going to another screen (Iter3-A14): the video goes at once, since its surface would
  * not fade with the screen; coming from one, it stays.
  */
@@ -207,13 +208,26 @@ class SubjectTransitionTest {
         val modules = launch()
         connect(modules)
 
-        modules.photographerRatio(AspectRatio.R1_1)
+        modules.photographerRatio(AspectRatio.R16_9)
         assertFalse(screen().overlaysShown())
 
         play(2_500)
         screen().let {
             assertTrue(it.overlaysShown())
             assertEquals(View.GONE, it.videoScrim.visibility)
+        }
+    }
+
+    @Test
+    fun oneByOne_after4By3_waitsForNoFrame_sinceItComesInThe4By3Around() {
+        val modules = launch()
+        connect(modules)
+
+        modules.photographerRatio(AspectRatio.R1_1)
+
+        screen().let {
+            assertTrue(it.overlaysShown())
+            assertTrue(it.compositionOverlay.dimOutside)
         }
     }
 

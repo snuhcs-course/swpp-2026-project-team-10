@@ -16,6 +16,8 @@ import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.generation.Situation
+import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.session.ConfirmSyncer
 import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.EndReason
@@ -54,6 +56,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
+/**
+ * The subject's ✕ took [guide] off the camera, at [state]: "Joonhyung removed the guide", with *Undo*, which puts it
+ * back there (FR-7.2, FR-7.4). Not a [SessionNotice]: it waits for the Camera screen ([SessionViewModel.guideRemovals]).
+ */
+data class SubjectRemovedGuide(val name: String, val guide: ReferenceGuide, val state: GuideState)
+
 /** Short notices for the photographer's camera screen. */
 sealed interface SessionNotice {
     /** The other phone left or dropped: "Joonhyung left" (FR-6.10, FR-6.11). */
@@ -80,6 +88,15 @@ sealed interface SessionNotice {
     /** The subject moved or resized the guide: "Joonhyung moved the guide" (FR-7.2, FR-7.4). */
     data class RemoteGuideMove(val name: String) : SessionNotice
 
+    /** The subject hid the guide or showed it: "Joonhyung hid the guide" (FR-7.2, FR-7.4). */
+    data class RemoteGuideVisible(val name: String, val visible: Boolean) : SessionNotice
+
+    /** The subject set the guide's opacity: "Joonhyung set the guide's opacity to 70%" (FR-7.2, FR-7.4). */
+    data class RemoteGuideOpacity(val name: String, val opacity: Float) : SessionNotice
+
+    /** The subject's *Undo* put the guide back: "Joonhyung put the guide back" (FR-7.2, FR-7.4). */
+    data class RemoteGuideRestore(val name: String) : SessionNotice
+
     /** The subject set the brightness: "Joonhyung set brightness to +1"; [index] is the applied exposure index. */
     data class RemoteBrightness(val name: String, val index: Int) : SessionNotice
 
@@ -94,9 +111,6 @@ sealed interface SessionNotice {
      * [SessionViewModel.FOCUS_NOTICE_MS], and not for every tap (SessionViewModel.remoteFocus).
      */
     data class RemoteFocus(val name: String) : SessionNotice
-
-    /** A subject connected, so the live view starts: "Joonhyung is watching your camera" (#271). */
-    data class Watching(val name: String) : SessionNotice
 }
 
 /**
@@ -161,6 +175,14 @@ class SessionViewModel(
 
     private val _notices = MutableSharedFlow<SessionNotice>(extraBufferCapacity = 16)
     val notices: SharedFlow<SessionNotice> = _notices.asSharedFlow()
+
+    private val _guideRemovals = Channel<SubjectRemovedGuide>(Channel.BUFFERED)
+
+    /**
+     * The subject's ✕, with what *Undo* puts back (FR-7.2): kept until the Camera screen reads it, so a Camera stopped
+     * meanwhile, as under Settings, still offers *Undo* once it is back.
+     */
+    val guideRemovals: Flow<SubjectRemovedGuide> = _guideRemovals.receiveAsFlow()
 
     /** Runs while a pinch that ended without its last value is still named ([ZOOMING_LINGER_MS]). */
     private var zoomingLinger: Job? = null
@@ -292,9 +314,6 @@ class SessionViewModel(
 
     /** The link dropped and the session goes on: the next Connected resumes it, with the `hello` it began with. */
     private var afterDrop = false
-
-    /** Whether the last state was Connected, so another Connected of the same connection says nothing new. */
-    private var wasConnected = false
 
     private var connectedJob: Job? = null
 
@@ -532,11 +551,6 @@ class SessionViewModel(
         // Read for this Connected only: any other state between ends the session, and the next one has its own hello.
         val resumed = afterDrop && connected != null
         afterDrop = reconnecting
-        // The subject's live view starts: Camera says who watches it, once per connection, not after a drop (#271).
-        if (connected?.role == Role.PHOTOGRAPHER && !resumed && !wasConnected) {
-            _notices.tryEmit(SessionNotice.Watching(connected.peer.displayName))
-        }
-        wasConnected = connected != null
         if (liveNow && connectedJob == null) {
             // Another session's first tap to focus is said again; a reconnect is the same session.
             if (!resumed) focusNoticeAt = null
@@ -558,6 +572,17 @@ class SessionViewModel(
                                 }
 
                                 is RemoteAction.GuideMove -> _notices.tryEmit(SessionNotice.RemoteGuideMove(name))
+
+                                is RemoteAction.GuideVisible ->
+                                    _notices.tryEmit(SessionNotice.RemoteGuideVisible(name, action.visible))
+
+                                is RemoteAction.GuideOpacity ->
+                                    _notices.tryEmit(SessionNotice.RemoteGuideOpacity(name, action.opacity))
+
+                                is RemoteAction.GuideRemove ->
+                                    _guideRemovals.trySend(SubjectRemovedGuide(name, action.guide, action.state))
+
+                                is RemoteAction.GuideRestore -> _notices.tryEmit(SessionNotice.RemoteGuideRestore(name))
 
                                 is RemoteAction.Brightness ->
                                     _notices.tryEmit(SessionNotice.RemoteBrightness(name, action.index))

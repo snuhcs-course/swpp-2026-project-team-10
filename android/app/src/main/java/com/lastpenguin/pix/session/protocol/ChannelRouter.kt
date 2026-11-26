@@ -24,6 +24,8 @@ class ChannelRouter {
 
         is SessionMessage.GuideMove -> if (message.final) Channel.RELIABLE else Channel.REALTIME
 
+        is SessionMessage.GuideOpacitySet -> if (message.final) Channel.RELIABLE else Channel.REALTIME
+
         is SessionMessage.ExposureSet -> if (message.final) Channel.RELIABLE else Channel.REALTIME
 
         is SessionMessage.Ping, is SessionMessage.Pong, is SessionMessage.PhotoShutter -> Channel.REALTIME
@@ -55,7 +57,7 @@ class ChannelRouter {
      */
     fun latestOnly(message: SessionMessage): Boolean = when (message) {
         is SessionMessage.GuideStateUpdate, is SessionMessage.CameraStateUpdate, is SessionMessage.ZoomSet,
-        is SessionMessage.GuideMove, is SessionMessage.ExposureSet,
+        is SessionMessage.GuideMove, is SessionMessage.ExposureSet, is SessionMessage.GuideOpacitySet,
         -> true
 
         else -> false

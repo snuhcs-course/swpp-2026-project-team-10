@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -27,6 +27,7 @@ import com.lastpenguin.pix.generation.PromptHistory
 import com.lastpenguin.pix.generation.SUGGESTED
 import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.planned
+import com.lastpenguin.pix.generation.poseGuideId
 import com.lastpenguin.pix.generation.testBitmap
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.NoPersonFoundException
@@ -1730,7 +1731,12 @@ class GenerationViewModelTest {
         assertEquals(2, maker.pending.size)
         repeat(2) { maker.finish(Result.success(fakeGuide("kept-$it"))) }
         runCurrent()
-        assertEquals(listOf("kept-1", "kept-0"), saved.saved.value.map { it.id })
+        // Each named for its set and pose, as the subject's phone names it too (#329).
+        val set = checkNotNull(model.uiState.value.setId)
+        assertEquals(
+            listOf(poseGuideId(set, "pose-3"), poseGuideId(set, "pose-1")),
+            saved.saved.value.map { it.id },
+        )
         assertTrue(saved.saved.value.none { it.favorite })
 
         model.describeAgain()

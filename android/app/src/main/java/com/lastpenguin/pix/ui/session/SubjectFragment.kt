@@ -7,8 +7,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
-import android.text.TextPaint
-import android.text.TextUtils
 import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityNodeInfo
@@ -36,12 +34,14 @@ import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
+import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.PhotographerAction
 import com.lastpenguin.pix.session.PoseStartStep
@@ -50,6 +50,7 @@ import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.FlowProgressView
 import com.lastpenguin.pix.ui.Motion
+import com.lastpenguin.pix.ui.NoticeAction
 import com.lastpenguin.pix.ui.NoticeAnchor
 import com.lastpenguin.pix.ui.NoticeLength
 import com.lastpenguin.pix.ui.PixViewModels
@@ -70,6 +71,7 @@ import com.lastpenguin.pix.ui.camera.ReferenceDragController
 import com.lastpenguin.pix.ui.camera.ReferencePlacement
 import com.lastpenguin.pix.ui.camera.TOP_BAR_OVERHANG_DP
 import com.lastpenguin.pix.ui.camera.ToggleLabel
+import com.lastpenguin.pix.ui.camera.TrackedSliderController
 import com.lastpenguin.pix.ui.camera.TurningIcons
 import com.lastpenguin.pix.ui.camera.ViewfinderFrame
 import com.lastpenguin.pix.ui.camera.ZOOM_ROW_MARGIN_DP
@@ -102,6 +104,7 @@ import com.lastpenguin.pix.ui.settings.renderLatency
 import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
 import com.lastpenguin.pix.ui.settings.tutorialFor
 import com.lastpenguin.pix.ui.showNotice
+import com.lastpenguin.pix.ui.showNoticeOnScreen
 import java.text.DecimalFormat
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -153,6 +156,7 @@ class SubjectFragment :
     private val settingsViewModel: SettingsViewModel by activityViewModels { PixViewModels.Factory }
     private val zoomFormat = DecimalFormat("0.0")
     private var pinchZoom: PinchZoomController? = null
+    private var opacitySlider: TrackedSliderController? = null
 
     // The focus box at this phone's tap and the brightness bar beside it, as on Camera (FR-7.3, FR-7.7).
     private var focusBrightness: FocusBrightness? = null
@@ -160,6 +164,12 @@ class SubjectFragment :
     private var watchdog: FrameWatchdog? = null
     private var referenceDrag: ReferenceDragController? = null
     private var leaveDialog: AlertDialog? = null
+
+    // "Guide removed" with Undo, by either phone's ✕ (FR-7.2), until a guide is on the video again.
+    private var undoNotice: Snackbar? = null
+
+    // Whether the last render had a guide on the video: one that comes back takes the Undo down.
+    private var guideShown = false
 
     // True while "Leave the session?" is up: it covers this screen without being another destination ([uncovered]).
     private val leaveAsked = MutableStateFlow(false)
@@ -263,7 +273,9 @@ class SubjectFragment :
             controls = listOf(
                 binding.cameraMenuButton,
                 binding.tipButton,
+                binding.hideGuideButton,
                 binding.saveGuideButton,
+                binding.removeGuideButton,
                 binding.editGuideButton,
                 binding.zoomReadout,
                 binding.countdownNumber,
@@ -308,7 +320,16 @@ class SubjectFragment :
             )
         this.photoViewer = photoViewer
         binding.guideButton.setOnClickListener { findNavController().navigate(R.id.action_subject_to_addGuide) }
+        // The guide's panel, as on Camera (FR-7.2): Hide, the opacity, and ✕ ask the photographer's phone; ♥ is this
+        // phone's own (FR-6.16).
+        binding.hideGuideButton.setOnClickListener { viewModel.onHideToggle() }
+        binding.removeGuideButton.setOnClickListener { viewModel.onRemoveGuide() }
         binding.saveGuideButton.setOnClickListener { viewModel.onSaveGuide() }
+        opacitySlider = TrackedSliderController(
+            binding.opacitySlider,
+            { getString(R.string.guide_opacity_percent, (it * 100f).roundToInt()) },
+            viewModel::onOpacityChange,
+        )
         setupTip(binding)
         // This phone's shutter (FR-7.8, #314): the photographer's phone takes the photo and tells of it as of any
         // other, so the blink, "Receiving photo…", and the saved photo follow as they do for the photographer's own.
@@ -360,6 +381,23 @@ class SubjectFragment :
                     binding.guideOverlay.followLook(settingsViewModel.guideLook, viewModel.uiState.map { it.guide })
                 }
                 launch {
+                    // Either phone's ✕ (FR-7.2), as the photographer's phone says it too, with the same Undo; none once a
+                    // guide is on the video again, as after a screen that was stopped meanwhile.
+                    viewModel.guideRemoved.collect { removal ->
+                        val ui = viewModel.uiState.value
+                        if (ui.guide != null) return@collect
+                        offerUndo(
+                            when (removal) {
+                                GuideRemoval.THIS_PHONE -> getString(R.string.guide_removed_from_camera)
+
+                                GuideRemoval.PHOTOGRAPHER ->
+                                    ui.photographerName?.let { getString(R.string.remote_guide_remove_notice, it) }
+                                        ?: getString(R.string.guide_removed_from_camera)
+                            },
+                        )
+                    }
+                }
+                launch {
                     viewModel.photoNotDeleted.collect {
                         showNotice(R.string.photo_not_deleted)
                     }
@@ -377,7 +415,9 @@ class SubjectFragment :
                         renderMirror(binding, ui.mirrored)
                         renderReference(binding, ui)
                         // The video fits itself to the stream; the grid and the guide fit to the same frame (AD-10).
+                        // 1:1 comes in the 4:3 around it, which is dimmed outside the frame, as on Camera (R&S 6.2).
                         binding.compositionOverlay.frameAspect = ui.aspect.frameAspect
+                        binding.compositionOverlay.dimOutside = ui.aspect.previewAspect != ui.aspect.frameAspect
                         binding.guideOverlay.frameAspect = ui.aspect.frameAspect
                         binding.guideOverlay.render(ui.guide, ui.guideState)
                         renderOverlays(binding, ui)
@@ -390,7 +430,8 @@ class SubjectFragment :
                         // Checked before enabled: MaterialButton ignores setChecked while it is disabled, so a
                         // hidden guide would leave the toggle drawn as on (found by SubjectFragmentRenderTest).
                         binding.editGuideButton.isChecked = ui.guideEditing
-                        binding.editGuideButton.isEnabled = ui.connected && ui.guideState.visible
+                        // Nor while a guide this phone offered waits for the photographer's phone (FR-7.2).
+                        binding.editGuideButton.isEnabled = ui.connected && ui.guideState.visible && !ui.guideWaiting
                         if (ui.guide == null) binding.pinchModeLabel.isVisible = false
                         // Guide-colored once a guide is on the video; it then replaces the guide on both phones.
                         binding.guideButton.isActivated = ui.guide != null
@@ -398,8 +439,12 @@ class SubjectFragment :
                         binding.guideButton.contentDescription = getString(
                             if (ui.guide == null) R.string.guide_add_description else R.string.guide_change_description,
                         )
-                        renderSaveGuide(binding, ui)
+                        // A guide on the video again, put back or another: nothing is left to undo.
+                        if (ui.guide != null && !guideShown) dismissUndo()
+                        guideShown = ui.guide != null
+                        // The tip first: whether the guide's panel fits depends on it.
                         renderTip(binding, ui)
+                        renderGuideControls(binding, ui)
                         binding.galleryButton.isEnabled = ui.lastPhoto != null
                         photoViewer.render(ui.photos, ui.photosOpen)
                         renderPoses(binding, ui)
@@ -551,6 +596,7 @@ class SubjectFragment :
 
     override fun onPause() {
         pinchZoom?.finishInteraction()
+        opacitySlider?.finishInteraction()
         focusBrightness?.finishDrag()
         super.onPause()
     }
@@ -615,7 +661,7 @@ class SubjectFragment :
             showPlace(binding, to)
         }
         // A frame of the new shape that came first.
-        if (abs((watchdog?.shape ?: 0f) - aspect.frameAspect) < SHAPE_TOLERANCE) endReshape(binding)
+        if (abs((watchdog?.shape ?: 0f) - aspect.previewAspect) < SHAPE_TOLERANCE) endReshape(binding)
     }
 
     /** The photographer's new shape came, or its time is up: the video clears, and the grid and the guide return. */
@@ -657,7 +703,8 @@ class SubjectFragment :
     /** The first frame, or one of a new shape: the video shows at once, and a new ratio's wait ends with its shape. */
     private fun onFrameShape(binding: FragmentSubjectBinding) {
         val shape = watchdog?.shape ?: return
-        if (abs(shape - viewModel.uiState.value.aspect.frameAspect) < SHAPE_TOLERANCE) endReshape(binding)
+        // The stream has its area's shape: 1:1 comes in the 4:3 around it (CameraFrameSource.streamCrop).
+        if (abs(shape - viewModel.uiState.value.aspect.previewAspect) < SHAPE_TOLERANCE) endReshape(binding)
         renderVideo(binding)
     }
 
@@ -847,6 +894,8 @@ class SubjectFragment :
         // A dialog belongs to the activity: one left open would leave a screen that is gone.
         leaveDialog?.dismiss()
         leaveDialog = null
+        dismissUndo()
+        guideShown = false
         countdownRing?.stop()
         countdownRing = null
         turningIcons?.stop()
@@ -864,6 +913,8 @@ class SubjectFragment :
         referenceDrag = null
         pinchZoom?.finishInteraction()
         pinchZoom = null
+        opacitySlider?.finishInteraction()
+        opacitySlider = null
         focusBrightness?.clear()
         focusBrightness = null
         // The bar stood beside a box of this view, on its own time: a view made again shows neither.
@@ -919,12 +970,57 @@ class SubjectFragment :
     }
 
     /**
-     * *Save guide* (FR-6.16): beside the guide-edit toggle while a guide is on the video, a ♥ filled red once a favorite
-     * here (#297).
+     * The guide's panel above the shutter while a guide is on the video, as Camera's (FR-7.2): Hide, the opacity, and ✕
+     * show the photographer's guide as both phones have it, and go to the photographer's phone; the opacity is off while
+     * the guide is hidden, and the three while not connected or while a guide this phone offered waits for the
+     * photographer's phone to adopt it. ♥ is this phone's own *Save guide*.
      */
+    private fun renderGuideControls(binding: FragmentSubjectBinding, ui: SubjectUiState) {
+        // The open tip comes first, as the line that names the camera gives way to it: at a large font the panel steps
+        // aside while the two do not fit together, and is back once the tip closes.
+        binding.guideControls.isVisible =
+            ui.guide != null && (!binding.tipBanner.isVisible || panelFitsBesideTheTip(binding))
+        val hidden = !ui.guideState.visible
+        val shared = ui.connected && !ui.guideWaiting
+        val opacityEnabled = shared && ui.guide != null && !hidden
+        opacitySlider?.render(GuideState.MIN_OPACITY, GuideState.MAX_OPACITY, ui.guideState.opacity, opacityEnabled)
+        binding.opacityValue.isEnabled = opacityEnabled
+        binding.opacityValue.text =
+            getString(R.string.guide_opacity_percent, (ui.guideState.opacity * 100f).roundToInt())
+        val hideIcon = if (hidden) R.drawable.ic_visibility else R.drawable.ic_visibility_off
+        // Setting the same icon again would redraw the button on every state change.
+        if (binding.hideGuideButton.tag != hideIcon) {
+            binding.hideGuideButton.setIconResource(hideIcon)
+            binding.hideGuideButton.tag = hideIcon
+        }
+        binding.hideGuideButton.contentDescription = getString(if (hidden) R.string.show_guide else R.string.hide_guide)
+        binding.hideGuideButton.isEnabled = shared
+        binding.removeGuideButton.isEnabled = shared
+        renderSaveGuide(binding, ui)
+    }
+
+    /**
+     * Whether the open tip, the guide's panel, and the zoom row above them fit between the top bar and the shutter's
+     * row. The longest tip at the largest font does not (CameraLayoutTest). True before the first layout.
+     */
+    private fun panelFitsBesideTheTip(binding: FragmentSubjectBinding): Boolean {
+        val overlays = binding.bottomOverlays
+        val width = overlays.width - overlays.paddingLeft - overlays.paddingRight
+        if (width <= 0) return true
+        val across = View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY)
+        val down = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        val margin = ZOOM_ROW_MARGIN_DP * resources.displayMetrics.density
+        var needed = overlays.paddingBottom + binding.zoomRow.height + margin
+        for (panel in listOf(binding.tipBanner, binding.guideControls)) {
+            panel.measure(across, down)
+            needed += panel.measuredHeight + (panel.layoutParams as ViewGroup.MarginLayoutParams).topMargin
+        }
+        return needed <= binding.bottomPanel.top - binding.topBar.bottom
+    }
+
+    /** *Save guide* (FR-6.16): on the guide's panel, a ♥ filled red once a favorite here (#297). */
     private fun renderSaveGuide(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         val button = binding.saveGuideButton
-        button.isVisible = ui.guide != null
         val icon = if (ui.guideSaved) R.drawable.ic_heart_filled else R.drawable.ic_heart
         // Setting the same icon again would redraw the button on every state change.
         if (button.tag != icon) {
@@ -1089,41 +1185,23 @@ class SubjectFragment :
 
     /**
      * One line while the name and "Live" fit the width above the shutter; at a font too large for that, the name
-     * stands over "Live". The name is the photographer's account, or their phone's while signed out, which can be
-     * long, such as "길동의 Galaxy S23 Ultra": one that does not fit its line is cut short, so "'s camera" stays.
+     * stands over "Live" (SessionCaption). The name is the photographer's account, or their phone's while signed out.
      */
     private fun fitCaption(binding: FragmentSubjectBinding, name: String?, live: Boolean) {
-        val title = binding.cameraCaptionTitle
         val overlays = binding.bottomOverlays
-        val dot = binding.cameraCaptionDot
-        val gap = (dot.layoutParams as ViewGroup.MarginLayoutParams).marginEnd
-        val room = overlays.width - overlays.paddingLeft - overlays.paddingRight -
-            if (live) dot.layoutParams.width + gap else 0
-        val full =
-            if (name == null) getString(R.string.subject_title_placeholder) else getString(R.string.subject_title, name)
-        val status = if (live) {
-            val separator = binding.cameraCaptionSeparator
-            separator.paint.measureText(separator.text.toString()) +
-                binding.cameraCaptionStatus.paint.measureText(getString(R.string.subject_live)) + 2 * gap
-        } else {
-            0f
-        }
-        // Before the first layout the width is not known: the whole name, fitted once it is.
-        val oneLine = room <= 0 || title.paint.measureText(full) + status <= room
-        binding.cameraCaption.orientation = if (oneLine) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
-        binding.cameraCaptionSeparator.isVisible = live && oneLine
-        val text = cameraTitle(title, name, full, if (oneLine) room - status else room.toFloat())
-        if (title.text.toString() != text) title.text = text
-    }
-
-    /** [full], or with [name] cut short when it is wider than [width], so "'s camera" stays. */
-    private fun cameraTitle(view: TextView, name: String?, full: String, width: Float): String {
-        if (name == null || width <= 0f) return full
-        val paint = TextPaint(view.paint)
-        if (paint.measureText(full) <= width) return full
-        val rest = paint.measureText(getString(R.string.subject_title, ""))
-        val short = TextUtils.ellipsize(name, paint, (width - rest).coerceAtLeast(0f), TextUtils.TruncateAt.END)
-        return getString(R.string.subject_title, short)
+        SessionCaption(
+            binding.cameraCaption,
+            binding.cameraCaptionDot,
+            binding.cameraCaptionTitle,
+            binding.cameraCaptionSeparator,
+            binding.cameraCaptionStatus,
+        ) { if (it == null) getString(R.string.subject_title_placeholder) else getString(R.string.subject_title, it) }
+            .fit(
+                overlays.width - overlays.paddingLeft - overlays.paddingRight,
+                name,
+                getString(R.string.subject_live),
+                live,
+            )
     }
 
     /**
@@ -1574,6 +1652,21 @@ class SubjectFragment :
         }
     }
 
+    /**
+     * [text], a guide removed by either phone, with *Undo*, which asks the photographer's phone to put it back (FR-7.2).
+     * It goes once a guide is on the video again.
+     */
+    private fun offerUndo(text: String) {
+        dismissUndo()
+        undoNotice =
+            showNoticeOnScreen(text, NoticeLength.UNDO, NoticeAction(R.string.undo) { viewModel.onUndoRemove() })
+    }
+
+    private fun dismissUndo() {
+        undoNotice?.dismiss()
+        undoNotice = null
+    }
+
     /** Asks before leaving, for Back and Leave alike (#298); one tap leaves the photographer's camera for good. */
     private fun confirmLeave() {
         if (leaveDialog?.isShowing == true) return
@@ -1743,6 +1836,39 @@ class SubjectFragment :
 
                 PhotographerAction.Guide ->
                     showToggleLabel(binding, getString(R.string.remote_guide_notice, name), R.drawable.ic_guide, white)
+
+                is PhotographerAction.GuideVisible -> if (action.visible) {
+                    showToggleLabel(
+                        binding,
+                        getString(R.string.remote_guide_show_notice, name),
+                        R.drawable.ic_visibility,
+                        white,
+                    )
+                } else {
+                    showToggleLabel(
+                        binding,
+                        getString(R.string.remote_guide_hide_notice, name),
+                        R.drawable.ic_visibility_off_small,
+                        white,
+                    )
+                }
+
+                is PhotographerAction.GuideOpacity -> showToggleLabel(
+                    binding,
+                    getString(R.string.remote_guide_opacity_notice, name, (action.opacity * 100f).roundToInt()),
+                    R.drawable.ic_guide,
+                    white,
+                )
+
+                // Said with its Undo through guideRemoved, which waits for this screen (FR-7.2).
+                PhotographerAction.GuideRemove -> Unit
+
+                PhotographerAction.GuideRestore -> showToggleLabel(
+                    binding,
+                    getString(R.string.remote_guide_restore_notice, name),
+                    R.drawable.ic_guide,
+                    white,
+                )
             }
         }
     }

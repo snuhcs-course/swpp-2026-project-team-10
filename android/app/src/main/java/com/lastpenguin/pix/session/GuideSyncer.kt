@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.util.Log
@@ -19,8 +19,11 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -103,6 +106,15 @@ class GuideSyncer(
 
     /** Subject: the id of each offered guide that did not become the photographer's; kept until a screen reads it. */
     val offerFailed: Flow<String> = failures.receiveAsFlow()
+
+    private val _offering = MutableStateFlow<String?>(null)
+
+    /**
+     * Subject: the id of the guide offered from this phone while no `guide.state` has named it yet, and null otherwise.
+     * The photographer's phone does not have that guide yet, so it would drop a request for it: Subject view's panel
+     * waits (FR-7.2).
+     */
+    val offering: StateFlow<String?> = _offering.asStateFlow()
 
     /** Subject: the receiver running for this session, which [offer] hands its guide to. */
     private var receiver: Receiver? = null
@@ -223,7 +235,10 @@ class GuideSyncer(
             try {
                 session.incoming.collect { running.handle(it) }
             } finally {
-                if (receiver === running) receiver = null
+                if (receiver === running) {
+                    receiver = null
+                    _offering.value = null
+                }
                 leaveMirror()
             }
         }
@@ -374,8 +389,12 @@ class GuideSyncer(
         /** Its newest state in this session. */
         private var theirState: SessionMessage.GuideStateUpdate? = null
 
-        /** The guide offered from this phone that no `guide.state` has named yet, and its deadline. */
+        /** The guide offered from this phone that no `guide.state` has named yet ([offering]), and its deadline. */
         private var offered: ReferenceGuide? = null
+            set(value) {
+                field = value
+                _offering.value = value?.id
+            }
         private var deadline: Job? = null
 
         /** The last guide offered, so a photographer's answer that comes after the deadline still finds its image. */

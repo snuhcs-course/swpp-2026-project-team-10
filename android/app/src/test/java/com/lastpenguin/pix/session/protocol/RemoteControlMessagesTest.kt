@@ -28,6 +28,9 @@ import org.junit.Test
  * The timer set from the subject's phone (#318): `camera.timer.set`, the timer in `camera.state` (none from a phone of
  * before it, which is off), and the photographer's own change as a `camera.did` of each value; seconds this Pix does
  * not offer are no action.
+ * The guide's panel from either phone (FR-7.2, FR-7.4): the subject's `guide.visible.set`, `guide.opacity.set` (a
+ * step when `final` is left out), `guide.remove`, and `guide.restore`, and the photographer's own hide, show, opacity,
+ * removal, and Undo as a `camera.did`; an opacity of no number or 0 is no action.
  */
 class RemoteControlMessagesTest {
     private val codec = MessageCodec(clock = { 1_759_212_345_678L })
@@ -126,10 +129,18 @@ class RemoteControlMessagesTest {
             PhotographerAction.Timer(ShutterTimer.OFF),
             PhotographerAction.GuideMove,
             PhotographerAction.Guide,
+            PhotographerAction.GuideVisible(false),
+            PhotographerAction.GuideVisible(true),
+            PhotographerAction.GuideOpacity(0.7f),
+            PhotographerAction.GuideRemove,
+            PhotographerAction.GuideRestore,
         )
 
         assertEquals(
-            listOf("zoom", "brightness", "flash", "timer", "timer", "guide.move", "guide"),
+            listOf(
+                "zoom", "brightness", "flash", "timer", "timer", "guide.move", "guide",
+                "guide.hide", "guide.show", "guide.opacity", "guide.remove", "guide.restore",
+            ),
             actions.map { it.toMessage().action },
         )
         for (action in actions) {
@@ -217,6 +228,41 @@ class RemoteControlMessagesTest {
     }
 
     @Test
+    fun theGuidePanel_designExamples_decode() {
+        val hide = """{ "v": 3, "t": "guide.visible.set", "seq": 3, "ts": 1759212356000,
+            "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "visible": false } }"""
+        val opacity = """{ "v": 3, "t": "guide.opacity.set", "seq": 14, "ts": 1759212356200,
+            "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "opacity": 0.7, "final": true } }"""
+        val remove = """{ "v": 3, "t": "guide.remove", "seq": 1, "ts": 1759212356400,
+            "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17" } }"""
+        val restore = """{ "v": 3, "t": "guide.restore", "seq": 1, "ts": 1759212358400,
+            "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17" } }"""
+        val did = """{ "v": 3, "t": "camera.did", "seq": 23, "ts": 1759212356600,
+            "b": { "action": "guide.opacity", "opacity": 0.3 } }"""
+
+        assertEquals(SessionMessage.GuideVisibleSet("5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", false), decode(hide))
+        assertEquals(
+            SessionMessage.GuideOpacitySet("5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", 0.7f, final = true),
+            decode(opacity),
+        )
+        assertEquals(SessionMessage.GuideRemove("5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17"), decode(remove))
+        assertEquals(SessionMessage.GuideRestore("5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17"), decode(restore))
+        assertEquals(
+            PhotographerAction.GuideOpacity(0.3f),
+            (decode(did) as SessionMessage.PhotographerDid).toAction(),
+        )
+    }
+
+    @Test
+    fun anOpacityStep_withoutFinal_isAStep_andAnOpacityOfNoValueIsNoAction() {
+        val step = """{"v":3,"t":"guide.opacity.set","seq":1,"ts":0,"b":{"guideId":"g","opacity":0.4}}"""
+
+        assertFalse((decode(step) as SessionMessage.GuideOpacitySet).final)
+        assertNull(SessionMessage.PhotographerDid("guide.opacity").toAction())
+        assertNull(SessionMessage.PhotographerDid("guide.opacity", opacity = Float.NaN).toAction())
+    }
+
+    @Test
     fun requests_roundTrip_keepEveryField() {
         val messages = listOf(
             SessionMessage.GuideMove("g", 0.1f, 0.2f, 0.3f, final = true),
@@ -235,6 +281,11 @@ class RemoteControlMessagesTest {
             SessionMessage.PoseStart("selfie"),
             SessionMessage.PoseStartAnswer(started = true),
             SessionMessage.PoseStartAnswer(started = false),
+            SessionMessage.GuideVisibleSet("g", visible = true),
+            SessionMessage.GuideOpacitySet("g", 0.25f),
+            SessionMessage.GuideOpacitySet("g", 0.9f, final = true),
+            SessionMessage.GuideRemove("g"),
+            SessionMessage.GuideRestore("g"),
         )
 
         for (message in messages) assertEquals(message, decode(codec.encode(message)))

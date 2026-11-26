@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.ImageFormat
@@ -19,6 +19,9 @@ import org.webrtc.VideoFrame
  * array back in the pool when the frame is released), and a front camera's full frame, flipped by rows when turned a
  * quarter and by columns when upright (FR-1.14). The crop-and-scale path needs libwebrtc and is left to the two-phone
  * check (IT-8). Under Robolectric, because the crop test needs a real Rect; the JVM stubs answer 0.
+ * What of the buffer is streamed (streamCrop, R&S 6.6): a 1:1 viewport on a landscape buffer and on a portrait one
+ * (widened to 4:3 along the long side), one a pixel off square (widened too, with even edges), 3:4 and 9:16 viewports
+ * and a small 2:1 frame (as they are), and an empty crop (as it is).
  */
 @RunWith(AndroidJUnit4::class)
 class CameraFrameSourceTest {
@@ -115,5 +118,32 @@ class CameraFrameSourceTest {
         val buffer = observer.buffers.single()
         val data = NV21Buffer::class.java.getDeclaredField("data").apply { isAccessible = true }.get(buffer)
         return (data as ByteArray).copyOf(12).also { buffer.release() }
+    }
+
+    @Test
+    fun aSquareViewport_isWidenedToTheSensors4By3_alongTheBuffersLongSide() {
+        assertEquals(CropBox(0, 0, 960, 720), streamCrop(CropBox(120, 0, 840, 720), 960, 720))
+        assertEquals(CropBox(0, 0, 720, 960), streamCrop(CropBox(0, 120, 720, 840), 720, 960))
+    }
+
+    @Test
+    fun aViewportAPixelOffSquare_isWidenedToo_withEvenEdges() {
+        // 721 × 720 in a buffer wider than 4:3: 960 wide around its middle, from an even column.
+        val widened = streamCrop(CropBox(151, 0, 872, 720), 1024, 720)
+
+        assertEquals(CropBox(30, 0, 990, 720), widened)
+    }
+
+    @Test
+    fun otherViewports_andAnEmptyCrop_streamAsTheyAre() {
+        val threeByFour = CropBox(0, 0, 960, 720)
+        val nineBySixteen = CropBox(0, 120, 1280, 840)
+        val empty = CropBox(0, 0, 0, 0)
+        val small = CropBox(0, 0, 4, 2)
+
+        assertEquals(small, streamCrop(small, 4, 2))
+        assertEquals(threeByFour, streamCrop(threeByFour, 960, 720))
+        assertEquals(nineBySixteen, streamCrop(nineBySixteen, 1280, 960))
+        assertEquals(empty, streamCrop(empty, 960, 720))
     }
 }

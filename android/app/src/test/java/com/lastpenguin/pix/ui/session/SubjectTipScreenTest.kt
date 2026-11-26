@@ -264,8 +264,9 @@ class SubjectTipScreenTest {
         onScreen { controls, _ -> controls.tipButton.performClick() }
         idle()
 
-        // Above the open tip, which lies over the video's middle on this small screen.
-        onScreen { controls, _ -> tapThroughTheRoot(controls, controls.videoContainer, down = 0.25f) }
+        // Above the zoom row, the open tip, and the guide's panel, which lie over the video's lower part on this small
+        // screen.
+        onScreen { controls, _ -> tapThroughTheRoot(controls, controls.videoContainer, down = 0.15f) }
         idle()
 
         assertEquals(1, focuses().size)

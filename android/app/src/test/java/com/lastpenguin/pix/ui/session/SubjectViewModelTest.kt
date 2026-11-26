@@ -38,6 +38,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -84,6 +86,15 @@ import org.junit.Test
  * reverted by the echo; one set before this screen existed (shown at once); a request without an answer (put back
  * after TIMER_WAIT_MS, 1 ms before / at it) and one answered in time; waiting during the countdown and without a link;
  * the photographer's change as a line.
+ * The guide's panel (FR-7.2): Hide and Show, each a request for the other state that the echo settles; the opacity
+ * shown at once, sent in steps, kept over an echo during the drag and settled by the first echo after it, clamped to
+ * 10–90 %; ✕ a request; none sent without a guide or a connection, no opacity for a hidden guide, and none for a
+ * guide this phone offered that the photographer has not adopted yet, which would drop it (then sent once it has);
+ * neither guide-edit mode nor a move for it meanwhile.
+ * Undo (FR-7.2): this phone's ✕ and the photographer's (its line before or after `guide.clear`) said once the guide is
+ * gone, and kept until read; not when another guide replaces it; Undo asks for the last guide shown, only without a
+ * guide on the video and while connected. The
+ * photographer's hide, show, opacity, and removal each a line.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SubjectViewModelTest {
@@ -659,6 +670,207 @@ class SubjectViewModelTest {
         assertTrue(moves().isEmpty())
     }
 
+    // ---- The guide's panel (FR-7.2) -------------------------------------------------------------------------------
+
+    private fun opacities(): List<SessionMessage.GuideOpacitySet> =
+        session.sent.filterIsInstance<SessionMessage.GuideOpacitySet>()
+
+    @Test
+    fun `Hide asks the photographer for the other state, and the echo hides the guide here`() = runTest(dispatcher) {
+        connect()
+        mirror.setGuide(fakeGuide("g1"))
+        runCurrent()
+
+        viewModel.onHideToggle()
+        // Nothing changes here before the photographer's phone has hidden it for both.
+        assertTrue(viewModel.uiState.value.guideState.visible)
+        mirror.update(final = true) { it.copy(visible = false) }
+        runCurrent()
+        viewModel.onHideToggle()
+
+        assertEquals(
+            listOf(SessionMessage.GuideVisibleSet("g1", false), SessionMessage.GuideVisibleSet("g1", true)),
+            session.sent.filterIsInstance<SessionMessage.GuideVisibleSet>(),
+        )
+        assertFalse(viewModel.uiState.value.guideState.visible)
+    }
+
+    @Test
+    fun `the opacity shows at once, goes in steps, and the first echo after its last value wins`() =
+        runTest(dispatcher) {
+            connect()
+            mirror.setGuide(fakeGuide("g1"))
+            runCurrent()
+
+            viewModel.onOpacityChange(0.6f, final = false)
+            viewModel.onOpacityChange(0.7f, final = false)
+            assertEquals(0.7f, viewModel.uiState.value.guideState.opacity, EPSILON)
+            assertEquals(listOf(SessionMessage.GuideOpacitySet("g1", 0.6f)), opacities())
+
+            // An echo of an earlier step does not pull the slider back during the drag.
+            mirror.update(final = false) { it.copy(opacity = 0.6f) }
+            runCurrent()
+            assertEquals(0.7f, viewModel.uiState.value.guideState.opacity, EPSILON)
+            advanceTimeBy(60)
+            assertEquals(SessionMessage.GuideOpacitySet("g1", 0.7f), opacities().last())
+
+            viewModel.onOpacityChange(0.95f, final = true)
+            assertEquals(SessionMessage.GuideOpacitySet("g1", GuideState.MAX_OPACITY, final = true), opacities().last())
+            mirror.update(final = true) { it.copy(opacity = 0.8f) }
+            runCurrent()
+            assertEquals(0.8f, viewModel.uiState.value.guideState.opacity, EPSILON)
+        }
+
+    @Test
+    fun `remove asks the photographer's phone to take the guide off`() = runTest(dispatcher) {
+        connect()
+        mirror.setGuide(fakeGuide("g1"))
+        runCurrent()
+
+        viewModel.onRemoveGuide()
+
+        assertEquals(
+            listOf(SessionMessage.GuideRemove("g1")),
+            session.sent.filterIsInstance<SessionMessage.GuideRemove>(),
+        )
+        // The guide goes with the photographer's `guide.clear`, on both phones at once.
+        assertEquals("g1", viewModel.uiState.value.guide?.id)
+    }
+
+    @Test
+    fun `the panel asks nothing for a guide this phone offered until the photographer has adopted it`() =
+        runTest(dispatcher) {
+            val offering = MutableStateFlow<String?>("g1")
+            val offered = SubjectViewModel(session, mirror, references, FakeRemoteVideo(), offering = offering)
+            connect()
+            mirror.setGuide(fakeGuide("g1"))
+            runCurrent()
+            assertTrue(offered.uiState.value.guideWaiting)
+
+            offered.onHideToggle()
+            offered.onOpacityChange(0.7f, final = true)
+            offered.onRemoveGuide()
+            assertTrue(session.sent.none { it is SessionMessage.GuideVisibleSet || it is SessionMessage.GuideRemove })
+            assertTrue(opacities().isEmpty())
+
+            // Nor guide-edit mode, nor a move, which the photographer would drop as well.
+            offered.setGuideEditing(true)
+            assertFalse(offered.uiState.value.guideEditing)
+            offered.onGuideGesture(0.1f, 0f, 1f, final = true)
+            assertTrue(moves().isEmpty())
+
+            offering.value = null
+            runCurrent()
+            offered.setGuideEditing(true)
+            offered.onGuideGesture(0.1f, 0f, 1f, final = true)
+            assertEquals(listOf("g1"), moves().map { it.guideId })
+            offered.onHideToggle()
+            assertEquals(
+                listOf(SessionMessage.GuideVisibleSet("g1", false)),
+                session.sent.filterIsInstance<SessionMessage.GuideVisibleSet>(),
+            )
+        }
+
+    @Test
+    fun `this phone's remove is said once its guide is gone, and not for a replacement`() =
+        runTest(dispatcher) {
+            val removed = mutableListOf<GuideRemoval>()
+            backgroundScope.launch { viewModel.guideRemoved.collect { removed += it } }
+            connect()
+            mirror.setGuide(fakeGuide("g1"))
+            runCurrent()
+
+            viewModel.onRemoveGuide()
+            runCurrent()
+            assertTrue("not before the photographer's phone took it", removed.isEmpty())
+            mirror.setGuide(null)
+            runCurrent()
+            assertEquals(listOf(GuideRemoval.THIS_PHONE), removed)
+
+            // A guide replaced, or gone without a ✕ said, is no removal.
+            mirror.setGuide(fakeGuide("g2"))
+            runCurrent()
+            mirror.setGuide(null)
+            mirror.setGuide(fakeGuide("g3"))
+            runCurrent()
+            viewModel.onRemoveGuide()
+            mirror.setGuide(fakeGuide("g4"))
+            runCurrent()
+            assertEquals(listOf(GuideRemoval.THIS_PHONE), removed)
+        }
+
+    @Test
+    fun `the photographer's remove is said once its guide is gone, whichever comes first, and waits to be read`() =
+        runTest(dispatcher) {
+            connect()
+            mirror.setGuide(fakeGuide("g1"))
+            runCurrent()
+
+            // The line before guide.clear: said once the guide goes.
+            session.deliver(SessionMessage.PhotographerDid("guide.remove"))
+            runCurrent()
+            mirror.setGuide(null)
+            runCurrent()
+            // guide.clear first, then the line: said at once.
+            mirror.setGuide(fakeGuide("g2"))
+            runCurrent()
+            mirror.setGuide(null)
+            runCurrent()
+            session.deliver(SessionMessage.PhotographerDid("guide.remove"))
+            runCurrent()
+
+            // Read only now, as by a Subject view that was stopped meanwhile.
+            assertEquals(
+                listOf(GuideRemoval.PHOTOGRAPHER, GuideRemoval.PHOTOGRAPHER),
+                viewModel.guideRemoved.take(2).toList(),
+            )
+        }
+
+    @Test
+    fun `Undo asks for the last guide shown, only with no guide on the video and while connected`() =
+        runTest(dispatcher) {
+            connect()
+            mirror.setGuide(fakeGuide("g1"))
+            runCurrent()
+            viewModel.onUndoRemove()
+            mirror.setGuide(null)
+            runCurrent()
+
+            viewModel.onUndoRemove()
+            session.setState(SessionState.Ended(EndReason.CONNECTION_LOST))
+            runCurrent()
+            viewModel.onUndoRemove()
+
+            assertEquals(
+                listOf(SessionMessage.GuideRestore("g1")),
+                session.sent.filterIsInstance<SessionMessage.GuideRestore>(),
+            )
+        }
+
+    @Test
+    fun `the panel asks nothing without a guide or a connection, nor an opacity for a hidden guide`() =
+        runTest(dispatcher) {
+            connect()
+            runCurrent()
+            viewModel.onHideToggle()
+            viewModel.onOpacityChange(0.7f, final = true)
+            viewModel.onRemoveGuide()
+
+            mirror.setGuide(fakeGuide("g1"))
+            mirror.update(final = true) { it.copy(visible = false) }
+            runCurrent()
+            viewModel.onOpacityChange(0.7f, final = true)
+            assertEquals(0.5f, viewModel.uiState.value.guideState.opacity, EPSILON)
+
+            session.setState(SessionState.Ended(EndReason.CONNECTION_LOST))
+            runCurrent()
+            viewModel.onHideToggle()
+            viewModel.onRemoveGuide()
+
+            assertTrue(session.sent.none { it is SessionMessage.GuideVisibleSet || it is SessionMessage.GuideRemove })
+            assertTrue(opacities().isEmpty())
+        }
+
     @Test
     fun `the brightness slider shows its value at once, sends steps like zoom, and the echo wins afterwards`() =
         runTest(dispatcher) {
@@ -718,6 +930,10 @@ class SubjectViewModelTest {
         session.deliver(SessionMessage.PhotographerDid("flash", flash = FlashMode.ON))
         session.deliver(SessionMessage.PhotographerDid("guide.move"))
         session.deliver(SessionMessage.PhotographerDid("guide"))
+        session.deliver(SessionMessage.PhotographerDid("guide.hide"))
+        session.deliver(SessionMessage.PhotographerDid("guide.show"))
+        session.deliver(SessionMessage.PhotographerDid("guide.opacity", opacity = 0.3f))
+        session.deliver(SessionMessage.PhotographerDid("guide.restore"))
         // From a newer photographer, and a ratio that is none.
         session.deliver(SessionMessage.PhotographerDid("lens"))
         session.deliver(SessionMessage.PhotographerDid("zoom", zoom = Float.NaN))
@@ -730,6 +946,10 @@ class SubjectViewModelTest {
                 PhotographerLine.Did(PhotographerAction.Flash(FlashMode.ON)),
                 PhotographerLine.Did(PhotographerAction.GuideMove),
                 PhotographerLine.Did(PhotographerAction.Guide),
+                PhotographerLine.Did(PhotographerAction.GuideVisible(false)),
+                PhotographerLine.Did(PhotographerAction.GuideVisible(true)),
+                PhotographerLine.Did(PhotographerAction.GuideOpacity(0.3f)),
+                PhotographerLine.Did(PhotographerAction.GuideRestore),
             ),
             lines,
         )

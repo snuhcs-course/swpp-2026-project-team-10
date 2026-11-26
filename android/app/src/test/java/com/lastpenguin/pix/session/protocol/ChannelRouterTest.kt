@@ -92,6 +92,19 @@ class ChannelRouterTest {
     }
 
     @Test
+    fun `the subject's guide panel goes as a move does, its taps as final values`() {
+        // The opacity slider's steps, as a move's: the newest wins, and the last must arrive (FR-7.2).
+        assertEquals(Channel.REALTIME, router.channelFor(SessionMessage.GuideOpacitySet("g", 0.4f)))
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.GuideOpacitySet("g", 0.4f, final = true)))
+        assertTrue(router.latestOnly(SessionMessage.GuideOpacitySet("g", 0.4f)))
+        // Hide and ✕ are taps, each of which counts.
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.GuideVisibleSet("g", visible = false)))
+        assertFalse(router.latestOnly(SessionMessage.GuideVisibleSet("g", visible = false)))
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.GuideRemove("g")))
+        assertFalse(router.latestOnly(SessionMessage.GuideRemove("g")))
+    }
+
+    @Test
     fun `a dropped photo goes on the reliable channel, since a lost one keeps the subject waiting`() {
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PhotoDropped("shot-1")))
         assertFalse(router.latestOnly(SessionMessage.PhotoDropped("shot-1")))

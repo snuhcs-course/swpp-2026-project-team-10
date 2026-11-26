@@ -54,6 +54,7 @@ object PixViewModels {
                 timerChoice = container.remoteControlHandler.timerChoice,
                 onFocused = container.remoteControlHandler::focusedHere,
                 onDid = container.remoteControlHandler::didHere,
+                onRemoved = container.remoteControlHandler::removedHere,
                 onCountdown = container.remoteControlHandler::countdownHere,
             )
         }
@@ -113,6 +114,7 @@ object PixViewModels {
                 sessionPhotos = container.photoSyncer.sessionPhotos,
                 deleter = container.photoDeleter,
                 receivingPhoto = container.photoSyncer.receiving,
+                offering = container.guideSyncer.offering,
                 phoneTurns = container.phoneTurns,
             )
         }

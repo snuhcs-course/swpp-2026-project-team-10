@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModelStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.generation.PoseLibrary
+import com.lastpenguin.pix.generation.poseGuideId
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -166,7 +167,9 @@ class PoseGuideTurnTest {
         val image = Bitmap.createBitmap(40, 30, Bitmap.Config.ARGB_8888)
         model.onCandidatePicked(image, kept = { hearts.keptGuide(key, image, turn = 90) }, turn = 90)
         runCurrent()
-        assertEquals(ReferenceUiState.Ready(cut), model.uiState.value)
+        // The cut, named for its set and pose (#329).
+        val id = poseGuideId("set-1", "pose-1")
+        assertEquals(ReferenceUiState.Ready(cut.copy(id = id)), model.uiState.value)
         model.onUseGuide()
         val used = guides.guide.value ?: error("No guide on the camera")
         assertEquals(30 to 40, used.mask.width to used.mask.height)
@@ -174,10 +177,10 @@ class PoseGuideTurnTest {
 
         // Later, from the library: where it lay on the camera.
         guides.setGuide(null)
-        model.onUseSaved("pose")
+        model.onUseSaved(id)
         runCurrent()
         val opened = guides.guide.value ?: error("No guide from the library")
-        assertEquals("pose", opened.id)
+        assertEquals(id, opened.id)
         assertEquals(30 to 40, opened.mask.width to opened.mask.height)
         assertEquals(used.anchor, opened.anchor)
     }

@@ -85,6 +85,9 @@ internal fun nextSubjectTip(previous: SubjectTip?, shared: SharedTip?): SubjectT
     else -> SubjectTip(shared.guideId, shared.tip)
 }
 
+/** Whose ✕ took the guide off both phones (FR-7.2): this phone's, or the photographer's. */
+enum class GuideRemoval { THIS_PHONE, PHOTOGRAPHER }
+
 /** Subject view (R&S 6.6, FR-3.9, FR-4.10, FR-6.6, FR-6.15, FR-6.16, FR-7.1–7.3). */
 data class SubjectUiState(
     /** For "Dongje's camera"; arrives in `hello`. */
@@ -150,6 +153,11 @@ data class SubjectUiState(
      * #314): the shutter takes no other press meanwhile.
      */
     val shutterWaiting: Boolean = false,
+    /**
+     * The guide this phone offered (*Add a pose guide*) while the photographer's phone has not adopted it yet
+     * (`GuideSyncer.offering`); null otherwise. That phone would drop a request for it, so the panel waits (FR-7.2).
+     */
+    val offeredGuide: String? = null,
     /** Whether the guide on the video is a favorite in this phone's library (FR-6.16, #297): *Save guide* is filled. */
     val guideSaved: Boolean = false,
     val savingGuide: Boolean = false,
@@ -189,6 +197,10 @@ data class SubjectUiState(
 
     val canZoom: Boolean
         get() = connected && minZoom.isFinite() && maxZoom.isFinite() && minZoom > 0f && maxZoom > minZoom
+
+    /** The guide on the video is this phone's offer, not yet the photographer's: its panel's shared controls wait. */
+    val guideWaiting: Boolean
+        get() = guide != null && guide.id == offeredGuide
 
     /** Whether the photographer's camera has a brightness range to set (FR-7.3). */
     val hasBrightness: Boolean
@@ -239,6 +251,8 @@ class SubjectViewModel(
     private val deleter: PhotoDeleter = PhotoDeleter { PhotoDeletion.Failed },
     /** Whether a photo of the photographer's is on its way here (`PhotoSyncer.receiving`, #271). */
     private val receivingPhoto: Flow<Boolean> = flowOf(false),
+    /** The guide this phone offered and the photographer has not adopted yet (`GuideSyncer.offering`). */
+    private val offering: Flow<String?> = flowOf(null),
     /** How this phone is held, which its own controls' icons turn with; nothing is sent (FR-1.15). */
     private val phoneTurns: PhoneTurns = PhoneTurns.Fixed(),
     /** For the time between two lines about the photographer's focus (#292). */
@@ -366,9 +380,38 @@ class SubjectViewModel(
         Timings.mark("move.sent", "${state.cx} ${state.cy} ${state.height}${if (final) " final" else ""}")
     }
 
+    // The last guide on the video, which Undo asks for again once it is removed (FR-7.2).
+    private var lastGuideId: String? = null
+
+    // The guide this phone's ✕ asked to remove, until it goes: its going is this phone's removal.
+    private var removing: String? = null
+
+    // The photographer said its ✕ (`camera.did`), whose guide may still be on the video until `guide.clear` comes.
+    private var photographerRemoving = false
+
+    private val _guideRemoved = Channel<GuideRemoval>(Channel.BUFFERED)
+
+    /**
+     * A ✕ took the guide off both phones, once it is gone from the video: "Guide removed" or "Dongje removed the guide",
+     * with *Undo* (FR-7.2). Kept until the screen reads it, so a screen stopped meanwhile still offers *Undo*.
+     */
+    val guideRemoved: Flow<GuideRemoval> = _guideRemoved.receiveAsFlow()
+
+    private val opacitySender = StepSender<GuideState>(viewModelScope, SEND_INTERVAL_MS) { state, final ->
+        val guideId = state.guideId ?: return@StepSender
+        session.send(SessionMessage.GuideOpacitySet(guideId, state.opacity, final))
+        Timings.mark("opacity.sent", "${state.opacity}${if (final) " final" else ""}")
+    }
+
     init {
         viewModelScope.launch {
             receivingPhoto.collect { receiving -> _uiState.update { it.copy(receivingPhoto = receiving) } }
+        }
+        viewModelScope.launch {
+            offering.collect { id ->
+                // A guide that waits for the photographer's phone cannot be edited yet: its moves would be dropped.
+                _uiState.update { it.copy(offeredGuide = id, guideEditing = it.guideEditing && it.guide?.id != id) }
+            }
         }
         viewModelScope.launch {
             sessionPhotos.collect { photos ->
@@ -455,7 +498,18 @@ class SubjectViewModel(
                     return@collect
                 }
                 if (message is SessionMessage.PhotographerDid) {
-                    message.toAction()?.let { _photographerLines.tryEmit(PhotographerLine.Did(it)) }
+                    when (val action = message.toAction()) {
+                        null -> Unit
+
+                        // Not a line: a notice with Undo once the guide is gone, kept until the screen reads it.
+                        PhotographerAction.GuideRemove -> if (_uiState.value.guide == null) {
+                            _guideRemoved.trySend(GuideRemoval.PHOTOGRAPHER)
+                        } else {
+                            photographerRemoving = true
+                        }
+
+                        else -> _photographerLines.tryEmit(PhotographerLine.Did(action))
+                    }
                     return@collect
                 }
                 if (message is SessionMessage.ShutterAnswer) {
@@ -508,7 +562,19 @@ class SubjectViewModel(
                     )
                 }
                 // A gesture never crosses guide identities (Design 2.6.2): a removed or replaced guide ends it.
-                if (guide?.id != previous?.id) guideSender.cancel()
+                if (guide?.id != previous?.id) {
+                    guideSender.cancel()
+                    opacitySender.cancel()
+                    if (guide == null && previous != null) {
+                        when {
+                            previous.id == removing -> _guideRemoved.trySend(GuideRemoval.THIS_PHONE)
+                            photographerRemoving -> _guideRemoved.trySend(GuideRemoval.PHOTOGRAPHER)
+                        }
+                    }
+                    removing = null
+                    photographerRemoving = false
+                }
+                if (guide != null) lastGuideId = guide.id
             }
         }
         viewModelScope.launch {
@@ -559,13 +625,14 @@ class SubjectViewModel(
             mirror.state.collect { state ->
                 _uiState.update {
                     it.copy(
-                        // This phone's own gesture is drawn until it ends; the photographer's echo then settles the
-                        // guide. Hiding and opacity stay the photographer's even meanwhile (FR-7.2).
-                        guideState = if (guideSender.adjusting) {
-                            it.guideState.copy(visible = state.visible, opacity = state.opacity)
-                        } else {
-                            state
-                        },
+                        // This phone's own gesture, a move or the opacity slider, is drawn until it ends; the
+                        // photographer's echo then settles the guide (FR-7.2).
+                        guideState = state.copy(
+                            cx = if (guideSender.adjusting) it.guideState.cx else state.cx,
+                            cy = if (guideSender.adjusting) it.guideState.cy else state.cy,
+                            height = if (guideSender.adjusting) it.guideState.height else state.height,
+                            opacity = if (opacitySender.adjusting) it.guideState.opacity else state.opacity,
+                        ),
                         // A guide the photographer hid cannot be edited, so the mode ends and the pinch zooms again.
                         guideEditing = it.guideEditing && state.visible,
                         // Its tip is hidden with it, and closed: shown again, the guide brings back the button
@@ -697,10 +764,67 @@ class SubjectViewModel(
         }
     }
 
-    /** The guide-edit mode toggle; there is no mode without a visible guide. */
+    /**
+     * *Hide* or *Show* on the guide's panel (FR-7.2): asks the photographer's phone, whose echo hides or shows the guide
+     * on both phones.
+     */
+    fun onHideToggle() {
+        val ui = _uiState.value
+        val guide = ui.guide ?: return
+        if (!ui.connected || ui.guideWaiting) return
+        session.send(SessionMessage.GuideVisibleSet(guide.id, !ui.guideState.visible))
+        Timings.mark("guide.visible.sent", "${!ui.guideState.visible}")
+    }
+
+    /**
+     * From the opacity slider (FR-7.2): the guide here takes the value at once, the photographer's phone gets it as
+     * `guide.opacity.set` (steps at most every [SEND_INTERVAL_MS], the last at once), and its echo settles it.
+     */
+    fun onOpacityChange(opacity: Float, final: Boolean) {
+        val ui = _uiState.value
+        val guide = ui.guide
+        if (guide == null || !ui.connected || !ui.guideState.visible || ui.guideWaiting) {
+            if (final) opacitySender.cancel()
+            return
+        }
+        if (!opacity.isFinite()) return
+        val shown = ui.guideState.copy(
+            guideId = guide.id,
+            opacity = opacity.coerceIn(GuideState.MIN_OPACITY, GuideState.MAX_OPACITY),
+        )
+        _uiState.update { it.copy(guideState = shown) }
+        if (final) opacitySender.finish(shown) else opacitySender.step(shown)
+    }
+
+    /** ✕ on the guide's panel (FR-7.2): the photographer's phone removes the guide, and both phones lose it. */
+    fun onRemoveGuide() {
+        val ui = _uiState.value
+        val guide = ui.guide ?: return
+        if (!ui.connected || ui.guideWaiting) return
+        removing = guide.id
+        session.send(SessionMessage.GuideRemove(guide.id))
+        Timings.mark("guide.remove.sent", guide.id)
+    }
+
+    /**
+     * *Undo* after either phone's ✕ (FR-7.2): asks the photographer's phone to put the last guide back where it was,
+     * unless a guide is on the video again.
+     */
+    fun onUndoRemove() {
+        val ui = _uiState.value
+        val id = lastGuideId ?: return
+        if (!ui.connected || ui.guide != null) return
+        session.send(SessionMessage.GuideRestore(id))
+        Timings.mark("guide.restore.sent", id)
+    }
+
+    /**
+     * The guide-edit mode toggle; there is no mode without a visible guide, nor for a guide this phone offered that the
+     * photographer's phone has not adopted yet, which would drop its moves.
+     */
     fun setGuideEditing(on: Boolean) {
         _uiState.update {
-            val editing = on && it.guide != null && it.guideState.visible
+            val editing = on && it.guide != null && it.guideState.visible && !it.guideWaiting
             // The video's touches are the guide's then, so the bar that a tap brought goes (FR-7.7).
             it.copy(guideEditing = editing, brightnessOpen = it.brightnessOpen && !editing)
         }
@@ -715,7 +839,7 @@ class SubjectViewModel(
     fun onGuideGesture(dx: Float, dy: Float, scale: Float, final: Boolean) {
         val ui = _uiState.value
         val guide = ui.guide
-        if (guide == null || !ui.guideEditing || !ui.connected) {
+        if (guide == null || !ui.guideEditing || !ui.connected || ui.guideWaiting) {
             if (final) guideSender.cancel()
             return
         }
@@ -997,6 +1121,7 @@ class SubjectViewModel(
         zoomSender.cancel()
         exposureSender.cancel()
         guideSender.cancel()
+        opacitySender.cancel()
     }
 
     companion object {

@@ -377,6 +377,17 @@ class SubjectViewModel(
         Timings.mark("move.sent", "${state.cx} ${state.cy} ${state.height}${if (final) " final" else ""}")
     }
 
+    // The last guide on the video, which Undo asks for again once it is removed (FR-7.2).
+    private var lastGuideId: String? = null
+
+    // The guide this phone's ✕ asked to remove, until it goes: its going is this phone's removal.
+    private var removing: String? = null
+
+    private val _guideRemoved = Channel<Unit>(Channel.BUFFERED)
+
+    /** This phone's ✕ took the guide off both phones: "Guide removed", with *Undo* (FR-7.2). */
+    val guideRemoved: Flow<Unit> = _guideRemoved.receiveAsFlow()
+
     private val opacitySender = StepSender<GuideState>(viewModelScope, SEND_INTERVAL_MS) { state, final ->
         val guideId = state.guideId ?: return@StepSender
         session.send(SessionMessage.GuideOpacitySet(guideId, state.opacity, final))
@@ -531,7 +542,10 @@ class SubjectViewModel(
                 if (guide?.id != previous?.id) {
                     guideSender.cancel()
                     opacitySender.cancel()
+                    if (guide == null && previous != null && previous.id == removing) _guideRemoved.trySend(Unit)
+                    removing = null
                 }
+                if (guide != null) lastGuideId = guide.id
             }
         }
         viewModelScope.launch {
@@ -758,8 +772,21 @@ class SubjectViewModel(
         val ui = _uiState.value
         val guide = ui.guide ?: return
         if (!ui.connected || ui.guideWaiting) return
+        removing = guide.id
         session.send(SessionMessage.GuideRemove(guide.id))
         Timings.mark("guide.remove.sent", guide.id)
+    }
+
+    /**
+     * *Undo* after either phone's ✕ (FR-7.2): asks the photographer's phone to put the last guide back where it was,
+     * unless a guide is on the video again.
+     */
+    fun onUndoRemove() {
+        val ui = _uiState.value
+        val id = lastGuideId ?: return
+        if (!ui.connected || ui.guide != null) return
+        session.send(SessionMessage.GuideRestore(id))
+        Timings.mark("guide.restore.sent", id)
     }
 
     /** The guide-edit mode toggle; there is no mode without a visible guide. */

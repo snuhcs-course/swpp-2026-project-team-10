@@ -94,6 +94,9 @@ sealed interface SessionNotice {
      */
     data class RemoteGuideRemove(val name: String, val guide: ReferenceGuide, val state: GuideState) : SessionNotice
 
+    /** The subject's *Undo* put the guide back: "Joonhyung put the guide back" (FR-7.2, FR-7.4). */
+    data class RemoteGuideRestore(val name: String) : SessionNotice
+
     /** The subject set the brightness: "Joonhyung set brightness to +1"; [index] is the applied exposure index. */
     data class RemoteBrightness(val name: String, val index: Int) : SessionNotice
 
@@ -570,6 +573,8 @@ class SessionViewModel(
 
                                 is RemoteAction.GuideRemove ->
                                     _notices.tryEmit(SessionNotice.RemoteGuideRemove(name, action.guide, action.state))
+
+                                is RemoteAction.GuideRestore -> _notices.tryEmit(SessionNotice.RemoteGuideRestore(name))
 
                                 is RemoteAction.Brightness ->
                                     _notices.tryEmit(SessionNotice.RemoteBrightness(name, action.index))

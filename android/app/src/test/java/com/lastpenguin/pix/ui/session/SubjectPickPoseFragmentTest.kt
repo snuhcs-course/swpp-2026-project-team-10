@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -13,6 +13,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentPickPoseBinding
+import com.lastpenguin.pix.generation.poseGuideId
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.FakePoseCandidateCodec
@@ -323,8 +324,9 @@ class SubjectPickPoseFragmentTest {
         modules.maker.finish(Result.success(guide().copy(id = "saved-pose", source = GuideSource.GENERATED)))
         idle()
 
+        // Named for its set and pose, as the photographer's phone names it (#329).
         assertEquals(
-            listOf("saved-pose" to GuideSource.GENERATED),
+            listOf(poseGuideId("set1", "pose-1") to GuideSource.GENERATED),
             modules.saved.saved.value.map {
                 it.id to it.source
             },
@@ -350,7 +352,7 @@ class SubjectPickPoseFragmentTest {
         idle()
 
         // Turned back into the photographer's portrait frame by the scene's quarter, as the photographer's camera has it.
-        val (kept, _) = runBlocking { modules.saved.load("saved-pose") }.getOrThrow()
+        val (kept, _) = runBlocking { modules.saved.load(poseGuideId("set1", "pose-1")) }.getOrThrow()
         assertEquals(30 to 40, kept.mask.width to kept.mask.height)
     }
 }

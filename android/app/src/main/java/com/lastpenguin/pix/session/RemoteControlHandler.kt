@@ -68,6 +68,9 @@ sealed interface RemoteAction {
     /** The subject removed [guide], which was at [state]: *Undo* on this phone puts it back there (FR-7.2). */
     data class GuideRemove(val guide: ReferenceGuide, val state: GuideState) : RemoteAction
 
+    /** The subject's *Undo* put the removed guide back where it was (FR-7.2). */
+    data object GuideRestore : RemoteAction
+
     /** The subject set the brightness to the exposure index [index] (FR-7.3). */
     data class Brightness(val index: Int) : RemoteAction
 
@@ -144,7 +147,9 @@ sealed interface RemoteAction {
  * opacity with the same step-then-final pattern as a move, and `guide.remove` takes it off the camera, as the
  * toolbar's own controls do; each is the subject's in the echoed `guide.state`, or `guide.clear` for a removal. Like a
  * move, a request for a guide since replaced is dropped, and so is an opacity for a hidden guide. A removal is
- * reported with the guide and where it was, so that *Undo* here can put it back.
+ * reported with the guide and where it was, so that *Undo* here can put it back. The last guide removed, by either
+ * phone ([removedHere] for this one's ✕), is kept for `guide.restore`, the subject's *Undo*, which puts it back unless
+ * another guide went on since.
  *
  * **Shutter (It 5, FR-7.8, #314).** `camera.shutter` is the subject's press. The photo is the Camera screen's to take
  * ([shutter]), as at its own shutter, with its timer when that is on, and every press is answered with
@@ -212,6 +217,14 @@ class RemoteControlHandler(
     // The base brightness a tap to focus asked for, until the camera reports it: its echo is the subject's, without
     // the notice of a brightness the subject chose.
     private var pendingBase: PendingValue<Int>? = null
+
+    // The last guide removed, by either phone, and where it was: what the subject's Undo puts back (FR-7.2).
+    private var removed: Pair<ReferenceGuide, GuideState>? = null
+
+    /** This phone's ✕ took [guide] off the camera, at [state]: the subject's *Undo* can put it back too (FR-7.2). */
+    fun removedHere(guide: ReferenceGuide, state: GuideState) {
+        removed = guide to state
+    }
 
     /** Echoes every applied zoom while [scope] is active, starting with the current one. */
     fun start(scope: CoroutineScope) {
@@ -308,6 +321,7 @@ class RemoteControlHandler(
             is SessionMessage.GuideVisibleSet -> handleGuideVisible(message)
             is SessionMessage.GuideOpacitySet -> handleGuideOpacity(message)
             is SessionMessage.GuideRemove -> handleGuideRemove(message)
+            is SessionMessage.GuideRestore -> handleGuideRestore(message)
             is SessionMessage.ShutterPress -> handleShutter(message)
             is SessionMessage.PoseStart -> handlePoseStart(message)
             else -> Unit
@@ -657,8 +671,23 @@ class RemoteControlHandler(
         val guide = guides.guide.value ?: return
         if (guide.id != request.guideId) return
         val state = guides.state.value
+        removed = guide to state
         guides.setGuide(null)
         confirm(RemoteAction.GuideRemove(guide, state), "guide.remove.applied", guide.id)
+    }
+
+    /**
+     * `guide.restore`: the subject's *Undo* puts back the guide removed last, by either phone, where it was, as this
+     * phone's own *Undo* does; nothing when it names another guide or another went on since (FR-7.2).
+     */
+    private fun handleGuideRestore(request: SessionMessage.GuideRestore) {
+        val (guide, state) = removed ?: return
+        if (guide.id != request.guideId || guides.guide.value != null) return
+        removed = null
+        attributeGuideChanges(Role.SUBJECT)
+        guides.setGuide(guide)
+        guides.update(final = true) { state }
+        confirm(RemoteAction.GuideRestore, "guide.restore.applied", guide.id)
     }
 
     /**

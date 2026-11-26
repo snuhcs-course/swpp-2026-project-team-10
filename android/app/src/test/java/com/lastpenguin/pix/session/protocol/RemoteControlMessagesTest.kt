@@ -29,8 +29,8 @@ import org.junit.Test
  * before it, which is off), and the photographer's own change as a `camera.did` of each value; seconds this Pix does
  * not offer are no action.
  * The guide's panel from either phone (FR-7.2, FR-7.4): the subject's `guide.visible.set`, `guide.opacity.set` (a
- * step when `final` is left out), and `guide.remove`, and the photographer's own hide, show, opacity, and removal as a
- * `camera.did`; an opacity of no number or 0 is no action.
+ * step when `final` is left out), `guide.remove`, and `guide.restore`, and the photographer's own hide, show, opacity,
+ * removal, and Undo as a `camera.did`; an opacity of no number or 0 is no action.
  */
 class RemoteControlMessagesTest {
     private val codec = MessageCodec(clock = { 1_759_212_345_678L })
@@ -133,12 +133,13 @@ class RemoteControlMessagesTest {
             PhotographerAction.GuideVisible(true),
             PhotographerAction.GuideOpacity(0.7f),
             PhotographerAction.GuideRemove,
+            PhotographerAction.GuideRestore,
         )
 
         assertEquals(
             listOf(
                 "zoom", "brightness", "flash", "timer", "timer", "guide.move", "guide",
-                "guide.hide", "guide.show", "guide.opacity", "guide.remove",
+                "guide.hide", "guide.show", "guide.opacity", "guide.remove", "guide.restore",
             ),
             actions.map { it.toMessage().action },
         )
@@ -234,6 +235,8 @@ class RemoteControlMessagesTest {
             "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "opacity": 0.7, "final": true } }"""
         val remove = """{ "v": 3, "t": "guide.remove", "seq": 1, "ts": 1759212356400,
             "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17" } }"""
+        val restore = """{ "v": 3, "t": "guide.restore", "seq": 1, "ts": 1759212358400,
+            "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17" } }"""
         val did = """{ "v": 3, "t": "camera.did", "seq": 23, "ts": 1759212356600,
             "b": { "action": "guide.opacity", "opacity": 0.3 } }"""
 
@@ -243,6 +246,7 @@ class RemoteControlMessagesTest {
             decode(opacity),
         )
         assertEquals(SessionMessage.GuideRemove("5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17"), decode(remove))
+        assertEquals(SessionMessage.GuideRestore("5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17"), decode(restore))
         assertEquals(
             PhotographerAction.GuideOpacity(0.3f),
             (decode(did) as SessionMessage.PhotographerDid).toAction(),
@@ -281,6 +285,7 @@ class RemoteControlMessagesTest {
             SessionMessage.GuideOpacitySet("g", 0.25f),
             SessionMessage.GuideOpacitySet("g", 0.9f, final = true),
             SessionMessage.GuideRemove("g"),
+            SessionMessage.GuideRestore("g"),
         )
 
         for (message in messages) assertEquals(message, decode(codec.encode(message)))

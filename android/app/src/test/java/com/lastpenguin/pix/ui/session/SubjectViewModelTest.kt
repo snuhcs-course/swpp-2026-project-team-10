@@ -87,7 +87,9 @@ import org.junit.Test
  * The guide's panel (FR-7.2): Hide and Show, each a request for the other state that the echo settles; the opacity
  * shown at once, sent in steps, kept over an echo during the drag and settled by the first echo after it, clamped to
  * 10–90 %; ✕ a request; none sent without a guide or a connection, no opacity for a hidden guide, and none for a
- * guide this phone offered that the photographer has not adopted yet, which would drop it (then sent once it has). The
+ * guide this phone offered that the photographer has not adopted yet, which would drop it (then sent once it has).
+ * Undo (FR-7.2): this phone's ✕ said once its guide is gone, not when the photographer's ✕ takes it, nor when another
+ * guide replaces it; Undo asks for the last guide shown, only without a guide on the video and while connected. The
  * photographer's hide, show, opacity, and removal each a line.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -757,6 +759,55 @@ class SubjectViewModelTest {
         }
 
     @Test
+    fun `this phone's remove is said once its guide is gone, and not for the photographer's or a replacement`() =
+        runTest(dispatcher) {
+            val removed = mutableListOf<Unit>()
+            backgroundScope.launch { viewModel.guideRemoved.collect { removed += it } }
+            connect()
+            mirror.setGuide(fakeGuide("g1"))
+            runCurrent()
+
+            viewModel.onRemoveGuide()
+            runCurrent()
+            assertTrue("not before the photographer's phone took it", removed.isEmpty())
+            mirror.setGuide(null)
+            runCurrent()
+            assertEquals(1, removed.size)
+
+            // The photographer's own ✕ is its line, with its own Undo; a replaced guide is no removal.
+            mirror.setGuide(fakeGuide("g2"))
+            runCurrent()
+            mirror.setGuide(null)
+            mirror.setGuide(fakeGuide("g3"))
+            runCurrent()
+            viewModel.onRemoveGuide()
+            mirror.setGuide(fakeGuide("g4"))
+            runCurrent()
+            assertEquals(1, removed.size)
+        }
+
+    @Test
+    fun `Undo asks for the last guide shown, only with no guide on the video and while connected`() =
+        runTest(dispatcher) {
+            connect()
+            mirror.setGuide(fakeGuide("g1"))
+            runCurrent()
+            viewModel.onUndoRemove()
+            mirror.setGuide(null)
+            runCurrent()
+
+            viewModel.onUndoRemove()
+            session.setState(SessionState.Ended(EndReason.CONNECTION_LOST))
+            runCurrent()
+            viewModel.onUndoRemove()
+
+            assertEquals(
+                listOf(SessionMessage.GuideRestore("g1")),
+                session.sent.filterIsInstance<SessionMessage.GuideRestore>(),
+            )
+        }
+
+    @Test
     fun `the panel asks nothing without a guide or a connection, nor an opacity for a hidden guide`() =
         runTest(dispatcher) {
             connect()
@@ -843,6 +894,7 @@ class SubjectViewModelTest {
         session.deliver(SessionMessage.PhotographerDid("guide.show"))
         session.deliver(SessionMessage.PhotographerDid("guide.opacity", opacity = 0.3f))
         session.deliver(SessionMessage.PhotographerDid("guide.remove"))
+        session.deliver(SessionMessage.PhotographerDid("guide.restore"))
         // From a newer photographer, and a ratio that is none.
         session.deliver(SessionMessage.PhotographerDid("lens"))
         session.deliver(SessionMessage.PhotographerDid("zoom", zoom = Float.NaN))
@@ -859,6 +911,7 @@ class SubjectViewModelTest {
                 PhotographerLine.Did(PhotographerAction.GuideVisible(true)),
                 PhotographerLine.Did(PhotographerAction.GuideOpacity(0.3f)),
                 PhotographerLine.Did(PhotographerAction.GuideRemove),
+                PhotographerLine.Did(PhotographerAction.GuideRestore),
             ),
             lines,
         )

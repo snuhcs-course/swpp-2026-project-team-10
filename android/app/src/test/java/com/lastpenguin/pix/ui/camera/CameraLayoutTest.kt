@@ -1291,15 +1291,16 @@ class CameraLayoutTest {
     }
 
     private fun assertTheTipFitsOnSubjectView(binding: FragmentSubjectBinding, font: String) {
-        // The row: the tip at its start, clear of the readout; the toggle at its end.
+        // The row, as Camera's: the readout in the middle, and at the end the tip beside the toggle (#329).
         val row = binding.zoomRow.box()
         val tip = binding.tipButtonFrame.box()
         val readout = binding.zoomReadout.box()
+        val toggle = binding.editGuideButton.box()
         assertTrue("$font: the tip button shows", binding.tipButtonFrame.isShown)
-        // Inside the row's 12 dp of padding.
-        assertEquals("$font: the tip button at the row's start", row.left + 12, tip.left)
-        assertTrue("$font: $tip clear of the readout $readout", tip.right <= readout.left)
-        assertTrue("$font: the readout clear of the toggle", readout.right <= binding.editGuideButton.box().left)
+        // Inside the row's 12 dp of padding, 8 dp apart.
+        assertEquals("$font: the toggle at the row's end", row.right - 12, toggle.right)
+        assertEquals("$font: the tip button beside the toggle", toggle.left - 8, tip.right)
+        assertTrue("$font: the readout $readout clear of the tip $tip", readout.right <= tip.left)
         assertTrue("$font: in the row", tip.top >= row.top && tip.bottom <= row.bottom)
         assertEveryControlAtLeast48(binding.root, "Subject view with a tip, $font")
 

@@ -34,6 +34,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.FlashMode
@@ -49,6 +50,7 @@ import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.FlowProgressView
 import com.lastpenguin.pix.ui.Motion
+import com.lastpenguin.pix.ui.NoticeAction
 import com.lastpenguin.pix.ui.NoticeAnchor
 import com.lastpenguin.pix.ui.NoticeLength
 import com.lastpenguin.pix.ui.PixViewModels
@@ -102,6 +104,7 @@ import com.lastpenguin.pix.ui.settings.renderLatency
 import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
 import com.lastpenguin.pix.ui.settings.tutorialFor
 import com.lastpenguin.pix.ui.showNotice
+import com.lastpenguin.pix.ui.showNoticeOnScreen
 import java.text.DecimalFormat
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -161,6 +164,12 @@ class SubjectFragment :
     private var watchdog: FrameWatchdog? = null
     private var referenceDrag: ReferenceDragController? = null
     private var leaveDialog: AlertDialog? = null
+
+    // "Guide removed" with Undo, by either phone's ✕ (FR-7.2), until a guide is on the video again.
+    private var undoNotice: Snackbar? = null
+
+    // Whether the last render had a guide on the video: one that comes back takes the Undo down.
+    private var guideShown = false
 
     // True while "Leave the session?" is up: it covers this screen without being another destination ([uncovered]).
     private val leaveAsked = MutableStateFlow(false)
@@ -372,6 +381,10 @@ class SubjectFragment :
                     binding.guideOverlay.followLook(settingsViewModel.guideLook, viewModel.uiState.map { it.guide })
                 }
                 launch {
+                    // This phone's ✕ (FR-7.2): the photographer's phone offers the same Undo.
+                    viewModel.guideRemoved.collect { offerUndo(getString(R.string.guide_removed_from_camera)) }
+                }
+                launch {
                     viewModel.photoNotDeleted.collect {
                         showNotice(R.string.photo_not_deleted)
                     }
@@ -412,6 +425,9 @@ class SubjectFragment :
                         binding.guideButton.contentDescription = getString(
                             if (ui.guide == null) R.string.guide_add_description else R.string.guide_change_description,
                         )
+                        // A guide on the video again, put back or another: nothing is left to undo.
+                        if (ui.guide != null && !guideShown) dismissUndo()
+                        guideShown = ui.guide != null
                         // The tip first: whether the guide's panel fits depends on it.
                         renderTip(binding, ui)
                         renderGuideControls(binding, ui)
@@ -864,6 +880,8 @@ class SubjectFragment :
         // A dialog belongs to the activity: one left open would leave a screen that is gone.
         leaveDialog?.dismiss()
         leaveDialog = null
+        dismissUndo()
+        guideShown = false
         countdownRing?.stop()
         countdownRing = null
         turningIcons?.stop()
@@ -1620,6 +1638,21 @@ class SubjectFragment :
         }
     }
 
+    /**
+     * [text], a guide removed by either phone, with *Undo*, which asks the photographer's phone to put it back (FR-7.2).
+     * It goes once a guide is on the video again.
+     */
+    private fun offerUndo(text: String) {
+        dismissUndo()
+        undoNotice =
+            showNoticeOnScreen(text, NoticeLength.UNDO, NoticeAction(R.string.undo) { viewModel.onUndoRemove() })
+    }
+
+    private fun dismissUndo() {
+        undoNotice?.dismiss()
+        undoNotice = null
+    }
+
     /** Asks before leaving, for Back and Leave alike (#298); one tap leaves the photographer's camera for good. */
     private fun confirmLeave() {
         if (leaveDialog?.isShowing == true) return
@@ -1813,13 +1846,15 @@ class SubjectFragment :
                     white,
                 )
 
-                PhotographerAction.GuideRemove ->
-                    showToggleLabel(
-                        binding,
-                        getString(R.string.remote_guide_remove_notice, name),
-                        R.drawable.ic_close,
-                        white,
-                    )
+                // As on the photographer's phone, with Undo (FR-7.2).
+                PhotographerAction.GuideRemove -> offerUndo(getString(R.string.remote_guide_remove_notice, name))
+
+                PhotographerAction.GuideRestore -> showToggleLabel(
+                    binding,
+                    getString(R.string.remote_guide_restore_notice, name),
+                    R.drawable.ic_guide,
+                    white,
+                )
             }
         }
     }

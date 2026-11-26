@@ -625,6 +625,9 @@ class CameraFragment :
                                 notice.name,
                             )
 
+                            is SessionNotice.RemoteGuideRestore ->
+                                getString(R.string.remote_guide_restore_notice, notice.name)
+
                             is SessionNotice.RemoteBrightness ->
                                 getString(R.string.remote_brightness_notice, notice.name, formatEv(notice.index))
 

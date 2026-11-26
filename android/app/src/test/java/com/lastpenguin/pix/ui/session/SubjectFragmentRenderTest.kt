@@ -47,6 +47,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
+import com.lastpenguin.pix.ui.ScreenTestSupport.noticeAction
 import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.shownNoticeView
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
@@ -73,6 +74,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -132,7 +134,9 @@ import org.robolectric.shadows.ShadowDialog
  * filled. The grid on by default and kept off. The tip and guide-edit buttons on glass, the toggle's tinted while on
  * (#298). The guide's panel (FR-7.2): hidden without a guide; with one, above the line that names the camera, Hide and
  * ✕ asking the photographer's phone; a hidden guide (Show, the opacity off); a guide this phone offered, whose Hide,
- * opacity, and ✕ wait until the photographer adopts it, ♥ not. 1:1 (R&S 6.6): the 4:3 around the frame
+ * opacity, and ✕ wait until the photographer adopts it, ♥ not. Undo (FR-7.2): after the photographer's ✕ and after
+ * this phone's, a notice with Undo, which asks for the guide back, and which goes once a guide is on the video again.
+ * 1:1 (R&S 6.6): the 4:3 around the frame
  * dimmed; 3:4 not.
  * What the photographer did (#292): each action a line with their name where the labels show, for a label's time and
  * the focus's for its shorter one; the photographer's pinch named for as long as it, replaced by the ratio's line, gone
@@ -1963,6 +1967,49 @@ class SubjectFragmentRenderTest {
             assertTrue(binding.opacitySlider.isEnabled)
             assertTrue(binding.removeGuideButton.isEnabled)
         }
+    }
+
+    @Test
+    fun aGuideThePhotographerRemoved_offersUndo_whichAsksForItBack_andGoesOnceAGuideIsBack() {
+        val modules = launch()
+        connect(modules)
+        val guide = guide(withReference = false)
+        modules.mirror.setGuide(guide)
+        idle()
+
+        modules.session.deliver(SessionMessage.PhotographerDid("guide.remove"))
+        modules.mirror.setGuide(null)
+        idle()
+        assertEquals(string(R.string.remote_guide_remove_notice, "Dongje"), shownNotice())
+        val undo = checkNotNull(noticeAction())
+        assertEquals(string(R.string.undo), undo.text.toString())
+
+        undo.performClick()
+        idle()
+        assertEquals(
+            listOf(SessionMessage.GuideRestore("guide-1")),
+            modules.session.sent.filterIsInstance<SessionMessage.GuideRestore>(),
+        )
+        modules.mirror.setGuide(guide)
+        idle()
+        assertNull(shownNotice())
+    }
+
+    @Test
+    fun thisPhonesRemove_saysGuideRemovedWithUndo_onceThePhotographersPhoneTookIt() {
+        val modules = launch()
+        connect(modules)
+        modules.mirror.setGuide(guide(withReference = false))
+        idle()
+
+        onScreen { binding, _ -> binding.removeGuideButton.performClick() }
+        idle()
+        assertNull(shownNotice())
+        modules.mirror.setGuide(null)
+        idle()
+
+        assertEquals(string(R.string.guide_removed_from_camera), shownNotice())
+        assertEquals(string(R.string.undo), noticeAction()?.text.toString())
     }
 
     @Test

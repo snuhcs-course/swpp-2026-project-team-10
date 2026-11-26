@@ -54,6 +54,7 @@ object PixViewModels {
                 timerChoice = container.remoteControlHandler.timerChoice,
                 onFocused = container.remoteControlHandler::focusedHere,
                 onDid = container.remoteControlHandler::didHere,
+                onRemoved = container.remoteControlHandler::removedHere,
                 onCountdown = container.remoteControlHandler::countdownHere,
             )
         }

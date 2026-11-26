@@ -77,7 +77,7 @@ import org.robolectric.annotation.GraphicsMode
  * a session connected, with who watches the camera in the line above the shutter for as long as they watch (R&S 6.2),
  * gone while the link reconnects and once the room waits alone, and a peer leaving or dropping, whose notice stays
  * 10 s and goes once the peer is back (#238); the subject's guide panel (FR-7.2): hiding and the opacity named in a
- * notice, and ✕ with Undo, which puts the guide back where it was;
+ * notice, and ✕ with Undo, which puts the guide back where it was, and the subject's own Undo named;
  * and the scene photo step in a session, without End session until it ends, a reconnect included; a guide added from
  * Subject view, with the reference thumbnail its phone sent (#234); the camera switch on a phone with and without a
  * front camera, gone while the
@@ -426,6 +426,18 @@ class CameraFragmentRenderTest {
 
         assertSame(guide, modules.guides.guide.value)
         assertEquals(where, modules.guides.state.value)
+
+        // The subject's own Undo, after another ✕, is named too.
+        modules.session.deliver(SessionMessage.GuideRemove("guide-1"))
+        modules.session.deliver(SessionMessage.GuideRestore("guide-1"))
+        idle()
+        assertSame(guide, modules.guides.guide.value)
+        onScreen { controls, _ ->
+            assertEquals(
+                string(R.string.remote_guide_restore_notice, "Test Account 2"),
+                controls.noticeText.text.toString(),
+            )
+        }
     }
 
     @Test

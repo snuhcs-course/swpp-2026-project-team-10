@@ -326,6 +326,8 @@ class CameraViewModel(
     private val onFocused: (x: Float, y: Float) -> Unit = { _, _ -> },
     /** Tells the subject's phone what was done on this camera (`RemoteControlHandler.didHere`, FR-7.4, #292). */
     private val onDid: (PhotographerAction) -> Unit = {},
+    /** Keeps the guide this phone's ✕ took off, and where it was, for the subject's *Undo* (`removedHere`, FR-7.2). */
+    private val onRemoved: (ReferenceGuide, GuideState) -> Unit = { _, _ -> },
     /**
      * Tells the subject's phone the seconds the timer has left, and 0 when it ends with the photo or is cancelled
      * (`RemoteControlHandler.countdownHere`, FR-1.17).
@@ -1250,7 +1252,9 @@ class CameraViewModel(
      */
     fun onRemoveGuide() {
         val guide = guides.guide.value ?: return
-        removed = guide to guides.state.value
+        val state = guides.state.value
+        removed = guide to state
+        onRemoved(guide, state)
         guides.setGuide(null)
         _guideRemoved.trySend(Unit)
         onDid(PhotographerAction.GuideRemove)
@@ -1273,11 +1277,12 @@ class CameraViewModel(
      */
     fun onUndoRemoteRemove(guide: ReferenceGuide, state: GuideState) = putBack(guide, state)
 
-    /** [guide] at [state] again, unless another guide went on since. */
+    /** [guide] at [state] again, unless another guide went on since; a connected subject's phone is told (FR-7.4). */
     private fun putBack(guide: ReferenceGuide, state: GuideState) {
         if (guides.guide.value != null) return
         guides.setGuide(guide)
         guides.update(final = true) { state }
+        onDid(PhotographerAction.GuideRestore)
     }
 
     override fun onCleared() {

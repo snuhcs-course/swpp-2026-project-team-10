@@ -37,6 +37,9 @@ sealed interface PhotographerAction {
 
     /** ✕ on the guide's toolbar took the guide off the camera. */
     data object GuideRemove : PhotographerAction
+
+    /** *Undo* put the removed guide back where it was. */
+    data object GuideRestore : PhotographerAction
 }
 
 private const val ZOOM = "zoom"
@@ -49,6 +52,7 @@ private const val GUIDE_HIDE = "guide.hide"
 private const val GUIDE_SHOW = "guide.show"
 private const val GUIDE_OPACITY = "guide.opacity"
 private const val GUIDE_REMOVE = "guide.remove"
+private const val GUIDE_RESTORE = "guide.restore"
 
 /** The message that tells the subject's phone of this action. */
 fun PhotographerAction.toMessage(): SessionMessage.PhotographerDid = when (this) {
@@ -61,6 +65,7 @@ fun PhotographerAction.toMessage(): SessionMessage.PhotographerDid = when (this)
     is PhotographerAction.GuideVisible -> SessionMessage.PhotographerDid(if (visible) GUIDE_SHOW else GUIDE_HIDE)
     is PhotographerAction.GuideOpacity -> SessionMessage.PhotographerDid(GUIDE_OPACITY, opacity = opacity)
     PhotographerAction.GuideRemove -> SessionMessage.PhotographerDid(GUIDE_REMOVE)
+    PhotographerAction.GuideRestore -> SessionMessage.PhotographerDid(GUIDE_RESTORE)
 }
 
 /** The action a message names, or null for one this phone does not know or cannot show, as a newer phone may send. */
@@ -75,5 +80,6 @@ fun SessionMessage.PhotographerDid.toAction(): PhotographerAction? = when (actio
     GUIDE_SHOW -> PhotographerAction.GuideVisible(true)
     GUIDE_OPACITY -> PhotographerAction.GuideOpacity(opacity).takeIf { opacity.isFinite() && opacity > 0f }
     GUIDE_REMOVE -> PhotographerAction.GuideRemove
+    GUIDE_RESTORE -> PhotographerAction.GuideRestore
     else -> null
 }

@@ -17,6 +17,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -46,7 +47,9 @@ import org.junit.Test
  * The subject's guide panel (FR-7.2): Hide and Show (applied, attributed, one action each; the state it has already, a
  * guide since replaced, and no guide, all dropped); the opacity (steps applied without an action, the last value
  * clamped to 10–90 % with one action; a hidden guide, a replaced guide, and no number dropped); ✕ (the guide removed
- * and reported with where it was; a replaced guide dropped).
+ * and reported with where it was; a replaced guide dropped). Undo (`guide.restore`): the guide removed last, by the
+ * subject's ✕ or by this phone's (removedHere), back where it was, attributed to the subject, with one action, and only
+ * once; another guide's id, or a guide on the camera meanwhile, changes nothing.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemoteControlHandlerTest {
@@ -838,6 +841,59 @@ class RemoteControlHandlerTest {
 
         assertNull(guides.guide.value)
         assertEquals(listOf<RemoteAction>(RemoteAction.GuideRemove(guide, before)), actions)
+        handler.stop()
+    }
+
+    @Test
+    fun `the subject's Undo puts back the guide removed last, by either phone, where it was, once`() = runTest {
+        val guide = fakeGuide("g1")
+        guides.setGuide(guide)
+        guides.update(final = true) { it.copy(cx = 0.3f, opacity = 0.8f) }
+        val where = guides.state.value
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        runCurrent()
+        handler.handle(SessionMessage.GuideRemove("g1"))
+        runCurrent()
+        attributions.clear()
+        actions.clear()
+
+        handler.handle(SessionMessage.GuideRestore("g1"))
+        runCurrent()
+        assertSame(guide, guides.guide.value)
+        assertEquals(where, guides.state.value)
+        assertEquals(listOf<Role?>(Role.SUBJECT), attributions)
+        assertEquals(listOf<RemoteAction>(RemoteAction.GuideRestore), actions)
+
+        // This phone's own ✕, told by Camera, is put back the same way.
+        handler.removedHere(guide, where)
+        guides.setGuide(null)
+        handler.handle(SessionMessage.GuideRestore("g1"))
+        handler.handle(SessionMessage.GuideRestore("g1"))
+        runCurrent()
+        assertSame(guide, guides.guide.value)
+        assertEquals(2, actions.size)
+        handler.stop()
+    }
+
+    @Test
+    fun `an Undo for another guide, or with a guide on the camera meanwhile, changes nothing`() = runTest {
+        guides.setGuide(fakeGuide("g1"))
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        runCurrent()
+        handler.handle(SessionMessage.GuideRemove("g1"))
+        runCurrent()
+        actions.clear()
+
+        handler.handle(SessionMessage.GuideRestore("g2"))
+        val other = fakeGuide("g3")
+        guides.setGuide(other)
+        handler.handle(SessionMessage.GuideRestore("g1"))
+        runCurrent()
+
+        assertSame(other, guides.guide.value)
+        assertTrue(actions.isEmpty())
         handler.stop()
     }
 

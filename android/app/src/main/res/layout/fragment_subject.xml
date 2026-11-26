@@ -582,8 +582,8 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- The Camera screen's row: the photographer's tip (FR-4.10) at its start, the zoom readout (FR-7.1), and the
-         guide-edit mode toggle, over the bottom of the video (placed in code). -->
+    <!-- The Camera screen's row, as it is there: the zoom readout (FR-7.1) in the middle, and at its end the
+         photographer's tip (FR-4.10) beside the guide-edit mode toggle, over the bottom of the video (placed in code). -->
     <FrameLayout
         android:id="@+id/zoomRow"
         android:layout_width="0dp"
@@ -595,10 +595,27 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
+        <com.lastpenguin.pix.ui.camera.TurningLabel
+            android:id="@+id/zoomReadout"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_zoom_readout"
+            android:focusable="true"
+            android:gravity="center"
+            android:importantForAccessibility="yes"
+            android:minWidth="48dp"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp"
+            android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+            android:textColor="@color/zoom_readout_text"
+            android:textSize="11sp"
+            tools:text="1.0×" />
+
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="start|center_vertical"
+            android:layout_gravity="end|center_vertical"
             android:gravity="center_vertical">
 
             <!-- Opens and closes the photographer's tip while the guide on the video has one (FR-4.10, #213), lit
@@ -608,6 +625,7 @@
                 android:id="@+id/tipButtonFrame"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
                 android:visibility="gone"
                 tools:visibility="visible">
 
@@ -635,41 +653,23 @@
                     app:tint="@color/pix_accent"
                     tools:visibility="visible" />
             </FrameLayout>
+
+            <!-- Shown while a guide is on the video (AD-17); checked while gestures edit the guide. One person's outline,
+                 lit in the guide's color while checked, as on Camera (#271). -->
+            <com.lastpenguin.pix.ui.camera.TurningButton
+                android:id="@+id/editGuideButton"
+                style="@style/Widget.Pix.Button.Icon.OnPhoto"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checkable="true"
+                android:contentDescription="@string/edit_guide"
+                android:visibility="gone"
+                app:backgroundTint="@color/edit_guide_background"
+                app:strokeColor="@color/edit_guide_stroke"
+                app:icon="@drawable/ic_guide_mode"
+                app:iconTint="@color/edit_guide_icon"
+                tools:visibility="visible" />
         </LinearLayout>
-
-        <com.lastpenguin.pix.ui.camera.TurningLabel
-            android:id="@+id/zoomReadout"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_gravity="center"
-            android:background="@drawable/bg_zoom_readout"
-            android:focusable="true"
-            android:gravity="center"
-            android:importantForAccessibility="yes"
-            android:minWidth="48dp"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="8dp"
-            android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
-            android:textColor="@color/zoom_readout_text"
-            android:textSize="11sp"
-            tools:text="1.0×" />
-
-        <!-- Shown while a guide is on the video (AD-17); checked while gestures edit the guide. One person's outline, lit
-             in the guide's color while checked, as on Camera (#271). -->
-        <com.lastpenguin.pix.ui.camera.TurningButton
-            android:id="@+id/editGuideButton"
-            style="@style/Widget.Pix.Button.Icon.OnPhoto"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:checkable="true"
-            android:layout_gravity="end|center_vertical"
-            android:contentDescription="@string/edit_guide"
-            android:visibility="gone"
-            app:backgroundTint="@color/edit_guide_background"
-            app:strokeColor="@color/edit_guide_stroke"
-            app:icon="@drawable/ic_guide_mode"
-            app:iconTint="@color/edit_guide_icon"
-            tools:visibility="visible" />
     </FrameLayout>
 
     <!-- Over the guide-edit mode toggle, for a few seconds after a tap: what a pinch moves now, Guide or Camera

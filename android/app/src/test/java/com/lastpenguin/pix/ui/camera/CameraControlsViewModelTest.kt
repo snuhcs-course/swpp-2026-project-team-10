@@ -59,6 +59,7 @@ import org.junit.Test
  * moved it (once, at its end) and one that did not (nothing); a camera without a flash or without brightness
  * (nothing). The guide's panel (FR-7.4): Hide and Show each, the opacity once at the drag's end with its clamped value,
  * and ✕; nothing without a guide. The subject's ✕ undone: the guide back where it was, and not over a newer guide.
+ * This phone's ✕ handed on with where the guide was, for the subject's Undo; this phone's Undo told.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CameraControlsViewModelTest {
@@ -414,6 +415,32 @@ class CameraControlsViewModelTest {
             ),
             did,
         )
+    }
+
+    @Test
+    fun thisPhonesRemove_isHandedOnWithWhereItWas_andItsUndoIsTold() = runTest(dispatcher) {
+        val removedHere = mutableListOf<Pair<ReferenceGuide, GuideState>>()
+        val did = mutableListOf<PhotographerAction>()
+        model = CameraViewModel(
+            camera,
+            guides,
+            settings,
+            onDid = { did += it },
+            onRemoved = { guide, state -> removedHere += guide to state },
+        )
+        store.put("camera", model)
+        val guide = guide()
+        guides.setGuide(guide)
+        guides.update(final = true) { it.copy(cx = 0.3f) }
+        val where = guides.state.value
+        runCurrent()
+
+        model.onRemoveGuide()
+        model.onUndoRemoveGuide()
+        runCurrent()
+
+        assertEquals(listOf(guide to where), removedHere)
+        assertEquals(listOf(PhotographerAction.GuideRemove, PhotographerAction.GuideRestore), did)
     }
 
     @Test

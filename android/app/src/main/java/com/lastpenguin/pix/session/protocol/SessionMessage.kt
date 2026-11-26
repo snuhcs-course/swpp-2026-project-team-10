@@ -159,6 +159,14 @@ sealed interface SessionMessage {
     @SerialName("guide.remove")
     data class GuideRemove(val guideId: String) : SessionMessage
 
+    /**
+     * The subject's *Undo* after the guide [guideId] was removed, by either phone (FR-7.2): the photographer puts it
+     * back where it was, as its own *Undo* does, unless another guide went on since.
+     */
+    @Serializable
+    @SerialName("guide.restore")
+    data class GuideRestore(val guideId: String) : SessionMessage
+
     @Serializable
     @SerialName("guide.clear")
     data object GuideClear : SessionMessage
@@ -548,8 +556,8 @@ sealed interface SessionMessage {
      * What the photographer did on their own camera (P → S, #292): the subject's phone says it in a line, as the
      * photographer's phone says the subject's (FR-7.4). [action] is a name, kept a string so that a phone that does
      * not know one drops only that line: `zoom` with [zoom], `brightness` with [exposure], `flash` with [flash],
-     * `timer` with [seconds], `guide.move`, `guide`, `guide.hide`, `guide.show`, `guide.opacity` with [opacity], and
-     * `guide.remove` (`PhotographerAction`). The photographer's own focus goes as `camera.focus`.
+     * `timer` with [seconds], `guide.move`, `guide`, `guide.hide`, `guide.show`, `guide.opacity` with [opacity],
+     * `guide.remove`, and `guide.restore` (`PhotographerAction`). The photographer's own focus goes as `camera.focus`.
      */
     @Serializable
     @SerialName("camera.did")

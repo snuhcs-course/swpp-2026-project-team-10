@@ -173,6 +173,7 @@
     <string name="remote_guide_show_notice">%1$s님이 가이드를 표시했어요</string>
     <string name="remote_guide_opacity_notice">%1$s님이 가이드 불투명도를 %2$d%%로 바꿨어요</string>
     <string name="remote_guide_remove_notice">%1$s님이 가이드를 지웠어요</string>
+    <string name="remote_guide_restore_notice">%1$s님이 가이드를 되돌렸어요</string>
     <string name="peer_caption_title">%1$s님</string>
     <string name="peer_caption_status">내 카메라를 보는 중</string>
     <string name="remote_brightness_notice">%1$s님이 밝기를 %2$s에 맞췄어요</string>

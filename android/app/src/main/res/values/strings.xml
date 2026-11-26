@@ -183,6 +183,7 @@
     <string name="remote_guide_show_notice">%1$s showed the guide</string>
     <string name="remote_guide_opacity_notice">%1$s set the guide\'s opacity to %2$d%%</string>
     <string name="remote_guide_remove_notice">%1$s removed the guide</string>
+    <string name="remote_guide_restore_notice">%1$s put the guide back</string>
     <!-- Camera's line above the shutter while a subject watches (R&S 6.2): the subject's name, bold, then the status, as
          Subject view's "Dongje's camera · Live". -->
     <string name="peer_caption_title">%1$s</string>

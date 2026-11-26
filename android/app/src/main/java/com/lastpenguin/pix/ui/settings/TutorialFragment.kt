@@ -253,8 +253,9 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
     TutorialScreen.SUBJECT_VIEW to TutorialTips(
         title = R.string.tutorial_friend_title,
         tips = listOf(
-            // Guide is at the left, as on Camera, so its caption takes the empty middle.
-            TutorialTip(R.string.tutorial_friend_guide, CaptionSide.END, locate = control(R.id.guideButtonIcon)),
+            // Guide and the shutter are where Camera's are (#314), so their captions stand above them as there.
+            TutorialTip(R.string.tutorial_friend_guide, CaptionSide.ABOVE, locate = control(R.id.guideButtonIcon)),
+            TutorialTip(R.string.tutorial_friend_shutter, CaptionSide.ABOVE, locate = control(R.id.shutterButton)),
             TutorialTip(R.string.tutorial_friend_zoom, CaptionSide.ABOVE, locate = control(R.id.zoomReadout)),
             // No button: a tap on the video focuses, and the brightness comes up beside it (#273). In the video's
             // upper half, clear of the row's captions.

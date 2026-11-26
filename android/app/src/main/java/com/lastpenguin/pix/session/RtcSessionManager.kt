@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.os.SystemClock
@@ -921,24 +921,33 @@ class RtcSessionManager(
 
     /**
      * Realtime messages go out at once or not at all. Reliable messages wait in order until hello has gone out and
-     * the channel's buffer is below the limit (Design 2.8, Backpressure).
+     * the channel's buffer is below the limit (Design 2.8, Backpressure). With the realtime channel lost, its messages
+     * go on the reliable one and wait there like the rest, except a moment that is wrong late
+     * (`ChannelRouter.neverLate`): that one is not sent at all. The reliable channel retransmits, so even with
+     * nothing ahead of it a message can arrive long after a drop, and "at once or not at all" holds only on the
+     * channel that never retransmits.
      */
     private fun sendNow(message: SessionMessage): Boolean {
         val client = peer ?: return false
         val text = codec.encode(message)
         val routed = router.channelFor(message)
-        val channel = if (routed == Channel.REALTIME && realtimeLost) Channel.RELIABLE else routed
+        val standIn = routed == Channel.REALTIME && realtimeLost
+        val channel = if (standIn) Channel.RELIABLE else routed
         return when (channel) {
             Channel.REALTIME -> client.send(Channel.REALTIME, text)
 
             Channel.RELIABLE -> {
                 val wait = !helloSent || reliableQueue.isNotEmpty() ||
                     client.bufferedAmount(Channel.RELIABLE) >= BACKPRESSURE_BYTES
-                if (wait) {
-                    reliableQueue.addLast(text)
-                    true
-                } else {
-                    client.send(Channel.RELIABLE, text)
+                when {
+                    standIn && router.neverLate(message) -> false
+
+                    wait -> {
+                        reliableQueue.addLast(text)
+                        true
+                    }
+
+                    else -> client.send(Channel.RELIABLE, text)
                 }
             }
         }

@@ -390,7 +390,7 @@ class PhotoSyncer(
 
     private val _received = Channel<Boolean>(Channel.UNLIMITED)
 
-    /** True when a photo reached this phone's album, false when it could not be saved. */
+    /** True when a photo reached this phone's album; false when it could not be saved, or will not come at all. */
     val received: Flow<Boolean> = _received.receiveAsFlow()
 
     private val _shutters =
@@ -473,8 +473,14 @@ class PhotoSyncer(
                         photoMessagesSeen.update { it + 1 }
                         _shutters.tryEmit(Unit)
                     }
-                    // That photo will not come; one whose shutter never arrived ends no other's wait.
-                    if (message is SessionMessage.PhotoDropped) awaited.update { it.end(message.shot) }
+                    // That photo will not come; one whose shutter never arrived ends no other's wait. It is said,
+                    // once, as a photo that could not be saved here: the photographer's camera may have failed after
+                    // its shutter, which the subject's own press was told was taken (#314).
+                    if (message is SessionMessage.PhotoDropped) {
+                        val told = message.shot in awaited.value.ended
+                        awaited.update { it.end(message.shot) }
+                        if (!told) _received.trySend(false)
+                    }
                 }
             }
             launch {

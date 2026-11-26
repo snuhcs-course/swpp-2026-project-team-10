@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -42,7 +42,7 @@ import org.robolectric.annotation.GraphicsMode
  * on the preview, and by its button again; the ratio's button and the menu's each in the bar's pill while its own panel
  * is open, the menu taking the ratios' place; the timer chosen in the menu (its icon beside the menu's button, its notice,
  * the shutter's spoken label) and off again (both gone); the countdown on the screen (the seconds over the preview,
- * the hint, the other controls dimmed and waiting, the shutter's label for cancelling), its end (one photo, all back),
+ * alone, the other controls dimmed and waiting, the shutter's label for cancelling), its end (one photo, all back),
  * the shutter's second tap (no photo), and the screen stopping (no photo); in a session, each second and the end told
  * to the subject's phone, and End session waiting, dimmed, until the end. The scene photo's countdown: at its end, the
  * shutter waits while the frame is taken, so a tap then starts no second countdown.
@@ -182,7 +182,8 @@ class CameraTimerScreenTest {
         onScreen { controls, _ ->
             assertEquals(View.VISIBLE, controls.countdownPanel.visibility)
             assertEquals("3", controls.countdownNumber.text.toString())
-            assertEquals(string(R.string.countdown_cancel_hint), controls.countdownHint.text.toString())
+            // The number alone: that the shutter cancels is its name here and the tutorial's tip, not a line.
+            assertEquals(1, controls.countdownPanel.childCount)
             assertEquals(string(R.string.shutter_cancel_timer), controls.shutterButton.contentDescription)
             assertTrue(controls.shutterButton.isEnabled)
             for (waiting in listOf(controls.guideButton, controls.galleryButton, controls.switchCameraButton)) {

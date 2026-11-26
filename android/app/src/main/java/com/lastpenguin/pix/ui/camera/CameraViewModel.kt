@@ -35,6 +35,7 @@ import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.PhotoShare
 import com.lastpenguin.pix.session.PhotographerAction
 import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.ShutterOutcome
 import com.lastpenguin.pix.session.ZoomHold
 import com.lastpenguin.pix.telemetry.Telemetry
 import com.lastpenguin.pix.telemetry.TelemetryEvent
@@ -798,6 +799,27 @@ class CameraViewModel(
         if (state.shutterBusy || camera.status.value != CameraStatus.READY) return false
         startCountdown(state.timer.seconds)
         return false
+    }
+
+    /**
+     * The subject's shutter (FR-7.8, #314), which this phone's timer serves as it does its own (FR-1.17): with the
+     * timer off the photo now, with it on the countdown, whose end takes the photo. The subject's phone says what its
+     * press meant, since it may come late. A press to [cancel], made while that phone showed the countdown, stops it
+     * and never takes a photo or starts a countdown: with none left, nothing happens. A press for a photo that meets a
+     * countdown leaves it to its own photo.
+     */
+    fun onSubjectShutter(cancel: Boolean): ShutterOutcome {
+        val state = _uiState.value
+        if (state.countdown != null) {
+            if (!cancel) return ShutterOutcome.TIMER_KEPT
+            cancelCountdown()
+            return ShutterOutcome.TIMER_STOPPED
+        }
+        if (cancel) return ShutterOutcome.TIMER_KEPT
+        if (state.timer == ShutterTimer.OFF) return if (shoot()) ShutterOutcome.TAKEN else ShutterOutcome.REFUSED
+        if (state.shutterBusy || camera.status.value != CameraStatus.READY) return ShutterOutcome.REFUSED
+        startCountdown(state.timer.seconds)
+        return ShutterOutcome.TIMER_STARTED
     }
 
     /**

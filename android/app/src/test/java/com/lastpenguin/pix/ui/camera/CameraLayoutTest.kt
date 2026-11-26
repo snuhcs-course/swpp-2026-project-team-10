@@ -18,6 +18,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.view.PreviewView
@@ -79,6 +80,12 @@ import org.robolectric.annotation.GraphicsMode
 /** How much of a 4:3 image's bottom the scene photo's panel may cover on the S22 when its hint takes two lines, in dp (#231). */
 private const val SCENE_PANEL_OVER_IMAGE_DP = 16
 
+/**
+ * How wide a step's name may be on the S22: twice what is between its icon's middle and the shutter, less 4 dp
+ * (`SubjectFragment.renderPoses`, #314).
+ */
+private const val STEP_NAME_WIDTH_DP = 2 * ((360 - 32) / 3f - 26 - 36 - 4)
+
 /** The large font scales the layout holds at: Android's own steps up to its largest, 200 % (#298). */
 private val LARGE_FONTS = listOf(1.3f, 1.5f, 2f)
 
@@ -97,11 +104,12 @@ private val LARGE_FONTS = listOf(1.3f, 1.5f, 2f)
  * one streamed); a held 1:1 frame dimmed once. The ratios under the top bar, in their shapes, each taking taps on 48 dp.
  * The zoom readout's tap
  * area, the row's height, and every control's, at least 48 dp (NFR-16). Subject view's video placed the same way;
- * its session photo's thumbnail (Iter4-A2) on Guide's icon line, shown before any photo, Guide where Camera's is and
- * the thumbnail as far from the right edge, and the button beside it where Camera's shutter is, clear of both, with each of its labels at
- * font scale 1, 1.3, 1.5, and 2; in that place without a step, whose camera it is and "Live" (#271), on the icons' line and
- * clear of both, with a short name, a Galaxy's own name, and a longer one cut short, and while a photo comes, at both
- * font scales. At font scale 1.3, 1.5, and 2, every text on both screens whole: none cut short or taller than its view (#298),
+ * its session photo's thumbnail (Iter4-A2) on Guide's icon line, shown before any photo, Guide, the shutter, and the
+ * thumbnail where Camera's Guide, shutter, and gallery button are (#314); a step's button beside the thumbnail, which moves
+ * aside for it, clear of the shutter with each of its labels at font scale 1, 1.3, 1.5, and 2; right above the shutter,
+ * whose camera it is and "Live" (#271), on one line or, where they do not fit, the name over "Live", with a short name, a
+ * Galaxy's own name, and a longer one cut short, and while a photo comes, at each font scale; that line gone while the tip
+ * is open. At font scale 1.3, 1.5, and 2, every text on both screens whole: none cut short or taller than its view (#298),
  * with the camera menu open and the timer counting down too (FR-1.17).
  * The session photos' viewer over the whole screen,
  * on Subject view and on Camera.
@@ -978,11 +986,22 @@ class CameraLayoutTest {
         assertEveryControlAtLeast48(binding.root, "Subject view")
     }
 
-    private fun assertThumbnailBesideGuide(fontScale: Float) {
+    /** The middle of the row's right third, in dp: the panel's 16 dp of padding and five sixths of the rest. */
+    private val rightThird = 16 + (360 - 32) * 5f / 6f
+
+    /**
+     * Subject view's bottom row is Camera's (R&S 6.6, #314): Guide and the shutter where Camera's are, at their sizes,
+     * and the thumbnail where Camera's gallery button is, in the middle of the right third. While the photographer's
+     * step lasts, its button stands beside the thumbnail, which moves aside for it, clear of the shutter with each of
+     * its labels.
+     */
+    private fun assertTheRowIsCameras(fontScale: Float) {
         val camera = camera(fontScale).controls
         val camerasGuide = camera.guideButtonIcon.box()
-        val shutter = camera.shutterButton.box()
+        val camerasShutter = camera.shutterButton.box()
+        val camerasGallery = camera.galleryButton.box()
         val binding = subjectView(fontScale)
+        val font = "font $fontScale"
         // Shown from the start, empty until the session's first photo (FR-6.14).
         assertTrue("the thumbnail shows before any photo", binding.galleryButton.isShown)
         // Guide where Camera's is, at its size, within a pixel's rounding (R&S 6.6).
@@ -993,8 +1012,32 @@ class CameraLayoutTest {
         )
         assertEquals(camerasGuide.centerY(), guideIcon.centerY())
         assertEquals(camerasGuide.width(), guideIcon.width())
-        assertCaptionInTheShuttersPlace(binding, shutter, "font $fontScale")
+        // The shutter where Camera's is, at its size.
+        val shutter = binding.shutterButton.box()
+        assertTrue("$font: the shutter shows", binding.shutterButton.isShown)
+        assertTrue(
+            "$font: $shutter where Camera's is, $camerasShutter",
+            abs(shutter.centerX() - camerasShutter.centerX()) <= 1,
+        )
+        assertEquals("$font: on Camera's line", camerasShutter.centerY(), shutter.centerY())
+        assertEquals("$font: Camera's size", camerasShutter.width(), shutter.width())
+        assertEquals("$font: round", shutter.width(), shutter.height())
+        assertEquals("$font: on Guide's icon line", guideIcon.centerY(), shutter.centerY())
+        // The thumbnail alone: as far from the right edge as Guide is from the left, on the icons' line.
+        val alone = binding.galleryButton.box()
+        assertEquals("$font: the thumbnail on Guide's icon line", guideIcon.centerY(), alone.centerY())
+        assertTrue("$font: $alone mirrors $guideIcon", abs((360 - alone.centerX()) - guideIcon.centerX()) <= 1)
+        assertTrue(
+            "$font: $alone where Camera's gallery button is, $camerasGallery",
+            abs(alone.centerX() - camerasGallery.centerX()) <= 1,
+        )
+        assertCaptionAboveTheShutter(binding, shutter, font)
+
+        // As the screen shows a step: its button beside the thumbnail, which makes room.
         binding.pickPoseButton.visibility = View.VISIBLE
+        binding.galleryButton.translationX =
+            SubjectFragment.STEP_BESIDE_THUMBNAIL_DP * binding.root.resources.displayMetrics.density
+        binding.pickPoseLabel.maxWidth = (STEP_NAME_WIDTH_DP * binding.root.resources.displayMetrics.density).toInt()
         val labels = listOf(
             R.string.pick_pose_title,
             R.string.generating_title,
@@ -1005,68 +1048,89 @@ class CameraLayoutTest {
             binding.pickPoseLabel.setText(label)
             idle()
             val thumbnail = binding.galleryButton.box()
-            val guide = binding.guideButton.box()
-            val pick = binding.pickPoseButton.box()
-            val text = "font $fontScale, ${binding.pickPoseLabel.text}"
-            assertEquals("$text: on Guide's icon line", binding.guideButtonIcon.box().centerY(), thumbnail.centerY())
-            // Pick a pose in the shutter's place, clear of Guide and of the thumbnail.
-            assertTrue(
-                "$text: $pick centered where the shutter is, $shutter",
-                abs(pick.centerX() - shutter.centerX()) <= 1,
-            )
-            assertTrue("$text: $guide clear of $pick", guide.right <= pick.left)
-            assertTrue("$text: $pick clear of $thumbnail", pick.right <= thumbnail.left)
-            // As far from the right edge as Guide is from the left: the right third's middle, as on Camera.
-            assertTrue(
-                "$text: $thumbnail mirrors $guideIcon",
-                abs((360 - thumbnail.centerX()) - guideIcon.centerX()) <= 1,
-            )
+            val icon = binding.pickPoseButton.getChildAt(0).box()
+            val name = binding.pickPoseLabel.box()
+            val text = "$font, ${binding.pickPoseLabel.text}"
+            // A name of two lines makes the row taller, and the row's line moves up with all that is on it.
+            val line = binding.guideButtonIcon.box().centerY()
+            val shutterNow = binding.shutterButton.box()
+            // Each 26 dp from the third's middle, the button on the shutter's side.
+            assertTrue("$text: $icon left of the third's middle", abs(icon.centerX() - (rightThird - 26)) <= 1)
+            assertTrue("$text: $thumbnail right of it", abs(thumbnail.centerX() - (rightThird + 26)) <= 1)
+            assertEquals("$text: the step's icon on Guide's icon line", line, icon.centerY())
+            assertEquals("$text: the thumbnail on it too", line, thumbnail.centerY())
+            assertEquals("$text: and the shutter", line, shutterNow.centerY())
+            assertTrue("$text: $icon clear of the thumbnail $thumbnail", icon.right <= thumbnail.left)
             assertTrue("$text: $thumbnail inside the screen", thumbnail.right <= 360 && thumbnail.bottom <= 705)
+            // The name may be wider than its icon, never as far as the shutter, and it is whole on the screen.
+            assertTrue("$text: the shutter $shutterNow clear of $icon", shutterNow.right <= icon.left)
+            assertTrue("$text: the shutter $shutterNow clear of the name $name", shutterNow.right <= name.left)
+            assertTrue("$text: the name $name inside the screen", name.right <= 360 && name.bottom <= 705)
         }
+        binding.galleryButton.translationX = 0f
     }
 
     /**
-     * Without a step, the slot says whose camera this is (#271): centered where Camera's shutter is, on the line of
-     * Guide's icon and the thumbnail, clear of both. A name that fits stays whole; a long one, such as a Galaxy's own
-     * name, is made smaller and then cut short, so "'s camera" stays; a photo on its way changes the second line.
+     * The line that says whose camera this is (#271) is right above the shutter (#314): centered on it, between the
+     * screen's sides, and whole above it. A name that fits stays whole; a long one, such as a Galaxy's own name, is
+     * cut short so "'s camera" stays; where the name and "Live" do not fit one line, the name stands over "Live"; a
+     * photo on its way takes the line.
      */
-    private fun assertCaptionInTheShuttersPlace(binding: FragmentSubjectBinding, shutter: Rect, font: String) {
+    private fun assertCaptionAboveTheShutter(binding: FragmentSubjectBinding, shutter: Rect, font: String) {
         val modules = checkNotNull(subjectModules)
+        val context = binding.root.context
         val names = listOf("Dongje", "길동의 Galaxy S23 Ultra", "Test Account With A Very Long Name")
-        val suffix = binding.root.context.getString(R.string.subject_title, "")
+        val suffix = context.getString(R.string.subject_title, "")
         for (name in names) {
             for (receiving in listOf(false, true)) {
                 modules.session.setState(SessionState.Connected("s1", PeerInfo(name), Role.SUBJECT))
                 idle()
-                binding.cameraCaptionStatus.setText(
-                    if (receiving) R.string.subject_receiving_photo else R.string.subject_live,
-                )
-                binding.cameraCaptionSpinner.visibility = if (receiving) View.VISIBLE else View.GONE
-                binding.cameraCaptionDot.visibility = if (receiving) View.GONE else View.VISIBLE
-                idle()
+                if (receiving) {
+                    // As the screen shows a photo on its way: the spinner and its words alone.
+                    binding.cameraCaption.orientation = LinearLayout.HORIZONTAL
+                    binding.cameraCaptionName.visibility = View.GONE
+                    binding.cameraCaptionSeparator.visibility = View.GONE
+                    binding.cameraCaptionSpinner.visibility = View.VISIBLE
+                    binding.cameraCaptionStatus.setText(R.string.subject_receiving_photo)
+                    idle()
+                }
                 val what = "$font, $name, receiving $receiving"
-                assertTrue("$what: the slot shows", binding.cameraCaption.isShown)
+                assertTrue("$what: the line shows", binding.cameraCaption.isShown)
                 val caption = binding.cameraCaption.box()
-                val icon = binding.guideButtonIcon.box()
-                val thumbnail = binding.galleryButton.box()
                 assertTrue(
-                    "$what: $caption centered where the shutter is",
+                    "$what: $caption centered on the shutter $shutter",
                     abs(caption.centerX() - shutter.centerX()) <= 1,
                 )
-                assertTrue("$what: $caption on the icons' line $icon", abs(caption.centerY() - icon.centerY()) <= 1)
-                assertTrue("$what: and the thumbnail's $thumbnail", abs(caption.centerY() - thumbnail.centerY()) <= 1)
-                assertTrue("$what: clear of Guide", binding.guideButton.box().right <= caption.left)
-                assertTrue("$what: clear of the thumbnail", caption.right <= thumbnail.left)
-                val title = binding.cameraCaptionTitle
-                val text = title.text.toString()
-                if (name == "Dongje") {
-                    assertEquals(binding.root.context.getString(R.string.subject_title, name), text)
+                assertTrue("$what: $caption above the shutter $shutter", caption.bottom <= shutter.top)
+                assertTrue("$what: $caption close to it", shutter.top - caption.bottom <= 24)
+                assertTrue("$what: $caption between the screen's sides", caption.left >= 12 && caption.right <= 348)
+                val status = binding.cameraCaptionStatus
+                assertEquals("$what: \"${status.text}\" whole", 0, status.layout.getEllipsisCount(0))
+                assertTrue("$what: the status in its height", status.layout.height <= status.height + 1)
+                if (receiving) {
+                    assertEquals(context.getString(R.string.subject_receiving_photo), status.text.toString())
+                    assertFalse("$what: the name gives way", binding.cameraCaptionTitle.isShown)
+                } else {
+                    val title = binding.cameraCaptionTitle
+                    val text = title.text.toString()
+                    if (name == "Dongje") assertEquals(context.getString(R.string.subject_title, name), text)
+                    assertTrue("$what: \"$text\" keeps \"$suffix\"", text.endsWith(suffix))
+                    assertEquals("$what: \"$text\" not cut at its end", 0, title.layout.getEllipsisCount(0))
+                    assertEquals("$what: \"$text\" on one line", 1, title.lineCount)
+                    // Within a pixel's rounding, as KoreanScreensTest's check of a cut text.
+                    assertTrue("$what: the name in its height", title.layout.height <= title.height + 1)
+                    assertTrue("$what: the name inside the line", title.box().right <= caption.right + 1)
+                    assertEquals(context.getString(R.string.subject_live), status.text.toString())
+                    // One line while both fit, as at this font with a short name; else the name over "Live".
+                    val oneLine = binding.cameraCaption.orientation == LinearLayout.HORIZONTAL
+                    assertEquals(
+                        "$what: the dot between them on one line",
+                        oneLine,
+                        binding.cameraCaptionSeparator.isShown,
+                    )
+                    if (!oneLine) assertTrue("$what: the name over Live", title.box().bottom <= status.box().top + 1)
+                    if (name == "Dongje" && font == "font 1.0") assertTrue("$what: on one line", oneLine)
                 }
-                assertTrue("$what: \"$text\" keeps \"$suffix\"", text.endsWith(suffix))
-                assertEquals("$what: \"$text\" not cut at its end", 0, title.layout.getEllipsisCount(0))
-                // Within a pixel's rounding, as KoreanScreensTest's check of a cut text.
-                assertTrue("$what: one line in its height", title.layout.height <= title.height + 1)
-                assertEquals("$what: the status line whole", 0, binding.cameraCaptionStatus.layout.getEllipsisCount(0))
             }
         }
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
@@ -1074,12 +1138,12 @@ class CameraLayoutTest {
     }
 
     @Test
-    fun subjectView_theBottomRow_isCamerasRow_guideAtTheLeft_theThumbnailAtTheRight_pickAPoseInTheMiddle() =
-        assertThumbnailBesideGuide(fontScale = 1f)
+    fun subjectView_theBottomRow_isCamerasRow_guideTheShutterAndTheThumbnail_andAStepsButtonBesideIt() =
+        assertTheRowIsCameras(fontScale = 1f)
 
     @Test
     fun subjectView_theBottomRow_isCamerasRow_atLargeFonts() {
-        for (scale in LARGE_FONTS) assertThumbnailBesideGuide(fontScale = scale)
+        for (scale in LARGE_FONTS) assertTheRowIsCameras(fontScale = scale)
     }
 
     /**
@@ -1186,7 +1250,9 @@ class CameraLayoutTest {
         assertTrue("$font: ${words.lineCount} lines", words.lineCount >= 5)
         assertEquals("$font: the last line is whole", 0, words.layout.getEllipsisCount(words.lineCount - 1))
         assertTrue("$font: the text is as tall as its lines", words.height >= words.layout.height)
-        assertTrue("$font: $banner above the caption", banner.bottom <= binding.bottomPanel.box().top)
+        assertTrue("$font: $banner above the shutter's row", banner.bottom <= binding.bottomPanel.box().top)
+        // The open tip takes the place of the line that names the camera (#314), which is back once it closes.
+        assertFalse("$font: the camera's name gives way to the tip", binding.cameraCaption.isShown)
         assertTrue("$font: $banner under the top bar", banner.top >= binding.topBar.box().bottom)
         assertTrue("$font: the row above the banner", binding.zoomRow.box().bottom <= banner.top)
         assertEveryControlAtLeast48(binding.root, "Subject view with the tip open, $font")

@@ -1099,6 +1099,33 @@ class PhotoSyncerTest {
     }
 
     @Test
+    fun `a photo the photographer dropped is said as not saved, once`() = runTest {
+        val (_, _, received) = receiver()
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        runCurrent()
+        assertTrue(received.isEmpty())
+
+        // The camera failed after its shutter, or the photo could not be read or sent (#314).
+        session.deliver(SessionMessage.PhotoDropped("a"))
+        runCurrent()
+        assertEquals(listOf(false), received)
+
+        session.deliver(SessionMessage.PhotoDropped("a"))
+        runCurrent()
+        assertEquals(listOf(false), received)
+    }
+
+    @Test
+    fun `a dropped photo whose shutter was lost is said too`() = runTest {
+        val (_, _, received) = receiver()
+
+        session.deliver(SessionMessage.PhotoDropped("b"))
+        runCurrent()
+
+        assertEquals(listOf(false), received)
+    }
+
+    @Test
     fun `a dropped photo whose shutter was lost ends no other photo's wait`() = runTest {
         val (syncer, _, _) = receiver()
         // The second shutter is lost on the realtime channel, or was pressed while the link reconnected.

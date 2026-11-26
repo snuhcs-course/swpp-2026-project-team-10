@@ -134,7 +134,7 @@ import org.robolectric.shadows.ShadowDialog
  * filled. The grid on by default and kept off. The tip and guide-edit buttons on glass, the toggle's tinted while on
  * (#298). The guide's panel (FR-7.2): hidden without a guide; with one, above the line that names the camera, Hide and
  * ✕ asking the photographer's phone; a hidden guide (Show, the opacity off); a guide this phone offered, whose Hide,
- * opacity, and ✕ wait until the photographer adopts it, ♥ not. Undo (FR-7.2): after the photographer's ✕ and after
+ * opacity, ✕, and the guide-edit toggle wait until the photographer adopts it, ♥ not. Undo (FR-7.2): after the photographer's ✕ and after
  * this phone's, a notice with Undo, which asks for the guide back, and which goes once a guide is on the video again.
  * 1:1 (R&S 6.6): the 4:3 around the frame
  * dimmed; 3:4 not.
@@ -1954,6 +1954,7 @@ class SubjectFragmentRenderTest {
             assertFalse(binding.hideGuideButton.isEnabled)
             assertFalse(binding.opacitySlider.isEnabled)
             assertFalse(binding.removeGuideButton.isEnabled)
+            assertFalse(binding.editGuideButton.isEnabled)
             // ♥ keeps the guide on this phone, which has it already.
             assertTrue(binding.saveGuideButton.isEnabled)
         }
@@ -1966,6 +1967,7 @@ class SubjectFragmentRenderTest {
             assertTrue(binding.hideGuideButton.isEnabled)
             assertTrue(binding.opacitySlider.isEnabled)
             assertTrue(binding.removeGuideButton.isEnabled)
+            assertTrue(binding.editGuideButton.isEnabled)
         }
     }
 

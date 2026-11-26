@@ -10,8 +10,10 @@ import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.guide.ReferenceGuideMaker
+import com.lastpenguin.pix.guide.SavedGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.protocol.PoseSetStep
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -33,7 +35,8 @@ import org.junit.Test
  * (nothing). Subject: a guide on its copy of the camera, its photo arriving after it (kept once the photo is here, not
  * before), one with the photo already (kept at once), one that leaves the video before a photo comes (kept as it was),
  * and another guide's photo (not taken for it). A guide already in the library (left as it is, favorite or not) and one
- * deleted after it was kept (not kept again). The photographer's candidates (each cut out and kept once, under the id
+ * deleted after it was kept (not kept again). Guides that come one after another while one is written (each kept, in
+ * order, none lost to the next). The photographer's candidates (each cut out and kept once, under the id
  * the photographer's phone gives it; a later copy of the set asks again only for its new candidate).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -122,6 +125,34 @@ class SessionGuideKeeperTest {
         }
 
     @Test
+    fun `guides that come one after another while one is being written are each kept`() = runTest(dispatcher) {
+        val slow = SlowStore()
+        SessionGuideKeeper(
+            slow,
+            PoseLibrary(maker, slow, CoroutineScope(dispatcher)),
+            guides,
+            adopted,
+            mirror,
+            references,
+            poses,
+        )
+            .start(backgroundScope)
+        runCurrent()
+
+        mirror.setGuide(fakeGuide("p1").copy(reference = fakeBitmap()))
+        runCurrent()
+        // p1 is still being written while p2 and p3 come.
+        mirror.setGuide(fakeGuide("p2").copy(reference = fakeBitmap()))
+        runCurrent()
+        mirror.setGuide(fakeGuide("p3").copy(reference = fakeBitmap()))
+        runCurrent()
+        slow.written.complete(Unit)
+        runCurrent()
+
+        assertEquals(listOf("p3", "p2", "p1"), slow.saved.value.map { it.id })
+    }
+
+    @Test
     fun `each of the photographer's candidates is cut out and kept once, under the photographer's id for it`() =
         runTest(dispatcher) {
             started()
@@ -138,6 +169,18 @@ class SessionGuideKeeperTest {
             )
             assertTrue(store.saved.value.none { it.favorite })
         }
+
+    /** A library whose writes wait for [written], as a slow disk's would. */
+    private class SlowStore(
+        private val inner: SavedGuideStore = SavedGuideStore.InMemory(),
+    ) : SavedGuideStore by inner {
+        val written = CompletableDeferred<Unit>()
+
+        override suspend fun save(guide: ReferenceGuide, state: GuideState, favorite: Boolean): Result<SavedGuide> {
+            written.await()
+            return inner.save(guide, state, favorite)
+        }
+    }
 
     /** Cuts every image at once into a generated guide with an id of its own, as ML Kit's maker does. */
     private class CuttingMaker : ReferenceGuideMaker {

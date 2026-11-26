@@ -87,7 +87,8 @@ import org.junit.Test
  * The guide's panel (FR-7.2): Hide and Show, each a request for the other state that the echo settles; the opacity
  * shown at once, sent in steps, kept over an echo during the drag and settled by the first echo after it, clamped to
  * 10–90 %; ✕ a request; none sent without a guide or a connection, no opacity for a hidden guide, and none for a
- * guide this phone offered that the photographer has not adopted yet, which would drop it (then sent once it has).
+ * guide this phone offered that the photographer has not adopted yet, which would drop it (then sent once it has);
+ * neither guide-edit mode nor a move for it meanwhile.
  * Undo (FR-7.2): this phone's ✕ said once its guide is gone, not when the photographer's ✕ takes it, nor when another
  * guide replaces it; Undo asks for the last guide shown, only without a guide on the video and while connected. The
  * photographer's hide, show, opacity, and removal each a line.
@@ -749,8 +750,17 @@ class SubjectViewModelTest {
             assertTrue(session.sent.none { it is SessionMessage.GuideVisibleSet || it is SessionMessage.GuideRemove })
             assertTrue(opacities().isEmpty())
 
+            // Nor guide-edit mode, nor a move, which the photographer would drop as well.
+            offered.setGuideEditing(true)
+            assertFalse(offered.uiState.value.guideEditing)
+            offered.onGuideGesture(0.1f, 0f, 1f, final = true)
+            assertTrue(moves().isEmpty())
+
             offering.value = null
             runCurrent()
+            offered.setGuideEditing(true)
+            offered.onGuideGesture(0.1f, 0f, 1f, final = true)
+            assertEquals(listOf("g1"), moves().map { it.guideId })
             offered.onHideToggle()
             assertEquals(
                 listOf(SessionMessage.GuideVisibleSet("g1", false)),

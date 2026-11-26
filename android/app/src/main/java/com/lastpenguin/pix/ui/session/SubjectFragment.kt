@@ -417,7 +417,8 @@ class SubjectFragment :
                         // Checked before enabled: MaterialButton ignores setChecked while it is disabled, so a
                         // hidden guide would leave the toggle drawn as on (found by SubjectFragmentRenderTest).
                         binding.editGuideButton.isChecked = ui.guideEditing
-                        binding.editGuideButton.isEnabled = ui.connected && ui.guideState.visible
+                        // Nor while a guide this phone offered waits for the photographer's phone (FR-7.2).
+                        binding.editGuideButton.isEnabled = ui.connected && ui.guideState.visible && !ui.guideWaiting
                         if (ui.guide == null) binding.pinchModeLabel.isVisible = false
                         // Guide-colored once a guide is on the video; it then replaces the guide on both phones.
                         binding.guideButton.isActivated = ui.guide != null

@@ -399,7 +399,10 @@ class SubjectViewModel(
             receivingPhoto.collect { receiving -> _uiState.update { it.copy(receivingPhoto = receiving) } }
         }
         viewModelScope.launch {
-            offering.collect { id -> _uiState.update { it.copy(offeredGuide = id) } }
+            offering.collect { id ->
+                // A guide that waits for the photographer's phone cannot be edited yet: its moves would be dropped.
+                _uiState.update { it.copy(offeredGuide = id, guideEditing = it.guideEditing && it.guide?.id != id) }
+            }
         }
         viewModelScope.launch {
             sessionPhotos.collect { photos ->
@@ -789,10 +792,13 @@ class SubjectViewModel(
         Timings.mark("guide.restore.sent", id)
     }
 
-    /** The guide-edit mode toggle; there is no mode without a visible guide. */
+    /**
+     * The guide-edit mode toggle; there is no mode without a visible guide, nor for a guide this phone offered that the
+     * photographer's phone has not adopted yet, which would drop its moves.
+     */
     fun setGuideEditing(on: Boolean) {
         _uiState.update {
-            val editing = on && it.guide != null && it.guideState.visible
+            val editing = on && it.guide != null && it.guideState.visible && !it.guideWaiting
             // The video's touches are the guide's then, so the bar that a tap brought goes (FR-7.7).
             it.copy(guideEditing = editing, brightnessOpen = it.brightnessOpen && !editing)
         }
@@ -807,7 +813,7 @@ class SubjectViewModel(
     fun onGuideGesture(dx: Float, dy: Float, scale: Float, final: Boolean) {
         val ui = _uiState.value
         val guide = ui.guide
-        if (guide == null || !ui.guideEditing || !ui.connected) {
+        if (guide == null || !ui.guideEditing || !ui.connected || ui.guideWaiting) {
             if (final) guideSender.cancel()
             return
         }

@@ -82,6 +82,7 @@ import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.RemoteVideo
 import com.lastpenguin.pix.session.RtcSessionManager
+import com.lastpenguin.pix.session.SessionGuideKeeper
 import com.lastpenguin.pix.session.SessionIdentity
 import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.SessionState
@@ -302,6 +303,18 @@ class AppContainer(
             val promptHistory = DataStorePromptHistory(appContext, appScope)
             promptHistory.followSubjectSets(descriptionSyncer.started, poseSyncer.mirror, poseSyncer.verdicts, appScope)
             val poseTips = PoseTips(poseTipper, guideRepository.guide, appScope, screenLanguage)
+            val poseLibrary = PoseLibrary(referenceGuideMaker, savedGuideStore, appScope)
+            // In a session, each phone keeps what the other keeps by itself: the guides that go on the camera and every
+            // pose candidate (#297), whichever screen is in front.
+            SessionGuideKeeper(
+                savedGuideStore,
+                poseLibrary,
+                guideRepository,
+                guideSyncer.adopted,
+                mirrorGuideRepository,
+                mirrorReference.reference,
+                poseSyncer.mirror,
+            ).start(appScope)
             val phonePhotos = PhonePhotos(
                 appContext.contentResolver,
                 appScope,
@@ -333,7 +346,7 @@ class AppContainer(
                 mirrorReference = mirrorReference,
                 referenceGuideMaker = referenceGuideMaker,
                 savedGuideStore = savedGuideStore,
-                poseLibrary = PoseLibrary(referenceGuideMaker, savedGuideStore, appScope),
+                poseLibrary = poseLibrary,
                 poseGenerator = RemotePoseGenerator(pixApi),
                 personDetector = RuleBasedPersonDetector(MlKitPersonSignals()),
                 poseTipper = poseTipper,

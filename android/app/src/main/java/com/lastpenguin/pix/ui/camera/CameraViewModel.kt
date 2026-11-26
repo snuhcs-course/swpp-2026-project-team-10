@@ -326,6 +326,8 @@ class CameraViewModel(
     private val onFocused: (x: Float, y: Float) -> Unit = { _, _ -> },
     /** Tells the subject's phone what was done on this camera (`RemoteControlHandler.didHere`, FR-7.4, #292). */
     private val onDid: (PhotographerAction) -> Unit = {},
+    /** Keeps the guide this phone's ✕ took off, and where it was, for the subject's *Undo* (`removedHere`, FR-7.2). */
+    private val onRemoved: (ReferenceGuide, GuideState) -> Unit = { _, _ -> },
     /**
      * Tells the subject's phone the seconds the timer has left, and 0 when it ends with the photo or is cancelled
      * (`RemoteControlHandler.countdownHere`, FR-1.17).
@@ -1156,10 +1158,14 @@ class CameraViewModel(
         guideGestureMoved = false
     }
 
-    /** From the opacity slider; the repository keeps it within 10–90% (FR-3.4). */
+    /**
+     * From the opacity slider; the repository keeps it within 10–90% (FR-3.4). A connected subject's phone is told the
+     * value the drag left (FR-7.4).
+     */
     fun onOpacityChange(opacity: Float, final: Boolean) {
         if (!opacity.isFinite()) return
         guides.update(final) { it.copy(opacity = opacity) }
+        if (final && guides.guide.value != null) onDid(PhotographerAction.GuideOpacity(guides.state.value.opacity))
     }
 
     /**
@@ -1169,7 +1175,9 @@ class CameraViewModel(
     fun onHideToggle() {
         if (_uiState.value.guide == null) return
         guides.update(final = true) { it.copy(visible = !it.visible) }
-        _toggleLabels.trySend(if (guides.state.value.visible) ToggleLabel.GuideShown else ToggleLabel.GuideHidden)
+        val visible = guides.state.value.visible
+        _toggleLabels.trySend(if (visible) ToggleLabel.GuideShown else ToggleLabel.GuideHidden)
+        onDid(PhotographerAction.GuideVisible(visible))
     }
 
     /**
@@ -1244,9 +1252,12 @@ class CameraViewModel(
      */
     fun onRemoveGuide() {
         val guide = guides.guide.value ?: return
-        removed = guide to guides.state.value
+        val state = guides.state.value
+        removed = guide to state
+        onRemoved(guide, state)
         guides.setGuide(null)
         _guideRemoved.trySend(Unit)
+        onDid(PhotographerAction.GuideRemove)
     }
 
     /**
@@ -1257,9 +1268,21 @@ class CameraViewModel(
     fun onUndoRemoveGuide() {
         val (guide, state) = removed ?: return
         removed = null
+        putBack(guide, state)
+    }
+
+    /**
+     * *Undo* on "Joonhyung removed the guide" (FR-7.2): puts back the guide the subject's ✕ took off, as
+     * [onUndoRemoveGuide] does for this phone's own.
+     */
+    fun onUndoRemoteRemove(guide: ReferenceGuide, state: GuideState) = putBack(guide, state)
+
+    /** [guide] at [state] again, unless another guide went on since; a connected subject's phone is told (FR-7.4). */
+    private fun putBack(guide: ReferenceGuide, state: GuideState) {
         if (guides.guide.value != null) return
         guides.setGuide(guide)
         guides.update(final = true) { state }
+        onDid(PhotographerAction.GuideRestore)
     }
 
     override fun onCleared() {

@@ -632,8 +632,10 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Right above the shutter's row: remote action notices, the pose tip, and the guide's controls. In
-         the space below the image when they fit there, and over the image when it reaches the controls (R&S 6.2). -->
+    <!-- Right above the shutter's row: remote action notices, the pose tip, the guide's controls, and in a session
+         the line that says who watches. In the space below the image when they fit there, and over the image when it
+         reaches the controls (R&S 6.2). 4 dp over the row, as on Subject view, so the guide's controls keep clear of
+         the image above them. -->
     <LinearLayout
         android:id="@+id/bottomOverlays"
         android:layout_width="0dp"
@@ -642,7 +644,7 @@
         android:orientation="vertical"
         android:outlineProvider="none"
         android:paddingHorizontal="12dp"
-        android:paddingBottom="8dp"
+        android:paddingBottom="4dp"
         android:translationZ="1dp"
         app:layout_constraintBottom_toTopOf="@id/bottomPanel"
         app:layout_constraintEnd_toEndOf="parent"
@@ -817,12 +819,84 @@
                     android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
+
+        <!-- While a subject watches, right above the shutter, as Subject view's line that names the camera (R&S 6.2):
+             who watches, and that they watch this camera live. At a font too large for one line, the name stands over
+             the rest (SessionCaption). -->
+        <LinearLayout
+            android:id="@+id/peerCaption"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:minHeight="24dp"
+            android:orientation="horizontal"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical">
+
+                <!-- Red, as the live light over the image. -->
+                <ImageView
+                    android:id="@+id/peerCaptionDot"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:layout_marginEnd="6dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_status_dot"
+                    app:tint="@color/pix_recording" />
+
+                <!-- A name too long for the line is cut short (SessionCaption). -->
+                <TextView
+                    android:id="@+id/peerCaptionTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+                    android:textColor="@color/pix_text"
+                    android:textSize="14sp"
+                    tools:text="Joonhyung" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/peerCaptionSeparator"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:importantForAccessibility="no"
+                    android:includeFontPadding="false"
+                    android:text="@string/caption_separator"
+                    android:textAppearance="@style/TextAppearance.Pix.Label"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/peerCaptionStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:text="@string/peer_caption_status"
+                    android:textAppearance="@style/TextAppearance.Pix.Label"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
     </LinearLayout>
 
     <!-- The applied zoom (FR-1.3), which a pinch on the preview changes, the pose tip's button, and the guide-edit
          mode toggle, over the bottom of the image whatever the ratio, above the panels below when they reach into it
-         (placed in code); the same row as Subject view, which adds Save guide. The readout and the buttons are on glass,
-         so they show on a bright scene (#298). The readout keeps the Zoom in / Zoom out accessibility actions. -->
+         (placed in code); the same row as Subject view. The readout and the buttons are on glass, so they show on a
+         bright scene (#298). The readout keeps the Zoom in / Zoom out accessibility actions. -->
     <FrameLayout
         android:id="@+id/zoomRow"
         android:layout_width="0dp"

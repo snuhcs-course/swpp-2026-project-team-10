@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -18,6 +18,7 @@ import com.lastpenguin.pix.camera.FrameSink
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideSource
+import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.session.PhotographerAction
@@ -36,6 +37,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -55,7 +57,9 @@ import org.junit.Test
  * clamped to the camera's range) and a quick step (its step); a drag for the brightness (nothing at its steps, its end
  * clamped) and each tap on the flash; not the base brightness a tap to focus puts back; a gesture on the guide that
  * moved it (once, at its end) and one that did not (nothing); a camera without a flash or without brightness
- * (nothing).
+ * (nothing). The guide's panel (FR-7.4): Hide and Show each, the opacity once at the drag's end with its clamped value,
+ * and ✕; nothing without a guide. The subject's ✕ undone: the guide back where it was, and not over a newer guide.
+ * This phone's ✕ handed on with where the guide was, for the subject's Undo; this phone's Undo told.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CameraControlsViewModelTest {
@@ -383,6 +387,82 @@ class CameraControlsViewModelTest {
         did.clear()
         model.onGuideGesture(0f, 0f, 1f, final = true)
         assertTrue(did.isEmpty())
+    }
+
+    @Test
+    fun theGuidePanel_isToldAtEachTap_andTheOpacityOnceAtItsEnd() = runTest(dispatcher) {
+        val did = startTelling()
+        runCurrent()
+        model.onHideToggle()
+        model.onOpacityChange(0.7f, final = true)
+        model.onRemoveGuide()
+        assertTrue(did.isEmpty())
+        guides.setGuide(guide())
+        runCurrent()
+
+        model.onHideToggle()
+        model.onHideToggle()
+        model.onOpacityChange(0.6f, final = false)
+        model.onOpacityChange(0.95f, final = true)
+        model.onRemoveGuide()
+
+        assertEquals(
+            listOf(
+                PhotographerAction.GuideVisible(false),
+                PhotographerAction.GuideVisible(true),
+                PhotographerAction.GuideOpacity(GuideState.MAX_OPACITY),
+                PhotographerAction.GuideRemove,
+            ),
+            did,
+        )
+    }
+
+    @Test
+    fun thisPhonesRemove_isHandedOnWithWhereItWas_andItsUndoIsTold() = runTest(dispatcher) {
+        val removedHere = mutableListOf<Pair<ReferenceGuide, GuideState>>()
+        val did = mutableListOf<PhotographerAction>()
+        model = CameraViewModel(
+            camera,
+            guides,
+            settings,
+            onDid = { did += it },
+            onRemoved = { guide, state -> removedHere += guide to state },
+        )
+        store.put("camera", model)
+        val guide = guide()
+        guides.setGuide(guide)
+        guides.update(final = true) { it.copy(cx = 0.3f) }
+        val where = guides.state.value
+        runCurrent()
+
+        model.onRemoveGuide()
+        model.onUndoRemoveGuide()
+        runCurrent()
+
+        assertEquals(listOf(guide to where), removedHere)
+        assertEquals(listOf(PhotographerAction.GuideRemove, PhotographerAction.GuideRestore), did)
+    }
+
+    @Test
+    fun undoOfTheSubjectsRemove_putsTheGuideBackWhereItWas_butNotOverANewerGuide() = runTest(dispatcher) {
+        start()
+        val removed = guide()
+        guides.setGuide(removed)
+        guides.update(final = true) { it.copy(cx = 0.3f, opacity = 0.8f) }
+        val where = guides.state.value
+        guides.setGuide(null)
+        runCurrent()
+
+        model.onUndoRemoteRemove(removed, where)
+        runCurrent()
+        assertSame(removed, model.uiState.value.guide)
+        assertEquals(where, model.uiState.value.guideState)
+
+        val newer = guide()
+        guides.setGuide(newer)
+        model.onUndoRemoteRemove(removed, where)
+        runCurrent()
+        assertSame(newer, model.uiState.value.guide)
     }
 
     @Test

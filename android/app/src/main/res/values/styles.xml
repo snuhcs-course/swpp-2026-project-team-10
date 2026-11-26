@@ -684,8 +684,15 @@
     </style>
 
     <!-- Material's 12 dp set again as start and end: the theme's materialButtonStyle gives every button 20 dp there,
-         which would win over the left and right of Material's dialog style. -->
+         which would win over the left and right of Material's dialog style. The row of buttons is 24 dp in from the
+         dialog's sides, as the title is, so the 12 dp end margin taken back puts the last button's text 24 dp from the
+         right edge, as far in as the title is from the left; 20 dp at the start keeps the buttons' texts 32 dp apart, and
+         stacked buttons stay in line. -->
     <style name="Widget.Pix.Button.Dialog" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:layout_marginStart">20dp</item>
+        <item name="android:layout_marginLeft">20dp</item>
+        <item name="android:layout_marginEnd">-12dp</item>
+        <item name="android:layout_marginRight">-12dp</item>
         <item name="android:paddingStart">12dp</item>
         <item name="android:paddingEnd">12dp</item>
         <item name="android:textColor">@color/button_text_text</item>

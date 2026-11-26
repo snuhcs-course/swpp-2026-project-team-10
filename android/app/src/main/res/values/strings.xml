@@ -179,8 +179,15 @@
     <string name="photographer_timer_label">%1$s is taking a photo</string>
     <string name="remote_guide_move_notice">%1$s moved the guide</string>
     <string name="remote_guide_notice">%1$s set a pose guide</string>
-    <!-- For 3 s on Camera as a subject connects (#271). -->
-    <string name="peer_watching_notice">%1$s is watching your camera</string>
+    <string name="remote_guide_hide_notice">%1$s hid the guide</string>
+    <string name="remote_guide_show_notice">%1$s showed the guide</string>
+    <string name="remote_guide_opacity_notice">%1$s set the guide\'s opacity to %2$d%%</string>
+    <string name="remote_guide_remove_notice">%1$s removed the guide</string>
+    <string name="remote_guide_restore_notice">%1$s put the guide back</string>
+    <!-- Camera's line above the shutter while a subject watches (R&S 6.2): the subject's name, bold, then the status, as
+         Subject view's "Dongje's camera · Live". -->
+    <string name="peer_caption_title">%1$s</string>
+    <string name="peer_caption_status">Watching your camera</string>
     <string name="remote_brightness_notice">%1$s set brightness to %2$s</string>
     <string name="remote_focus_notice">%1$s set the focus</string>
     <string name="remote_shutter_notice">%1$s took a photo</string>

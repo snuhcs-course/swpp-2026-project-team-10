@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.settings
 
 import android.app.Dialog
@@ -173,8 +173,8 @@ private fun pointOn(@IdRes id: Int, x: Float, y: Float): (View) -> Rect? = { roo
 /** The touch point's size on the guide and on the video. */
 private const val TOUCH_POINT_DP = 56
 
-/** Where Subject view's focus tip points on the video: its middle, a third of the way down. */
-private const val FOCUS_TIP_X = 0.5f
+/** Where Subject view's focus tip points on the video: left of its middle, a third of the way down. */
+private const val FOCUS_TIP_X = 0.28f
 private const val FOCUS_TIP_Y = 0.33f
 
 /** The tips of each screen (FR-10.4), in the order they are placed: a caption placed first keeps the nearest place. */
@@ -258,10 +258,11 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
             TutorialTip(R.string.tutorial_friend_shutter, CaptionSide.ABOVE, locate = control(R.id.shutterButton)),
             TutorialTip(R.string.tutorial_friend_zoom, CaptionSide.ABOVE, locate = control(R.id.zoomReadout)),
             // No button: a tap on the video focuses, and the brightness comes up beside it (#273). In the video's
-            // upper half, clear of the row's captions.
+            // upper half with its caption beside it: above it is the title, and below it the zoom row's caption, which
+            // the guide's panel raises.
             TutorialTip(
                 R.string.tutorial_friend_focus,
-                CaptionSide.BELOW,
+                CaptionSide.END,
                 locate = pointOn(R.id.videoContainer, FOCUS_TIP_X, FOCUS_TIP_Y),
             ),
             TutorialTip(R.string.tutorial_friend_move, CaptionSide.ABOVE, locate = control(R.id.editGuideButton)),

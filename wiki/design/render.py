@@ -1,4 +1,4 @@
-# AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+# AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 """Render the drawings in wiki/design/ to the images the wiki pages show.
 
 Each drawing has one image in wiki/images/, named after it:
@@ -23,7 +23,10 @@ that `wireframes/ko.json` lists under `notes` stay in English, except where they
 the button an arrow starts from: that part is marked `data-ui` (`tap <span data-ui>Shoot together</span>`) and becomes
 the same Korean as on the screen. A screen's text that is one of the English strings of
 `android/app/src/main/res/values/strings.xml`, in any case and with its arguments filled in, becomes that string's
-Korean from `values-ko`; a quantity string's English forms ("1 invite", "2 invites") become its Korean `other`. The
+Korean from `values-ko`; a quantity string's English forms ("1 invite", "2 invites") become its Korean `other`. A
+string that is its argument alone, such as Camera's caption title (`%1$s`, in Korean `%1$s님`), would match every text,
+so it matches none: the text names it in its element (`<span data-string="peer_caption_title">Test Account 2</span>`)
+and takes its Korean around itself. The
 rest, such as the screens the app does not have yet, is in ko.json under the flow's name, which also keeps the names and
 Pix IDs of the flow's people as they are. A screen's text with a Latin letter that neither gives, or an entry the flow
 no longer uses, stops the render, so ko.json changes with the drawing; render the flows again after a Korean string
@@ -81,6 +84,7 @@ ARGUMENT = re.compile(r"%(\d+)\$([sd])")
 VOID = {"br", "hr", "img", "input", "link", "meta", "wbr"}
 # An element outside the screens whose text is a screen's own, such as the button an arrow starts from.
 QUOTED = re.compile(r"<[a-zA-Z][\w-]*\b[^>]*\bdata-ui\b")
+NAMED = re.compile(r'\bdata-string="(\w+)"')
 CHROME_PATHS = [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     "google-chrome",
@@ -139,9 +143,12 @@ class Korean:
         self.used: set[str] = set()
         english, english_arrays, english_plurals = android_strings("values")
         korean, korean_arrays, korean_plurals = android_strings("values-ko")
+        self.named = korean
         self.strings: dict[str, str] = {}
         formats = []
         for name, text in english.items():
+            if ARGUMENT.search(text) and not clean(ARGUMENT.sub("", text)):
+                continue  # its argument alone: it would match every text, so only data-string names it
             if ARGUMENT.search(text):
                 formats.append((self.pattern(text), korean.get(name), text))
             elif name in korean:
@@ -164,6 +171,11 @@ class Korean:
             argument = r"\d+" if parts[i + 1] == "d" else ".+?"
             regex += f"(?P<a{parts[i]}>{argument})" + re.escape(parts[i + 2])
         return re.compile(regex.replace("%%", "%"), re.IGNORECASE)
+
+    def around(self, name: str, text: str) -> str | None:
+        """The Korean of the app's string [name] with [text] as its argument, or None when it has no Korean."""
+        korean = self.named.get(name)
+        return None if korean is None else ARGUMENT.sub(lambda _: clean(text), korean).replace("%%", "%")
 
     def __call__(self, text: str) -> str | None:
         """The Korean of [text], or None when neither the app nor ko.json has it."""
@@ -250,7 +262,8 @@ def korean_page(source: Path) -> str:
         # A text without a Latin letter stays, unless ko.json gives it another: a count that differs with the language.
         if not LATIN.search(text) and clean(text).casefold() not in korean.entries:
             continue
-        translated = korean(text)
+        named = NAMED.search(parts[i - 1])
+        translated = korean.around(named.group(1), text) if named else korean(text)
         if translated is None:
             missing.append(clean(text))
         elif translated != text.strip():

@@ -42,9 +42,9 @@ class ChannelRouter {
     /**
      * True for a moment that is wrong late: the subject's press of the shutter and their start of AI poses, each given
      * up by the subject's phone after 2 s (#314, #276). On the realtime channel such a message goes at once or not at
-     * all. With that channel lost the reliable one carries the realtime messages (Design 2.6.7), and there this one is
-     * sent only while nothing waits ahead of it, never queued: kept back, it would take a photo, or open the scene
-     * photo's step, once the subject was told that nothing happened.
+     * all. With that channel lost the reliable one carries the realtime messages (Design 2.6.7), but not this one,
+     * which is then not sent: the reliable channel queues and retransmits, so the message could take a photo, or open
+     * the scene photo's step, once the subject was told that nothing happened.
      */
     fun neverLate(message: SessionMessage): Boolean =
         message is SessionMessage.ShutterPress || message is SessionMessage.PoseStart

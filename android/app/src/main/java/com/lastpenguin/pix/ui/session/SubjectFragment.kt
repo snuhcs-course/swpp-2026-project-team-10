@@ -3,6 +3,7 @@ package com.lastpenguin.pix.ui.session
 
 import android.animation.Animator
 import android.animation.ValueAnimator
+import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
@@ -24,6 +25,7 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.Accessibilit
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -153,6 +155,9 @@ class SubjectFragment :
     private var watchdog: FrameWatchdog? = null
     private var referenceDrag: ReferenceDragController? = null
     private var leaveDialog: AlertDialog? = null
+
+    // True while "Leave the session?" is up: it covers this screen without being another destination ([uncovered]).
+    private val leaveAsked = MutableStateFlow(false)
     private var turningIcons: TurningIcons? = null
     private var photoViewer: PhotoViewer? = null
     private var toggleLabelJob: Job? = null
@@ -971,7 +976,8 @@ class SubjectFragment :
 
     /**
      * Whether this screen itself is what its user looks at: the current destination, so not under a sheet such as Add
-     * a pose guide, which leaves it started, and not under its own photos.
+     * a pose guide, which leaves it started, and not under its own photos or a dialog of its own, "Leave the session?"
+     * or the tutorial's tips. A new dialog of this screen belongs here too.
      */
     private fun uncovered(): Flow<Boolean> {
         // Without a navigation controller, as in a screen test, nothing can cover it but its photos.
@@ -987,8 +993,27 @@ class SubjectFragment :
                 awaitClose { nav.removeOnDestinationChangedListener(listener) }
             }
         }
-        return combine(onTop, viewModel.uiState.map { it.photosOpen }) { top, photos -> top && !photos }
-            .distinctUntilChanged()
+        val photos = viewModel.uiState.map { it.photosOpen }
+        return combine(onTop, photos, leaveAsked, tutorialOver()) { top, open, leaving, tips ->
+            top && !open && !leaving && !tips
+        }.distinctUntilChanged()
+    }
+
+    /** Whether the tutorial's tips are over this screen: a child dialog, so the destination stays this one. */
+    private fun tutorialOver(): Flow<Boolean> = callbackFlow {
+        val fragments = childFragmentManager
+        val watcher = object : FragmentManager.FragmentLifecycleCallbacks() {
+            override fun onFragmentAttached(manager: FragmentManager, fragment: Fragment, context: Context) {
+                if (fragment is TutorialFragment) trySend(true)
+            }
+
+            override fun onFragmentDetached(manager: FragmentManager, fragment: Fragment) {
+                if (fragment is TutorialFragment) trySend(false)
+            }
+        }
+        trySend(TutorialFragment.over(this@SubjectFragment) != null)
+        fragments.registerFragmentLifecycleCallbacks(watcher, false)
+        awaitClose { fragments.unregisterFragmentLifecycleCallbacks(watcher) }
     }
 
     /**
@@ -1462,7 +1487,9 @@ class SubjectFragment :
             .setTitle(R.string.leave_session_title)
             .setPositiveButton(R.string.leave) { _, _ -> leaveNow() }
             .setNegativeButton(R.string.cancel, null)
+            .setOnDismissListener { leaveAsked.value = false }
             .show()
+        leaveAsked.value = true
     }
 
     private fun leaveNow() {

@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -138,6 +138,9 @@ class CameraFragment :
 
     /** The AI notice that the subject's start of poses asked this phone's user, while it is up (#276). */
     private var askedForSubject: AlertDialog? = null
+
+    // The session whose subject asked for it: the question goes when that session ends, or another begins.
+    private var askedInSession: String? = null
 
     /** The notices shown without a time of their own ([holdNotice]), each until it is let go. */
     private val heldNotices = EnumMap<HeldNotice, String>(HeldNotice::class.java)
@@ -508,6 +511,8 @@ class CameraFragment :
                         if (connected != null) takeDownPeerGoneNotice(controls)
                         // Nothing is left to end once the subject has gone.
                         if (!live) dismissEndSession()
+                        // Nor to agree to for the subject's poses, once the session that asked is over or another's.
+                        if (askedForSubject != null && sessionId(state) != askedInSession) dismissAskedForSubject()
                         // The scene photo's top bar has only Back, the light, the ratio, its title, and Use.
                         controls.endSessionButton.isVisible = live && !isScenePhotoActive()
                         controls.shootTogetherButton.isVisible = !live && !isScenePhotoActive()
@@ -2112,16 +2117,17 @@ class CameraFragment :
 
     /**
      * Whether the camera itself is what the photographer looks at. Under a sheet, such as Add a pose guide, this screen
-     * stays started with its camera running, and so it does under its own photos and under a question of its own, the
-     * AI notice for the subject's poses or "End the session?": none of them is "in front", and what the subject asks
-     * of the camera is refused then (#314, #276). A new dialog of this screen belongs here too.
+     * stays started with its camera running, and so it does under its own photos and under a dialog of its own, the
+     * AI notice for the subject's poses, "End the session?", or the tutorial's tips: none of them is "in front", and
+     * what the subject asks of the camera is refused then (#314, #276). A new dialog of this screen belongs here too.
      */
     private fun cameraInFront(): Boolean {
         // Without a navigation controller, as in a screen test, nothing can cover it.
         val destination = runCatching { findNavController().currentDestination?.id }.getOrNull()
-        val asking = askedForSubject != null || endSessionDialog?.isShowing == true
+        val covered = askedForSubject != null || endSessionDialog?.isShowing == true ||
+            TutorialFragment.over(this) != null
         return (destination == null || destination == R.id.cameraFragment) && !viewModel.uiState.value.photosOpen &&
-            !asking
+            !covered
     }
 
     /**
@@ -2161,6 +2167,7 @@ class CameraFragment :
             getString(R.string.consent_message),
         ).joinToString("\n\n")
         var agreed = false
+        askedInSession = sessionId(sessionViewModel.state.value)
         askedForSubject = MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.consent_title)
             .setMessage(words)
@@ -2176,6 +2183,23 @@ class CameraFragment :
                 if (!agreed) answer(PoseStartStep.REFUSED)
             }
             .show()
+    }
+
+    /** The id of the session [state] is, running or reconnecting; null outside one. */
+    private fun sessionId(state: SessionState): String? = when (state) {
+        is SessionState.Connected -> state.sessionId
+        is SessionState.Reconnecting -> state.sessionId
+        else -> null
+    }
+
+    /**
+     * Takes the question for the subject's poses down unanswered, which refuses the request: its session is over, so
+     * agreeing would begin the step for no one, or in another subject's session.
+     */
+    private fun dismissAskedForSubject() {
+        askedForSubject?.dismiss()
+        askedForSubject = null
+        askedInSession = null
     }
 
     /** Over the guide-edit mode toggle for [CameraViewModel.NOTICE_MS]: what a pinch moves now (Design 2.8). */

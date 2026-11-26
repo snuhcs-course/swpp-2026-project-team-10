@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -45,6 +45,7 @@ import com.lastpenguin.pix.session.RtcSessionManager
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.session.shoot
+import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.ScreenTestSupport
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
@@ -56,6 +57,7 @@ import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
+import com.lastpenguin.pix.ui.settings.TutorialFragment
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CompletableDeferred
@@ -63,6 +65,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -118,8 +121,9 @@ import org.robolectric.shadows.ShadowDialog
  * The subject starts AI poses (#276, FR-6.15): the scene photo's step begun here for their situation, with its notice;
  * refused for a selfie without a front camera, while a scene photo is already framed (the step unchanged), with a
  * sheet over the camera, and while this phone's timer counts down (the countdown going on to its photo); a press, and
- * a start, while one of this screen's own questions is up (the agreement, End session), taken again once it is
- * answered; without the agreement on this phone, asked first with the subject's name, begun once agreed,
+ * a start, while one of this screen's own questions is up (the agreement, End session) or the tutorial's tips are,
+ * taken again once it is answered or closed; the agreement's question gone with its session, ended or another's,
+ * and kept through a drop; without the agreement on this phone, asked first with the subject's name, begun once agreed,
  * refused at "Not now", and a second request refused while the question is up.
  */
 @RunWith(AndroidJUnit4::class)
@@ -832,6 +836,68 @@ class CameraFragmentInteractionTest {
 
         // Answered with Cancel, the camera is in front again.
         (ShadowDialog.getLatestDialog() as AlertDialog).getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+        idle()
+        modules.session.deliver(SessionMessage.ShutterPress(2))
+        idle()
+        assertEquals(1, camera.photoTurns.size)
+    }
+
+    @Test
+    fun theQuestionForTheSubjectsPoses_goesWithItsSession_endedOrAnotherOnes() {
+        val modules = TestAppContainer().apply { consent.given = false }
+        inASession(modules)
+        modules.session.deliver(SessionMessage.PoseStart("default"))
+        idle()
+        val first = ShadowDialog.getLatestDialog() as AlertDialog
+        assertTrue(first.isShowing)
+
+        // A drop is the same session: the photographer still reads the question.
+        modules.session.setState(
+            SessionState.Reconnecting("s1", 0L, peer = PeerInfo("Joonhyung"), role = Role.PHOTOGRAPHER),
+        )
+        idle()
+        assertTrue(first.isShowing)
+
+        // The subject who asked leaves: nothing is left to agree to, and no step begins later.
+        modules.session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        idle()
+        assertFalse(first.isShowing)
+        assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
+
+        // Asked in one session and still up as another subject's begins: gone as well.
+        modules.session.setState(SessionState.Connected("s2", PeerInfo("Sungmin"), Role.PHOTOGRAPHER))
+        idle()
+        modules.session.deliver(SessionMessage.PoseStart("default"))
+        idle()
+        val second = ShadowDialog.getLatestDialog() as AlertDialog
+        assertTrue(second.isShowing)
+        modules.session.setState(SessionState.Connected("s3", PeerInfo("Jaewan"), Role.PHOTOGRAPHER))
+        idle()
+        assertFalse(second.isShowing)
+        assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
+    }
+
+    @Test
+    fun underTheTutorialsTips_neitherTheSubjectsPressNorTheirStartOfPosesIsTaken() {
+        val camera = FakeCameraController().apply { photo = Uri.parse("content://media/external/images/9") }
+        val modules = TestAppContainer(camera = camera)
+        inASession(modules)
+        // The first-use tips are a dialog over this screen, which stays the destination under them.
+        onScreen { _, fragment -> TutorialFragment.show(fragment, TutorialScreen.CAMERA) }
+        idle()
+        onScreen { _, fragment -> assertNotNull(TutorialFragment.over(fragment)) }
+
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        modules.session.deliver(SessionMessage.PoseStart("full_body"))
+        idle()
+
+        assertTrue(camera.photoTurns.isEmpty())
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), shutterAnswers(modules))
+        assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers(modules))
+
+        // Closed, the camera is in front again.
+        onScreen { _, fragment -> TutorialFragment.over(fragment)!!.dismiss() }
         idle()
         modules.session.deliver(SessionMessage.ShutterPress(2))
         idle()

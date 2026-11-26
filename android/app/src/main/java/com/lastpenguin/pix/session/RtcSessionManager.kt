@@ -923,8 +923,9 @@ class RtcSessionManager(
      * Realtime messages go out at once or not at all. Reliable messages wait in order until hello has gone out and
      * the channel's buffer is below the limit (Design 2.8, Backpressure). With the realtime channel lost, its messages
      * go on the reliable one and wait there like the rest, except a moment that is wrong late
-     * (`ChannelRouter.neverLate`): that one goes only while nothing is ahead of it, and is dropped otherwise, so "at
-     * once or not at all" holds for it on either channel.
+     * (`ChannelRouter.neverLate`): that one is not sent at all. The reliable channel retransmits, so even with
+     * nothing ahead of it a message can arrive long after a drop, and "at once or not at all" holds only on the
+     * channel that never retransmits.
      */
     private fun sendNow(message: SessionMessage): Boolean {
         val client = peer ?: return false
@@ -936,11 +937,10 @@ class RtcSessionManager(
             Channel.REALTIME -> client.send(Channel.REALTIME, text)
 
             Channel.RELIABLE -> {
-                val buffered = client.bufferedAmount(Channel.RELIABLE)
-                val wait = !helloSent || reliableQueue.isNotEmpty() || buffered >= BACKPRESSURE_BYTES
+                val wait = !helloSent || reliableQueue.isNotEmpty() ||
+                    client.bufferedAmount(Channel.RELIABLE) >= BACKPRESSURE_BYTES
                 when {
-                    standIn && router.neverLate(message) ->
-                        !wait && buffered < MOMENT_BYTES && client.send(Channel.RELIABLE, text)
+                    standIn && router.neverLate(message) -> false
 
                     wait -> {
                         reliableQueue.addLast(text)
@@ -1218,11 +1218,5 @@ class RtcSessionManager(
 
         /** A bulk chunk waits below this, so that a control message sent next waits for this much at most. */
         const val BULK_BYTES = 64L * 1024
-
-        /**
-         * A moment that is wrong late goes on the reliable channel, in the lost realtime one's place, only below this:
-         * what a slow link sends in about a tenth of a second, so not behind a photo's chunks.
-         */
-        const val MOMENT_BYTES = 16L * 1024
     }
 }

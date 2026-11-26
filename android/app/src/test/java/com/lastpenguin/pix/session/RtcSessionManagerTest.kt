@@ -1238,56 +1238,35 @@ class RtcSessionManagerTest {
         assertTrue(peer.closed)
     }
 
-    // ---- With the realtime channel lost, a moment never waits (#314, #276): the reliable channel free (sent at
-    // once), backed up (dropped, while a pinch's step is kept), and below the backpressure limit with a photo's
-    // chunks ahead (dropped).
+    // ---- With the realtime channel lost, a moment is not sent (#314, #276): the reliable channel retransmits, so
+    // even free it could deliver the press after a drop, once the subject gave it up; a pinch's step still goes.
 
     @Test
-    fun `with the realtime channel lost, a moment goes at once on the reliable one or not at all`() = runTest {
+    fun `with the realtime channel lost, a moment is not sent on the reliable one, even while it is free`() = runTest {
         val (manager, peer) = connectedSubject(token = "subject-token")
         peer.push(PeerEvent.ChannelClosed(Channel.REALTIME))
         runCurrent()
 
-        // The reliable channel is free: the press and the start of poses go on it at once.
         manager.send(SessionMessage.ShutterPress(1))
+        manager.send(SessionMessage.ShutterPress(2, cancel = true))
         manager.send(SessionMessage.PoseStart("full_body", request = 1))
+        // A step of a pinch goes there as before: late, it is only an old value.
+        manager.send(SessionMessage.ZoomSet(2f, final = false))
         runCurrent()
-        assertEquals(
-            listOf<SessionMessage>(SessionMessage.ShutterPress(1), SessionMessage.PoseStart("full_body", request = 1)),
-            peer.sentMessages().takeLast(2),
-        )
+
+        val sent = peer.sentMessages()
+        assertTrue(sent.none { it is SessionMessage.ShutterPress || it is SessionMessage.PoseStart })
+        assertEquals(SessionMessage.ZoomSet(2f, final = false), sent.last())
         assertEquals(Channel.RELIABLE, peer.sent.last().first)
 
-        // It is backed up, as while a photo goes: neither is kept behind it, to arrive once the subject gave it up.
+        // Nor later, once the channel has been backed up and drained.
         peer.buffered = backpressureFull
-        manager.send(SessionMessage.ShutterPress(2))
-        manager.send(SessionMessage.PoseStart("full_body", request = 2))
-        // A step of a pinch is kept, as before: late, it is only an old value.
-        manager.send(SessionMessage.ZoomSet(2f, final = false))
+        manager.send(SessionMessage.ShutterPress(3))
         runCurrent()
         peer.buffered = 0
         peer.push(PeerEvent.BufferedAmount(Channel.RELIABLE, 0))
         runCurrent()
-
-        val later = peer.sentMessages()
-        assertFalse(SessionMessage.ShutterPress(2) in later)
-        assertFalse(SessionMessage.PoseStart("full_body", request = 2) in later)
-        assertEquals(SessionMessage.ZoomSet(2f, final = false), later.last())
-        manager.leave(EndReason.LEFT)
-    }
-
-    @Test
-    fun `with the realtime channel lost, a moment does not go behind what the reliable one still sends`() = runTest {
-        val (manager, peer) = connectedSubject(token = "subject-token")
-        peer.push(PeerEvent.ChannelClosed(Channel.REALTIME))
-        runCurrent()
-
-        // Below the limit that makes other messages wait, yet with a photo's chunks ahead of it in the buffer.
-        peer.buffered = RtcSessionManager.BULK_BYTES
-        manager.send(SessionMessage.ShutterPress(1))
-        runCurrent()
-
-        assertFalse(SessionMessage.ShutterPress(1) in peer.sentMessages())
+        assertTrue(peer.sentMessages().none { it is SessionMessage.ShutterPress })
         manager.leave(EndReason.LEFT)
     }
 

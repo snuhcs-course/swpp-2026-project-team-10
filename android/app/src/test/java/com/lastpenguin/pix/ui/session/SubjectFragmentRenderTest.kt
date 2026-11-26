@@ -39,6 +39,7 @@ import com.lastpenguin.pix.session.protocol.ConfirmStep
 import com.lastpenguin.pix.session.protocol.DescriptionStep
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
@@ -54,6 +55,7 @@ import com.lastpenguin.pix.ui.camera.FocusBrightness
 import com.lastpenguin.pix.ui.camera.REFERENCE_HIDDEN_ALPHA
 import com.lastpenguin.pix.ui.camera.REFERENCE_PEEK_DP
 import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
+import com.lastpenguin.pix.ui.settings.TutorialFragment
 import java.time.Duration
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
@@ -130,7 +132,7 @@ import org.robolectric.shadows.ShadowDialog
  * answered taken (free, no line), not taken (free, a line for a label's time), and not answered (the line after the
  * wait).
  * A result under a sheet: a start's answer and a refused press that come while Add a pose guide covers the screen,
- * said once it is gone.
+ * said once it is gone; and under this screen's own dialogs, "Leave the session?" and the tutorial's tips.
  * This phone's start of AI poses (FR-6.15, #276): the answer said where the lines show, begun (who takes the scene
  * photo), not begun, or the photographer asked to agree first; no answer, said after the wait.
  */
@@ -877,6 +879,40 @@ class SubjectFragmentRenderTest {
         nav.popBackStack()
         idle()
         assertEquals(string(R.string.subject_shutter_refused) to true, label())
+    }
+
+    @Test
+    fun aRefusedPressThatIsAnsweredUnderLeaveTheSession_isSaidOnceTheQuestionIsGone() {
+        val modules = launch()
+        connectWithVideo(modules)
+        onScreen { binding, _ -> binding.shutterButton.performClick() }
+        idle()
+        onScreen { binding, _ -> binding.leaveButton.performClick() }
+        idle()
+
+        answer(modules, taken = false)
+        idle()
+        // The question covers the line's place, and a touch on it would answer the question.
+        assertFalse(label().second)
+
+        leaveQuestion().getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
+        idle()
+        assertEquals(string(R.string.subject_shutter_refused) to true, label())
+    }
+
+    @Test
+    fun anAnswerThatComesUnderTheTutorialsTips_isSaidOnceTheyAreClosed() {
+        val modules = launch()
+        connectWithVideo(modules)
+        onScreen { _, fragment -> TutorialFragment.show(fragment, TutorialScreen.SUBJECT_VIEW) }
+        idle()
+
+        askAndAnswer(modules, started = true)
+        assertFalse(label().second)
+
+        onScreen { _, fragment -> TutorialFragment.over(fragment)!!.dismiss() }
+        idle()
+        assertEquals(string(R.string.subject_poses_started, "Dongje") to true, label())
     }
 
     @Test

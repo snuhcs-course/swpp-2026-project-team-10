@@ -1,6 +1,7 @@
-# AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park
 # HTTPS for the AWS servers (server/README.md, HTTPS). deploy.sh adds this file to docker-compose.yml once the
-# server has a certificate in /etc/letsencrypt/live/pix; the course servers have none and serve plain HTTP only.
+# server has a certificate in /etc/letsencrypt/live/pix; the course servers have none, and the course's proxy serves
+# HTTPS in front of their port 80.
 services:
   nginx:
     ports:

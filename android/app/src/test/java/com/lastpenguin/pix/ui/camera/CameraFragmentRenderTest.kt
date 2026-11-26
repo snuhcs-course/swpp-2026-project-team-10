@@ -32,8 +32,11 @@ import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.ScreenTestSupport.assertNoticeInTheZoomRowsPlace
 import com.lastpenguin.pix.ui.ScreenTestSupport.noticeAction
 import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNoticeView
+import com.lastpenguin.pix.ui.ScreenTestSupport.windowBox
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
@@ -59,8 +62,8 @@ import org.robolectric.annotation.GraphicsMode
  * camera status STARTING, READY; the grid and the horizon bar on by default, and each kept off (#271); a
  * guide added, with the guide-edit toggle unlit and the guide not filled (#304), the toggle tapped on (lit, the guide
  * filled) and off again (unlit, the same icon, no fill; #271), hidden, removed by the shutter's end of edit mode; the
- * tip and guide-edit buttons on glass, the toggle's tinted while on (#298); Remove guide's notice above the zoom row
- * with Undo, which puts the guide back, and taken down by another guide (#298); the
+ * tip and guide-edit buttons on glass, the toggle's tinted while on (#298); Remove guide's notice in the zoom row's
+ * place with Undo, which puts the guide back, and taken down by another guide (#298); the
  * hint chip with no line for the pinch, and "Guide hidden" for a hidden guide (#306); a photo saved or
  * failed; the camera menu's flash and the brightness controls with and without the capability; the aspect ratio 4:3
  * and 16:9; the
@@ -352,7 +355,7 @@ class CameraFragmentRenderTest {
     }
 
     @Test
-    fun removeGuide_offersUndo_aboveTheZoomRow_whichPutsTheGuideBack() {
+    fun removeGuide_offersUndo_inTheZoomRowsPlace_whichPutsTheGuideBack() {
         val modules = launch()
         val guide = guide()
         modules.guides.setGuide(guide)
@@ -366,9 +369,9 @@ class CameraFragmentRenderTest {
         val undo = checkNotNull(noticeAction())
         assertEquals(string(R.string.undo), undo.text.toString())
         onScreen { controls, _ ->
-            val notice = IntArray(2).also { (undo.parent.parent as View).getLocationInWindow(it) }
-            val row = IntArray(2).also { controls.zoomRow.getLocationInWindow(it) }
-            assertTrue("the notice above the zoom row", notice[1] + (undo.parent.parent as View).height <= row[1])
+            val notice = checkNotNull(shownNoticeView())
+            assertNoticeInTheZoomRowsPlace(notice, controls.zoomRow, controls.zoomReadout, controls.noticeLine)
+            assertTrue("clear of the controls", windowBox(notice).bottom <= windowBox(controls.bottomPanel).top)
         }
 
         undo.performClick()

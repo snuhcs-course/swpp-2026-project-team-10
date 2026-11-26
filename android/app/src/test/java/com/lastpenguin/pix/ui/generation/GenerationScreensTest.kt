@@ -87,7 +87,8 @@ import org.robolectric.shadows.ShadowChoreographer
  * comes first, which opens Generating poses (Design 2.6.5). Generating poses: the situation named on the photo's card
  * as on Generate poses, Auto naming none; the set planned, candidates arriving with the count, all ready (to Pick a pose), none ready (to Couldn't create poses),
  * Back and system back, at once (the run stopped, Generate poses with the photo and the text, #297), a pose that came
- * before Back (kept in the library, and Generate poses told). Pick a pose: only the ready
+ * before Back (kept in the library, and Generate poses told, with a notice whose View opens the library and which goes
+ * with the screen's view). Pick a pose: only the ready
  * candidates, one per page with a counter; the page on screen is the selected pose, so Select works at once and takes
  * the pose swiped to (to Reference confirm, this screen and the set left under it); a pose selected before the screen
  * opens is the one shown; every ready candidate kept in the library as history with no tap (#297); Back and system
@@ -787,6 +788,31 @@ class GenerationScreensTest {
             assertEquals(LibraryFilter.ALL, activity.viewModel<ReferenceViewModel>().library.value.filter)
             assertEquals(GenerationUiState(), activity.viewModel<GenerationViewModel>().uiState.value)
         }
+    }
+
+    @Test
+    fun describe_posesKeptNotice_goesWithTheScreen_soItsViewNeverReachesAScreenThatIsGone() {
+        val modules = modules()
+        val (s, _) = launchPrepared<DescribePoseFragment>(R.id.describePoseFragment) {
+            generating(it).apply {
+                modules.generator.runs.single().apply {
+                    plan(poses)
+                    send(CandidateEvent.Ready("pose-1", bitmap()))
+                }
+                stopGenerating()
+            }
+        }
+        scenario = s
+        idle()
+        modules.maker.finish(Result.success(fakeGuide("kept")))
+        idle()
+        assertEquals(string(R.string.poses_kept_notice), shownNotice())
+
+        // The screen's view goes, as at Back to Camera; the notice, the activity's, goes with it.
+        s.moveToState(Lifecycle.State.CREATED)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(NOTICE_GONE_MS))
+
+        assertNull(shownNotice())
     }
 
     /** Generating poses for [scene] with its four slots planned and on screen, the first ones filled with [ready]. */
@@ -1624,5 +1650,8 @@ class GenerationScreensTest {
     private companion object {
         /** The longest of the fades and the pop, and a little more. */
         const val MOTION_END_MS = 300L
+
+        /** Past a notice's going, 300 ms (`notice_out_ms`). */
+        const val NOTICE_GONE_MS = 500L
     }
 }

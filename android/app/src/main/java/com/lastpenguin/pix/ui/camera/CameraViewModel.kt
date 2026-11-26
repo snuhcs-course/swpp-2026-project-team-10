@@ -101,7 +101,7 @@ data class TipBanner(
     /** The guide the tip is for; a new guide opens the banner again. */
     val guideId: String,
     val state: TipState,
-    /** The banner is open; a touch anywhere closes it, and the tip button opens it again. */
+    /** The banner is open; only the tip button closes it and opens it again. */
     val open: Boolean,
     /** The tip arrived while the banner was closed: the tip button shows a dot until it is opened. */
     val unseen: Boolean = false,
@@ -379,6 +379,9 @@ class CameraViewModel(
     /** The photo whose Android question is open, and whether its yes deletes it; null while none is. */
     private var asking: Pair<Uri, Boolean>? = null
 
+    /** The photo to delete once Android's screen for managing media closes ([deleteAfterAccess]); null while none. */
+    private var deletingAfterAccess: Uri? = null
+
     private val _menuNotices = Channel<MenuNotice>(Channel.CONFLATED)
 
     /** One per choice in the camera menu, the newest replacing one not yet shown (FR-1.17). */
@@ -540,14 +543,6 @@ class CameraViewModel(
         }
     }
 
-    /** A touch anywhere on the screen ended: an open tip closes (FR-4.10). */
-    fun onAnyTouch() {
-        _uiState.update { state ->
-            state.tip?.takeIf { it.open }?.let { state.copy(tip = it.copy(open = false)) }
-                ?: state
-        }
-    }
-
     /** The phone's photos as read, the newest of them the thumbnail's. */
     private fun takePhonePhotos(photos: List<Uri>) {
         album = photos
@@ -653,8 +648,32 @@ class CameraViewModel(
         }
     }
 
-    /** Whether the viewer asks before it deletes [uri]: for Pix's own photos, which go at once (FR-1.16). */
+    /**
+     * Whether the viewer asks before it deletes [uri] (FR-1.16): for Pix's own photos, which go at once, and from
+     * Android 12 for every photo.
+     */
     fun asksBeforeDeleting(uri: Uri): Boolean = deleter.asksFirst(uri)
+
+    /** Whether Android would ask about deleting [uri] too, every time, until Pix may manage the phone's media. */
+    fun needsAccessToDelete(uri: Uri): Boolean = deleter.needsAccess(uri)
+
+    /**
+     * The media access offer's *Allow access* for [uri] (FR-1.16): the screen opens Android's screen for managing media,
+     * and [uri] is deleted once it closes ([accessAnswered]).
+     */
+    fun deleteAfterAccess(uri: Uri) {
+        deletingAfterAccess = uri
+    }
+
+    /**
+     * Android's screen for managing media closed: the photo asked for is deleted, without Android's question when the
+     * user allowed it, and with it otherwise, since the user asked for the photo to go.
+     */
+    fun accessAnswered() {
+        val uri = deletingAfterAccess ?: return
+        deletingAfterAccess = null
+        deletePhoto(uri)
+    }
 
     /**
      * The viewer's Delete (FR-1.6, FR-1.16), once Pix asked for its own photo: the photo leaves the viewer and the
@@ -750,8 +769,8 @@ class CameraViewModel(
     }
 
     /**
-     * The tip button: the tip opens again, and is no longer unseen; another tap while it is open closes it. A tip that
-     * could not be had has no button.
+     * The tip button, the only way to open and close the tip (FR-4.10): a tap opens it, and it is no longer unseen;
+     * another tap while it is open closes it. A tip that could not be had has no button.
      */
     fun onTipButton() {
         _uiState.update { state ->

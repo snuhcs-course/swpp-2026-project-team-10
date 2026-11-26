@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -113,6 +113,17 @@ internal fun ViewPhotoViewerBinding.stripCount(): Int =
 /** Which of the strip's thumbnails is selected, by its place in the list; null when none is. */
 internal fun ViewPhotoViewerBinding.stripSelected(): Int? =
     stripItems().firstOrNull { it.isSelected }?.let { photoViewerStrip.getChildAdapterPosition(it) }
+
+/**
+ * How far the selected thumbnail's middle is from the strip's middle, in px, as they show in the window; null when none
+ * is selected.
+ */
+internal fun ViewPhotoViewerBinding.selectedFromStripMiddle(): Int? {
+    val selected = stripItems().firstOrNull { it.isSelected } ?: return null
+    val thumb = IntArray(2).also(selected::getLocationInWindow)
+    val strip = IntArray(2).also(photoViewerStrip::getLocationInWindow)
+    return (thumb[0] + selected.width / 2) - (strip[0] + photoViewerStrip.width / 2)
+}
 
 /** Taps the strip's thumbnail of the photo at [position]. */
 internal fun ViewPhotoViewerBinding.tapStrip(position: Int) {

@@ -345,8 +345,9 @@
             tools:visibility="visible" />
 
         <!-- The photographer's timer counting down (FR-1.17), as their Camera screen shows it: the seconds left, large in
-             the middle of the video, and whose photo it is. That this phone's shutter stops it is the tutorial's tip, not a
-             line here (FR-7.8). The number turns with the phone (FR-1.15). -->
+             the middle of the video, and whose photo it is. That this phone's shutter stops it is the shutter's stop
+             square in the timer's ring and the tutorial's tip, not a line here (FR-7.8). The number turns with the phone
+             (FR-1.15). -->
         <LinearLayout
             android:id="@+id/countdownPanel"
             android:layout_width="wrap_content"
@@ -393,8 +394,8 @@
         app:layout_constraintStart_toStartOf="parent">
 
         <!-- The photographer's tip of the guide on the video (FR-4.10, #213), as on their Camera screen: the tip's
-             sentences, one on a line. Closed until the tip button; a touch anywhere closes it again. Translucent, so
-             the video shows through. -->
+             sentences, one on a line. Closed until the tip button, which alone closes it again; a touch on it does
+             nothing, and does not reach the video under it. Translucent, so the video shows through. -->
         <LinearLayout
             android:id="@+id/tipBanner"
             android:layout_width="match_parent"
@@ -402,7 +403,6 @@
             android:layout_marginTop="8dp"
             android:accessibilityLiveRegion="polite"
             android:background="@drawable/bg_glass_panel"
-            android:clickable="true"
             android:focusable="true"
             android:gravity="center_vertical"
             android:minHeight="48dp"
@@ -535,8 +535,9 @@
             android:layout_gravity="start|center_vertical"
             android:gravity="center_vertical">
 
-            <!-- Opens the photographer's tip while the guide on the video has one (FR-4.10, #213); the dot says there
-                 is a tip not yet looked at, since the tip never opens by itself here. -->
+            <!-- Opens and closes the photographer's tip while the guide on the video has one (FR-4.10, #213), lit
+                 while the tip is open; nothing else closes it. The dot says there is a tip not yet looked at, since the
+                 tip never opens by itself here. -->
             <FrameLayout
                 android:id="@+id/tipButtonFrame"
                 android:layout_width="wrap_content"
@@ -550,7 +551,10 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:contentDescription="@string/show_tip"
-                    app:icon="@drawable/ic_lightbulb" />
+                    app:backgroundTint="@color/tip_button_background"
+                    app:icon="@drawable/ic_lightbulb"
+                    app:iconTint="@color/tip_button_icon"
+                    app:strokeColor="@color/tip_button_stroke" />
 
                 <ImageView
                     android:id="@+id/tipDot"
@@ -631,6 +635,17 @@
         app:layout_constraintEnd_toEndOf="parent"
         tools:text="@string/pinch_mode_guide"
         tools:visibility="visible" />
+
+    <!-- The line the zoom row stands on, 6 dp under it: the image's bottom, or the top of the panels over it. A notice
+         sits on it, over the zoom row (ui/Notices.kt, NoticeAnchor). Moved with the zoom row in code. -->
+    <View
+        android:id="@+id/noticeLine"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:importantForAccessibility="no"
+        app:layout_constraintBottom_toTopOf="@id/bottomPanel"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
 
     <LinearLayout
         android:id="@+id/bottomPanel"

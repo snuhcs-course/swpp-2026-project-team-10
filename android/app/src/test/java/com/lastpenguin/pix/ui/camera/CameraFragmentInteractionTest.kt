@@ -57,13 +57,16 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNoticeView
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
+import com.lastpenguin.pix.ui.ScreenTestSupport.windowBox
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.generation.SceneHandOff
 import com.lastpenguin.pix.ui.session.SessionViewModel
+import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.TutorialFragment
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -94,10 +97,15 @@ import org.robolectric.shadows.ShadowDialog
  * answer binding the camera; Open settings and Try again); the clicks that navigate (Add a guide, Shoot together, Use
  * this photo, which opens nothing for a photo without a person) and system back during the scene photo step; End
  * session, which asks first (#298): confirmed, cancelled, and the question gone once the subject left; the gallery button: outside a session the album's newest, which opens Pix's album in Pix's viewer as a
- * grid of every photo, the newest first, where a tap opens that photo's page, then a swipe to an older one and a tap
- * on the strip of thumbnails, and system Back to the grid, with the photo on screen in it, and again to the camera,
+ * grid of every photo, the newest first, where a tap opens that photo's page, its pages and strip newest first too,
+ * its thumbnail in the strip's middle, the first and the last too, and at each swipe,
+ * then a swipe to the left to an older one and a tap on the strip's first thumbnail, the newest, and system Back to the
+ * grid, with the photo on screen in it, and again to the camera,
  * and a photo just taken there at once; a photo deleted there, once asked, leaves it, the grid, and the thumbnail, and
- * one that cannot be deleted stays with a notice; the tabs: Photos at each opening, Albums listing the phone's albums,
+ * one that cannot be deleted stays with a notice above the viewer's strip; another app's photo, from Android 12, asked
+ * about by Pix too, with only Cancel and Delete, and while the media access is off, at the first such delete, the access
+ * offered apart after Delete: Allow access (Android's screen, then the photo goes) or Not now (Android's question), and
+ * never offered again; with it on, Pix's question alone; the tabs: Photos at each opening, Albums listing the phone's albums,
  * each its newest photo, its name, and its count, and one tapped opening its grid under its name, from which a photo
  * opens its page, and Back goes back one step at a time to the camera; the grid's squares read at their own size; another app's photo, not asked about by Pix, goes to Android's
  * question, whose yes takes it away; while Pix may read only its own photos, the thumbnail, also with none, asks for
@@ -1445,18 +1453,20 @@ class CameraFragmentInteractionTest {
             assertEquals(emptyList<String>(), viewer.textsShown())
             assertTrue(viewer.photoViewerShare.isShown)
             assertEquals(string(R.string.photo_page_counter_description, 2, 3), viewer.pageReads())
+            // The pages and the strip run newest first, as the grid does: p3, p2, p1 from the left.
             assertEquals(3, viewer.stripCount())
             assertEquals(1, viewer.stripSelected())
-            viewer.photoViewerPages.setCurrentItem(0, false)
+            // A swipe to the left, to the last page: the oldest.
+            viewer.photoViewerPages.setCurrentItem(2, false)
         }
         settleReads()
         onScreen { controls, _ ->
             val viewer = photoViewerOn(controls.root)
             assertSame(pictures[TestAppContainer.savedPhoto("p1")], viewer.pageShows())
             assertEquals(string(R.string.photo_page_counter_description, 1, 3), viewer.pageReads())
-            assertEquals(0, viewer.stripSelected())
-            // A tap on the strip, as in a gallery app.
-            viewer.tapStrip(2)
+            assertEquals(2, viewer.stripSelected())
+            // A tap on the strip's first thumbnail, as in a gallery app: the newest.
+            viewer.tapStrip(0)
         }
         settleReads()
         onScreen { controls, _ ->
@@ -1479,7 +1489,8 @@ class CameraFragmentInteractionTest {
             val viewer = photoViewerOn(controls.root)
             assertTrue(viewer.pagesShown())
             assertSame(pictures[TestAppContainer.savedPhoto("p1")], viewer.pageShows())
-            assertEquals(0, viewer.stripSelected())
+            // The oldest, the strip's last.
+            assertEquals(2, viewer.stripSelected())
         }
 
         // Back twice: the grid, then Camera as it was.
@@ -1494,6 +1505,43 @@ class CameraFragmentInteractionTest {
         onScreen { controls, _ -> controls.galleryButton.performClick() }
         settleReads()
         onScreen { controls, _ -> assertTrue(photoViewerOn(controls.root).gridShown()) }
+    }
+
+    @Test
+    fun photoViewer_aPhotoOpened_hasItsThumbnailInTheStripsMiddle_theNewestAndTheOldestToo() {
+        val modules = launch()
+        onScreen { _, fragment ->
+            fragment.thumbnailOf = { Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888) }
+            fragment.cellOf = { _, _ -> Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888) }
+            fragment.photoOf = { Bitmap.createBitmap(4, 3, Bitmap.Config.ARGB_8888) }
+        }
+        modules.album.value = (1..9).map { TestAppContainer.savedPhoto("p$it") }
+        settleReads()
+        onScreen { controls, _ -> controls.galleryButton.performClick() }
+        settleReads()
+
+        // The newest, the strip's first: in its middle all the same.
+        onScreen { controls, _ -> photoViewerOn(controls.root).tapGrid(0) }
+        settleReads()
+        onScreen { controls, _ ->
+            val viewer = photoViewerOn(controls.root)
+            assertEquals(0, viewer.stripSelected())
+            assertEquals(0f, checkNotNull(viewer.selectedFromStripMiddle()).toFloat(), 1f)
+        }
+
+        // A swipe to an older one brings its thumbnail to the middle, and so does one to the oldest, the last.
+        onScreen { controls, _ -> photoViewerOn(controls.root).photoViewerPages.setCurrentItem(4, false) }
+        settleReads()
+        onScreen { controls, _ ->
+            assertEquals(0f, checkNotNull(photoViewerOn(controls.root).selectedFromStripMiddle()).toFloat(), 1f)
+        }
+        onScreen { controls, _ -> photoViewerOn(controls.root).photoViewerPages.setCurrentItem(8, false) }
+        settleReads()
+        onScreen { controls, _ ->
+            val viewer = photoViewerOn(controls.root)
+            assertEquals(8, viewer.stripSelected())
+            assertEquals(0f, checkNotNull(viewer.selectedFromStripMiddle()).toFloat(), 1f)
+        }
     }
 
     @Test
@@ -1521,7 +1569,15 @@ class CameraFragmentInteractionTest {
         (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_POSITIVE).performClick()
         settleReads()
         assertEquals(string(R.string.photo_not_deleted), shownNotice())
-        onScreen { controls, _ -> assertEquals(2, photoViewerOn(controls.root).stripCount()) }
+        onScreen { controls, _ ->
+            val viewer = photoViewerOn(controls.root)
+            assertEquals(2, viewer.stripCount())
+            // Over the viewer, above its strip, not over the photo where Camera's zoom row lies under it.
+            val notice = checkNotNull(shownNoticeView())
+            val strip = windowBox(viewer.photoViewerStrip)
+            val dp = controls.root.resources.displayMetrics.density
+            assertEquals(strip.top - 12 * dp, windowBox(notice).bottom.toFloat(), 1f)
+        }
 
         modules.deleteFails = false
         onScreen { controls, _ -> photoViewerOn(controls.root).photoViewerDelete.performClick() }
@@ -1686,6 +1742,139 @@ class CameraFragmentInteractionTest {
             assertEquals(string(R.string.session_photo), viewer.pageReads())
         }
         assertTrue(modules.deleted.isEmpty())
+    }
+
+    /** Opens Pix's album on its newest photo's page, of [photos] with the newest of another app's. */
+    private fun openOthersNewest(modules: TestAppContainer, photos: List<Uri>) {
+        onScreen { _, fragment ->
+            fragment.thumbnailOf = { Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888) }
+            fragment.photoOf = { Bitmap.createBitmap(4, 3, Bitmap.Config.ARGB_8888) }
+        }
+        modules.album.value = photos
+        modules.othersPhotos = setOf(photos.last())
+        modules.asksForOthers = true
+        settleReads()
+        onScreen { controls, _ -> controls.galleryButton.performClick() }
+        settleReads()
+        onScreen { controls, _ -> photoViewerOn(controls.root).tapGrid(0) }
+        settleReads()
+    }
+
+    /** Android's question, as the screen launched it, answered with [result]. */
+    private fun answerAndroidsQuestion(modules: TestAppContainer, result: Int) {
+        val question = onScreen { _, fragment -> shadowOf(fragment.requireActivity()).lastIntentSenderRequest }
+        assertSame(modules.deleteQuestion, question.intentSender)
+        onScreen { _, fragment ->
+            shadowOf(fragment.requireActivity()).callOnActivityResult(question.requestCode, result, null)
+        }
+        settleReads()
+    }
+
+    /** Pix's own question, as it always is: its line, *Cancel* and *Delete*, and nothing else. */
+    private fun assertPixsQuestion(asking: AlertDialog) {
+        assertEquals(
+            string(R.string.delete_photo_message),
+            asking.findViewById<TextView>(android.R.id.message)!!.text.toString(),
+        )
+        assertFalse(asking.getButton(DialogInterface.BUTTON_NEUTRAL).isShown)
+        assertEquals(string(R.string.delete), asking.getButton(DialogInterface.BUTTON_POSITIVE).text.toString())
+        assertEquals(string(R.string.cancel), asking.getButton(DialogInterface.BUTTON_NEGATIVE).text.toString())
+    }
+
+    @Test
+    fun photoViewer_anotherAppsPhoto_fromAndroid12_offersTheMediaAccessApart_afterPixsDelete_andDeletesAfterIt() {
+        val modules = launch()
+        modules.needsMediaAccess = true
+        openOthersNewest(modules, (1..2).map { TestAppContainer.savedPhoto("p$it") })
+
+        onScreen { controls, _ -> photoViewerOn(controls.root).photoViewerDelete.performClick() }
+        idle()
+        val asking = ShadowDialog.getLatestDialog() as AlertDialog
+        assertPixsQuestion(asking)
+        asking.getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idle()
+
+        // Then, apart, the offer: *Allow access* or *Not now*.
+        val offer = ShadowDialog.getLatestDialog() as AlertDialog
+        assertNotSame(asking, offer)
+        assertTrue(offer.isShowing)
+        assertEquals(
+            string(R.string.media_access_message),
+            offer.findViewById<TextView>(android.R.id.message)!!.text.toString(),
+        )
+        assertEquals(
+            string(R.string.allow_media_access),
+            offer.getButton(DialogInterface.BUTTON_POSITIVE).text.toString(),
+        )
+        assertEquals(string(R.string.not_now), offer.getButton(DialogInterface.BUTTON_NEGATIVE).text.toString())
+        offer.getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idle()
+
+        // Android's screen for managing media; nothing goes while it is open.
+        val settings = onScreen { _, fragment -> shadowOf(fragment.requireActivity()).nextStartedActivityForResult }
+        assertEquals(Settings.ACTION_REQUEST_MANAGE_MEDIA, settings.intent.action)
+        assertEquals("package:com.lastpenguin.pix", settings.intent.dataString)
+        onScreen { _, fragment -> assertNull(shadowOf(fragment.requireActivity()).lastIntentSenderRequest) }
+
+        // Allowed there: the photo goes through Android's request, which no longer asks.
+        modules.needsMediaAccess = false
+        onScreen { _, fragment ->
+            shadowOf(
+                fragment.requireActivity(),
+            ).callOnActivityResult(settings.requestCode, Activity.RESULT_CANCELED, null)
+        }
+        idle()
+        answerAndroidsQuestion(modules, Activity.RESULT_OK)
+        onScreen { controls, _ -> assertEquals(0, photoViewerOn(controls.root).stripCount()) }
+    }
+
+    @Test
+    fun photoViewer_theMediaAccessOffer_isShownOnce_andNotNowDeletesThroughAndroidsQuestion() {
+        val modules = launch()
+        modules.needsMediaAccess = true
+        val photos = (1..3).map { TestAppContainer.savedPhoto("p$it") }
+        openOthersNewest(modules, photos)
+        modules.othersPhotos = setOf(photos[1], photos[2])
+
+        onScreen { controls, _ -> photoViewerOn(controls.root).photoViewerDelete.performClick() }
+        idle()
+        (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idle()
+        (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
+        idle()
+        answerAndroidsQuestion(modules, Activity.RESULT_OK)
+        onScreen { _, fragment ->
+            assertTrue(fragment.requireActivity().viewModel<SettingsViewModel>().mediaAccessOffered())
+        }
+
+        // The next one, the access still off: Pix's question, then Android's at once, with no offer again.
+        onScreen { controls, _ -> photoViewerOn(controls.root).photoViewerDelete.performClick() }
+        idle()
+        val asking = ShadowDialog.getLatestDialog() as AlertDialog
+        assertPixsQuestion(asking)
+        asking.getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idle()
+        assertSame(asking, ShadowDialog.getLatestDialog())
+        answerAndroidsQuestion(modules, Activity.RESULT_OK)
+        onScreen { controls, _ -> assertEquals(0, photoViewerOn(controls.root).stripCount()) }
+    }
+
+    @Test
+    fun photoViewer_anotherAppsPhoto_withTheMediaAccess_isAskedOnlyByPix() {
+        val modules = launch()
+        openOthersNewest(modules, (1..2).map { TestAppContainer.savedPhoto("p$it") })
+
+        onScreen { controls, _ -> photoViewerOn(controls.root).photoViewerDelete.performClick() }
+        idle()
+
+        val asking = ShadowDialog.getLatestDialog() as AlertDialog
+        assertPixsQuestion(asking)
+        asking.getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idle()
+        assertSame(asking, ShadowDialog.getLatestDialog())
+        answerAndroidsQuestion(modules, Activity.RESULT_OK)
+
+        onScreen { controls, _ -> assertEquals(0, photoViewerOn(controls.root).stripCount()) }
     }
 
     @Test

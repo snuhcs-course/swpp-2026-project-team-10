@@ -71,7 +71,7 @@ import kotlinx.coroutines.launch
 
 /**
  * The photographer's tip of the guide on the video, as Subject view shows it (FR-4.10, #213): closed until the tip
- * button, whose dot says there is a tip not yet looked at; a touch anywhere closes it again.
+ * button, whose dot says there is a tip not yet looked at, and closed again only by that button.
  */
 data class SubjectTip(val guideId: String, val tip: PoseTip, val open: Boolean = false, val unseen: Boolean = true)
 
@@ -577,18 +577,14 @@ class SubjectViewModel(
         }
     }
 
-    /** The tip button: the tip opens, and is no longer unseen; another tap while it is open closes it (FR-4.10). */
+    /**
+     * The tip button, the only way to open and close the tip, as on the Camera screen (FR-4.10): a tap opens it, and it
+     * is no longer unseen; another tap while it is open closes it.
+     */
     fun onTipButton() {
         _uiState.update { state ->
             val tip = state.tip ?: return@update state
             state.copy(tip = tip.copy(open = !tip.open, unseen = false))
-        }
-    }
-
-    /** A touch anywhere on the screen ended: an open tip closes, as on the Camera screen. */
-    fun onAnyTouch() {
-        _uiState.update { state ->
-            state.tip?.takeIf { it.open }?.let { state.copy(tip = it.copy(open = false)) } ?: state
         }
     }
 

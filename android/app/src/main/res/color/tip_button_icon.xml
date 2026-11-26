@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The tip button's light bulb: in the accent while its tip is open (activated), as the banner's own bulb is. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/pix_text_faint" android:state_enabled="false" />
+    <item android:color="@color/pix_accent" android:state_activated="true" />
+    <item android:color="@color/pix_text" />
+</selector>

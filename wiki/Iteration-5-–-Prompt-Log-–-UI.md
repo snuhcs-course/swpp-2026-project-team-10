@@ -100,14 +100,72 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 - [Jaewan, 11-26] "seems like this is still slightly, very slightly moved inwards can you check this? the screenshots show"
 - [Jaewan, 11-26] "yes"
 
+## Impeccable's review, and its UI fixes ([#298], [#300], [#312])
+
+- [Sungmin, 11-23] "Now I'm going to handle issue #298. Take a look first."
+- [Sungmin, 11-23] "But what exactly does doing that do...? Is it changing the Android UI code, or what?"
+- [Sungmin, 11-23] "Just install everything yourself and review it." (The agent installed the Impeccable skill and reviewed Pix's screens with it.)
+- [Sungmin, 11-24] "I'm curious how it would look exactly once fixed. Before doing it, can you draw it first so only I can see it?" (A private page with each fix drawn before and after.)
+- [Sungmin, 11-24] "What does TalkBack mean? And weren't there more fixes besides these?"
+- [Sungmin, 11-24] "I don't think TalkBack needs to go in. But isn't something like this possible? In guide-edit mode, mark the guide so it looks movable, by painting something over it or drawing a box around it? Also draw the fixes written in the other issues. And the ratio's text can be left out."
+- [Sungmin, 11-24] "Apply option B for the edit-mode mark, in the shutter's place. What does showing the photo instead of the outline mean? I think the confirm dialog can go."
+- [Sungmin, 11-24] "Put it at the same link, and update GitHub."
+- [Sungmin, 11-24] "Did you change the documents too?"
+- [Sungmin, 11-24] "Yes, fix them and open the PR." ([#300]: Testing 4.4 records the guide's light teal fill while editing, and Back from the poses without "Go back?".)
+- [Sungmin, 11-25] "Now I'm going to build issue #298. First make an implementation plan."
+- [Sungmin, 11-25] "Then can you start with the parts that don't overlap issue #308?"
+- [Sungmin, 11-25] "If it doesn't change much code, bring the tip back too. Five seconds for Undo seems fine."
+- [Sungmin, 11-25] "Commit what's done so far and open the PR." ([#312], as a draft.)
+- [Sungmin, 11-25] "Oh, just build the rest too."
+- [Sungmin, 11-25] "Commit and push."
+- [Sungmin, 11-25] "Fix the description and take it out of draft."
+- [Sungmin, 11-25] "PR #312 has conflicts now. Resolve them." (With #308, then #313, merged meanwhile. The library now has two tabs, so the switches' touch target test takes two parts or more.)
+- [Sungmin, 11-25] "When done, commit and push."
+- [Sungmin, 11-25] "Build an APK from this PR and install it on the connected phone."
+
+## A photo turns into its guide ([#295], [#319])
+
+- [Sungmin, 11-25] "First plan how to build issue #295. Don't change anything." (The agent proposed one animation for every gallery photo, grown from the screenshot's cut, with two choices. The photo goes to the card's bottom right, where a screenshot's photo already goes. AI poses keep their fade, or the subject's phone would have to change too.)
+- [Sungmin, 11-25] "Go with the recommendations." (Built test-first: five screen tests failed on the old behaviour. `PhotoToGuide` and `PhotoToGuideView` replace the screenshot's cut. The line is the outline view's own drawing, shown along `OutlineExtractor.lines`. `ReferenceGuide.photo` keeps the photo, dropped on *Use*. R&S 4.19, Design 4.20, Testing 4.22, and Flow 1's note.)
+- [Sungmin, 11-25] "Commit and open the PR." ([#319])
+- [Sungmin, 11-26] "PR #319 has conflicts now. Resolve them and update the PR." (With #316 and #321: the revision rows renumbered, and Flow 1's images rendered again.)
+- [Sungmin, 11-26] "I connected the phone. Install the APK."
+- [Sungmin, 11-26] "Checked. Upload the prompt log too. If there are logs I didn't upload while building other features, include them as well." (On the phone, `seg.start`–`seg.end` took 0.49–1.33 s.)
+- [Sungmin, 11-26] "Let's just put the prompt logs in a new PR." (This section and the one above, the privacy policy's on its page, and ONE store's on a new page.)
+
+## Notices in the zoom row's place, the timer's ring, the tip's button, and the photo viewer ([#328])
+
+- [Jaewan, 11-26] "I want to have three fixes: \ 1. in several places we have snack bars that have a '되돌리기' '다시 시도' '취소' etc option. but these currently show above the 1.0x zoom control button, which looks weird. can we have that snack bar at thebottom of the camera roll, even if it covers the zoom button, and instead allow the user to make it disappear by sweeping it down? \ 2. when we film with a timer, does it show like this? [Image #1] i think we removed the '셔터를 누르면 취소돼요' text, which is intended, but we don't have that ui in the shutter. can we do this? \ 3. pose tips are hidden whenever we touch any place in the screen. can we make this controllable only through the tip button? \ first check if you can apply these changes, and give me ui mockups. i'll confirm, and then start implementing"
+- [Jaewan, 11-26] "1. fill up 2. yes i think this is good. draw this in the mockup first 3. what othere cases do we have? \ don't implement these yet"
+- [Jaewan, 11-26] "on every notice \ before that, one more question: during a session, the '실시간으로 보는 중' text only appears in the subject side? no corresponding notification in the photographer side? and does that not collide with the guide control tool bar region? can you give me screenshots of how this works currently, using two emulators on S22, for all three camera ratios?"
+- [Jaewan, 11-26] "ok, close the emulators. i'll get back to this later, now implement the three we talked about earlier (in a new branch)"
+- [Jaewan, 11-26] "i want to install this app on my phone via android studio debug build, can i do this now?"
+- [Jaewan, 11-26] "one more. what happens if we delete a photo from the gallery now?"
+- [Jaewan, 11-26] "for a photo not taken by pix, android asks 'Pix에서 이 사진을 삭제하도록 허용하겠습니까?', but do we need to press '허용' for this all the time? i think it's better to always keep the '이 사진을 삭제할까요?' popup for all photos. if we need to grant permission, can we make this happen only once? is this possible? \ And the phrase '이 휴대폰에서 지워져요 / It is removed from this phone' seems kinda too artificial, any better candidates?"
+- [Jaewan, 11-26] "yes make that fix for allowing deleting once. also for the wording i'd choose for A, but for korean say '휴대폰 갤러리' instead of '갤러리'. also, since our grid shows newest images at the top, the scrolling should also put the newest image at the left. fix these too"
+- [Jaewan, 11-26] "skip the full check let's check them through github. fix the wireframes/docs, and then push this and create a pr. also create an issue (Iter5-A14) and link it"
+- [Jaewan, 11-26] "wait i want to first install this on my phone first can i do this first"
+- [Jaewan, 11-26] "just put allow access a separate popup at the first try, and never place allow access together with delete and cancel."
+- [Jaewan, 11-26] "when we first click a photo, can we make it place in the center of the bottom scroll bar (if possible)"
+- [Jaewan, 11-26] "make the snackbar disappearing animation slightly slower"
+- [Jaewan, 11-26] "ok now do the wireframes, issue, and pr"
+- [Jaewan, 11-26] "phone checks are done. also add the prompt logs"
+- [Jaewan, 11-26] "there are changes in dev resolve the conflicts"
+
 [#270]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/270
 [#292]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/292
 [#294]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/294
+[#295]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/295
 [#297]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/297
+[#298]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/298
+[#300]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/300
 [#301]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/301
 [#304]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/304
 [#306]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/306
 [#308]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/308
 [#310]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/310
+[#312]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/312
 [#315]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/315
+[#319]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/319
 [#321]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/321
+[#328]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/328

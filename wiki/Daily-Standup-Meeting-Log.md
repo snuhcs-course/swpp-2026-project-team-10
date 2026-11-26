@@ -507,6 +507,68 @@ Weekend standups are flexible.
 
 </details>
 
+<details>
+<summary><b>2026-11-20 (Fri)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Recorded the tips check of Iteration 4 ([#253]) | The Iteration 5 kickoff on 11/21 | – |
+| 박재완 | Merged Iter4-A6: each situation's tile as its button ([#250]), and crash reports and usage events from release builds ([#256]) | The Iteration 5 kickoff on 11/21 | – |
+| 조성민 | Merged the standup logs up to 11/19 ([#251]), one phone zooms at a time ([#252]), the Iteration 4 test results ([#255]), the Iteration 4 documents ([#257]–[#259]), and `dev` into `main` ([#260]); submitted Iteration 4; started the ONE store registration | The Iteration 5 kickoff on 11/21; release builds on the AWS servers | – |
+| 한준형 | Prepared the Iteration 5 kickoff meeting | The Iteration 5 kickoff on 11/21 | – |
+
+</details>
+
+## Iteration 5
+
+<details>
+<summary><b>2026-11-22 (Sun)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Iter5-P4: a guide from an earlier session on the subject's phone ([#268]) | Open its PR; UAT cycle 2 on 11/23 | – |
+| 박재완 | Sent the AWS servers' logs to CloudWatch ([#263]); merged what Sign up collects and deleting an account ([#287]) and the policy page's language link ([#289]), each into `main` too ([#288], [#290]) | UAT cycle 2 on 11/23; Iter5-P7: the UI fixes ([#271]) | – |
+| 조성민 | Merged release builds on the two AWS servers over HTTPS ([#261], [#262]), the privacy policy ([#264]), and the Iteration 5 plan ([#286]) with its issues, Iter5-P1–P21 ([#265]–[#285]); sent the new build to ONE store's review; rewrote the alpha prep survey | Run UAT cycle 2 in class ([#267]) | – |
+| 한준형 | Iter5-P6: the library's situations and memos ([#270]) | UAT cycle 2 on 11/23; continue [#270] | – |
+
+</details>
+
+<details>
+<summary><b>2026-11-23 (Mon)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Merged removing the earlier session's guide ([#291]); UAT cycle 2 in class | Iter5-P10: options on *Generate poses* ([#274]); Iter5-A5: the scene photo straight to *Generate poses* ([#296]) | – |
+| 박재완 | UAT cycle 2 in class; the UI fixes ([#271]) | Open the PR for [#271] | – |
+| 조성민 | Ran UAT cycle 2 in class ([#267]); recorded its results ([#299]) and opened its follow-ups, Iter5-A1–A7 ([#292]–[#298]); ONE store refused the first review because the listing's countries did not match, so asked again with Korea alone | Iter5-A7: Impeccable on Pix's screens ([#298]) | – |
+| 한준형 | UAT cycle 2 in class; the library ([#270]) | Iter5-A6: the library's history and favorites ([#297]) | – |
+
+</details>
+
+<details>
+<summary><b>2026-11-24 (Tue)</b> · 23:00–23:10</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Merged options on *Generate poses* without the scene photo's review ([#302]), remote focus with the brightness beside it ([#303]), and a new guide that starts with the camera's gestures ([#305]); opened Camera without the pinch-to-zoom hint ([#307]) | Iter5-A3: Back from *No person found* ([#294]); Iter5-A1: who is zooming ([#292]) | – |
+| 박재완 | Merged the switches for the grid and the horizon bar, with UAT cycle 2's UI fixes ([#301]) | Iter5-P8: a self-timer ([#272]) | – |
+| 조성민 | Reviewed the screens with Impeccable ([#298]) and opened the follow-ups it decided ([#300]); made and prepared the TA meeting slides | Build Impeccable's fixes ([#298]); the TA meeting on 11/25 | – |
+| 한준형 | The library's history and favorites ([#297]) | Open the library's PR | – |
+
+</details>
+
+<details>
+<summary><b>2026-11-25 (Wed)</b> · 17:30–18:00</summary>
+
+| Member | Done | Plan | Blockers |
+|---|---|---|---|
+| 박동제 | Merged [#307], Back from *No person found* to *Add a pose guide* ([#309]), who is zooming with a gliding zoom step ([#311]), and reconnecting for 30 s ([#313]); opened a shutter on *Subject view* with AI poses started by the subject ([#316]) | Merge [#316]; Iter5-A12: the timer set from the subject's phone ([#318]) | – |
+| 박재완 | Opened the self-timer ([#315]) | Merge [#315]; Iter5-A13: the phone's photos in Pix ([#320]) | – |
+| 조성민 | Merged the review's follow-ups ([#300]) and Impeccable's fixes ([#312]); ONE store approved Pix; made and prepared the TA meeting slides | Present Iteration 5 at the TA meeting at 19:00; Iter5-A4: a photo turns into its guide ([#295]) | – |
+| 한준형 | Merged the library's situations, memos, history, favorites, and selection ([#308]) | The pose tip and the camera through a ratio change | – |
+
+</details>
+
 [#5]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/5
 [#6]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/6
 [#11]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/11
@@ -681,3 +743,51 @@ Weekend standups are flexible.
 [#248]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/248
 [#249]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/249
 [#250]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/250
+[#251]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/251
+[#252]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/252
+[#253]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/253
+[#255]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/255
+[#256]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/256
+[#257]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/257
+[#259]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/259
+[#260]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/260
+[#261]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/261
+[#262]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/262
+[#263]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/263
+[#264]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/264
+[#265]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/265
+[#267]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/267
+[#268]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/268
+[#270]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/270
+[#271]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/271
+[#272]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/272
+[#274]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/274
+[#285]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/285
+[#286]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/286
+[#287]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/287
+[#288]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/288
+[#289]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/289
+[#290]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/290
+[#291]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/291
+[#292]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/292
+[#294]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/294
+[#295]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/295
+[#296]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/296
+[#297]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/297
+[#298]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/298
+[#299]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/299
+[#300]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/300
+[#301]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/301
+[#302]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/302
+[#303]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/303
+[#305]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/305
+[#307]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/307
+[#308]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/308
+[#309]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/309
+[#311]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/311
+[#312]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/312
+[#313]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/313
+[#315]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/315
+[#316]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/316
+[#318]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/318
+[#320]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/320

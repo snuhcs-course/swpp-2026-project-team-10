@@ -211,6 +211,15 @@ class TestAppContainer(
     /** Other apps' photos, which only Android's question deletes, [deleteQuestion]; its yes deletes them. */
     var othersPhotos: Set<Uri> = emptySet()
 
+    /**
+     * As from Android 12, where Pix asks before deleting another app's photo too; false as on Android 11, where only
+     * Android's question does.
+     */
+    var asksForOthers = false
+
+    /** Whether Pix may not manage the phone's media yet, so Android would ask about another app's photo each time. */
+    var needsMediaAccess = false
+
     /** Stands in for Android's question before another app's photo is deleted. */
     val deleteQuestion: IntentSender = PendingIntent.getActivity(
         ApplicationProvider.getApplicationContext(),
@@ -241,7 +250,9 @@ class TestAppContainer(
     private val deleter = object : PhotoDeleter {
         override suspend fun delete(uri: Uri) = photos.delete(uri, albumDeleter, CoroutineScope(Dispatchers.Main))
 
-        override fun asksFirst(uri: Uri) = uri !in othersPhotos
+        override fun asksFirst(uri: Uri) = uri !in othersPhotos || asksForOthers
+
+        override fun needsAccess(uri: Uri) = uri in othersPhotos && needsMediaAccess
     }
 
     /** The candidates kept as history through [maker], so a test finishes each cut it waits for. */

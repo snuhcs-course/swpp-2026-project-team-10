@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.Looper
@@ -17,6 +17,7 @@ import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.TestAppContainer
+import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
 import java.time.Duration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,9 +38,10 @@ import org.robolectric.annotation.GraphicsMode
  * with the test modules' TipSyncer as the session runs it. The button (equivalence partitioning of what the guide on
  * the video has): no guide, a guide without a tip, a tip of another guide, a tip of the guide on the video, a hidden
  * guide, which closes an open tip for good, a tip the photographer's phone took back. The banner (state-based): closed
- * when the tip comes, with the button's dot; opened by the button with the tip's sentences, one on a line; closed by
- * the button, by a touch anywhere, which still reaches the control it lands on, and by a click on itself; closed again
- * for another guide's tip.
+ * when the tip comes, with the button's dot; opened by the button with the tip's sentences, one on a line; closed only
+ * by the button, lit and named "Close tip" while the tip is open; left open by a touch on the video (which still asks
+ * for the focus), on another control (which still does what it does), and on itself (which reaches no video under it);
+ * closed again for another guide's tip.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -59,15 +61,20 @@ class SubjectTipScreenTest {
 
     private fun idle() = shadowOf(Looper.getMainLooper()).idle()
 
-    /** Subject view in a live session with the photographer's video, listening for their tip. */
-    private fun launch() {
+    /**
+     * Subject view in a live session with the photographer's video, listening for their tip; with [focuses], a camera
+     * that a tap on the video focuses.
+     */
+    private fun launch(focuses: Boolean = false) {
         modules = TestAppContainer().install()
         scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix)
         idle()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
         modules.video.deliverFrame()
         modules.session.deliver(
-            SessionMessage.Capabilities(CameraCapabilities(0.6f, 10f, listOf(1f, 2f), -6..6, 0.5f, false)),
+            SessionMessage.Capabilities(
+                CameraCapabilities(0.6f, 10f, listOf(1f, 2f), -6..6, 0.5f, false, supportsFocusPoint = focuses),
+            ),
         )
         modules.tipSync.startAsReceiver(receiving)
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
@@ -91,12 +98,17 @@ class SubjectTipScreenTest {
 
     private fun string(id: Int) = onScreen { controls, _ -> controls.root.context.getString(id) }
 
-    /** A tap that starts and ends at [view]'s middle, dispatched from the screen's root as a finger's would be. */
-    private fun tapThroughTheRoot(controls: FragmentSubjectBinding, view: View) {
+    private fun focuses() = modules.session.sent.filterIsInstance<SessionMessage.FocusSet>()
+
+    /**
+     * A tap that starts and ends at [view]'s middle, or [down] of its height down, dispatched from the screen's root as a
+     * finger's would be.
+     */
+    private fun tapThroughTheRoot(controls: FragmentSubjectBinding, view: View, down: Float = 0.5f) {
         val at = IntArray(2).also(view::getLocationInWindow)
         val origin = IntArray(2).also(controls.root::getLocationInWindow)
         val x = (at[0] - origin[0] + view.width / 2).toFloat()
-        val y = (at[1] - origin[1] + view.height / 2).toFloat()
+        val y = at[1] - origin[1] + view.height * down
         val now = SystemClock.uptimeMillis()
         controls.root.dispatchTouchEvent(MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, x, y, 0))
         controls.root.dispatchTouchEvent(MotionEvent.obtain(now, now + 50, MotionEvent.ACTION_UP, x, y, 0))
@@ -202,14 +214,22 @@ class SubjectTipScreenTest {
         guideOnVideo()
         tipArrives()
 
-        // As a finger's tap: the root sees the touch end first, which must not close what the button then opens.
+        // As a finger's tap, through the root.
         onScreen { controls, _ -> tapThroughTheRoot(controls, controls.tipButton) }
         idle()
-        onScreen { controls, _ -> assertTrue(controls.tipBanner.isShown) }
+        onScreen { controls, _ ->
+            assertTrue(controls.tipBanner.isShown)
+            assertTrue("lit while the tip is open", controls.tipButton.isActivated)
+            assertEquals(string(R.string.close_tip), controls.tipButton.contentDescription)
+        }
 
         onScreen { controls, _ -> tapThroughTheRoot(controls, controls.tipButton) }
         idle()
-        onScreen { controls, _ -> assertFalse(controls.tipBanner.isShown) }
+        onScreen { controls, _ ->
+            assertFalse(controls.tipBanner.isShown)
+            assertFalse(controls.tipButton.isActivated)
+            assertEquals(string(R.string.show_tip), controls.tipButton.contentDescription)
+        }
 
         onScreen { controls, _ -> tapThroughTheRoot(controls, controls.tipButton) }
         idle()
@@ -220,7 +240,7 @@ class SubjectTipScreenTest {
     }
 
     @Test
-    fun aTouchAnywhere_closesTheTip_andStillReachesTheControlItLandsOn() {
+    fun aTouchOnAnotherControl_stillReachesIt_andLeavesTheTipOpen() {
         launch()
         guideOnVideo()
         tipArrives()
@@ -231,24 +251,49 @@ class SubjectTipScreenTest {
         idle()
 
         onScreen { controls, _ ->
-            assertFalse(controls.tipBanner.isShown)
+            assertTrue(controls.tipBanner.isShown)
             assertTrue("guide-edit mode turned on", controls.editGuideButton.isChecked)
-            assertTrue("the button stays for another look", controls.tipButtonFrame.isShown)
         }
     }
 
     @Test
-    fun aClickOnTheBanner_closesIt_asTalkBackDoes() {
-        launch()
+    fun aTouchOnTheVideo_asksForTheFocus_andLeavesTheTipOpen() {
+        launch(focuses = true)
         guideOnVideo()
         tipArrives()
         onScreen { controls, _ -> controls.tipButton.performClick() }
         idle()
 
-        onScreen { controls, _ -> controls.tipBanner.performClick() }
+        // Above the open tip, which lies over the video's middle on this small screen.
+        onScreen { controls, _ -> tapThroughTheRoot(controls, controls.videoContainer, down = 0.25f) }
         idle()
 
-        onScreen { controls, _ -> assertFalse(controls.tipBanner.isShown) }
+        assertEquals(1, focuses().size)
+        onScreen { controls, _ -> assertTrue(controls.tipBanner.isShown) }
+    }
+
+    @Test
+    fun aTapOnTheOpenTip_leavesItOpen_andAsksForNoFocusThroughIt() {
+        launch(focuses = true)
+        guideOnVideo()
+        tipArrives()
+        onScreen { controls, _ -> controls.tipButton.performClick() }
+        idle()
+        onScreen { controls, _ ->
+            // The banner lies over the photographer's image here, so a tap that went through it would ask for focus.
+            val area = controls.videoContainer
+            val frame = fitViewfinderFrame(area.width.toFloat(), area.height.toFloat())
+            val banner = IntArray(2).also(controls.tipBanner::getLocationInWindow)
+            val video = IntArray(2).also(area::getLocationInWindow)
+            val middle = banner[1] + controls.tipBanner.height / 2f - video[1]
+            assertTrue(middle > frame.top && middle < frame.bottom)
+        }
+
+        onScreen { controls, _ -> tapThroughTheRoot(controls, controls.tipBanner) }
+        idle()
+
+        onScreen { controls, _ -> assertTrue(controls.tipBanner.isShown) }
+        assertEquals(emptyList<SessionMessage.FocusSet>(), focuses())
     }
 
     @Test

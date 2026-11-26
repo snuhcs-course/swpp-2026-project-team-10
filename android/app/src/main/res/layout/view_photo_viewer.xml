@@ -147,11 +147,12 @@
             app:layout_constraintTop_toBottomOf="@id/photoViewerHeader"
             tools:listitem="@layout/item_photo_page" />
 
-        <!-- The thumbnails, in the middle while they fit and scrolling once they do not; kept in place while there is
-             one photo, so a second one coming does not move the photo on screen. -->
+        <!-- The thumbnails, the one on screen in the strip's middle: the strip spans the screen, and PhotoViewer pads its
+             ends by half its width less a thumbnail, so the first and the last can stand there too. Kept in place while
+             there is one photo, so a second one coming does not move the photo on screen. -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/photoViewerStrip"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_marginBottom="24dp"
             android:clipToPadding="false"
@@ -160,7 +161,6 @@
             android:paddingHorizontal="16dp"
             android:translationZ="1dp"
             android:visibility="invisible"
-            app:layout_constrainedWidth="true"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"

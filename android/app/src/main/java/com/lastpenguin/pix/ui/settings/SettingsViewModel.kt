@@ -78,8 +78,11 @@ class SettingsViewModel(
     // Set at once, as the tips closed are: the stored answer comes back later, and a second delete must not offer again.
     private val accessOfferedHere = MutableStateFlow(false)
 
-    /** Whether Pix has offered to manage the phone's media for deleting another app's photo (FR-1.16): only once. */
-    fun mediaAccessOffered(): Boolean = accessOfferedHere.value || settings.mediaAccessOffered.value
+    /**
+     * Whether Pix has offered to manage the phone's media for deleting another app's photo (FR-1.16): only once. While
+     * the stored answer is unread it counts as offered, so the offer never comes twice.
+     */
+    fun mediaAccessOffered(): Boolean = accessOfferedHere.value || settings.mediaAccessOffered.value != false
 
     /** The media access was offered now, so it never is again. */
     fun markMediaAccessOffered() {

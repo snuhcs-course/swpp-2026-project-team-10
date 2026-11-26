@@ -8,6 +8,7 @@ import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -35,7 +36,8 @@ import org.robolectric.Shadows.shadowOf
  * A notice swiped down and away (Design 2.8; SwipeDownToDismiss in ui/Notices.kt), on a notice of the activity's and on
  * one in a sheet's window. Partitions of the drag (boundary value analysis on its length, and its speed): down past
  * half the notice's height (gone), down less and slowly (back where it was, whole again), down less but flung (gone),
- * up (left where it is). Where it starts: on the text, or on the action, whose tap still runs it and whose drag goes
+ * up (left where it is), sideways while wandering down past the slop (left), and a quick fling mostly sideways after a
+ * start down (left). Where it starts: on the text, or on the action, whose tap still runs it and whose drag goes
  * without running it. In a sheet, the drag takes the notice away and leaves the sheet open. How long it goes: 300 ms,
  * swiped away or by itself.
  */
@@ -67,25 +69,40 @@ class NoticeSwipeTest {
     private fun notice() = noticeIn(activity.window.decorView)
 
     /**
-     * A finger down at [from] on [notice] (its own coordinates), moved [by] px down (up when negative) in [steps] over
-     * [ms], held there for [holdMs], and lifted: the notice's events as a finger's, timed so the speed at the lift is
-     * [by] / [ms] unless the finger held still first.
+     * A finger down at [from] on [notice] (its own coordinates), moved [by] px down (up when negative) and [across] px to
+     * the right in [steps] over [ms], held there for [holdMs], and lifted: the notice's events as a finger's, timed so
+     * the speed at the lift is the way over [ms] unless the finger held still first.
      */
-    private fun drag(notice: View, from: Pair<Float, Float>, by: Float, ms: Long, holdMs: Long = 0, steps: Int = 5) {
+    private fun drag(
+        notice: View,
+        from: Pair<Float, Float>,
+        by: Float,
+        ms: Long,
+        holdMs: Long = 0,
+        steps: Int = 5,
+        across: Float = 0f,
+    ) {
         val start = SystemClock.uptimeMillis()
         val (x, y) = from
-        fun send(action: Int, at: Long, dy: Float) {
-            val event = MotionEvent.obtain(start, start + at, action, x, y + dy, 0)
+        fun send(action: Int, at: Long, dx: Float, dy: Float) {
+            val event = MotionEvent.obtain(start, start + at, action, x + dx, y + dy, 0)
             notice.dispatchTouchEvent(event)
             event.recycle()
         }
-        send(MotionEvent.ACTION_DOWN, 0, 0f)
-        for (step in 1..steps) send(MotionEvent.ACTION_MOVE, ms * step / steps, by * step / steps)
-        if (holdMs > 0) {
-            send(MotionEvent.ACTION_MOVE, ms + holdMs / 2, by)
-            send(MotionEvent.ACTION_MOVE, ms + holdMs, by)
+        send(MotionEvent.ACTION_DOWN, 0, 0f, 0f)
+        for (step in 1..steps) {
+            send(
+                MotionEvent.ACTION_MOVE,
+                ms * step / steps,
+                across * step / steps,
+                by * step / steps,
+            )
         }
-        send(MotionEvent.ACTION_UP, ms + holdMs, by)
+        if (holdMs > 0) {
+            send(MotionEvent.ACTION_MOVE, ms + holdMs / 2, across, by)
+            send(MotionEvent.ACTION_MOVE, ms + holdMs, across, by)
+        }
+        send(MotionEvent.ACTION_UP, ms + holdMs, across, by)
     }
 
     private fun middleOf(notice: View) = notice.width / 3f to notice.height / 2f
@@ -157,6 +174,62 @@ class NoticeSwipeTest {
         val notice = notice()
 
         drag(notice, middleOf(notice), by = -notice.height.toFloat(), ms = 60, steps = 3)
+        settle()
+
+        assertEquals("A notice", shownNotice())
+        assertEquals(0f, notice.translationY, 0.5f)
+    }
+
+    @Test
+    fun aSidewaysSwipe_thatWandersDownPastTheSlop_leavesTheNoticeWhereItIs() {
+        showNotice()
+        val notice = notice()
+        val slop = ViewConfiguration.get(notice.context).scaledTouchSlop.toFloat()
+        val start = SystemClock.uptimeMillis()
+        val (x, y) = middleOf(notice)
+        fun send(action: Int, at: Long, dx: Float, dy: Float) {
+            val event = MotionEvent.obtain(start, start + at, action, x + dx, y + dy, 0)
+            notice.dispatchTouchEvent(event)
+            event.recycle()
+        }
+
+        // Twice the slop down on the way, but four times as far sideways: the notice does not follow.
+        send(MotionEvent.ACTION_DOWN, 0, 0f, 0f)
+        send(MotionEvent.ACTION_MOVE, 100, slop * 4, slop)
+        send(MotionEvent.ACTION_MOVE, 200, slop * 8, slop * 2)
+        assertEquals(0f, notice.translationY, 0.5f)
+        send(MotionEvent.ACTION_UP, 500, slop * 8, slop * 2)
+        settle()
+
+        assertEquals("A notice", shownNotice())
+        assertEquals(0f, notice.translationY, 0.5f)
+    }
+
+    @Test
+    fun aQuickDiagonalFling_mostlySideways_leavesTheNotice() {
+        showNotice()
+        val notice = notice()
+        val slop = ViewConfiguration.get(notice.context).scaledTouchSlop.toFloat()
+        // Past the slop, so the drag starts, and short of half the notice's height at the end, so only a fling could
+        // take it: still going down at the lift, fast enough for one, but far faster sideways.
+        val down = slop * 1.1f
+        val last = slop * 1.5f
+        assertTrue("$last px is under half of ${notice.height} px", last < notice.height / 2f)
+        val start = SystemClock.uptimeMillis()
+        val (x, y) = middleOf(notice)
+        fun send(action: Int, at: Long, dx: Float, dy: Float) {
+            val event = MotionEvent.obtain(start, start + at, action, x + dx, y + dy, 0)
+            notice.dispatchTouchEvent(event)
+            event.recycle()
+        }
+
+        // Down first, then flung far sideways.
+        send(MotionEvent.ACTION_DOWN, 0, 0f, 0f)
+        send(MotionEvent.ACTION_MOVE, 20, 0f, down)
+        assertTrue("the drag started", notice.translationY > 0f)
+        send(MotionEvent.ACTION_MOVE, 30, slop * 6, (down + last) / 2)
+        send(MotionEvent.ACTION_MOVE, 40, slop * 12, last)
+        send(MotionEvent.ACTION_UP, 40, slop * 12, last)
         settle()
 
         assertEquals("A notice", shownNotice())

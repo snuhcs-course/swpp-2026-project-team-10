@@ -16,6 +16,7 @@ import androidx.fragment.app.FragmentActivity
 import com.google.android.material.R as materialR
 import com.google.android.material.snackbar.Snackbar
 import com.lastpenguin.pix.R
+import kotlin.math.abs
 
 /** How long a notice stays: a Toast's two lengths, and longer for one that can be undone (#298). */
 enum class NoticeLength(val ms: Int) {
@@ -106,7 +107,8 @@ private fun noticeContext(host: View) = ContextThemeWrapper(host.context, R.styl
 /**
  * A notice that a swipe down takes away, on every screen (Design 2.8): it follows the finger down and fades, and goes
  * once dragged past half its height or flung down; a shorter, slower drag springs it back. Only down: a drag up or
- * sideways leaves it. The drag may start on the action, such as Undo, which is then not pressed; a tap there still runs
+ * sideways leaves it, also one that wanders down a little on its way sideways, since the drag starts only while the
+ * finger has gone more down than sideways, and a fling counts only when mostly down. The drag may start on the action, such as Undo, which is then not pressed; a tap there still runs
  * it. Material's own swipe works only in a CoordinatorLayout and only sideways, and Pix's notices go on the activity's
  * content or a sheet's window, so this replaces the notice's touch handling, which otherwise only keeps touches from
  * the views under it.
@@ -118,8 +120,12 @@ internal class SwipeDownToDismiss(private val notice: Snackbar) : View.OnTouchLi
     private val slop = config.scaledTouchSlop
     private val minimumFling = config.scaledMinimumFlingVelocity.toFloat()
     private val maximumFling = config.scaledMaximumFlingVelocity.toFloat()
+    private var startX = 0f
     private var startY = 0f
     private var dragging = false
+
+    // The touch went sideways first: it is no swipe down, whatever it does after.
+    private var passed = false
     private var velocity: VelocityTracker? = null
 
     fun attach() {
@@ -135,8 +141,10 @@ internal class SwipeDownToDismiss(private val notice: Snackbar) : View.OnTouchLi
         track(event)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                startX = event.rawX
                 startY = event.rawY
                 dragging = false
+                passed = false
                 view.animate().cancel()
                 // A sheet under a notice in its window must not take the drag for its own.
                 view.parent?.requestDisallowInterceptTouchEvent(true)
@@ -144,7 +152,9 @@ internal class SwipeDownToDismiss(private val notice: Snackbar) : View.OnTouchLi
 
             MotionEvent.ACTION_MOVE -> {
                 val down = event.rawY - startY
-                if (!dragging && down > slop) {
+                val sideways = abs(event.rawX - startX)
+                if (!dragging && sideways > slop && sideways >= down) passed = true
+                if (!dragging && !passed && down > slop && down > sideways) {
                     dragging = true
                     // The action was pressed at the touch's start: it lets go without a tap.
                     if (onAction) {
@@ -184,11 +194,12 @@ internal class SwipeDownToDismiss(private val notice: Snackbar) : View.OnTouchLi
     }
 
     private fun release(down: Float) {
-        val speed = velocity?.run {
-            computeCurrentVelocity(1_000, maximumFling)
-            yVelocity
-        } ?: 0f
-        settle(away = down > view.height / 2f || (speed >= minimumFling && down > 0f))
+        val tracker = velocity
+        tracker?.computeCurrentVelocity(1_000, maximumFling)
+        val speed = tracker?.yVelocity ?: 0f
+        val across = abs(tracker?.xVelocity ?: 0f)
+        // A fling away is mostly down: a fast diagonal one is not.
+        settle(away = down > view.height / 2f || (speed >= minimumFling && speed > across && down > 0f))
     }
 
     /** Away: on down and out, then the notice is dismissed; otherwise back where it was. */
@@ -230,6 +241,7 @@ internal class SwipeDownToDismiss(private val notice: Snackbar) : View.OnTouchLi
 
     private fun end() {
         dragging = false
+        passed = false
         velocity?.recycle()
         velocity = null
     }

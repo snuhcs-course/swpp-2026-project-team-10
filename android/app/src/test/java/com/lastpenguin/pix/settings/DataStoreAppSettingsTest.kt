@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNotNull
@@ -32,7 +33,8 @@ import org.junit.runner.RunWith
 
 /*
  * The settings kept across runs (FR-10.1, Design 2.8): the defaults before any choice (usage data shared, FR-10.6; the
- * grid and the horizon bar on, FR-1.9, FR-1.10; the media access not yet offered, FR-1.16), then each choice in the flows and read back by a new instance, as after
+ * grid and the horizon bar on, FR-1.9, FR-1.10; the media access not yet offered, FR-1.16, and unread until the store
+ * is read), then each choice in the flows and read back by a new instance, as after
  * a restart; two toggles of the grid at once (back where it was) and one of the horizon bar; and a store that cannot be read,
  * whose usage choice stays unread instead of taking the default (FR-10.6) while the other settings take theirs. One test, because the DataStore behind the context extension lives
  * for the process.
@@ -47,7 +49,7 @@ class DataStoreAppSettingsTest {
         assertFalse(settings.showLatency.value)
         assertTrue(settings.showGrid.value)
         assertTrue(settings.showLevel.value)
-        assertFalse(settings.mediaAccessOffered.value)
+        assertEquals(false, withTimeout(TIMEOUT_MS) { settings.mediaAccessOffered.filterNotNull().first() })
         assertEquals(
             emptySet<TutorialScreen>(),
             withTimeout(TIMEOUT_MS) {
@@ -74,7 +76,7 @@ class DataStoreAppSettingsTest {
         assertFalse(withTimeout(TIMEOUT_MS) { settings.showLevel.first { !it } })
         assertEquals(seen, withTimeout(TIMEOUT_MS) { settings.tutorialSeen.first { it == seen } })
         assertEquals(false, withTimeout(TIMEOUT_MS) { settings.shareUsage.first { it == false } })
-        assertTrue(withTimeout(TIMEOUT_MS) { settings.mediaAccessOffered.first { it } })
+        assertEquals(true, withTimeout(TIMEOUT_MS) { settings.mediaAccessOffered.first { it == true } })
 
         val restarted = DataStoreAppSettings(ApplicationProvider.getApplicationContext<Context>(), scope)
         assertEquals(chosen, withTimeout(TIMEOUT_MS) { restarted.guideLook.first { it == chosen } })
@@ -86,7 +88,7 @@ class DataStoreAppSettingsTest {
         // Off from the first read: a phone whose user turned it off never sends in between (FR-10.6).
         assertEquals(false, withTimeout(TIMEOUT_MS) { restarted.shareUsage.filterNotNull().first() })
         // Offered once, never again after a restart (FR-1.16).
-        assertTrue(withTimeout(TIMEOUT_MS) { restarted.mediaAccessOffered.first { it } })
+        assertEquals(true, withTimeout(TIMEOUT_MS) { restarted.mediaAccessOffered.first { it == true } })
 
         // The camera menu's Grid tapped twice at once, and Horizon once: each toggle reads what the one before it saved,
         // so the grid is back off and the horizon bar on (FR-1.17).
@@ -132,6 +134,22 @@ class DataStoreAppSettingsTest {
         assertFalse(settings.showLatency.value)
         assertTrue(settings.showGrid.value)
         assertTrue(settings.showLevel.value)
+    }
+
+    @Test
+    fun aStoreNotReadYet_leavesTheMediaOfferUnread() = runTest {
+        val slow = object : DataStore<Preferences> {
+            override val data: Flow<Preferences> = flow { awaitCancellation() }
+
+            override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences =
+                awaitCancellation()
+        }
+
+        val settings = DataStoreAppSettings(slow, backgroundScope)
+        testScheduler.runCurrent()
+
+        // Not false, which would offer the media access again before the stored answer comes (FR-1.16).
+        assertNull(settings.mediaAccessOffered.value)
     }
 
     private companion object {

@@ -58,9 +58,10 @@ interface AppSettings {
 
     /**
      * Whether Pix has offered to manage the phone's media, which it does once, at the first delete of another app's photo
-     * that Android would ask about (FR-1.16); false by default.
+     * that Android would ask about (FR-1.16); false by default. null until the stored answer is read, so a delete right
+     * after a start never offers it a second time.
      */
-    val mediaAccessOffered: StateFlow<Boolean>
+    val mediaAccessOffered: StateFlow<Boolean?>
 
     suspend fun setGuideColor(color: GuideColor)
 
@@ -121,8 +122,8 @@ interface AppSettings {
         private val _shareUsage = MutableStateFlow(usage)
         override val shareUsage: StateFlow<Boolean?> = _shareUsage.asStateFlow()
 
-        private val _mediaAccessOffered = MutableStateFlow(mediaAccess)
-        override val mediaAccessOffered: StateFlow<Boolean> = _mediaAccessOffered.asStateFlow()
+        private val _mediaAccessOffered = MutableStateFlow<Boolean?>(mediaAccess)
+        override val mediaAccessOffered: StateFlow<Boolean?> = _mediaAccessOffered.asStateFlow()
 
         override suspend fun setGuideColor(color: GuideColor) {
             _guideLook.value = _guideLook.value.copy(color = color)
@@ -224,8 +225,11 @@ class DataStoreAppSettings(private val store: DataStore<Preferences>, scope: Cor
             }
             .stateIn(scope, SharingStarted.Eagerly, null)
 
-    override val mediaAccessOffered: StateFlow<Boolean> =
-        preferences.map { it[MEDIA_ACCESS_OFFERED] ?: false }.stateIn(scope, SharingStarted.Eagerly, false)
+    // Unread until the first read, unlike the switches, whose default is safe to show meanwhile.
+    override val mediaAccessOffered: StateFlow<Boolean?> =
+        preferences.map<Preferences, Boolean?> {
+            it[MEDIA_ACCESS_OFFERED] ?: false
+        }.stateIn(scope, SharingStarted.Eagerly, null)
 
     override suspend fun setGuideColor(color: GuideColor) = save { it[GUIDE_COLOR] = color.name }
 

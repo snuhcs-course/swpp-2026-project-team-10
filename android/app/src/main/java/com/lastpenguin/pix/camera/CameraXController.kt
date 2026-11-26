@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.camera
 
 import android.animation.ValueAnimator
@@ -839,7 +839,11 @@ class CameraXController(
         }
         if (current.exposureRestored) return
         current.exposureRestored = true
-        if (retainedExposure == 0) return
+        if (retainedExposure == 0) {
+            // The camera is at 0 EV, as asked for; a change to 0 while it was closed was never reported.
+            _state.update { it.copy(exposure = 0) }
+            return
+        }
         current.restoringExposure = true
         applyExposure(current, retainedExposure)
     }

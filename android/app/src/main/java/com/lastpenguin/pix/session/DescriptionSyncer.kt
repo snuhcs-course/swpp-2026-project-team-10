@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-15, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -118,7 +118,10 @@ data class StartedDescription(val text: String, val partner: SessionPartner?, va
  * Subject ([startAsReceiver]): keeps the description in [mirror], in memory only, through a reconnect, and drops it at
  * its end, at another description, and when the session ends, saying in [ended] how it ended and in [started] what
  * description a set was made from, for the prompt history (FR-4.11). [edit] sends the field's text, and [go] sends
- * *Generate 4 poses* or *Skip* and waits [GO_TIMEOUT_MS] for the description's end; otherwise [goFailed].
+ * *Generate 4 poses* or *Skip* and waits [GO_TIMEOUT_MS] for the description's end; otherwise [goFailed]. What the
+ * field asked for last is kept, and sent again when it could not be sent and the link is back, or when the
+ * photographer's phone names another holder ([reassert]): a drop that only one phone saw loses the field's hold, its
+ * release, or its newest text (Design 2.6.7).
  * Owner: Shared steps (Iter3-P16).
  */
 class DescriptionSyncer(
@@ -314,9 +317,19 @@ class DescriptionSyncer(
     private var receiver: CoroutineScope? = null
     private var deadline: Job? = null
 
+    /** Subject: what this phone's field last asked for of a description, and whether it could be [sent]. */
+    private data class Asked(val descriptionId: String, val holding: Boolean, val text: String, val sent: Boolean)
+
+    @Volatile
+    private var asked: Asked? = null
+
     /** Subject: keeps the photographer's description in [mirror] while [scope] is active. */
     fun startAsReceiver(scope: CoroutineScope) {
         receiver = scope
+        scope.launch {
+            // The link is back: what the field asked for while it was down was not sent.
+            session.state.collect { _mirror.value?.let(::reassert) }
+        }
         scope.launch {
             var assembler: SceneAssembler? = null
             try {
@@ -359,6 +372,7 @@ class DescriptionSyncer(
                     _going.value = null
                     _mirror.value = null
                     _startedScene.value = null
+                    asked = null
                 }
             }
         }
@@ -388,7 +402,7 @@ class DescriptionSyncer(
                     answer()
                     _startedScene.value = null
                 }
-                _mirror.value = MirrorDescription(
+                val description = MirrorDescription(
                     message.descriptionId,
                     message.text.orEmpty(),
                     message.writer,
@@ -396,6 +410,8 @@ class DescriptionSyncer(
                     current?.takeIf { it.descriptionId == message.descriptionId }?.scene,
                     message.situation,
                 )
+                _mirror.value = description
+                reassert(description)
             }
 
             DescriptionStep.STARTED, DescriptionStep.CLOSED -> when {
@@ -437,13 +453,36 @@ class DescriptionSyncer(
 
     /**
      * Subject: this phone's field [holding] the description, with its [text]; false, and nothing sent, without an open
-     * description or a session.
+     * description or a session. It is kept either way, for [reassert].
      */
     fun edit(holding: Boolean, text: String): Boolean {
         val description = _mirror.value ?: return false
-        if (!connected()) return false
-        session.send(SessionMessage.PoseDescriptionEdit(description.descriptionId, holding, text))
-        return true
+        val sent = connected()
+        asked = Asked(description.descriptionId, holding, text, sent)
+        if (sent) session.send(SessionMessage.PoseDescriptionEdit(description.descriptionId, holding, text))
+        return sent
+    }
+
+    /**
+     * Subject: sends what this phone's field asked for last again, once the link is there. What could not be sent goes
+     * out whatever [description] says: the photographer's phone may still name this phone as the holder, with the text
+     * from before the drop. What was sent goes out again only when [description], as the photographer's phone has it,
+     * names another holder: nobody while this field holds it, as after a drop only the photographer's phone saw,
+     * which frees the field ([DescriptionRequest.Gone]); or this phone after its field let go. Its text is not
+     * compared, since an echo of an earlier text is on its way whenever this phone types. The photographer's own
+     * field holding the description settles it the other way: this phone's hold was not taken, and is not asked for
+     * again.
+     */
+    private fun reassert(description: MirrorDescription) {
+        val mine = asked?.takeIf {
+            it.descriptionId == description.descriptionId && description.writer != Role.PHOTOGRAPHER
+        }
+        asked = mine
+        if (mine == null || !connected()) return
+        if (mine.sent && mine.holding == (description.writer == Role.SUBJECT)) return
+        asked = mine.copy(sent = true)
+        session.send(SessionMessage.PoseDescriptionEdit(mine.descriptionId, mine.holding, mine.text))
+        Timings.mark("pose.sent", "description edit again ${mine.descriptionId} holding=${mine.holding}")
     }
 
     /**

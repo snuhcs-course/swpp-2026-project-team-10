@@ -148,6 +148,7 @@
 | 4.25 | 2026-11-26 | The viewer's pages newest first and the media access for deleting (Iter5-A14, [#327]): their tests, the fake deleter's new flags, and IT-43's steps 2 and 3 (1.1, 2.1.8, Appendix A). |
 | 4.26 | 2026-11-26 | The guide's panel on *Subject view*, Camera's line that says who watches, and 1:1 in its 4:3 on *Subject view* (Iter5-A15, [#329]): their owner and tests, added steps on IT-6 and IT-8, and IT-33's line (1.1, 2.1.5, Appendix A). |
 | 4.27 | 2026-11-26 | Both phones' libraries, *Undo* on both, *Subject view*'s tip, and the dialogs' buttons (Iter5-A15, [#329]): their tests and added steps on IT-6 and IT-27 (1.1, 2.1.5, Appendix A). |
+| 4.28 | 2026-11-26 | The two-phone sync fixes: their owner and tests, and IT-44 (1.1, 2.1.5, Appendix A). |
 
 </details>
 
@@ -258,6 +259,7 @@ One member writes and maintains each component's tests, following the module own
 | The library's situations and memos (Iter5-P6, [#270]) | Repositories, Models, ViewModels, Views, the session protocol | `guide/` (`FileSavedGuideStoreTest`), `ui/guide/` (`LibraryPageTest`, `SavedGuidesViewModelTest`, `ReferenceViewModelTest`, `LibraryFragmentTest`), `ui/generation/` (`PoseSaveViewModelTest`, `GenerationViewModelTest`), `session/` (`PoseSyncerTest`, `GuideSyncerTest`), `ui/` (`KoreanScreensTest`); IT-26 on phones | 한준형 |
 | The cutout, and pose generation started by the subject (Iter5-P11, P12) | Managers, ViewModels, Views, the session protocol | `guide/`, `ui/guide/`, `session/`, `ui/session/`, `generation/` | 한준형 |
 | The ratio-change fixes: the pose tip stays open, the focus box and the brightness bar go, the subject's tap waits for the new frame, and no ratio while the scene photo is taken | ViewModels, Views | `ui/camera/` (`CameraTipScreenTest`, `CameraControlsViewModelTest`), `ui/session/SubjectFragmentRenderTest`, `ui/generation/GenerationViewModelTest`; IT-7 and IT-30 on phones | 한준형 |
+| The two-phone sync fixes: a guide gesture without a final value, the description field after a one-sided drop, a queue for each reader of `incoming`, the brightness of an unmoved finger and of a camera that opens at 0 EV, and Back after the pick of a subject who left | Managers, ViewModels, Views | `session/` (`DescriptionSyncerTest`, `RtcSessionManagerTest`), `ui/session/SubjectViewModelTest`, `ui/camera/ExposureBarViewTest`, `ui/generation/GenerationViewModelTest`; IT-44 on phones. `CameraXController`'s 0 EV needs a camera: IT-44 step 4 only. The pick of a subject who left cannot be timed by hand: its test only | 한준형 |
 | AI module tests: the outline and the person check (Iter5-P16, P17) | The phone's segmentation and person check; the server's person check | 3.1, 3.2 | 박재완 (the outline), 한준형 (the person check) |
 | Integration tests, Iteration 2 flows | Across components (two phones, public server) | 2.1.5; Design 2.9 (Iter2-P21) | 한준형 |
 | Integration tests, Iteration 3 flows | Across components (two phones, public server) | 2.1.5; Design 2.9 | 박재완 |
@@ -517,6 +519,7 @@ The codec and message tests use the JSON examples of Design 2.5 verbatim, so a f
 | IT-41 | Remote focus, with the brightness beside the focus box (Iter5-P9) | Two real phones in a session, AWS dev server, Wi-Fi; a near thing and a far thing in the photographer's view | A tap on the subject's video moves the photographer's focus there, with the focus box at the same place on both phones and one notice for taps in a row. The bar beside the box changes the brightness on both phones, and each tap puts it back to 0 EV. A tap in guide-edit mode or beside the image does nothing. The photographer's own tap shows the box on the subject's phone too. | US-12, FR-7.3, FR-7.4, FR-7.7 · Iteration 5 | [steps](#it-41-procedure) |
 | IT-42 | The self-timer and the camera menu (Iter5-P8) | One real phone, then a second phone as the subject; AWS dev server, Wi-Fi | Each of the menu's choices applies, with its notice for the flash and the timer. With 3 s, one photo 3 s ± 0.3 s after the shutter; a second tap, or leaving Camera, saves nothing; meanwhile only zoom and focus work. In a session the subject's phone counts within 0.5 s of the photographer's. | FR-1.9, FR-1.10, FR-1.12, FR-1.17, R&S 6.2, 6.5, 6.6 · Iteration 5 | [steps](#it-42-procedure) |
 | IT-43 | The phone's photos, and the pose flow's screens (Iter5-A13) | One real phone with photos from its camera app, a screenshot, and a download; Android 14 or later for chosen photos; AWS dev server, Wi-Fi | The gallery shows every photo, five a row, newest first, and the phone's albums; Back goes one step at a time; chosen and denied access each show what they say; every delete asks Pix's question, the media access is offered once on its own, and another app's photo, after *Allow access*, gets no question of Android's; the pages run newest first. The scene photo keeps Camera's bar, *Generate poses* unfolds from it, the steps fade with Back and the flow's bar in place, and a library tab comes back where it was left. Each touch light is whole, in its shape. | FR-1.6, FR-1.16, FR-3.11, FR-4.1, FR-4.5, R&S 6.2, 6.3, 6.9 · Iteration 5 | [steps](#it-43-procedure) |
+| IT-44 | The two phones in step through a short drop and at a shared control | Two real phones in a room-code session, AWS dev server, Wi-Fi; a second tester for the Wi-Fi switches | After each step both phones show the same guide, brightness, and description, within 1 s of the link coming back. No field stays "… is typing…" while the other phone's field is free. The subject's screens follow each pose step while photos arrive. | FR-6.12, FR-6.15, FR-7.2, FR-7.3, FR-7.6, NFR-11 · Iteration 5 | [steps](#it-44-procedure) |
 
 #### 2.1.6 Test design techniques and where they apply
 
@@ -2218,6 +2221,30 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 - Step 7: *Favorites* starts at its top. *All* comes back where it was left, fading in, with no guide moving across the grid.
 - Step 8: ←, *Share*, *Delete*, and ⋮ light a round area about 40 dp across, never cut at its side. A guide lights in its rounded corners, a Settings row inside its card's corners, *AI pose generation* with its text, and the Pix ID in rounded corners. Each option of the camera menu and the ratios lights inside itself, rounded, never over the next one. ⋮ opens a card in the app's colors and font.
 - Step 9: every change is immediate.
+
+### IT-44 procedure
+
+**Flow:** The two phones in step through a short drop and at a shared control (the two-phone sync fixes; FR-6.12, FR-6.15, FR-7.2, FR-7.3, FR-7.6, NFR-11 · Iteration 5). **Devices and network:** two real phones in a room-code session against the AWS dev server, on Wi-Fi; a second tester, who switches a phone's Wi-Fi off for about 5 s and on again where a step says "a drop".
+
+**Steps**
+
+1. With a guide on Camera, turn guide-edit mode on on Subject view and drag the guide. While the finger moves, the photographer hides the guide and shows it again. Lift the finger.
+2. Drag the guide on Subject view again. While the finger moves, a drop on the photographer's phone. Lift the finger during the drop.
+3. Tap the preview on Camera, so the brightness bar is up at 0. Put a finger on its sun and hold it still. Meanwhile the subject taps the video and drags its sun up by about 1 EV. Lift the photographer's finger.
+4. The subject drags the brightness to about +1 EV. The photographer presses Home. The subject drags the brightness back to 0, and the photographer opens Pix again within 30 s. Then the subject drags the brightness to +1 EV again.
+5. Open *Generate poses* on both phones. The subject taps the field and types "jump". A drop on the subject's phone. After the link is back, wait 2 s, then the photographer taps the field.
+6. The subject taps the field and types "wave". A drop on the photographer's phone; the subject goes on typing " high" while its field still takes it. After the link is back, the subject taps Done.
+7. Take five photos in a row on Camera. While the subject's phone still shows a photo on its way, open *Generate poses*, go Back to the scene photo, and open it again.
+
+**Expected result**
+
+- Step 1: the guide on Subject view is where Camera's is as soon as the finger lifts, not where the finger left it.
+- Step 2: once the link is back, both phones show the guide at the same place, within 3 % of the frame width.
+- Step 3: the brightness stays at the subject's value on both phones. Camera shows no brightness notice of its own, and its sun moves to the subject's value when the finger lifts.
+- Step 4: back in Pix, both bars show 0 and the preview is as bright as at 0 EV. The last drag brightens the preview, and both bars show about +1 EV.
+- Step 5: the subject's field waits during the drop. After it, neither phone says "… is typing…", both fields show "jump", and the photographer's tap takes the field.
+- Step 6: after the link is back, the photographer's field shows what the subject's shows, and says the subject is typing while the subject's field still has the keyboard. After Done, both fields show the same text and both *Generate* buttons work.
+- Step 7: the subject's *Generate poses* opens, closes, and opens again with the photographer's, each within 1 s, and all five photos reach the subject's Pix album.
 
 ## Appendix B. Run records
 

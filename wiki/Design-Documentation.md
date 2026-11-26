@@ -141,6 +141,7 @@
 | 4.24 | 2026-11-26 | The viewer's pages newest first, Pix's question before every delete, the media access offered once on its own (`needsAccess`, `mediaAccessOffered`, `MANAGE_MEDIA`), and notices above the viewer's strip (2.6.5, 2.8; Iter5-A14, [#327]). |
 | 4.25 | 2026-11-26 | Iter5-A15 ([#329]): the guide's panel on *Subject view* (`guide.visible.set`, `guide.opacity.set`, `guide.remove`), the photographer's panel in `camera.did`, Camera's line that says who watches (`SessionCaption`), the 1:1 stream in its 4:3 (`streamCrop`), and the focus tip beside its point (2.1, 2.5.1, 2.6.2, 2.6.4, 2.6.5, 2.6.8, 2.8). |
 | 4.26 | 2026-11-26 | Iter5-A15 ([#329]): `SessionGuideKeeper` and `poseGuideId`, so both phones keep each other's guides and candidates; `guide.restore` and *Undo* on both phones; *Subject view*'s tip beside the toggle; the dialogs' buttons (2.5.1, 2.6.3, 2.6.5, 2.8). |
+| 4.27 | 2026-11-26 | Two-phone sync fixes: a guide gesture without a final value settles on the mirror, the description field asks again after a one-sided drop, each reader of `incoming` has its own queue, an unmoved finger sends no brightness, 0 EV is reported when the camera opens, and Back undoes the pick of a subject who left (2.4, 2.6.5, 2.8). |
 
 </details>
 
@@ -1623,7 +1624,7 @@ stateDiagram-v2
 | The pose set (`PoseSetStep`) | `GENERATING` → `PICKING` when *Pick a pose* opens with a candidate → `CHOSEN` by the first *Select*; `CLOSED` without a choice |
 | *Reference confirm* of a chosen pose (`ConfirmStep`) | `FINDING` → `READY` with the outline → `USED` by the first *Use*; `CLOSED` without a guide |
 
-**Pose screens (2.6.3, [#199]).** `GenerationUiState.phase` on the photographer's phone. Back on each screen goes one step back, and that step shows what it had. The guide on the camera, or a choice in a session, ends the step (`IDLE`).
+**Pose screens (2.6.3, [#199]).** `GenerationUiState.phase` on the photographer's phone. Back on each screen goes one step back, and that step shows what it had. The guide on the camera, or a choice in a session, ends the step (`IDLE`). Back on *Reference confirm* outside a session undoes the choice (`pickAgain`), also one that a subject made just before leaving: kept, it would send *Pick a pose* on again at every Back.
 
 ```mermaid
 stateDiagram-v2
@@ -3000,6 +3001,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - With it on, drags and pinches move the guide locally, clamped by `GuideGeometry` for the photographer's frame. `guide.move` sends the guide's id, center, and height: steps at most every 50 ms, the final value at once.
   - `RemoteControlHandler` drops a move for a missing, hidden, or replaced guide. Otherwise the photographer's `GuideRepository` clamps and applies it, and `GuideSyncer` echoes `guide.state` with `by: SUBJECT`.
   - During the gesture the subject takes only `visible` and `opacity` from the mirror. The first `guide.state` after the final value settles the guide. Of two moves, the later wins (FR-7.6).
+  - A gesture that ends without a final value gets no echo: the mode went off under it, the guide was hidden, or the link dropped. The subject's guide then goes back to the mirror's state at once (`SubjectViewModel.endGuideGesture`). At a drop it does so also after a final value, which may not arrive.
 - **The guide's panel (It 5, FR-7.2, [#329]).** While a guide is on the video, *Subject view* has Camera's panel above the line that names the camera: *Hide* / *Show*, the opacity slider, ♥, and ✕.
   - *Hide* sends `guide.visible.set` with the other state and ✕ sends `guide.remove`; neither changes the guide here before the echo. The slider sends `guide.opacity.set` like a move (`opacitySender`): the guide here takes each value at once, the mirror's opacity waits meanwhile, and the first `guide.state` after the final value settles it.
   - `RemoteControlHandler` applies them as Camera's own panel does, `attribute(SUBJECT)` for the echo, and drops a request for a replaced guide or an opacity for a hidden one. So while a guide offered from *Subject view* waits for the photographer's phone to adopt it (`GuideSyncer.offering`), the three and guide-edit mode wait too: that phone does not have the guide yet, and would drop its moves. Camera says "Joonhyung hid the guide", "… showed the guide", "… set the guide's opacity to 70%", "… put the guide back", or "… removed the guide" with *Undo*, which puts the same guide back where it was (`RemoteAction.GuideRemove` carries both; `CameraViewModel.onUndoRemoteRemove`).
@@ -3024,6 +3026,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - The other phone waits and shows "Joonhyung is typing…" or "Dongje is typing…". A subject's chip, of the history or of the options (FR-4.15), sends its text at once.
   - `pose.description.go` starts the set with the subject's text, or the photographer's when nobody held the field. It is refused while the photographer's field holds it.
   - A drop frees the subject's field (`DescriptionRequest.Gone`). The photographer's Back closes the subject's screen with "Dongje closed Generate poses". The subject's Back closes only its own.
+  - A drop that only one phone saw loses the field's hold or its release. The subject's `DescriptionSyncer` therefore keeps what its field asked for last (`reassert`). What could not be sent goes out when the link is back, also text typed into a field it still holds. What was sent goes out again when `pose.description` names another holder. The text is not compared, since an echo of an earlier text is on its way whenever the subject types. The photographer's own field holding the description ends that: the subject's hold was not taken.
   - Subject view shows a description only while it holds no set or confirm.
   - `STARTED` carries the text and `setId`. The subject records the text once that set has a candidate or is `PICKING` (2.6.3, Prompt history).
 - **Pick a pose on both phones.** `PoseShare` reports `GENERATING`, the planned slots and failed candidates (Iter3-A13), each candidate, `PICKING` in pager order, and `CHOSEN` or `CLOSED`.
@@ -3040,7 +3043,7 @@ Subject view's controls are requests. The photographer's phone applies them in a
 - **Photos on both phones (FR-6.14, US-14, [#121]).** Each session photo reaches the subject's "Pix" album.
   - A photo belongs to the session at its shutter (`PhotoShare.shutter`), then follows as `taken` or `notTaken`. In a connected session the shutter also sends `photo.shutter`, so the subject's video blinks (2.6.4).
   - `PhotoSyncer` sends the saved JPEG itself, with its EXIF rotation, over the encrypted data channel, not through the Pix server (FR-1.5, NFR-13). It sends one photo at a time in shutter order, read from the gallery at its turn.
-  - `SessionManager.sendBulk` sends a chunk only while no reliable message waits and under 64 KiB are buffered (2.8, NFR-7). `photo.ack` allows 32 unacknowledged chunks, within the phones' 64- and 256-message buffers.
+  - `SessionManager.sendBulk` sends a chunk only while no reliable message waits and under 64 KiB are buffered (2.8, NFR-7). `photo.ack` allows 32 unacknowledged chunks, within the 256 events the peer connection buffers.
   - The subject writes chunks to a cache file. At `photo.end`, `PhotoAlbum` saves it to Pictures/Pix through a pending MediaStore row dated `takenAt`. `photo.saved` answers, `ok: true` again for a repeat.
   - The subject sees "Photo saved to your Pix album" or "Couldn't save Dongje's photo". The photographer sees "Couldn't send a photo to Joonhyung" for an unreadable or refused photo, one over 40 MiB, or one stalled for 30 s.
   - `PhotoSyncer.sessionPhotos` lists the session's photos on this phone, oldest first: those taken on the photographer's phone, those saved on the subject's. It is null outside a session, empty until the first, and kept through a reconnect, which keeps the session's id ([#235]).
@@ -3369,6 +3372,7 @@ erDiagram
 
 - Reliable messages wait in one ordered queue until `hello` has gone out and while the reliable channel's `bufferedAmount` is 256 KiB or more. Realtime messages never wait.
 - A guide image of tens of KB stays well under that limit, so control messages are not held up. A session photo of megabytes would hold the queue up, so its chunks go through `sendBulk`, outside it. They go one at a time, only while the queue is empty and `bufferedAmount` is below 64 KiB (2.6.5).
+- Each reader of `SessionManager.incoming` has its own queue of 1,024 messages (`MessageFanout`). A reader that falls behind delays only itself. Until Iteration 5 all readers shared one buffer of 64: a main thread that stood still while a photo's chunks arrived filled it, and the next messages were dropped for every reader, the end of a pose step among them.
 
 **Caching**
 
@@ -3583,6 +3587,8 @@ erDiagram
 - The focus box (`bg_focus_ring`) is a 64 dp square of a 1 dp accent line, with a short tick at the middle of each side. Subject view has the same box and bar for the photographer's camera, in place of its brightness button and slider (2.6.5, [#273]). `FocusBrightness` places and times both on either screen.
 - Beside the bar, the box stays as long as the bar does, and the two fade out together in 200 ms, whatever closes the bar (`FocusBrightness`). On a camera without brightness, the box fades by itself after about a second. Before, it went after a second while the bar stayed and still changed the brightness ([#207]).
 - A new ratio closes the bar on both screens. The rebind drops the focus point, so the box would mark a focus that is gone.
+- A finger lifted without moving the sun sends no value, and the bar then shows the brightness as it is. The old value would go out over a change the other phone made meanwhile (FR-7.6).
+- A camera that opens with 0 EV asked for reports 0 EV (`CameraXController.restoreExposureIfNeeded`). A change to 0 while the camera was closed was kept but never reported, so both bars showed the old value.
 - The ratio cannot change while the scene photo's shutter waits for its frame (`GenerationUiState.shooting`). A rebind then would leave no frame to take.
 
 **Language** (FR-10.2)

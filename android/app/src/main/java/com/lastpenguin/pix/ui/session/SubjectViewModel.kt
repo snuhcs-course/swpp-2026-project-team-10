@@ -563,8 +563,8 @@ class SubjectViewModel(
                 }
                 // A gesture never crosses guide identities (Design 2.6.2): a removed or replaced guide ends it.
                 if (guide?.id != previous?.id) {
-                    guideSender.cancel()
                     opacitySender.cancel()
+                    endGuideGesture()
                     if (guide == null && previous != null) {
                         when {
                             previous.id == removing -> _guideRemoved.trySend(GuideRemoval.THIS_PHONE)
@@ -828,7 +828,23 @@ class SubjectViewModel(
             // The video's touches are the guide's then, so the bar that a tap brought goes (FR-7.7).
             it.copy(guideEditing = editing, brightnessOpen = it.brightnessOpen && !editing)
         }
-        if (!on) guideSender.cancel()
+        if (!on) endGuideGesture()
+    }
+
+    /**
+     * Ends this phone's guide gesture without a last value to send. No echo settles the guide then, so when [settle]
+     * it goes back to the mirror's state at once: after a gesture that was still running, or always when the link
+     * dropped, where a last value that was sent may not arrive either (Design 2.6.5).
+     */
+    private fun endGuideGesture(settle: Boolean = guideSender.adjusting) {
+        guideSender.cancel()
+        if (!settle) return
+        val state = mirror.state.value
+        // The opacity slider's own drag is drawn until it ends, as when the mirror changes.
+        _uiState.update {
+            val opacity = if (opacitySender.adjusting) it.guideState.opacity else state.opacity
+            it.copy(guideState = state.copy(opacity = opacity))
+        }
     }
 
     /**
@@ -840,7 +856,7 @@ class SubjectViewModel(
         val ui = _uiState.value
         val guide = ui.guide
         if (guide == null || !ui.guideEditing || !ui.connected || ui.guideWaiting) {
-            if (final) guideSender.cancel()
+            if (final) endGuideGesture()
             return
         }
         if (!dx.isFinite() || !dy.isFinite() || !scale.isFinite() || scale <= 0f) return
@@ -1120,8 +1136,8 @@ class SubjectViewModel(
         zoomHeldBack = false
         zoomSender.cancel()
         exposureSender.cancel()
-        guideSender.cancel()
         opacitySender.cancel()
+        endGuideGesture(settle = true)
     }
 
     companion object {

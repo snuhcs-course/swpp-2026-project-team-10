@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Joonhyung Han and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.content.Context
@@ -54,6 +54,10 @@ class ExposureBarView @JvmOverloads constructor(
     private var step = 0f
     private var downIndex = 0
 
+    // Whether the drag in progress has changed the index, and the index rendered last, which a drag does not show.
+    private var stepped = false
+    private var applied = 0
+
     /** The index the sun shows: the applied one, or the finger's while a drag runs. */
     var index: Int = 0
         private set
@@ -102,8 +106,9 @@ class ExposureBarView @JvmOverloads constructor(
         isEnabled = enabled && range.first < range.last
         // A bar that takes no touch has no finger waiting on it, whatever the finger still does.
         if (!isEnabled) endWaiting()
-        if (isDragging) return
         val clamped = value.coerceIn(range)
+        applied = clamped
+        if (isDragging) return
         ViewCompat.setStateDescription(this, describe(clamped))
         if (clamped == index && !moved) return
         index = clamped
@@ -195,6 +200,7 @@ class ExposureBarView @JvmOverloads constructor(
     fun startDrag() {
         if (!isEnabled || isDragging) return
         isDragging = true
+        stepped = false
         downIndex = index
         onTouching?.invoke(true)
     }
@@ -209,17 +215,28 @@ class ExposureBarView @JvmOverloads constructor(
         val next = (downIndex + (ev / step).roundToInt()).coerceIn(range)
         if (next != index) {
             index = next
+            stepped = true
             ViewCompat.setStateDescription(this, describe(index))
             invalidate()
             onChange?.invoke(index, false)
         }
     }
 
-    /** Ends a drag in progress with its final value, as when the screen pauses under the finger. */
+    /**
+     * Ends a drag in progress with its final value, as when the screen pauses under the finger. A finger that never
+     * moved the sun changed nothing: no value goes out, and the bar shows the brightness as it is now, which the
+     * other phone may have changed meanwhile (FR-7.6).
+     */
     fun finishDrag() {
         if (!isDragging) return
         isDragging = false
-        onChange?.invoke(index, true)
+        if (stepped) {
+            onChange?.invoke(index, true)
+        } else if (index != applied) {
+            index = applied
+            ViewCompat.setStateDescription(this, describe(index))
+            invalidate()
+        }
         onTouching?.invoke(false)
     }
 

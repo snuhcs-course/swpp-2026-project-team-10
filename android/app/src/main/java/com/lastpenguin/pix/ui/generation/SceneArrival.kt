@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.animation.ValueAnimator
@@ -95,12 +95,12 @@ private const val FULL_TURN = 360
 /**
  * Shows [scene], the scene photo just taken, coming from the camera into its [place], its thumbnail on this screen
  * (#296): drawn over the screen where the camera held it, its frame [from] Camera's hand-off (#210), or else as wide as
- * the screen right [under] the header, or as high as the room there for a frame taller than that. It moves as the photo of a screenshot's cut goes to its corner on
- * Reference confirm (ScreenshotCut), so loading a guide and a scene photo look alike: it holds for
- * [SceneArrival.HOLD_MS], then goes to the thumbnail in [SceneArrival.MOVE_MS], slow to start and slow to settle,
- * its corners rounding to the thumbnail's. A first try in 250 ms without the hold was too fast to follow on a phone.
- * From Camera's hand-off it moves at once, as the header unfolds around it ([HeaderUnfold]), which is as easy to follow.
- * Longer than Motion's other lengths, but nothing waits for it: the screen under it takes touches at once.
+ * the screen right [under] the header, or as high as the room there for a frame taller than that. It moves as a picked
+ * photo goes to its corner on Reference confirm (PhotoToGuide), so loading a guide and a scene photo look alike: it
+ * holds for [SceneArrival.HOLD_MS], then goes to the thumbnail in [SceneArrival.MOVE_MS], slow to start and slow to
+ * settle, its corners rounding to the thumbnail's. A first try in 250 ms without the hold was too fast to follow on a
+ * phone. From Camera's hand-off it moves at once, as the header unfolds around it ([HeaderUnfold]), which is as easy to
+ * follow. Longer than Motion's other lengths, but nothing waits for it: the screen under it takes touches at once.
  *
  * [turn] is how far [scene] was turned clockwise from the frame the camera showed, to be upright as the phone was held
  * (`GenerationUiState.sceneTurn`). The photo starts in the frame's shape, turned back by that much, so nothing changes

@@ -142,7 +142,8 @@
 | 4.19 | 2026-11-26 | The phone's photos in Pix, the scene photo's bar, the pose flow's motions, touch lights, *Generate poses* folding when its field is left empty, and the library's tabs (Iter5-A13, [#320]): their owner and tests, areas of 2.1.6, fakes and pitfalls, IT-43, and changes noted on IT-20, IT-31, and IT-35 (1.1, 2.1.5, 2.1.6, 2.1.8, Appendix A). |
 | 4.20 | 2026-11-25 | The subject's shutter on *Subject view* (Iter5-A11, [#314]): its owner and tests, with the photographer's timer serving it and either shutter cancelling, and added steps on IT-6 and US-12 (1.1, 2.1.5, 4.3, Appendix A). |
 | 4.21 | 2026-11-25 | AI poses started by the subject (Iter5-P12, [#276]): its owner and tests, with the photographer's timer, and an added step on IT-17 (1.1, 2.1.5, Appendix A). |
-| 4.22 | 2026-11-26 | The timer set from the subject's phone (Iter5-A12, [#318]): its owner and tests, and an added step on IT-6 (1.1, 2.1.5, Appendix A). |
+| 4.22 | 2026-11-25 | A photo turning into its guide (Iter5-A4, [#295]): its owner and tests, and added steps on IT-28 and IT-32 (1.1, 2.1.5, Appendix A). |
+| 4.23 | 2026-11-26 | The timer set from the subject's phone (Iter5-A12, [#318]): its owner and tests, and an added step on IT-6 (1.1, 2.1.5, Appendix A). |
 
 </details>
 
@@ -236,6 +237,7 @@ One member writes and maintains each component's tests, following the module own
 | A new guide starts with the camera's gestures (Iter5-A8, [#304]) | ViewModels, Views | `ui/camera/` (`CameraViewModelTest`, `GuideControlsViewModelTest`, `CameraFragmentRenderTest`, `CameraFragmentInteractionTest`); IT-5 and IT-34 on phones | 박동제 |
 | Camera's hint chip without "Pinch to zoom" (Iter5-A9, [#306]) | Views | `ui/camera/CameraFragmentRenderTest`; IT-34 on a phone | 박동제 |
 | *No person found*: Back returns to *Add a pose guide* (Iter5-A3, [#294]) | Views | `ui/guide/` (`NoPersonFoundFragmentTest`, `ReferenceConfirmFragmentTest`, `AddGuideSheetTest`), `ui/` (`ScreenTransitionsTest` on the real navigation, `KoreanScreensTest`); IT-35 and US-2 on phones, where alone the system's photo picker shows | 박동제 |
+| A photo turns into its guide on *Reference confirm* (Iter5-A4, [#295]) | Managers, Views | `guide/` (`OutlineExtractorTest`, `MlKitReferenceGuideMakerTest`), `ui/guide/` (`PhotoToGuideTest`, the timeline on the JVM; `PhotoToGuideViewTest`, what the view draws; `ReferenceConfirmFragmentTest`, with the animator's fraction set for its middle); IT-28 and IT-32 on a phone | 조성민 |
 | Who is zooming, and the photographer's actions on *Subject view* (Iter5-A1, [#292]) | Models, ViewModels, Views | `session/` (`RemoteControlHandlerTest`, `protocol/RemoteControlMessagesTest`, `protocol/ChannelRouterTest`), `ui/session/` (`SessionViewModelTest`, `SubjectViewModelTest`, `SubjectFragmentRenderTest`), `ui/camera/` (`CameraControlsViewModelTest`, `CameraFragmentInteractionTest`), `ui/guide/` (`ReferenceViewModelTest`, `SavedGuidesViewModelTest`, `ReferenceConfirmFragmentTest`); IT-6 on two phones | 박동제 |
 | A tap on the zoom readout glides (Iter5-A10, [#310]) | Models, ViewModels | `camera/ZoomGlideTest`, `ui/camera/CameraViewModelTest`, `session/RemoteControlHandlerTest`. `CameraXController`'s part needs a camera: IT-10 on the S22 and the S21, by eye and with `zoom_timings.py` | 박동제 |
 | Reconnecting lasts 30 s, Camera says who it reconnects with, and a photo's wait does not count the drop (Iter5-A2, [#293]) | Models, ViewModels, Views | `session/` (`RtcSessionManagerTest`, `PhotoSyncerTest`), `ui/session/SessionViewModelTest`, `ui/camera/CameraFragmentInteractionTest`, `ui/KoreanScreensTest`; IT-4 and IT-16 on two phones | 박동제 |
@@ -493,11 +495,11 @@ The codec and message tests use the JSON examples of Design 2.5 verbatim, so a f
 | IT-25 | Person check (Iter3-A7) | One phone, AWS server, Wi-Fi; a friend; a dog or its photo | An empty place: "No one in this photo" at once, with no server request. The friend near, at about 10 m, or turned away, and a selfie pass; a dog fails as `NO_PERSON`. *Changed in Iter5-A5 ([#296]):* the message shows on the camera, which is ready to shoot again; was: on the photo's review, with *Use this photo* disabled. | FR-4.13, US-4 · Iteration 3 | [steps](#it-25-procedure) |
 | IT-26 | Guide library (Iter3-A8) | One phone, upgraded from the pre-library `dev` build; a subject at the end | Three guides, newest first, with source icons, the old build's one too. Filters list only their source. A tap places the guide; only *Delete* removes one. *Added in Iter4-A6 ([#243]):* a picker closed without a photo leaves *Add a pose guide* or the library open, with the guide unchanged. *Added in Iter5-P6 ([#270]):* a pose saved by either phone shows its situation, a chip filters by it, and a memo stays after a restart. *Added in Iter5-A6 ([#297]):* every pose and used photo guide is listed with no tap, favorites have their tab and heart, and guides are selected and deleted several at once. | FR-3.8, FR-3.11, FR-6.16, FR-2.7 · Iteration 3 | [steps](#it-26-procedure) |
 | IT-27 | Saved poses (Iter3-A9) | Two phones, AWS server; the subject joins at the end | Each ♥ fills once its pose is cut out and stays on its candidate; a second tap removes it. Saved poses survive a restart. Each phone keeps its own ♥. *Changed in Iter5-A6 ([#297]): every candidate is kept with no tap; a ♥ marks a favorite, and a second tap makes it history again, still in the library.* | FR-4.14, FR-3.8, FR-3.11, FR-6.15 · Iteration 3 | [steps](#it-27-procedure) |
-| IT-28 | Screenshot cut (Iter3-A10) | One phone; its own screenshots of Instagram posts, a story, a grid, and a camera photo | Each post plays the cut once, about 2 s, ending with its photo and its person's outline; `seg.start`–`seg.end` within 2 s. | FR-2.10, FR-3.1, FR-3.8, FR-3.9, NFR-3 · Iteration 3 | [steps](#it-28-procedure) |
+| IT-28 | Screenshot cut (Iter3-A10) | One phone; its own screenshots of Instagram posts, a story, a grid, and a camera photo | Each post plays the cut once, about 2 s, ending with its photo and its person's outline; `seg.start`–`seg.end` within 2 s. *Changed in Iter5-A4 ([#295]): after the cut, the outline is drawn along the person as the photo goes to the corner, still about 2 s; a camera photo does the same without the cut, in about 1.3 s.* | FR-2.3, FR-2.10, FR-3.1, FR-3.8, FR-3.9, NFR-3 · Iteration 3 | [steps](#it-28-procedure) |
 | IT-29 | Screenshots from other apps (Iter3-A11) | One phone; its own screenshots of Google Images, Naver image search, and Instagram stories | Each is cut to the photo alone, without page headers, margins, scrollbars, or story controls. The outline is the photo's person. | FR-2.10, FR-3.8, FR-3.9 · Iteration 3 | [steps](#it-29-procedure) |
 | IT-30 | Changes on screen (Iter3-A12) | Two phones, public server; Android 10 or 11 for the camera switch; *Remove animations* last | Ratio, camera, photo, and reconnection changes animate on both phones instead of jumping, with no longer waits. With *Remove animations* every change is immediate. *Added 2026-11-25 (the ratio-change fixes): a new ratio keeps an open pose tip, takes down the focus box and the brightness bar, and ignores the subject's tap until the new frame shows.* | FR-1.5, FR-1.6, FR-1.13, FR-1.14, FR-3.7, NFR-11, NFR-17 · Iteration 3 | [steps](#it-30-procedure) |
 | IT-31 | Transitions between screens (Iter3-A14) | One phone; a second for Subject view; *Remove animations* last | Screens fade to and from Camera and Subject view and slide between others. A tap during a transition acts at once. With *Remove animations* every change is immediate. | R&S 6.9, FR-10.4, NFR-16 · Iteration 3 | [steps](#it-31-procedure) |
-| IT-32 | The guide and the pose flow (Iter3-A13) | Two phones in a session, AWS server; *Remove animations* last | Guides fade at the same place on both phones, and a drag moves at once. Both phones show the same button text and slots. With *Remove animations* everything is immediate. | FR-3.1, FR-3.6, FR-4.4, FR-4.8, FR-4.14, FR-6.15, R&S 6.9 · Iteration 3 | [steps](#it-32-procedure) |
+| IT-32 | The guide and the pose flow (Iter3-A13) | Two phones in a session, AWS server; *Remove animations* last | Guides fade at the same place on both phones, and a drag moves at once. Both phones show the same button text and slots. With *Remove animations* everything is immediate. *Added in Iter5-A4 ([#295]): with it, a gallery photo's *Reference confirm* shows its end at once, the photo in the corner.* | FR-2.3, FR-3.1, FR-3.6, FR-4.4, FR-4.8, FR-4.14, FR-6.15, R&S 6.9 · Iteration 3 | [steps](#it-32-procedure) |
 | IT-33 | Who takes the photo (Iter3-A17) | Two phones, AWS server; the subject signed out, then a Pix friend | Each phone shows only its own ways to connect. Live view within 10 s in each role and sign-in state. A dismissed invitation stays listed, and *Accept* connects within 10 s. *Added in Iter5-P7 ([#271]): once connected, each phone says whose camera it shows, by the account's name, and *Leave* is red.* | FR-5.2, FR-6.17, FR-8.1–8.3, FR-10.5, US-9, US-13, R&S 6.7, 6.9 · Iteration 3 | [steps](#it-33-procedure) |
 | IT-34 | Camera's controls after the heuristic evaluation (Iter3-A15) | The `Pix_P` emulator with `-camera-back emulated`; then the S22 and a second phone as the subject | Labels show for 3 s; the brightness bar starts at the base, follows drags, and resets at each tap; the horizon bar goes past 20°; *Save guide* toggles; a refused description is not kept. *Added in Iter5-P7 ([#271]): the guide-edit toggle is one icon, lit while on, with the guide tinted then, on both phones.* | FR-1.3, FR-1.4, FR-1.10, FR-1.11, FR-3.6, FR-3.8, FR-4.6, FR-4.8, FR-4.10, FR-4.11, FR-6.16, FR-10.1 · Iteration 3 | [steps](#it-34-procedure) |
 | IT-35 | Back on the pose screens and the top bar (Iter4-P2) | One debug-build phone, AWS server; a second phone as the subject for the last steps | Back on each pose screen goes one step back; on *Generating poses* and *Pick a pose* it asks first and drops the set, on both phones in a session. *Changed in Iter5-A6 ([#297]): it asks nothing, since the poses are in the library, and *Generate poses* says so with *View*.* *Reference confirm*'s Back returns to the same set, and *Regenerate* sends the same request; nothing is sent by Back. Each step's action is at the top right. *Changed in Iter5-A5 ([#296]):* the scene photo has no review, so Back on *Generate poses* returns to the camera to shoot again. | FR-2.3, FR-2.4, FR-4.1, FR-4.5–4.8, FR-4.13, R&S 6.2, 6.3, 6.5, 6.6, 6.9 · Iteration 4 | [steps](#it-35-procedure) |
@@ -1805,15 +1807,17 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 2. Kill Pix, open it, and open the library.
 3. *Add photo* the story, the grid, and the camera photo.
 4. On one post's *Reference confirm*, tap *Use the whole image*.
+5. *Added in Iter5-A4 ([#295]):* with the guide's color set to yellow in Settings, choose the camera photo from the gallery and watch *Reference confirm*. Choose it again, and tap *Use* while it plays.
 
 **Expected result**
 
-- Each post plays the cut once, about 2 s. It ends with the post's photo in the corner, "Cut from a screenshot", and the outline of the post's person only.
+- Each post plays the cut once, about 2 s. It ends with the post's photo in the corner, "Cut from a screenshot", and the outline of the post's person only. *Changed in Iter5-A4 ([#295]): after the cut, the outline is drawn along the person on the photo, and then the photo goes to the corner.*
 - On Camera, the guide starts where the person stands in the post, and the thumbnail is the post's photo.
 - After the restart, the library shows only the post's photo.
 - The grid and the camera photo are used whole, without the chip. The story is cut to its frame (IT-29).
 - *Use the whole image* makes the guide again from the whole screenshot, without the chip.
 - `cut.start`–`cut.end` lies inside `seg.start`–`seg.end`, which stays within 2 s.
+- *Added in Iter5-A4 ([#295]):* the camera photo fills the card, its outline is drawn in yellow along the person, and the photo shrinks to the corner, in about 1.3 s, without the chip. *Use* while it plays puts the guide on Camera at once.
 
 ### IT-29 procedure
 
@@ -1886,6 +1890,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 3. Generate from a description, then suggested poses with an empty field, and watch both phones' *Generating poses*.
 4. Tap ♥ on a candidate, then again. Use a pose and watch *Your reference*.
 5. On the subject's *Generating poses*, tap *Back*, then its button on Subject view.
+6. *Added in Iter5-A4 ([#295]):* in the pass with *Remove animations*, choose a photo and a screenshot from the gallery on *Guide*.
 
 **Expected result**
 
@@ -1895,6 +1900,7 @@ The full procedures of the manual integration scripts in 2.1.5. "As IT-n" means 
 - After *Back*, Subject view opens it again, and *Pick a pose* waits for its button.
 - A ♥ that saves grows once; one that removes does not.
 - The outline fades in on both phones. With *Remove animations*, everything is immediate.
+- *Added in Iter5-A4 ([#295]):* with *Remove animations*, the photo's and the screenshot's *Reference confirm* show the end at once: the photo in the corner and the outline in its place.
 
 ### IT-33 procedure
 

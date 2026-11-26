@@ -19,6 +19,7 @@ import com.lastpenguin.pix.guide.SavedGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.guide.forSituation
 import com.lastpenguin.pix.guide.intoFrameHeldAt
+import com.lastpenguin.pix.guide.withoutPicked
 import com.lastpenguin.pix.session.ConfirmShare
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SubjectGuideTarget
@@ -223,17 +224,19 @@ class ReferenceViewModel(
         get() = if (forSubject) subject?.current != null else guides.guide.value != null
 
     /**
-     * Puts [guide] on the camera, or offers it to the photographer from the subject's phone. A pose's guide, cut from a
-     * candidate of a scene photo held at [turn], is turned back into the camera's portrait frame (Design 2.6.2), so it
-     * lies on the preview held that way, on both phones (NFR-8).
+     * Puts [guide] on the camera, or offers it to the photographer from the subject's phone, without the picked image
+     * Reference confirm showed, which neither camera needs (#295). A pose's guide, cut from a candidate of a scene photo
+     * held at [turn], is turned back into the camera's portrait frame (Design 2.6.2), so it lies on the preview held
+     * that way, on both phones (NFR-8).
      */
     private fun use(guide: ReferenceGuide, turn: Int = 0, shared: Boolean = false) {
         val target = subject
+        val used = guide.withoutPicked()
         if (forSubject && target != null) {
-            target.offer(guide)
+            target.offer(used)
             return
         }
-        guides.setGuide(guide.intoFrameHeldAt(turn))
+        guides.setGuide(used.intoFrameHeldAt(turn))
         if (!shared) onGuideSet()
     }
 

@@ -12,6 +12,7 @@ import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.PhoneTurns
 import com.lastpenguin.pix.camera.PhotoDeleter
+import com.lastpenguin.pix.camera.PhotoDeletion
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.camera.isAtZoomStep
 import com.lastpenguin.pix.camera.nextZoomStep
@@ -232,7 +233,7 @@ class SubjectViewModel(
     /** The session's photos in this phone's album (`PhotoSyncer.sessionPhotos`, FR-6.14); null outside a session. */
     private val sessionPhotos: Flow<List<Uri>?> = flowOf(null),
     /** Deletes a photo from the viewer, from the album and the session's photos (`AppContainer.photoDeleter`). */
-    private val deleter: PhotoDeleter = PhotoDeleter { false },
+    private val deleter: PhotoDeleter = PhotoDeleter { PhotoDeletion.Failed },
     /** Whether a photo of the photographer's is on its way here (`PhotoSyncer.receiving`, #271). */
     private val receivingPhoto: Flow<Boolean> = flowOf(false),
     /** How this phone is held, which its own controls' icons turn with; nothing is sent (FR-1.15). */
@@ -644,7 +645,8 @@ class SubjectViewModel(
      */
     fun deletePhoto(uri: Uri) {
         viewModelScope.launch {
-            if (!deleter.delete(uri)) _photoNotDeleted.trySend(Unit)
+            // The session's photos are Pix's own, which need no question of Android's.
+            if (deleter.delete(uri) != PhotoDeletion.Deleted) _photoNotDeleted.trySend(Unit)
         }
     }
 

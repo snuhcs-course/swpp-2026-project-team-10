@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationError
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.MirrorPoseSet
 import com.lastpenguin.pix.session.PoseSetEnd
@@ -35,6 +36,8 @@ data class SubjectGeneratingUiState(
     val scene: Bitmap? = null,
     /** The set asks for suggested poses, which are chosen first. */
     val suggested: Boolean = false,
+    /** The situation the set is made for (FR-4.8); null from an older photographer. */
+    val situation: Situation? = null,
     /** The set moved on to *Pick a pose* with copies here: the screen goes on to the subject's *Pick a pose*. */
     val picking: Boolean = false,
     /** The set this screen opened with ended, was replaced, or is not there: the screen goes back to Subject view. */
@@ -100,6 +103,7 @@ class SubjectGeneratingViewModel(
                     planned = set.slots.isNotEmpty(),
                     scene = scene?.scene,
                     suggested = scene?.suggested == true,
+                    situation = set.situation,
                     photographerName = name,
                 )
             }

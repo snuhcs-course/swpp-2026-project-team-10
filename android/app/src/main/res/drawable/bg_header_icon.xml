@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An icon button in a header under a touch (#210), such as Back, Share, Delete, and ⋮: a round light 40 dp across
+     behind its icon, the same on every screen, the scene photo's camera bar included. Small enough to draw inside its
+     48 dp button, so a container around it must not clip there (HeaderBackTest). -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/colorControlHighlight"
+    android:radius="20dp" />

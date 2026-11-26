@@ -35,6 +35,7 @@ import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.account.SentRequest
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.PhotoAccess
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
@@ -154,7 +155,7 @@ import org.robolectric.shadows.ShadowDialog
  * and while the photographer picks a pose, with a guide to save, and with the session's photos open in the viewer,
  * readable or not (Iter4-A2); the subject's Pick a pose; Connection lost; Camera in a session with its photos open in the
  * viewer (Iter4-A2), with the delay shown, and with the notice of the subject's tap to focus (FR-7.7); Camera with
- * Pix's album open in the viewer; Settings, signed in; How
+ * the phone's photos open in the viewer, as their grid with each line of what shows and at a photo; Settings, signed in; How
  * to use Pix; About Pix; the privacy policy, failed to load. On each, no visible text, hint, or content
  * description has an English word but what Korean keeps (KEPT) and the test's own data (names, Pix IDs, the server's
  * pose texts), and no text is cut off: none is ellipsized, has lines dropped, or is taller than its view, except a name
@@ -326,12 +327,31 @@ class KoreanScreensTest {
             Uri.parse("content://media/external/images/media/1"),
             Uri.parse("content://media/external/images/media/2"),
         )
+        modules.photoAccess.value = PhotoAccess.CHOSEN
         idle()
         scenario!!.onFragment { FragmentCameraBinding.bind(it.requireView()).galleryButton.performClick() }
         // The pictures are read off the main thread.
         idle()
         Thread.sleep(200)
+        idle()
+        // Its grid first, with the line for the chosen photos and then for Pix's own, then a photo tapped there.
         assertKorean(screen())
+        modules.photoAccess.value = PhotoAccess.OWN
+        idle()
+        assertKorean(screen())
+        openAlbumsNewest()
+        assertKorean(screen())
+    }
+
+    /** A tap on the newest photo of Pix's album, open as its grid on Camera. */
+    private fun openAlbumsNewest() {
+        scenario!!.onFragment { fragment ->
+            val grid = fragment.requireView().findViewById<RecyclerView>(R.id.photoViewerGrid)
+            checkNotNull(grid.findViewHolderForAdapterPosition(0)) { "No photo in the grid" }.itemView.performClick()
+        }
+        idle()
+        Thread.sleep(200)
+        idle()
     }
 
     @Test
@@ -346,6 +366,8 @@ class KoreanScreensTest {
         scenario!!.onFragment { FragmentCameraBinding.bind(it.requireView()).galleryButton.performClick() }
         idle()
         Thread.sleep(200)
+        idle()
+        openAlbumsNewest()
         scenario!!.onFragment { it.requireView().findViewById<View>(R.id.photoViewerDelete).performClick() }
         idle()
 

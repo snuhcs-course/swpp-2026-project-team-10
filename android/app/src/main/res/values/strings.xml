@@ -152,6 +152,19 @@
     <string name="session_photo">Photo</string>
     <string name="session_photo_unavailable">This photo is no longer in your album.</string>
     <string name="photo_page_counter_description">Photo %1$d of %2$d</string>
+    <string name="gallery_photos">All photos</string>
+    <string name="gallery_albums">Albums</string>
+    <plurals name="photo_album_description">
+        <item quantity="one">%1$s, %2$d photo</item>
+        <item quantity="other">%1$s, %2$d photos</item>
+    </plurals>
+    <string name="album_camera">Camera</string>
+    <string name="album_screenshots">Screenshots</string>
+    <string name="album_downloads">Downloads</string>
+    <string name="photos_access_own">Only the photos Pix saved show here.</string>
+    <string name="photos_access_chosen">Only the photos you allowed show here.</string>
+    <string name="photos_access_allow">Allow all</string>
+    <string name="photos_access_change">Change</string>
     <string name="share_photo">Share photo</string>
     <string name="delete_photo">Delete photo</string>
     <string name="delete_photo_title">Delete this photo?</string>
@@ -281,7 +294,6 @@
     <string name="creating_pose">Creating…</string>
     <string name="pose_failed">Couldn\'t create</string>
     <string name="ready_count">%1$d of %2$d ready</string>
-    <string name="generating_scene_caption">Same person and place · up to 60 s</string>
     <string name="pick_pose_title">Pick a pose</string>
     <string name="pose_page_counter" translatable="false">%1$d / %2$d</string>
     <string name="pose_page_counter_description">Pose %1$d of %2$d</string>

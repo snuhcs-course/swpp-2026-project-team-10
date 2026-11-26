@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The library's ⋮ menu (#297), a card under the button (LibraryFragment.showMore): Select, as a long press does, and
+     Select all, which selects every guide listed. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:minWidth="180dp"
+    android:orientation="vertical"
+    android:padding="6dp">
+
+    <TextView
+        android:id="@+id/selectGuides"
+        style="@style/Widget.Pix.MenuItem"
+        android:text="@string/library_select" />
+
+    <TextView
+        android:id="@+id/selectAllGuides"
+        style="@style/Widget.Pix.MenuItem"
+        android:text="@string/library_select_all" />
+</LinearLayout>

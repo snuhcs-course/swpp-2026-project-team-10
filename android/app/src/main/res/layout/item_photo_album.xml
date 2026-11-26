@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One album on the photo viewer's Albums tab (view_photo_viewer, FR-1.6): its newest photo as a square cover, cut
+     from its middle, then its name and how many photos it has. A tap opens its grid, and lights the cover in its
+     rounded shape. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:clickable="true"
+    android:focusable="true"
+    android:orientation="vertical"
+    android:padding="6dp">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/photoAlbumCover"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="@color/pix_surface_2"
+            android:duplicateParentState="true"
+            android:foreground="@drawable/fg_thumbnail_press"
+            android:importantForAccessibility="no"
+            android:scaleType="centerCrop"
+            app:layout_constraintDimensionRatio="1:1"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.Thumbnail" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical"
+        android:importantForAccessibility="no">
+
+        <TextView
+            android:id="@+id/photoAlbumName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:importantForAccessibility="no"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+            android:textColor="@color/pix_text"
+            tools:text="@string/album_camera" />
+
+        <TextView
+            android:id="@+id/photoAlbumCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:importantForAccessibility="no"
+            android:textAppearance="@style/TextAppearance.Pix.Label"
+            android:textColor="@color/pix_text_faint"
+            tools:text="812" />
+    </LinearLayout>
+</LinearLayout>

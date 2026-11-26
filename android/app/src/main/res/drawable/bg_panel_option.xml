@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An option of a panel under the top bar, the camera menu's and the ratios' (FR-1.13, FR-1.17), under a touch: the
+     light 4 dp inside the option and rounded 10 dp, over its icon and label together, so it never reaches the option
+     beside it or the panel's edge (#320). -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/colorControlHighlight">
+    <item android:id="@android:id/mask">
+        <inset android:inset="4dp">
+            <shape android:shape="rectangle">
+                <corners android:radius="10dp" />
+                <solid android:color="@color/pix_text" />
+            </shape>
+        </inset>
+    </item>
+</ripple>

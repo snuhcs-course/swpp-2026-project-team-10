@@ -7,6 +7,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import com.lastpenguin.pix.camera.PhotoAlbum
 import com.lastpenguin.pix.camera.PhotoDeleter
+import com.lastpenguin.pix.camera.PhotoDeletion
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.session.protocol.PhotoRefusal
 import com.lastpenguin.pix.session.protocol.SessionMessage
@@ -143,20 +144,24 @@ class PhotoSyncer(
     }
 
     /**
-     * Deletes [uri], one of this phone's photos, through [album] (FR-1.16), and drops it from the session's photos.
-     * True once it is gone, false when [album] could not delete it. On the photographer's phone a photo still waiting
-     * to go, or going, is read again at its turn, so it leaves the session's photos at once but stays on the phone
-     * until it has reached the subject, failed, or its session ended; [later] deletes it then, and true says so.
+     * Deletes [uri], one of this phone's photos, through [album] (FR-1.16), and drops it from the session's photos once
+     * it is gone; what [album] answers is the answer. On the photographer's phone a photo still waiting to go, or
+     * going, is read again at its turn, so it leaves the session's photos at once but stays on the phone until it has
+     * reached the subject, failed, or its session ended; [later] deletes it then, and the answer is that it is gone.
      * Deleted at once, it would never reach the subject, and no copy would be left (#247).
      */
-    suspend fun delete(uri: Uri, album: PhotoDeleter, later: CoroutineScope): Boolean {
-        if (uri !in outgoing.value) return album.delete(uri).also { gone -> if (gone) forget(uri) }
+    suspend fun delete(uri: Uri, album: PhotoDeleter, later: CoroutineScope): PhotoDeletion {
+        if (uri !in outgoing.value) {
+            return album.delete(uri).also { result -> if (result == PhotoDeletion.Deleted) forget(uri) }
+        }
         forget(uri)
         later.launch {
             outgoing.first { uri !in it }
-            if (!album.delete(uri)) Log.w(TAG, "A photo deleted while it went to the subject stays on this phone")
+            if (album.delete(uri) != PhotoDeletion.Deleted) {
+                Log.w(TAG, "A photo deleted while it went to the subject stays on this phone")
+            }
         }
-        return true
+        return PhotoDeletion.Deleted
     }
 
     // ---- Photographer -----------------------------------------------------------------------------------------

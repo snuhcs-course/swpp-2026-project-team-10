@@ -43,8 +43,8 @@ import org.robolectric.annotation.GraphicsMode
 
 /*
  * What the settings change on the camera screens (FR-10.1, FR-10.3, FR-3.10). Partitions for the camera menu's Settings
- * (FR-1.17): the menu's button shown on the camera, also during a session (connected or reconnecting, #204), hidden
- * during the scene photo, and Settings in the menu opening that screen and closing the menu; on Subject view, the same
+ * (FR-1.17): the menu's button shown on the camera, also during a session (connected or reconnecting, #204), and
+ * during the scene photo without Settings (#210), and Settings in the menu opening that screen and closing the menu; on Subject view, the same
  * item opening Settings; Settings over Subject view goes back to it when the session ends, and over the camera stays.
  * For the menu's grid and horizon bar: each tap turns the setting off and on again, on the overlay and in the item's
  * accent, on both screens (the horizon bar on the camera only). For the latency indicator: off (even in a
@@ -106,7 +106,7 @@ class SettingsOnScreensTest {
     // ---- The camera menu's Settings (FR-10.1, FR-1.17) --------------------------------------------------------------
 
     @Test
-    fun theMenusSettings_opensSettings_andTheMenuStaysDuringASession_andHidesDuringTheScenePhoto() {
+    fun theMenusSettings_opensSettings_andTheMenuStaysDuringASession_andDuringTheScenePhotoWithoutSettings() {
         val modules = launchCamera()
         val nav = camera!!.attachNav(R.id.cameraFragment)
 
@@ -128,8 +128,13 @@ class SettingsOnScreensTest {
         idle()
         onCamera { controls, _ -> assertEquals(View.VISIBLE, controls.cameraMenuButton.visibility) }
 
+        // The scene photo keeps the menu, without Settings, which would leave the step (#210).
         onCamera { _, fragment -> fragment.requireActivity().viewModel<GenerationViewModel>().beginScene() }
-        onCamera { controls, _ -> assertEquals(View.GONE, controls.cameraMenuButton.visibility) }
+        idle()
+        onCamera { controls, _ ->
+            assertEquals(View.VISIBLE, controls.cameraMenuButton.visibility)
+            assertEquals(View.GONE, controls.menuSettings.visibility)
+        }
     }
 
     @Test

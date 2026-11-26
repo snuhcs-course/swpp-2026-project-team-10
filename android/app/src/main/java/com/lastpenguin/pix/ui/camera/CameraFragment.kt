@@ -83,6 +83,7 @@ import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.PoseStartStep
+import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.ShutterOutcome
 import com.lastpenguin.pix.settings.TutorialScreen
@@ -99,6 +100,7 @@ import com.lastpenguin.pix.ui.generation.SceneHandOff
 import com.lastpenguin.pix.ui.generation.framingHint
 import com.lastpenguin.pix.ui.reveal
 import com.lastpenguin.pix.ui.session.RemoteFocus
+import com.lastpenguin.pix.ui.session.SessionCaption
 import com.lastpenguin.pix.ui.session.SessionNotice
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
@@ -293,7 +295,11 @@ class CameraFragment :
         controls.topBar.addOnLayoutChangeListener(placePreview)
         controls.bottomPanel.addOnLayoutChangeListener(placePreview)
         // The zoom row stays above the panels over the shutter as they open and close.
-        controls.bottomOverlays.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeZoomRow(controls) }
+        controls.bottomOverlays.addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
+            placeZoomRow(controls)
+            // The line that says who watches fits the width once it is known.
+            if (right - left != oldRight - oldLeft) renderPeerCaption(controls)
+        }
         val previewStreaming = MutableStateFlow(false)
         controls.previewView.previewStreamState.observe(viewLifecycleOwner) { state ->
             Timings.mark("preview.stream", state.name)
@@ -564,6 +570,7 @@ class CameraFragment :
                         val connected = state as? SessionState.Connected
                         val live = connected != null || state is SessionState.Reconnecting
                         renderLiveDot(controls, connected)
+                        renderPeerCaption(controls)
                         if (connected != null) takeDownPeerGoneNotice(controls)
                         // Nothing is left to end once the subject has gone.
                         if (!live) dismissEndSession()
@@ -601,6 +608,23 @@ class CameraFragment :
                                 notice.name,
                             )
 
+                            is SessionNotice.RemoteGuideVisible -> if (notice.visible) {
+                                getString(R.string.remote_guide_show_notice, notice.name)
+                            } else {
+                                getString(R.string.remote_guide_hide_notice, notice.name)
+                            }
+
+                            is SessionNotice.RemoteGuideOpacity -> getString(
+                                R.string.remote_guide_opacity_notice,
+                                notice.name,
+                                (notice.opacity * 100f).roundToInt(),
+                            )
+
+                            is SessionNotice.RemoteGuideRemove -> getString(
+                                R.string.remote_guide_remove_notice,
+                                notice.name,
+                            )
+
                             is SessionNotice.RemoteBrightness ->
                                 getString(R.string.remote_brightness_notice, notice.name, formatEv(notice.index))
 
@@ -633,8 +657,6 @@ class CameraFragment :
 
                             is SessionNotice.RemotePoseStart ->
                                 getString(R.string.remote_pose_start_notice, notice.name)
-
-                            is SessionNotice.Watching -> getString(R.string.peer_watching_notice, notice.name)
                         }
                         when (notice) {
                             is SessionNotice.PeerGone ->
@@ -642,6 +664,17 @@ class CameraFragment :
 
                             // The focus box says the same, so its line is short (FR-7.7).
                             is SessionNotice.RemoteFocus -> showNotice(controls, text, SessionViewModel.FOCUS_NOTICE_MS)
+
+                            // As this phone's own ✕, with Undo, which puts the guide back where it was (FR-7.2).
+                            is SessionNotice.RemoteGuideRemove -> {
+                                undoNotice = showNoticeOnScreen(
+                                    text,
+                                    NoticeLength.UNDO,
+                                    NoticeAction(R.string.undo) {
+                                        viewModel.onUndoRemoteRemove(notice.guide, notice.state)
+                                    },
+                                )
+                            }
 
                             else -> showNotice(controls, text)
                         }
@@ -1352,6 +1385,7 @@ class CameraFragment :
         }
         renderReference(controls, state)
         renderTip(controls, state)
+        renderPeerCaption(controls)
         renderScenePhoto(controls, generationViewModel.uiState.value, state, ready)
         renderCountdownRing(state)
         renderLatency(controls)
@@ -1576,6 +1610,7 @@ class CameraFragment :
         controls.guideOverlay.isVisible = false
         controls.guideControls.isVisible = false
         controls.tipBanner.isVisible = false
+        controls.peerCaption.isVisible = false
         if (scene.shotFailed) {
             showFailure(controls.captureStatus, R.string.scene_shot_failed)
         } else {
@@ -2024,6 +2059,33 @@ class CameraFragment :
         // The box first: the bar's going then leaves it alone.
         focusBrightness?.showBoxAlone(frame.left + focus.x * frame.width, frame.top + focus.y * frame.height)
         viewModel.setBrightnessOpen(false)
+    }
+
+    /**
+     * While a subject watches (R&S 6.2): the line right above the shutter, as Subject view's that names the camera,
+     * "Joonhyung · Watching your camera". The open tip takes its place, as on Subject view, since at the largest font
+     * the two do not fit above the shutter together; the scene photo's step hides it (renderScenePhoto).
+     */
+    private fun renderPeerCaption(controls: FragmentCameraBinding) {
+        val connected = sessionViewModel.state.value as? SessionState.Connected
+        val name = connected?.takeIf { it.role == Role.PHOTOGRAPHER }?.peer?.displayName
+        val shown = name != null && !controls.tipBanner.isVisible && !isScenePhotoActive()
+        controls.peerCaption.isVisible = shown
+        if (!shown) return
+        val overlays = controls.bottomOverlays
+        SessionCaption(
+            controls.peerCaption,
+            controls.peerCaptionDot,
+            controls.peerCaptionTitle,
+            controls.peerCaptionSeparator,
+            controls.peerCaptionStatus,
+        ) { getString(R.string.peer_caption_title, it.orEmpty()) }
+            .fit(
+                overlays.width - overlays.paddingLeft - overlays.paddingRight,
+                name,
+                getString(R.string.peer_caption_status),
+                live = true,
+            )
     }
 
     /**

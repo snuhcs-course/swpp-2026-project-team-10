@@ -366,6 +366,12 @@ class SubjectViewModel(
         Timings.mark("move.sent", "${state.cx} ${state.cy} ${state.height}${if (final) " final" else ""}")
     }
 
+    private val opacitySender = StepSender<GuideState>(viewModelScope, SEND_INTERVAL_MS) { state, final ->
+        val guideId = state.guideId ?: return@StepSender
+        session.send(SessionMessage.GuideOpacitySet(guideId, state.opacity, final))
+        Timings.mark("opacity.sent", "${state.opacity}${if (final) " final" else ""}")
+    }
+
     init {
         viewModelScope.launch {
             receivingPhoto.collect { receiving -> _uiState.update { it.copy(receivingPhoto = receiving) } }
@@ -508,7 +514,10 @@ class SubjectViewModel(
                     )
                 }
                 // A gesture never crosses guide identities (Design 2.6.2): a removed or replaced guide ends it.
-                if (guide?.id != previous?.id) guideSender.cancel()
+                if (guide?.id != previous?.id) {
+                    guideSender.cancel()
+                    opacitySender.cancel()
+                }
             }
         }
         viewModelScope.launch {
@@ -559,13 +568,14 @@ class SubjectViewModel(
             mirror.state.collect { state ->
                 _uiState.update {
                     it.copy(
-                        // This phone's own gesture is drawn until it ends; the photographer's echo then settles the
-                        // guide. Hiding and opacity stay the photographer's even meanwhile (FR-7.2).
-                        guideState = if (guideSender.adjusting) {
-                            it.guideState.copy(visible = state.visible, opacity = state.opacity)
-                        } else {
-                            state
-                        },
+                        // This phone's own gesture, a move or the opacity slider, is drawn until it ends; the
+                        // photographer's echo then settles the guide (FR-7.2).
+                        guideState = state.copy(
+                            cx = if (guideSender.adjusting) it.guideState.cx else state.cx,
+                            cy = if (guideSender.adjusting) it.guideState.cy else state.cy,
+                            height = if (guideSender.adjusting) it.guideState.height else state.height,
+                            opacity = if (opacitySender.adjusting) it.guideState.opacity else state.opacity,
+                        ),
                         // A guide the photographer hid cannot be edited, so the mode ends and the pinch zooms again.
                         guideEditing = it.guideEditing && state.visible,
                         // Its tip is hidden with it, and closed: shown again, the guide brings back the button
@@ -695,6 +705,47 @@ class SubjectViewModel(
         } else {
             setReferenceExpanded(!_uiState.value.referenceExpanded)
         }
+    }
+
+    /**
+     * *Hide* or *Show* on the guide's panel (FR-7.2): asks the photographer's phone, whose echo hides or shows the guide
+     * on both phones.
+     */
+    fun onHideToggle() {
+        val ui = _uiState.value
+        val guide = ui.guide ?: return
+        if (!ui.connected) return
+        session.send(SessionMessage.GuideVisibleSet(guide.id, !ui.guideState.visible))
+        Timings.mark("guide.visible.sent", "${!ui.guideState.visible}")
+    }
+
+    /**
+     * From the opacity slider (FR-7.2): the guide here takes the value at once, the photographer's phone gets it as
+     * `guide.opacity.set` (steps at most every [SEND_INTERVAL_MS], the last at once), and its echo settles it.
+     */
+    fun onOpacityChange(opacity: Float, final: Boolean) {
+        val ui = _uiState.value
+        val guide = ui.guide
+        if (guide == null || !ui.connected || !ui.guideState.visible) {
+            if (final) opacitySender.cancel()
+            return
+        }
+        if (!opacity.isFinite()) return
+        val shown = ui.guideState.copy(
+            guideId = guide.id,
+            opacity = opacity.coerceIn(GuideState.MIN_OPACITY, GuideState.MAX_OPACITY),
+        )
+        _uiState.update { it.copy(guideState = shown) }
+        if (final) opacitySender.finish(shown) else opacitySender.step(shown)
+    }
+
+    /** ✕ on the guide's panel (FR-7.2): the photographer's phone removes the guide, and both phones lose it. */
+    fun onRemoveGuide() {
+        val ui = _uiState.value
+        val guide = ui.guide ?: return
+        if (!ui.connected) return
+        session.send(SessionMessage.GuideRemove(guide.id))
+        Timings.mark("guide.remove.sent", guide.id)
     }
 
     /** The guide-edit mode toggle; there is no mode without a visible guide. */
@@ -997,6 +1048,7 @@ class SubjectViewModel(
         zoomSender.cancel()
         exposureSender.cancel()
         guideSender.cancel()
+        opacitySender.cancel()
     }
 
     companion object {

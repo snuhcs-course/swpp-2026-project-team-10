@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Looper
 import android.view.View
+import android.widget.LinearLayout
 import androidx.core.view.ViewCompat
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragmentInContainer
@@ -54,6 +55,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /*
@@ -72,8 +74,10 @@ import org.robolectric.annotation.GraphicsMode
  * with what to frame and the accent shutter while framing only, all gone after the step (#210), its review while the
  * phone looks for a person and without one (FR-4.13), and
  * its light (FR-4.1) turned on and off, and on a camera without a flash;
- * a session connected, with who watches the camera for 3 s (#271), and a peer leaving or dropping, whose notice stays
- * 10 s and gives way once the peer is back (#238),
+ * a session connected, with who watches the camera in the line above the shutter for as long as they watch (R&S 6.2),
+ * gone while the link reconnects and once the room waits alone, and a peer leaving or dropping, whose notice stays
+ * 10 s and goes once the peer is back (#238); the subject's guide panel (FR-7.2): hiding and the opacity named in a
+ * notice, and ✕ with Undo, which puts the guide back where it was;
  * and the scene photo step in a session, without End session until it ends, a reconnect included; a guide added from
  * Subject view, with the reference thumbnail its phone sent (#234); the camera switch on a phone with and without a
  * front camera, gone while the
@@ -380,6 +384,48 @@ class CameraFragmentRenderTest {
         assertSame(guide, modules.guides.guide.value)
         assertNull(shownNotice())
         onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.guideControls.visibility) }
+    }
+
+    @Test
+    fun theSubjectsPanel_isNamedInANotice_andTheirRemoveOffersUndo_whichPutsTheGuideBackWhereItWas() {
+        val modules = launch()
+        val guide = guide()
+        modules.guides.setGuide(guide)
+        modules.guides.update(final = true) { it.copy(cx = 0.4f, opacity = 0.8f) }
+        val where = modules.guides.state.value
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        idle()
+
+        modules.session.deliver(SessionMessage.GuideVisibleSet("guide-1", visible = false))
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(
+                string(R.string.remote_guide_hide_notice, "Test Account 2"),
+                controls.noticeText.text.toString(),
+            )
+        }
+        modules.session.deliver(SessionMessage.GuideVisibleSet("guide-1", visible = true))
+        modules.session.deliver(SessionMessage.GuideOpacitySet("guide-1", 0.8f, final = true))
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(
+                string(R.string.remote_guide_opacity_notice, "Test Account 2", 80),
+                controls.noticeText.text.toString(),
+            )
+        }
+
+        modules.session.deliver(SessionMessage.GuideRemove("guide-1"))
+        idle()
+        assertNull(modules.guides.guide.value)
+        assertEquals(string(R.string.remote_guide_remove_notice, "Test Account 2"), shownNotice())
+        val undo = checkNotNull(noticeAction())
+        assertEquals(string(R.string.undo), undo.text.toString())
+
+        undo.performClick()
+        idle()
+
+        assertSame(guide, modules.guides.guide.value)
+        assertEquals(where, modules.guides.state.value)
     }
 
     @Test
@@ -838,7 +884,7 @@ class CameraFragmentRenderTest {
             assertEquals(string(R.string.live_badge, "Joonhyung"), controls.liveDot.contentDescription.toString())
             assertEquals(View.VISIBLE, controls.endSessionButton.visibility)
             assertEquals(View.GONE, controls.shootTogetherButton.visibility)
-            assertEquals(string(R.string.peer_watching_notice, "Joonhyung"), controls.noticeText.text.toString())
+            assertTrue(controls.peerCaption.isShown)
         }
 
         modules.session.deliver(SessionMessage.Leave(EndReason.LEFT))
@@ -851,21 +897,41 @@ class CameraFragmentRenderTest {
     }
 
     @Test
-    fun aSubjectConnecting_saysWhoIsWatching_forANoticesTime() {
+    // At the Galaxy S22's width, where the name and the rest fit on one line.
+    @Config(qualifiers = "w360dp-h705dp-xxhdpi")
+    fun aSubjectConnecting_saysWhoIsWatching_inTheLineAboveTheShutter_whileTheyWatch() {
         val modules = launch()
+        onScreen { controls, _ -> assertFalse(controls.peerCaption.isShown) }
 
-        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 1"), Role.PHOTOGRAPHER))
-        // The live light's first blink plays here, which moves the clock on a little.
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
         idle()
-
-        onScreen { controls, _ ->
-            assertEquals(View.VISIBLE, controls.noticeText.visibility)
-            assertEquals(string(R.string.peer_watching_notice, "Test Account 1"), controls.noticeText.text.toString())
-        }
-
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(CameraViewModel.NOTICE_MS))
 
-        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+        onScreen { controls, _ ->
+            assertTrue(controls.peerCaption.isShown)
+            assertEquals(
+                string(R.string.peer_caption_title, "Test Account 2"),
+                controls.peerCaptionTitle.text.toString(),
+            )
+            assertEquals(string(R.string.peer_caption_status), controls.peerCaptionStatus.text.toString())
+            assertTrue(controls.peerCaptionDot.isShown)
+            // One line, as Subject view's "Dongje's camera · Live", whole above the shutter; no notice says it too.
+            assertEquals(LinearLayout.HORIZONTAL, controls.peerCaption.orientation)
+            assertTrue(controls.peerCaptionSeparator.isShown)
+            assertTrue(windowBox(controls.peerCaption).bottom <= windowBox(controls.shutterButton).top)
+            assertFalse(controls.noticeText.isShown)
+        }
+
+        // The link drops: the line goes until it is back, and once the room waits alone.
+        modules.session.setState(SessionState.Reconnecting("s1", 0L))
+        idle()
+        onScreen { controls, _ -> assertFalse(controls.peerCaption.isShown) }
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        idle()
+        onScreen { controls, _ -> assertTrue(controls.peerCaption.isShown) }
+        modules.session.setState(SessionState.Waiting("ABC123"))
+        idle()
+        onScreen { controls, _ -> assertFalse(controls.peerCaption.isShown) }
     }
 
     @Test
@@ -908,7 +974,7 @@ class CameraFragmentRenderTest {
     }
 
     @Test
-    fun thePeerBackBeforeItsNoticeEnds_replacesTheNotice_withWhoIsWatching() {
+    fun thePeerBackBeforeItsNoticeEnds_takesTheNoticeDown_andTheLineSaysWhoIsWatching() {
         val modules = launch()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
         idle()
@@ -922,11 +988,9 @@ class CameraFragmentRenderTest {
 
         onScreen { controls, _ ->
             assertEquals(View.VISIBLE, controls.liveDot.visibility)
-            assertEquals(string(R.string.peer_watching_notice, "Joonhyung"), controls.noticeText.text.toString())
+            assertFalse(controls.noticeText.isShown)
+            assertTrue(controls.peerCaption.isShown)
         }
-        // Its 3 s, not the 10 s of the notice it replaced (#238).
-        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(CameraViewModel.NOTICE_MS + 1))
-        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
     }
 
     @Test

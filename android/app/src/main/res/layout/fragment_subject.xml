@@ -379,7 +379,8 @@
     </FrameLayout>
 
     <!-- Right above the shutter, as the Camera screen's panels sit above its own: the photographer's tip (FR-4.10),
-         opened from its button in the zoom row, and under it the line that says whose camera this is (#314). -->
+         opened from its button in the zoom row, the guide's controls (FR-7.2), and under them the line that says whose
+         camera this is (#314). -->
     <LinearLayout
         android:id="@+id/bottomOverlays"
         android:layout_width="0dp"
@@ -387,7 +388,7 @@
         android:orientation="vertical"
         android:outlineProvider="none"
         android:paddingHorizontal="12dp"
-        android:paddingBottom="8dp"
+        android:paddingBottom="4dp"
         android:translationZ="1dp"
         app:layout_constraintBottom_toTopOf="@id/bottomPanel"
         app:layout_constraintEnd_toEndOf="parent"
@@ -427,6 +428,72 @@
                 android:layout_weight="1"
                 android:textAppearance="@style/TextAppearance.Pix.Body"
                 tools:text="Move a little closer.\nHold the phone at your waist, tilted up a little." />
+        </LinearLayout>
+
+        <!-- Camera's guide panel, while a guide is on the video (FR-7.2): Hide, the opacity, and ✕ go to the
+             photographer's phone, and both phones show the result; Save guide keeps the guide on this phone (FR-6.16). -->
+        <LinearLayout
+            android:id="@+id/guideControls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_glass_panel"
+            android:gravity="center_vertical"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <com.lastpenguin.pix.ui.camera.TurningButton
+                android:id="@+id/hideGuideButton"
+                style="@style/Widget.Pix.Button.Icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/hide_guide"
+                app:icon="@drawable/ic_visibility_off" />
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/opacitySlider"
+                style="@style/Widget.Pix.Slider.Guide"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="0dp"
+                android:layout_weight="1"
+                android:contentDescription="@string/guide_opacity"
+                android:enabled="false"
+                android:value="0.5"
+                android:valueFrom="0.1"
+                android:valueTo="0.9" />
+
+            <TextView
+                android:id="@+id/opacityValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:gravity="end"
+                android:importantForAccessibility="no"
+                android:minWidth="34dp"
+                android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+                android:textColor="@color/slider_value_text"
+                tools:text="50%" />
+
+            <!-- Save guide (FR-6.16): a ♥, filled red once a favorite on this phone (#297). -->
+            <com.lastpenguin.pix.ui.camera.TurningButton
+                android:id="@+id/saveGuideButton"
+                style="@style/Widget.Pix.Button.Icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/save_guide"
+                app:icon="@drawable/ic_heart" />
+
+            <com.lastpenguin.pix.ui.camera.TurningButton
+                android:id="@+id/removeGuideButton"
+                style="@style/Widget.Pix.Button.Icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/remove_guide"
+                app:icon="@drawable/ic_close"
+                app:iconTint="@color/button_danger_text" />
         </LinearLayout>
 
 
@@ -515,9 +582,8 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- The Camera screen's row: the photographer's tip (FR-4.10) at its start, the zoom readout (FR-7.1), then Save
-         guide (FR-6.16) and the guide-edit mode toggle, over the bottom of the video (placed in code). The tip is at
-         the start, where there is room: three buttons at the end reach the readout on a narrow phone. -->
+    <!-- The Camera screen's row: the photographer's tip (FR-4.10) at its start, the zoom readout (FR-7.1), and the
+         guide-edit mode toggle, over the bottom of the video (placed in code). -->
     <FrameLayout
         android:id="@+id/zoomRow"
         android:layout_width="0dp"
@@ -587,20 +653,6 @@
             android:textColor="@color/zoom_readout_text"
             android:textSize="11sp"
             tools:text="1.0×" />
-
-        <!-- Save guide (FR-6.16), beside the toggle while a guide is on the video: a ♥, filled red once a favorite on this
-             phone (#297). -->
-        <com.lastpenguin.pix.ui.camera.TurningButton
-            android:id="@+id/saveGuideButton"
-            style="@style/Widget.Pix.Button.Icon.OnPhoto"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="end|center_vertical"
-            android:layout_marginEnd="48dp"
-            android:contentDescription="@string/save_guide"
-            android:visibility="gone"
-            app:icon="@drawable/ic_heart"
-            tools:visibility="visible" />
 
         <!-- Shown while a guide is on the video (AD-17); checked while gestures edit the guide. One person's outline, lit
              in the guide's color while checked, as on Camera (#271). -->

@@ -62,7 +62,16 @@ class SubjectControlTurnTest {
 
     /** The controls that turn what they draw: the buttons' icons and the zoom readout. */
     private fun FragmentSubjectBinding.turningButtons(): List<View> =
-        listOf(cameraMenuButton, tipButton, saveGuideButton, editGuideButton, zoomReadout, countdownNumber)
+        listOf(
+            cameraMenuButton,
+            tipButton,
+            hideGuideButton,
+            saveGuideButton,
+            removeGuideButton,
+            editGuideButton,
+            zoomReadout,
+            countdownNumber,
+        )
 
     /** The menu's items, Guide, and Pick a pose turn with their labels, each as one block; the thumbnail turns whole. */
     private fun FragmentSubjectBinding.turningViews(): List<View> = listOf(

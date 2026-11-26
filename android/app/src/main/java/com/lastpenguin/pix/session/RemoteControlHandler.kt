@@ -10,6 +10,8 @@ import com.lastpenguin.pix.camera.baseExposureIndex
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideRepository
+import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
@@ -56,6 +58,15 @@ sealed interface RemoteAction {
 
     /** The subject moved or resized the guide; one per gesture (FR-7.2). */
     data object GuideMove : RemoteAction
+
+    /** The subject hid the guide, or showed it again ([visible]) (FR-7.2). */
+    data class GuideVisible(val visible: Boolean) : RemoteAction
+
+    /** The subject's drag on the opacity slider ended at [opacity], as applied (FR-7.2). */
+    data class GuideOpacity(val opacity: Float) : RemoteAction
+
+    /** The subject removed [guide], which was at [state]: *Undo* on this phone puts it back there (FR-7.2). */
+    data class GuideRemove(val guide: ReferenceGuide, val state: GuideState) : RemoteAction
 
     /** The subject set the brightness to the exposure index [index] (FR-7.3). */
     data class Brightness(val index: Int) : RemoteAction
@@ -128,6 +139,12 @@ sealed interface RemoteAction {
  * subject's. Requests are applied in arrival order, so the later change wins when both people move the guide
  * (FR-7.6). A move without a visible guide, or for a guide that has since been replaced, is dropped: a hidden
  * guide cannot be edited on either phone, and a gesture never crosses guide identities.
+ *
+ * **The guide's toolbar (It 5, FR-7.2).** `guide.visible.set` hides or shows the guide, `guide.opacity.set` sets its
+ * opacity with the same step-then-final pattern as a move, and `guide.remove` takes it off the camera, as the
+ * toolbar's own controls do; each is the subject's in the echoed `guide.state`, or `guide.clear` for a removal. Like a
+ * move, a request for a guide since replaced is dropped, and so is an opacity for a hidden guide. A removal is
+ * reported with the guide and where it was, so that *Undo* here can put it back.
  *
  * **Shutter (It 5, FR-7.8, #314).** `camera.shutter` is the subject's press. The photo is the Camera screen's to take
  * ([shutter]), as at its own shutter, with its timer when that is on, and every press is answered with
@@ -288,6 +305,9 @@ class RemoteControlHandler(
             is SessionMessage.TimerSet -> handleTimer(message)
             is SessionMessage.FocusSet -> handleFocus(message)
             is SessionMessage.GuideMove -> handleGuideMove(message)
+            is SessionMessage.GuideVisibleSet -> handleGuideVisible(message)
+            is SessionMessage.GuideOpacitySet -> handleGuideOpacity(message)
+            is SessionMessage.GuideRemove -> handleGuideRemove(message)
             is SessionMessage.ShutterPress -> handleShutter(message)
             is SessionMessage.PoseStart -> handlePoseStart(message)
             else -> Unit
@@ -605,6 +625,40 @@ class RemoteControlHandler(
         if (request.final) {
             confirm(RemoteAction.GuideMove, "move.applied", "${request.cx} ${request.cy} ${request.height}")
         }
+    }
+
+    /** `guide.visible.set`: the subject's *Hide* or *Show* (FR-7.2); nothing for another guide or no change. */
+    private fun handleGuideVisible(request: SessionMessage.GuideVisibleSet) {
+        val guide = guides.guide.value ?: return
+        if (guide.id != request.guideId || guides.state.value.visible == request.visible) return
+        attributeGuideChanges(Role.SUBJECT)
+        guides.update(final = true) { it.copy(visible = request.visible) }
+        confirm(RemoteAction.GuideVisible(request.visible), "guide.visible.applied", "${request.visible}")
+    }
+
+    /**
+     * `guide.opacity.set`: a step of the subject's slider, or its last value (FR-7.2); [guides] keeps it within
+     * 10–90 %. A hidden guide keeps its opacity, as its slider is off on both phones.
+     */
+    private fun handleGuideOpacity(request: SessionMessage.GuideOpacitySet) {
+        if (!request.opacity.isFinite()) return
+        val guide = guides.guide.value ?: return
+        if (!guides.state.value.visible || guide.id != request.guideId) return
+        attributeGuideChanges(Role.SUBJECT)
+        guides.update(request.final) { it.copy(opacity = request.opacity) }
+        if (request.final) {
+            val applied = guides.state.value.opacity
+            confirm(RemoteAction.GuideOpacity(applied), "guide.opacity.applied", "$applied")
+        }
+    }
+
+    /** `guide.remove`: the subject's ✕ takes the guide off the camera, kept in the report for *Undo* (FR-7.2). */
+    private fun handleGuideRemove(request: SessionMessage.GuideRemove) {
+        val guide = guides.guide.value ?: return
+        if (guide.id != request.guideId) return
+        val state = guides.state.value
+        guides.setGuide(null)
+        confirm(RemoteAction.GuideRemove(guide, state), "guide.remove.applied", guide.id)
     }
 
     /**

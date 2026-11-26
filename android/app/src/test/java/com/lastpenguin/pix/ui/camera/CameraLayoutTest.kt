@@ -1291,7 +1291,7 @@ class CameraLayoutTest {
     }
 
     private fun assertTheTipFitsOnSubjectView(binding: FragmentSubjectBinding, font: String) {
-        // The row: the tip at its start, clear of the readout; Save guide and the toggle at its end.
+        // The row: the tip at its start, clear of the readout; the toggle at its end.
         val row = binding.zoomRow.box()
         val tip = binding.tipButtonFrame.box()
         val readout = binding.zoomReadout.box()
@@ -1299,7 +1299,7 @@ class CameraLayoutTest {
         // Inside the row's 12 dp of padding.
         assertEquals("$font: the tip button at the row's start", row.left + 12, tip.left)
         assertTrue("$font: $tip clear of the readout $readout", tip.right <= readout.left)
-        assertTrue("$font: the readout clear of Save guide", readout.right <= binding.saveGuideButton.box().left)
+        assertTrue("$font: the readout clear of the toggle", readout.right <= binding.editGuideButton.box().left)
         assertTrue("$font: in the row", tip.top >= row.top && tip.bottom <= row.bottom)
         assertEveryControlAtLeast48(binding.root, "Subject view with a tip, $font")
 
@@ -1318,7 +1318,17 @@ class CameraLayoutTest {
         assertFalse("$font: the camera's name gives way to the tip", binding.cameraCaption.isShown)
         assertTrue("$font: $banner under the top bar", banner.top >= binding.topBar.box().bottom)
         assertTrue("$font: the row above the banner", binding.zoomRow.box().bottom <= banner.top)
+        // The guide's panel stays with the tip while both fit, as at the usual font, and gives way to it at a font too
+        // large for that (FR-7.2).
+        if (font == "font scale 1") assertTrue("$font: the panel stays", binding.guideControls.isShown)
+        if (binding.guideControls.isShown) {
+            assertTrue("$font: the panel under the banner", banner.bottom <= binding.guideControls.box().top)
+        }
         assertEveryControlAtLeast48(binding.root, "Subject view with the tip open, $font")
+
+        binding.tipButton.performClick()
+        idle()
+        assertTrue("$font: the panel is back once the tip closes", binding.guideControls.isShown)
     }
 
     @Test

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-26, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.FlashMode
@@ -28,6 +28,15 @@ sealed interface PhotographerAction {
 
     /** A guide put on the camera from a photo or the library. */
     data object Guide : PhotographerAction
+
+    /** *Hide* ([visible] false) or *Show* on the guide's toolbar (FR-3.6). */
+    data class GuideVisible(val visible: Boolean) : PhotographerAction
+
+    /** The end of a drag on the opacity slider: the [opacity] it left, 0.1–0.9 (FR-3.4). */
+    data class GuideOpacity(val opacity: Float) : PhotographerAction
+
+    /** ✕ on the guide's toolbar took the guide off the camera. */
+    data object GuideRemove : PhotographerAction
 }
 
 private const val ZOOM = "zoom"
@@ -36,6 +45,10 @@ private const val FLASH = "flash"
 private const val TIMER = "timer"
 private const val GUIDE_MOVE = "guide.move"
 private const val GUIDE = "guide"
+private const val GUIDE_HIDE = "guide.hide"
+private const val GUIDE_SHOW = "guide.show"
+private const val GUIDE_OPACITY = "guide.opacity"
+private const val GUIDE_REMOVE = "guide.remove"
 
 /** The message that tells the subject's phone of this action. */
 fun PhotographerAction.toMessage(): SessionMessage.PhotographerDid = when (this) {
@@ -45,6 +58,9 @@ fun PhotographerAction.toMessage(): SessionMessage.PhotographerDid = when (this)
     is PhotographerAction.Timer -> SessionMessage.PhotographerDid(TIMER, seconds = timer.seconds)
     PhotographerAction.GuideMove -> SessionMessage.PhotographerDid(GUIDE_MOVE)
     PhotographerAction.Guide -> SessionMessage.PhotographerDid(GUIDE)
+    is PhotographerAction.GuideVisible -> SessionMessage.PhotographerDid(if (visible) GUIDE_SHOW else GUIDE_HIDE)
+    is PhotographerAction.GuideOpacity -> SessionMessage.PhotographerDid(GUIDE_OPACITY, opacity = opacity)
+    PhotographerAction.GuideRemove -> SessionMessage.PhotographerDid(GUIDE_REMOVE)
 }
 
 /** The action a message names, or null for one this phone does not know or cannot show, as a newer phone may send. */
@@ -55,5 +71,9 @@ fun SessionMessage.PhotographerDid.toAction(): PhotographerAction? = when (actio
     TIMER -> ShutterTimer.ofSeconds(seconds)?.let { PhotographerAction.Timer(it) }
     GUIDE_MOVE -> PhotographerAction.GuideMove
     GUIDE -> PhotographerAction.Guide
+    GUIDE_HIDE -> PhotographerAction.GuideVisible(false)
+    GUIDE_SHOW -> PhotographerAction.GuideVisible(true)
+    GUIDE_OPACITY -> PhotographerAction.GuideOpacity(opacity).takeIf { opacity.isFinite() && opacity > 0f }
+    GUIDE_REMOVE -> PhotographerAction.GuideRemove
     else -> null
 }

@@ -128,8 +128,10 @@ import org.robolectric.shadows.ShadowDialog
  * The UAT's opinions (#271): the line above the shutter (#314; in the shutter's place until then) empty until
  * connected, then whose camera this is and "Live" on one line, the name alone while a step's button shows beside the
  * thumbnail, with no notice saying it as well; *Leave* red; the guide-edit toggle one person icon, unlit with the guide plain and lit with it
- * filled. The grid on by default and kept off. The tip, Save guide, and guide-edit buttons on glass, the
- * toggle's tinted while on (#298).
+ * filled. The grid on by default and kept off. The tip and guide-edit buttons on glass, the toggle's tinted while on
+ * (#298). The guide's panel (FR-7.2): hidden without a guide; with one, above the line that names the camera, Hide and
+ * ✕ asking the photographer's phone; a hidden guide (Show, the opacity off). 1:1 (R&S 6.6): the 4:3 around the frame
+ * dimmed; 3:4 not.
  * What the photographer did (#292): each action a line with their name where the labels show, for a label's time and
  * the focus's for its shorter one; the photographer's pinch named for as long as it, replaced by the ratio's line, gone
  * when it ends without one; another label meanwhile keeps its own time, and the line is back after it.
@@ -987,7 +989,7 @@ class SubjectFragmentRenderTest {
         launch()
 
         onScreen { binding, _ ->
-            for (button in listOf(binding.tipButton, binding.saveGuideButton, binding.editGuideButton)) {
+            for (button in listOf(binding.tipButton, binding.editGuideButton)) {
                 val name = button.resources.getResourceEntryName(button.id)
                 assertEquals(name, color(R.color.pix_glass), button.backgroundTintList?.defaultColor)
                 assertEquals(name, color(R.color.pix_glass_stroke), button.strokeColor?.defaultColor)
@@ -1870,12 +1872,12 @@ class SubjectFragmentRenderTest {
     fun saveGuide_showsWithAGuide_savesItOnThisPhone_andIsFilledOnceSaved() {
         val modules = launch()
         connect(modules)
-        onScreen { binding, _ -> assertEquals(View.GONE, binding.saveGuideButton.visibility) }
+        onScreen { binding, _ -> assertFalse(binding.saveGuideButton.isShown) }
 
         modules.mirror.setGuide(guide(withReference = false))
         idle()
         onScreen { binding, _ ->
-            assertEquals(View.VISIBLE, binding.saveGuideButton.visibility)
+            assertTrue(binding.saveGuideButton.isShown)
             assertTrue(binding.saveGuideButton.isEnabled)
             assertEquals(string(R.string.save_guide), binding.saveGuideButton.contentDescription)
             assertEquals(R.drawable.ic_heart, shadowOf(binding.saveGuideButton.plainIcon).createdFromResId)
@@ -1906,6 +1908,61 @@ class SubjectFragmentRenderTest {
             assertEquals(string(R.string.guide_removed_notice), binding.toggleLabel.text.toString())
             assertEquals(string(R.string.save_guide), binding.saveGuideButton.contentDescription)
         }
+    }
+
+    @Test
+    fun theGuidePanel_showsWithAGuideAboveTheCamerasName_andAsksThePhotographersPhone() {
+        val modules = launch()
+        connect(modules)
+        onScreen { binding, _ -> assertFalse(binding.guideControls.isShown) }
+
+        modules.mirror.setGuide(guide(withReference = false))
+        idle()
+        onScreen { binding, _ ->
+            assertTrue(binding.guideControls.isShown)
+            assertTrue(windowBox(binding.guideControls).bottom <= windowBox(binding.cameraCaption).top)
+            assertTrue(binding.opacitySlider.isEnabled)
+            assertEquals(string(R.string.guide_opacity_percent, 50), binding.opacityValue.text.toString())
+            binding.hideGuideButton.performClick()
+            binding.removeGuideButton.performClick()
+        }
+        idle()
+
+        assertEquals(
+            listOf(SessionMessage.GuideVisibleSet("guide-1", false), SessionMessage.GuideRemove("guide-1")),
+            modules.session.sent.filter { it is SessionMessage.GuideVisibleSet || it is SessionMessage.GuideRemove },
+        )
+    }
+
+    @Test
+    fun theGuidePanel_ofAHiddenGuide_offersShow_andItsOpacityIsOff() {
+        val modules = launch()
+        connect(modules)
+        modules.mirror.setGuide(guide(withReference = false))
+        modules.mirror.update(final = true) { it.copy(visible = false, opacity = 0.3f) }
+        idle()
+
+        onScreen { binding, _ ->
+            assertTrue(binding.guideControls.isShown)
+            assertEquals(string(R.string.show_guide), binding.hideGuideButton.contentDescription)
+            assertEquals(R.drawable.ic_visibility, shadowOf(binding.hideGuideButton.plainIcon).createdFromResId)
+            assertFalse(binding.opacitySlider.isEnabled)
+            assertEquals(string(R.string.guide_opacity_percent, 30), binding.opacityValue.text.toString())
+        }
+    }
+
+    @Test
+    fun oneByOne_showsTheWhole4By3AreaWithTheOutsideDimmed_asOnCamera() {
+        val modules = launch()
+        connect(modules)
+        onScreen { binding, _ -> assertFalse(binding.compositionOverlay.dimOutside) }
+
+        modules.session.deliver(
+            SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, aspect = AspectRatio.R1_1),
+        )
+        idle()
+
+        onScreen { binding, _ -> assertTrue(binding.compositionOverlay.dimOutside) }
     }
 
     @Test

@@ -16,6 +16,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -42,6 +43,10 @@ import org.junit.Test
  * screen in front; a situation this phone does not know; each answer naming its request; the photographer asked for
  * their agreement, said at once, then the one answer; one answered after the session ended or in another session
  * (no one told), and after a reconnection of the same session or during it (told).
+ * The subject's guide panel (FR-7.2): Hide and Show (applied, attributed, one action each; the state it has already, a
+ * guide since replaced, and no guide, all dropped); the opacity (steps applied without an action, the last value
+ * clamped to 10–90 % with one action; a hidden guide, a replaced guide, and no number dropped); ✕ (the guide removed
+ * and reported with where it was; a replaced guide dropped).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemoteControlHandlerTest {
@@ -727,6 +732,112 @@ class RemoteControlHandlerTest {
         assertEquals(0.5f, guides.state.value.cx, EPSILON)
         assertTrue(attributions.isEmpty())
         assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    // ---- The subject's guide panel (FR-7.2) -------------------------------------------------------------------------
+
+    @Test
+    fun `the subject's Hide and Show are applied, attributed to the subject, and reported once each`() = runTest {
+        guides.setGuide(fakeGuide("g1"))
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        runCurrent()
+
+        handler.handle(SessionMessage.GuideVisibleSet("g1", visible = false))
+        runCurrent()
+        assertFalse(guides.state.value.visible)
+        handler.handle(SessionMessage.GuideVisibleSet("g1", visible = true))
+        runCurrent()
+
+        assertTrue(guides.state.value.visible)
+        assertEquals(listOf<Role?>(Role.SUBJECT, Role.SUBJECT), attributions)
+        assertEquals(listOf<RemoteAction>(RemoteAction.GuideVisible(false), RemoteAction.GuideVisible(true)), actions)
+        handler.stop()
+    }
+
+    @Test
+    fun `a Hide for a guide that was replaced, for no guide, or for one hidden already is dropped`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        runCurrent()
+
+        handler.handle(SessionMessage.GuideVisibleSet("g1", visible = false))
+        guides.setGuide(fakeGuide("g2"))
+        handler.handle(SessionMessage.GuideVisibleSet("g1", visible = false))
+        runCurrent()
+        assertTrue(guides.state.value.visible)
+
+        guides.update(final = true) { it.copy(visible = false) }
+        handler.handle(SessionMessage.GuideVisibleSet("g2", visible = false))
+        runCurrent()
+
+        assertTrue(attributions.isEmpty())
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
+    fun `the subject's opacity is applied at each step and reported once at its clamped last value`() = runTest {
+        guides.setGuide(fakeGuide("g1"))
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        runCurrent()
+
+        handler.handle(SessionMessage.GuideOpacitySet("g1", 0.7f))
+        runCurrent()
+        assertEquals(0.7f, guides.state.value.opacity, EPSILON)
+        assertTrue(actions.isEmpty())
+
+        // Past the slider's end, as a newer phone could send: kept within 10–90 % (FR-3.4).
+        handler.handle(SessionMessage.GuideOpacitySet("g1", 1.5f, final = true))
+        runCurrent()
+
+        assertEquals(GuideState.MAX_OPACITY, guides.state.value.opacity, EPSILON)
+        assertEquals(listOf<Role?>(Role.SUBJECT, Role.SUBJECT), attributions)
+        assertEquals(listOf<RemoteAction>(RemoteAction.GuideOpacity(GuideState.MAX_OPACITY)), actions)
+        handler.stop()
+    }
+
+    @Test
+    fun `an opacity for a hidden guide, a replaced guide, or no number is dropped`() = runTest {
+        guides.setGuide(fakeGuide("g1"))
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        runCurrent()
+
+        handler.handle(SessionMessage.GuideOpacitySet("g1", Float.NaN, final = true))
+        handler.handle(SessionMessage.GuideOpacitySet("g2", 0.2f, final = true))
+        guides.update(final = true) { it.copy(visible = false) }
+        handler.handle(SessionMessage.GuideOpacitySet("g1", 0.2f, final = true))
+        runCurrent()
+
+        assertEquals(0.5f, guides.state.value.opacity, EPSILON)
+        assertTrue(attributions.isEmpty())
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
+    fun `the subject's remove takes the guide off and reports it with where it was`() = runTest {
+        val guide = fakeGuide("g1")
+        guides.setGuide(guide)
+        guides.update(final = true) { it.copy(cx = 0.3f, opacity = 0.8f) }
+        val before = guides.state.value
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        runCurrent()
+
+        handler.handle(SessionMessage.GuideRemove("g2"))
+        runCurrent()
+        assertEquals(guide, guides.guide.value)
+        assertTrue(actions.isEmpty())
+
+        handler.handle(SessionMessage.GuideRemove("g1"))
+        runCurrent()
+
+        assertNull(guides.guide.value)
+        assertEquals(listOf<RemoteAction>(RemoteAction.GuideRemove(guide, before)), actions)
         handler.stop()
     }
 

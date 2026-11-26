@@ -1,7 +1,8 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
+import android.graphics.Path
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -32,7 +33,8 @@ data class GuideLook(val color: GuideColor = GuideColor.WHITE, val thickness: Gu
  * A guide's outline at a thickness from the settings. [ReferenceGuide.outline] is the default line; another thickness
  * is traced again from the mask, off the main thread, as the other phone traces a received mask (Design 2.6.1). The last
  * few results are kept, so a screen that shows the same guide again does not trace it again. The inside that
- * guide-edit mode tints is made here too, the same way ([inside]).
+ * guide-edit mode tints is made here too, the same way ([inside]), and so are the lines Reference confirm draws along
+ * the person ([lines]), which are needed once and not kept.
  */
 class GuideOutlines(
     private val extractor: OutlineExtractor = OutlineExtractor(),
@@ -73,6 +75,13 @@ class GuideOutlines(
         }
         return inside
     }
+
+    /**
+     * [guide]'s outline as lines in its mask's pixels, for Reference confirm to draw along the person as the photo turns
+     * into the guide (#295): traced off the main thread like another thickness. None when the mask is gone.
+     */
+    suspend fun lines(guide: ReferenceGuide): List<Path> =
+        withContext(dispatcher) { guide.mask.takeUnless { it.isRecycled }?.let(extractor::lines).orEmpty() }
 
     companion object {
         private const val KEPT = 4

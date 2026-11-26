@@ -134,6 +134,7 @@
 | 4.17 | 2026-11-26 | The phone's photos in the viewer (`PhonePhotos`, the photo permission, the grid, *All photos* and *Albums*, deletes Android asks for); the scene photo in Camera's bar with the camera menu; the pose flow's motions (`FLOW`, `HAND_OFF`, `SceneHandOff`, `HeaderUnfold`); touch lights in their shapes; *Generate poses* folding when its field is left empty; library tabs that keep their place (Iter5-A13, [#320]; 2.1, 2.6.2, 2.6.3, 2.6.5, 2.8). |
 | 4.18 | 2026-11-25 | The subject's shutter (Iter5-A11, [#314]): `camera.shutter`, a numbered press on the realtime channel, and `camera.shutter.answer`, taken by the Camera screen alone and only in front (`RemoteControlHandler.shutter`, `takeForSubject`), `SubjectViewModel.onShutter` with its wait, the photographer's timer serving the press, with `cancel` and `timer` (`CameraViewModel.onSubjectShutter`, `ShutterOutcome`), a dropped photo said on the subject's phone, and *Subject view*'s row as Camera's, with the camera's name above the shutter and a step's button beside the thumbnail (1.1.4, 2.5.1, 2.6.5, 2.6.8). |
 | 4.19 | 2026-11-25 | The subject starts AI poses (Iter5-P12, [#276]): `pose.start`, on the realtime channel, and `pose.start.answer`, numbered, one request at a time, with the photographer asked said at once, a 2 s limit on the subject's phone, and the answer kept through a reconnection, begun by the Camera screen as its own tile begins it (`RemoteControlHandler.poseStarter`, `startPosesForSubject`), consent on each phone, and what each phone says; no longer among the open points (*Still open*, 2.5.1, 2.6.3, 2.6.5, 2.9). |
+| 4.20 | 2026-11-25 | A photo turns into its guide on *Reference confirm* (Iter5-A4, [#295]): `PhotoToGuideView` and `PhotoToGuide` in place of the screenshot's cut, `ReferenceGuide.photo`, `withoutPicked`, and `OutlineExtractor.lines` (2.3, 2.6.1). |
 
 </details>
 
@@ -1384,12 +1385,14 @@ data class ReferenceGuide(
     val reference: Bitmap? = null,        // the photo, long side ≤ 512 px, for the corner thumbnail only (FR-3.9); the
                                           // subject keeps the photographer's in MirrorReference (guide.reference.*)
     val crop: PhotoCrop? = null,          // the screenshot it was cut from (FR-2.10); null for a whole image or a generated
-                                          // pose; never sent or saved
+                                          // pose; never sent or saved, and dropped on Use (withoutPicked)
+    val photo: Bitmap? = null,            // a photo used whole, long side ≤ 1024 px, for Reference confirm (#295); null
+                                          // with a crop and for a generated pose; kept like crop
     val situation: Situation? = null,     // a generated pose's situation (FR-4.8), kept in the library (#270); null for
                                           // a photo guide; forSituation keeps the instance when it changes nothing
 )
 data class PhotoCrop(
-    val original: Bitmap,         // the whole picked image, long side ≤ 1024 px, for Reference confirm's cut
+    val original: Bitmap,         // the whole picked image, long side ≤ 1024 px, for Reference confirm (2.6.1)
     val photo: NormalizedRect,    // the part kept, which mask, anchor, and reference are made from
 )
 data class NormalizedRect(val left: Float, val top: Float, val right: Float, val bottom: Float)   // fractions of an image
@@ -2722,7 +2725,7 @@ Exact match only, with no partial search or listing (FR-5.5, NFR-15). Capitals a
 
 #### 2.6.1 Reference guide: segmentation and outline
 
-1.  **Load.** Decode the picked image with its EXIF rotation and downscale it to a long side of at most 1280 px, never up. **Cut a screenshot (It 3, FR-2.10, [#174], [#177]).** For an image taller than 1.9:1, `findScreenshotPhoto` looks for the photo in it by the rules below, in plain Kotlin on the phone (FR-2.6). Without one, the image is used whole, as are a generated pose and *Use the whole image*. Steps 2–5 see the cut alone, so the mask, `anchor`, and `reference` are the photo's. `crop` keeps the screenshot at 1024 px with the photo's place in it, on this phone only.
+1.  **Load.** Decode the picked image with its EXIF rotation and downscale it to a long side of at most 1280 px, never up. **Cut a screenshot (It 3, FR-2.10, [#174], [#177]).** For an image taller than 1.9:1, `findScreenshotPhoto` looks for the photo in it by the rules below, in plain Kotlin on the phone (FR-2.6). Without one, the image is used whole, as are a generated pose and *Use the whole image*. Steps 2–5 see the cut alone, so the mask, `anchor`, and `reference` are the photo's. `crop` keeps the screenshot at 1024 px with the photo's place in it, on this phone only. A photo used whole is kept as `photo` at 1024 px instead, for *Reference confirm* ([#295]). Both are dropped when the guide is used (`withoutPicked`).
 2.  **Segment.** ML Kit's subject segmenter runs with only the foreground confidence mask. Its model comes from Google Play services; the first use waits for it at most 60 s. A model not ready by then, or an unreadable photo, shows "Couldn't use this photo. Try another one." and returns to the camera.
 3.  **Check for a person.** Fewer than 2 % of pixels with confidence ≥ 0.5 fails with `NoPersonFound` (FR-2.4). All detected subjects are kept (FR-2.5).
 4.  **Smooth the mask (It 2, FR-2.9).** Three box blurs, close to a Gaussian, make the 0.5 level a smooth curve. Their radius is 0.8 % of the largest region's height (9 px for a person 1100 px tall). Separate regions under 1 % of the foreground are dropped, such as a small figure far behind. Holes under 0.2 % are filled; background that touches the photo's edge is never a hole. People of similar size are all kept (FR-2.5). The mask is cropped to its box plus 2 % of the box's longer side, and the box's place in the photo becomes `anchor` (FR-3.1).
@@ -2744,7 +2747,7 @@ Exact match only, with no partial search or listing (FR-5.5, NFR-15). Capitals a
 
 All steps run on `Dispatchers.Default`, within 2 s from selection to *Reference confirm* (NFR-3). `Timings` marks `seg.start`/`seg.end` around the whole, `smooth.start`/`smooth.end` around the smoothing, and `cut.start`/`cut.end` around the cut. On the emulator the whole took 0.25–0.35 s per photo once the model was loaded.
 
-**Reference confirm's cut (It 3, FR-2.10).** For a guide with a `crop`, `ScreenshotCutView` plays the cut once in 2 s, when the person is found while the screen watches. The rest of the screenshot dims around an accent-colored frame, the photo fills the card, and then it goes to the bottom-right corner at 72 dp as the outline fades in. A `ValueAnimator` drives it (`ScreenshotCut`), so *Remove animations* shows the end. Without a cut, the outline fades in over 200 ms, also on the subject's phone (Iter3-A13). *Use the whole image* (`onUseWholeImage`) makes the guide again from the whole image. Screen texts: R&S 6.2.
+**A photo turning into its guide (It 3, It 5, FR-2.3, FR-2.10, [#295]).** For a guide with a `crop` or a `photo`, `PhotoToGuideView` plays once, when the person is found while the screen watches. A photo fills the card and holds for 300 ms. A screenshot's cut comes first, in 1 s: the rest of the screenshot dims around an accent-colored frame, and the photo comes to fill the card. Then the outline is drawn along the person on the photo in 500 ms, while the photo dims to half. In the last 500 ms, the photo goes to the bottom-right corner at 72 dp and the outline to its place, where the outline's view takes over. The photo moves as the scene photo does (`SceneArrival`). A photo takes 1.3 s in all, a screenshot 2 s. The line is the outline view's own drawing, in the settings' look (FR-3.10), kept only along the part of its lines drawn so far. `GuideOutlines.lines` traces those lines from the mask off the main thread (`OutlineExtractor.lines`, the lines `extract` draws); until they arrive, the outline fades in instead. *Use* works throughout, so nothing waits for it (NFR-3). A `ValueAnimator` drives it (`PhotoToGuide`), so *Remove animations* shows the end at once. A generated pose has no picked image: its outline fades in over 200 ms, also on the subject's phone (Iter3-A13). *Use the whole image* (`onUseWholeImage`) makes the guide again from the whole image, which then plays as a photo. Screen texts: R&S 6.2.
 
 **Out of scope: arms and legs in front of the body.** Folded arms or crossed legs disappear inside the silhouette, and the outline does not draw them.
 
@@ -3828,6 +3831,7 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#292]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/292
 [#293]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/293
 [#294]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/294
+[#295]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/295
 [#296]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/296
 [#297]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/297
 [#298]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/298

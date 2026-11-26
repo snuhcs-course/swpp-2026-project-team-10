@@ -67,7 +67,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textAppearance="@style/TextAppearance.Pix.Body"
-                    tools:text="0.1.0" />
+                    tools:text="0.2.0" />
             </LinearLayout>
 
             <TextView

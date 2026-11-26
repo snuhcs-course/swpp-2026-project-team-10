@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -515,6 +515,10 @@ sealed interface SessionMessage {
     @SerialName("camera.timer")
     data class Countdown(val left: Int) : SessionMessage
 
+    @Serializable
+    @SerialName("camera.timer.set")
+    data class TimerSet(val seconds: Int) : SessionMessage
+
     /**
      * What the photographer did on their own camera (P → S, #292): the subject's phone says it in a line, as the
      * photographer's phone says the subject's (FR-7.4). [action] is a name, kept a string so that a phone that does
@@ -528,6 +532,7 @@ sealed interface SessionMessage {
         val zoom: Float = 0f,
         val exposure: Int = 0,
         val flash: FlashMode = FlashMode.OFF,
+        val seconds: Int = 0,
     ) : SessionMessage
 
     /** Whether the photographer allows remote control (FR-7.5, Could). */
@@ -554,6 +559,7 @@ sealed interface SessionMessage {
         val aspect: AspectRatio = AspectRatio.R4_3,
         val facing: CameraFacing = CameraFacing.BACK,
         val focused: Boolean = false,
+        val timer: Int = 0,
     ) : SessionMessage
 
     @Serializable

@@ -34,6 +34,7 @@ import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraStatus
+import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
@@ -927,6 +928,9 @@ class CameraLayoutTest {
         guideWithTip()
         session()
         assertEveryControlAtLeast48(controls.root, "a guide with a tip and a session, $font")
+        // The flash's and the timer's icons beside the menu's button are 16 dp: no control of their own (#318).
+        flashAndTimerOn()
+        assertEveryControlAtLeast48(controls.root, "the flash and the timer on, $font")
     }
 
     @Test
@@ -984,6 +988,65 @@ class CameraLayoutTest {
         binding.galleryButton.visibility = View.VISIBLE
         idle()
         assertEveryControlAtLeast48(binding.root, "Subject view")
+    }
+
+    /**
+     * Subject view shows the photographer's flash and timer beside its menu's button as Camera shows its own (#318):
+     * the same places and sizes, with the flash and the timer on, and with the timer alone.
+     */
+    @Test
+    fun subjectViewsFlashAndTimerIcons_areWhereCamerasAre() {
+        val camera = camera()
+        camera.flashAndTimerOn()
+        val camerasFlash = camera.controls.flashIndicator.box()
+        val camerasTimer = camera.controls.timerIndicator.box()
+        // The flash off again, which leaves the timer alone beside the button.
+        camera.controls.cameraMenuButton.performClick()
+        idle()
+        camera.controls.menuFlash.performClick()
+        camera.controls.cameraMenuButton.performClick()
+        idle()
+        assertFalse(camera.controls.flashIndicator.isShown)
+        val camerasTimerAlone = camera.controls.timerIndicator.box()
+
+        val binding = subjectView()
+        fun photographers(flash: FlashMode) {
+            subjectModules!!.session.deliver(
+                SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, flash = flash, timer = 10),
+            )
+            idle()
+        }
+        photographers(FlashMode.ON)
+        assertTrue(binding.flashIndicator.isShown && binding.timerIndicator.isShown)
+        assertEquals(camerasFlash, binding.flashIndicator.box())
+        assertEquals(camerasTimer, binding.timerIndicator.box())
+        // A tap on the icons opens the menu: the area that takes it is 48 dp, over both, inside the bar (NFR-16).
+        val touch = binding.indicatorsTouch.box()
+        assertTrue("$touch", touch.width() >= 48 && touch.height() >= 48)
+        assertTrue("$touch over the icons", touch.contains(binding.flashIndicator.box()))
+        assertTrue("$touch over the icons", touch.contains(binding.timerIndicator.box()))
+        assertTrue("$touch in the bar", binding.topBar.box().contains(touch))
+        assertEveryControlAtLeast48(binding.root, "Subject view with the flash and the timer on")
+
+        photographers(FlashMode.OFF)
+        assertFalse(binding.flashIndicator.isShown)
+        assertEquals(camerasTimerAlone, binding.timerIndicator.box())
+    }
+
+    @Test
+    fun subjectViewsFlashAndTimerIcons_stayInTheBar_clearOfLeave_atLargeFonts() {
+        for (scale in LARGE_FONTS) {
+            val binding = subjectView(fontScale = scale)
+            subjectModules!!.session.deliver(
+                SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, flash = FlashMode.ON, timer = 10),
+            )
+            idle()
+            val bar = binding.topBar.box()
+            val timer = binding.timerIndicator.box()
+            assertTrue("font $scale: $timer in $bar", binding.timerIndicator.isShown && bar.contains(timer))
+            assertTrue("font $scale: the flash in $bar", bar.contains(binding.flashIndicator.box()))
+            assertTrue("font $scale: $timer before Leave", timer.right <= binding.leaveButton.box().left)
+        }
     }
 
     /** The middle of the row's right third, in dp: the panel's 16 dp of padding and five sixths of the rest. */

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.Manifest
@@ -409,6 +409,28 @@ class KoreanScreensTest {
         assertEquals(true, notice.isShown)
         assertEquals(root.context.getString(R.string.remote_shutter_notice, "Test Account 2"), notice.text.toString())
         assertKorean(root, *people)
+    }
+
+    @Test
+    fun camera_whenTheSubjectSetTheTimer_isInKorean() {
+        val modules = TestAppContainer().install()
+        shadowOf(ApplicationProvider.getApplicationContext<Application>()).grantPermissions(Manifest.permission.CAMERA)
+        scenario = launchFragmentInContainer<CameraFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        idle()
+
+        // The subject's menu sets this phone's timer (#318): to 10 s, then off.
+        for ((seconds, line) in listOf(10 to R.string.remote_timer_notice, 0 to R.string.remote_timer_off_notice)) {
+            modules.session.deliver(SessionMessage.TimerSet(seconds))
+            idle()
+            val root = screen()
+            val notice = FragmentCameraBinding.bind(root).noticeText
+            assertEquals(true, notice.isShown)
+            val text = root.context.getString(line, "Test Account 2", seconds)
+            assertEquals(text, notice.text.toString())
+            assertKorean(root, *people)
+        }
     }
 
     @Test
@@ -1127,6 +1149,8 @@ class KoreanScreensTest {
             SessionMessage.PhotographerDid("flash", flash = FlashMode.ON),
             SessionMessage.PhotographerDid("flash", flash = FlashMode.AUTO),
             SessionMessage.PhotographerDid("flash", flash = FlashMode.OFF),
+            SessionMessage.PhotographerDid("timer", seconds = 3),
+            SessionMessage.PhotographerDid("timer", seconds = 0),
             SessionMessage.PhotographerDid("guide.move"),
             SessionMessage.PhotographerDid("guide"),
             SessionMessage.Focused(0.5f, 0.5f),

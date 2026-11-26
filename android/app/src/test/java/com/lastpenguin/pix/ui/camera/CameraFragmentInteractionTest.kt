@@ -136,6 +136,7 @@ import org.robolectric.shadows.ShadowDialog
  * with this phone's timer on, the countdown with who pressed, and its photo at its end; the subject's second press,
  * which cancels it with who cancelled; a cancel of a countdown this phone's shutter started; a press for a photo that
  * meets a countdown, left to its own photo without a refusal.
+ * The subject's timer (#318): shown in this phone's bar and menu, with who set it, and off again.
  * The subject starts AI poses (#276, FR-6.15): the scene photo's step begun here for their situation, with its notice;
  * refused for a selfie without a front camera, while a scene photo is already framed (the step unchanged), with a
  * sheet over the camera, and while this phone's timer counts down (the countdown going on to its photo); a press, and
@@ -724,6 +725,34 @@ class CameraFragmentInteractionTest {
         idleFor(5_000)
         // No scene photo was taken: the step is still framing.
         assertEquals(GenerationUiState.Phase.FRAMING, generation.uiState.value.phase)
+    }
+
+    @Test
+    fun theSubjectsTimer_showsInTheBarAndTheMenu_andSaysWhoSetIt() {
+        val (modules, _) = inASessionWithACameraThatSaves()
+
+        modules.session.deliver(SessionMessage.TimerSet(3))
+        idle()
+        onScreen { controls, _ ->
+            // This phone's one timer, set from the subject's menu (#318).
+            assertEquals(View.VISIBLE, controls.timerIndicator.visibility)
+            assertTrue(controls.menuTimer.isActivated)
+            assertEquals(
+                string(R.string.remote_timer_notice, "Joonhyung", 3),
+                controls.noticeText.text.toString(),
+            )
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+
+        modules.session.deliver(SessionMessage.TimerSet(0))
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(View.GONE, controls.timerIndicator.visibility)
+            assertEquals(
+                string(R.string.remote_timer_off_notice, "Joonhyung"),
+                controls.noticeText.text.toString(),
+            )
+        }
     }
 
     @Test

@@ -1,10 +1,11 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.generation.PoseTip
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
@@ -78,7 +79,11 @@ import org.junit.Test
  * SHUTTER_WAIT_MS with a line (1 ms before / at it); a press before the session is connected asks nothing; a drop
  * frees a waiting press without a line; an answer to a press given up before, which answers no later press. With
  * the photographer's timer (FR-1.17): a press while the countdown shows asks to cancel it; a press the timer took up
- * is no refusal; a cancel refused or not answered says nothing.
+ * is no refusal; a cancel refused or not answered says nothing. The timer set here too (#318): the photographer's
+ * state, with seconds this Pix does not offer shown as off; the menu's Timer cycling, sent each time, confirmed or
+ * reverted by the echo; one set before this screen existed (shown at once); a request without an answer (put back
+ * after TIMER_WAIT_MS, 1 ms before / at it) and one answered in time; waiting during the countdown and without a link;
+ * the photographer's change as a line.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SubjectViewModelTest {
@@ -714,7 +719,7 @@ class SubjectViewModelTest {
         session.deliver(SessionMessage.PhotographerDid("guide.move"))
         session.deliver(SessionMessage.PhotographerDid("guide"))
         // From a newer photographer, and a ratio that is none.
-        session.deliver(SessionMessage.PhotographerDid("timer"))
+        session.deliver(SessionMessage.PhotographerDid("lens"))
         session.deliver(SessionMessage.PhotographerDid("zoom", zoom = Float.NaN))
         runCurrent()
 
@@ -1173,6 +1178,136 @@ class SubjectViewModelTest {
 
         // "Can't take a photo right now" is for a press that asked for one.
         assertTrue(refusals.isEmpty())
+    }
+
+    // ---- The photographer's timer, set here too (#318) ------------------------------------------------------------
+
+    private fun timerSets() = session.sent.filterIsInstance<SessionMessage.TimerSet>().map { it.seconds }
+
+    @Test
+    fun `the timer is the photographer's, as their phone says it`() = runTest(dispatcher) {
+        connectWithControls()
+        runCurrent()
+        assertEquals(ShutterTimer.OFF, viewModel.uiState.value.timer)
+
+        session.deliver(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, timer = 10))
+        runCurrent()
+        assertEquals(ShutterTimer.TEN, viewModel.uiState.value.timer)
+
+        // Seconds this Pix does not offer, from a later one: shown as off, which this menu can name.
+        session.deliver(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, timer = 5))
+        runCurrent()
+        assertEquals(ShutterTimer.OFF, viewModel.uiState.value.timer)
+    }
+
+    @Test
+    fun `a timer set before this screen existed shows at once`() = runTest(dispatcher) {
+        // The photographer's first state comes as the subject connects, before Subject view is there to hear it.
+        val earlier = FakeSessionManager()
+        earlier.setState(SessionState.Connected("s_1", PeerInfo("Dongje"), Role.SUBJECT))
+        earlier.deliver(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, timer = 10))
+
+        val late = SubjectViewModel(earlier, mirror, references, FakeRemoteVideo())
+        runCurrent()
+
+        assertEquals(ShutterTimer.TEN, late.uiState.value.timer)
+    }
+
+    @Test
+    fun `a timer request that gets no answer is put back after its wait, and not before`() = runTest(dispatcher) {
+        connectWithControls()
+        session.deliver(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, timer = 3))
+        runCurrent()
+
+        // A photographer's phone of before #318 does not know the request, and says nothing.
+        viewModel.onTimerTap()
+        assertEquals(ShutterTimer.TEN, viewModel.uiState.value.timer)
+        advanceTimeBy(SubjectViewModel.TIMER_WAIT_MS - 1)
+        runCurrent()
+        assertEquals(ShutterTimer.TEN, viewModel.uiState.value.timer)
+        advanceTimeBy(1)
+        runCurrent()
+        // Back to what the photographer's phone said last.
+        assertEquals(ShutterTimer.THREE, viewModel.uiState.value.timer)
+    }
+
+    @Test
+    fun `a timer request answered in time stays, whatever the wait`() = runTest(dispatcher) {
+        connectWithControls()
+        runCurrent()
+
+        viewModel.onTimerTap()
+        session.deliver(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, timer = 3))
+        runCurrent()
+        advanceTimeBy(SubjectViewModel.TIMER_WAIT_MS * 2)
+        runCurrent()
+
+        assertEquals(ShutterTimer.THREE, viewModel.uiState.value.timer)
+    }
+
+    @Test
+    fun `the menu's Timer cycles off, 3 s, 10 s, and the echo confirms or reverts it`() = runTest(dispatcher) {
+        connectWithControls()
+        runCurrent()
+
+        viewModel.onTimerTap()
+        assertEquals(ShutterTimer.THREE, viewModel.uiState.value.timer)
+        assertEquals(listOf(3), timerSets())
+        session.deliver(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, timer = 3))
+        runCurrent()
+        assertEquals(ShutterTimer.THREE, viewModel.uiState.value.timer)
+
+        viewModel.onTimerTap()
+        assertEquals(ShutterTimer.TEN, viewModel.uiState.value.timer)
+        assertEquals(listOf(3, 10), timerSets())
+        // The photographer turned it off at the same moment, and theirs came later: the echo reverts the item.
+        session.deliver(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, timer = 0))
+        runCurrent()
+        assertEquals(ShutterTimer.OFF, viewModel.uiState.value.timer)
+
+        viewModel.onTimerTap()
+        viewModel.onTimerTap()
+        viewModel.onTimerTap()
+        assertEquals(listOf(3, 10, 3, 10, 0), timerSets())
+    }
+
+    @Test
+    fun `the timer waits while the countdown runs, and without a link`() = runTest(dispatcher) {
+        connectWithControls()
+        runCurrent()
+        session.deliver(SessionMessage.Countdown(3))
+        runCurrent()
+
+        viewModel.onTimerTap()
+        assertEquals(ShutterTimer.OFF, viewModel.uiState.value.timer)
+        assertTrue(timerSets().isEmpty())
+
+        session.deliver(SessionMessage.Countdown(0))
+        runCurrent()
+        session.setState(SessionState.Reconnecting("s_1", 0L))
+        runCurrent()
+        viewModel.onTimerTap()
+        assertTrue(timerSets().isEmpty())
+    }
+
+    @Test
+    fun `the photographer's change of the timer is a line`() = runTest(dispatcher) {
+        val lines = mutableListOf<PhotographerLine>()
+        backgroundScope.launch { viewModel.photographerLines.collect { lines += it } }
+        connectWithControls()
+        runCurrent()
+
+        session.deliver(SessionMessage.PhotographerDid("timer", seconds = 3))
+        session.deliver(SessionMessage.PhotographerDid("timer", seconds = 0))
+        runCurrent()
+
+        assertEquals(
+            listOf<PhotographerLine>(
+                PhotographerLine.Did(PhotographerAction.Timer(ShutterTimer.THREE)),
+                PhotographerLine.Did(PhotographerAction.Timer(ShutterTimer.OFF)),
+            ),
+            lines,
+        )
     }
 
     @Test

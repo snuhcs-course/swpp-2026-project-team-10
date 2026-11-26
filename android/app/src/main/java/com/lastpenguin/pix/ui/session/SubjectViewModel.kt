@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -13,6 +13,7 @@ import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.PhoneTurns
 import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.camera.PhotoDeletion
+import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.camera.isAtZoomStep
 import com.lastpenguin.pix.camera.nextZoomStep
@@ -179,6 +180,8 @@ data class SubjectUiState(
     val menuOpen: Boolean = false,
     /** The seconds the photographer's timer has left before its photo (FR-1.17), from `camera.timer`; null otherwise. */
     val countdown: Int? = null,
+    /** The photographer's timer as chosen, on either phone (FR-1.17, #318). */
+    val timer: ShutterTimer = ShutterTimer.OFF,
 ) {
     /** The thumbnail's photo, none until the session's first. */
     val lastPhoto: Uri?
@@ -351,6 +354,9 @@ class SubjectViewModel(
     // True when the press that waits asked to stop the photographer's countdown, not for a photo (FR-1.17).
     private var shutterCancels = false
 
+    // Runs while a change of the timer waits for the photographer's phone to answer it ([TIMER_WAIT_MS]).
+    private var timerWait: Job? = null
+
     // Takes down a number whose next second never came (showCountdown).
     private var countdownExpiry: Job? = null
 
@@ -376,6 +382,8 @@ class SubjectViewModel(
         session.peerCamera.value?.let { camera ->
             _uiState.update { it.copy(zoom = camera.zoom, exposure = camera.exposure, flash = camera.flash) }
         }
+        // And their timer, which the first state of a session carries before this screen is there to hear it (#318).
+        _uiState.update { it.copy(timer = photographersTimer()) }
         viewModelScope.launch {
             // Kept by the session, so a state sent before this screen existed, or before `incoming` was collected,
             // is here too. Outside a gesture it is also the value to show.
@@ -476,8 +484,12 @@ class SubjectViewModel(
                         zoom = shownZoom(message.zoom, message.by, shown = it.zoom),
                         exposure = if (exposureSender.adjusting) it.exposure else message.exposure,
                         flash = message.flash,
+                        timer = photographersTimer(),
                     )
                 }
+                // Whatever the photographer's phone says of its state answers a change of the timer asked here.
+                timerWait?.cancel()
+                timerWait = null
                 if (message.by == Role.SUBJECT && message.final) {
                     Timings.mark("zoom.echo", "${message.zoom} exposure=${message.exposure} flash=${message.flash}")
                 }
@@ -950,9 +962,40 @@ class SubjectViewModel(
         Timings.mark("flash.sent", "$next")
     }
 
+    /**
+     * The menu's Timer cycles the photographer's timer off, 3 s, 10 s, like their own (FR-1.17, #318); the echo
+     * confirms or reverts it, and no echo within [TIMER_WAIT_MS] reverts it too. Not while the timer counts down, as
+     * on their phone.
+     */
+    fun onTimerTap() {
+        val ui = _uiState.value
+        if (!ui.connected || ui.countdown != null) return
+        val next = ui.timer.next()
+        _uiState.update { it.copy(timer = next) }
+        session.send(SessionMessage.TimerSet(next.seconds))
+        Timings.mark("timer.sent", "${next.seconds}")
+        // A phone that does not know the request says nothing: the item then goes back to what it said last, or it
+        // would show a timer that a press of the shutter does not get.
+        timerWait?.cancel()
+        timerWait = viewModelScope.launch {
+            delay(TIMER_WAIT_MS)
+            timerWait = null
+            _uiState.update { it.copy(timer = photographersTimer()) }
+        }
+    }
+
+    /**
+     * The photographer's timer as their phone said it last, which the session keeps. Seconds this Pix does not offer,
+     * from a later one, show as off, which this menu can name.
+     */
+    private fun photographersTimer(): ShutterTimer =
+        ShutterTimer.ofSeconds(session.peerTimerSeconds.value) ?: ShutterTimer.OFF
+
     private fun endInteractions() {
         endBaseWait()
         endShutterWait()
+        timerWait?.cancel()
+        timerWait = null
         pendingZoomStep = null
         zoomHeldBack = false
         zoomSender.cancel()
@@ -968,6 +1011,9 @@ class SubjectViewModel(
          * the link's time alone; after it the press counts as not taken.
          */
         const val SHUTTER_WAIT_MS = 2_000L
+
+        /** How long a change of the timer waits for the photographer's phone to answer it (#318). */
+        const val TIMER_WAIT_MS = 2_000L
 
         /**
          * How long one second of the photographer's countdown stays without the next (FR-1.17): the second itself

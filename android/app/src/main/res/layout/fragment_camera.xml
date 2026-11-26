@@ -64,7 +64,8 @@
             <!-- The flash while it is on or auto, and the timer while it is on (FR-1.12, FR-1.17): what the shutter will
                  do, with the menu closed. The size and line of the bar's other icons, on their line: a bottom margin
                  of half the bar's overhang centers them where the buttons center their icons. A tap on one opens the
-                 menu. -->
+                 menu: too small for a tap of their own, they are in the reach of the menu's button
+                 (CameraFragment.reachOverIndicators). -->
             <ImageView
                 android:id="@+id/flashIndicator"
                 android:layout_width="16dp"

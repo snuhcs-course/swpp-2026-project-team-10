@@ -99,6 +99,9 @@ class RtcSessionManager(
     private val _peerCamera = MutableStateFlow<CameraState?>(null)
     override val peerCamera: StateFlow<CameraState?> = _peerCamera.asStateFlow()
 
+    private val _peerTimerSeconds = MutableStateFlow(0)
+    override val peerTimerSeconds: StateFlow<Int> = _peerTimerSeconds.asStateFlow()
+
     private val _peerZoomHolder = MutableStateFlow<Role?>(null)
     override val peerZoomHolder: StateFlow<Role?> = _peerZoomHolder.asStateFlow()
 
@@ -255,6 +258,7 @@ class RtcSessionManager(
         socketFailures = 0
         _peerCapabilities.value = null
         _peerCamera.value = null
+        _peerTimerSeconds.value = 0
         _peerZoomHolder.value = null
         // The photographer stays Idle until the code arrives, or waits for the friend of an invitation; the subject is
         // connecting from the first moment.
@@ -907,6 +911,8 @@ class RtcSessionManager(
             is SessionMessage.CameraStateUpdate -> {
                 _peerCamera.value =
                     CameraState(message.zoom, message.exposure, message.flash, message.aspect, facing = message.facing)
+                // The timer is no value of the camera's, so it is kept beside the state, for a screen that opens late.
+                _peerTimerSeconds.value = message.timer
                 _incoming.tryEmit(message)
             }
 

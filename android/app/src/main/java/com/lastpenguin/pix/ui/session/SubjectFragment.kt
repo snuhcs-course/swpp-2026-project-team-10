@@ -12,6 +12,7 @@ import android.text.TextUtils
 import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.addCallback
@@ -38,6 +39,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
 import com.lastpenguin.pix.session.EndReason
@@ -259,7 +261,10 @@ class SubjectFragment :
                 binding.countdownNumber,
             ),
             views = listOf(
+                binding.flashIndicator,
+                binding.timerIndicator,
                 binding.menuFlash,
+                binding.menuTimer,
                 binding.menuGrid,
                 binding.menuSettings,
                 binding.guideButton,
@@ -1125,9 +1130,17 @@ class SubjectFragment :
     private fun renderShutter(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         binding.shutterButton.isEnabled = ui.connected && videoShowing.value && !ui.shutterWaiting
         val name = ui.photographerName
+        val timer = ui.timer
         binding.shutterButton.contentDescription = when {
             ui.countdown != null -> getString(R.string.shutter_cancel_timer)
+
+            // With the photographer's timer on, a press starts its countdown (FR-7.8, #318), and the shutter says so.
+            name == null && timer != ShutterTimer.OFF -> getString(R.string.shutter_timer, timer.seconds)
+
             name == null -> getString(R.string.shutter)
+
+            timer != ShutterTimer.OFF -> getString(R.string.subject_shutter_timer, name, timer.seconds)
+
             else -> getString(R.string.subject_shutter, name)
         }
     }
@@ -1241,8 +1254,12 @@ class SubjectFragment :
      * one and comes back to it when the session ends (#204).
      */
     private fun setupMenu(binding: FragmentSubjectBinding) {
-        binding.cameraMenuButton.setOnClickListener { viewModel.setMenuOpen(!viewModel.uiState.value.menuOpen) }
+        val toggle = View.OnClickListener { viewModel.setMenuOpen(!viewModel.uiState.value.menuOpen) }
+        binding.cameraMenuButton.setOnClickListener(toggle)
+        // A tap on the icons beside the button opens the menu too, as on Camera, through the area over them.
+        binding.indicatorsTouch.setOnClickListener(toggle)
         binding.menuFlash.setOnClickListener { viewModel.onFlashTap() }
+        binding.menuTimer.setOnClickListener { viewModel.onTimerTap() }
         binding.menuGrid.setOnClickListener { settingsViewModel.toggleShowGrid() }
         binding.menuSettings.setOnClickListener {
             viewModel.setMenuOpen(false)
@@ -1252,16 +1269,42 @@ class SubjectFragment :
     }
 
     /**
-     * The camera menu's button and items, each in the accent while what it sets is on (FR-1.17): the photographer's
-     * flash, only when their camera has one (FR-7.3), and this phone's grid.
+     * The camera menu's button, the photographer's flash and timer beside it while either is on, as Camera shows its
+     * own, and the menu's items, each in the accent while what it sets is on (FR-1.17): the photographer's flash, only
+     * when their camera has one (FR-7.3), their timer (#318), and this phone's grid.
      */
     private fun renderMenu(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         binding.cameraMenuButton.isActivated = ui.menuOpen
         binding.cameraMenu.reveal(ui.menuOpen)
+        val flashOn = ui.hasFlash && ui.flash != FlashMode.OFF
+        val timerOn = ui.timer != ShutterTimer.OFF
+        binding.flashIndicator.isVisible = flashOn
+        binding.timerIndicator.isVisible = timerOn
+        binding.indicatorsTouch.isVisible = flashOn || timerOn
+        setImageOnce(
+            binding.flashIndicator,
+            when (ui.flash) {
+                FlashMode.OFF -> R.drawable.ic_flash_off
+                FlashMode.AUTO -> R.drawable.ic_flash_auto
+                FlashMode.ON -> R.drawable.ic_flash_on
+            },
+        )
+        setImageOnce(binding.timerIndicator, timerIcon(ui.timer))
         binding.menuFlash.isVisible = ui.hasFlash
-        // The photographer's flash waits while their timer counts down, as on their phone (FR-1.17).
+        // The photographer's flash and timer wait while their timer counts down, as on their phone (FR-1.17).
         binding.menuFlash.isEnabled = ui.connected && ui.countdown == null
-        binding.menuFlash.isActivated = ui.flash != FlashMode.OFF
+        binding.menuFlash.isActivated = flashOn
+        binding.menuTimer.isEnabled = ui.connected && ui.countdown == null
+        binding.menuTimer.isActivated = timerOn
+        setImageOnce(
+            binding.menuTimerIcon,
+            when (ui.timer) {
+                ShutterTimer.OFF -> R.drawable.ic_menu_timer_off
+                ShutterTimer.THREE -> R.drawable.ic_menu_timer_3
+                ShutterTimer.TEN -> R.drawable.ic_menu_timer_10
+            },
+        )
+        binding.menuTimer.contentDescription = timerText(ui.timer)
         val icon = when (ui.flash) {
             FlashMode.OFF -> R.drawable.ic_menu_flash_off
             FlashMode.AUTO -> R.drawable.ic_menu_flash_auto
@@ -1281,6 +1324,25 @@ class SubjectFragment :
         val grid = settingsViewModel.showGrid.value
         binding.menuGrid.isActivated = grid
         binding.menuGrid.contentDescription = getString(if (grid) R.string.grid_on else R.string.grid_off)
+    }
+
+    /** The timer beside the menu's button, at the weight of the top bar's icons; never off, which shows none. */
+    @DrawableRes
+    private fun timerIcon(timer: ShutterTimer): Int =
+        if (timer == ShutterTimer.TEN) R.drawable.ic_timer_10 else R.drawable.ic_timer_3
+
+    /** "Timer off", or "Timer 3 s": the menu's item as TalkBack reads it, as on Camera. */
+    private fun timerText(timer: ShutterTimer): String = if (timer == ShutterTimer.OFF) {
+        getString(R.string.timer_off)
+    } else {
+        getString(R.string.timer_seconds, timer.seconds)
+    }
+
+    /** Sets [image]'s drawable only when it changes, which the tag remembers: a render comes with every zoom step. */
+    private fun setImageOnce(image: ImageView, @DrawableRes icon: Int) {
+        if (image.tag == icon) return
+        image.tag = icon
+        image.setImageResource(icon)
     }
 
     /** The photographer's timer counting down (FR-1.17): the seconds left over the video, and whose photo it is. */
@@ -1596,6 +1658,22 @@ class SubjectFragment :
                     R.drawable.ic_brightness,
                     white,
                 )
+
+                is PhotographerAction.Timer -> if (action.timer == ShutterTimer.OFF) {
+                    showToggleLabel(
+                        binding,
+                        getString(R.string.remote_timer_off_notice, name),
+                        R.drawable.ic_menu_timer_off,
+                        white,
+                    )
+                } else {
+                    showToggleLabel(
+                        binding,
+                        getString(R.string.remote_timer_notice, name, action.timer.seconds),
+                        timerIcon(action.timer),
+                        white,
+                    )
+                }
 
                 is PhotographerAction.Flash -> when (action.mode) {
                     FlashMode.OFF -> showToggleLabel(

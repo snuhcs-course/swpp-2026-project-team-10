@@ -11,6 +11,7 @@ import com.lastpenguin.pix.account.AccountError
 import com.lastpenguin.pix.account.FakeInvitationManager
 import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.camera.PhotoAlbum
+import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.generation.GuideTip
 import com.lastpenguin.pix.generation.PoseTip
 import com.lastpenguin.pix.generation.Situation
@@ -902,6 +903,27 @@ class SessionViewModelTest {
 
         assertEquals(
             listOf(SessionNotice.RemoteShutterPress("Joonhyung"), SessionNotice.RemoteTimerCancel("Joonhyung")),
+            notices,
+        )
+    }
+
+    @Test
+    fun theSubjectsChangeOfTheTimer_isANotice_withWhatItIsNow() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.TimerSet(3))
+        runCurrent()
+        session.deliver(SessionMessage.TimerSet(0))
+        runCurrent()
+
+        assertEquals(
+            listOf(
+                SessionNotice.RemoteTimer("Joonhyung", ShutterTimer.THREE),
+                SessionNotice.RemoteTimer("Joonhyung", ShutterTimer.OFF),
+            ),
             notices,
         )
     }

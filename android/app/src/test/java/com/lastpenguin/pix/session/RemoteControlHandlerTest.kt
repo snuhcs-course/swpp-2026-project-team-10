@@ -1,8 +1,9 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -31,6 +32,9 @@ import org.junit.Test
  * own focus (`camera.focus`) and timer's countdown (`camera.timer`, FR-1.17): told
  * to the subject while the session runs, and to no one before it starts or after it stops; the subject's flash while
  * the countdown runs (answered unchanged) and after its 0 (applied).
+ * The timer set from the subject's phone (#318): said at the start; a request (set, echoed as the subject's, one
+ * action); the photographer's own change (echoed as theirs, no action); a request during the countdown (unchanged,
+ * applied after it); seconds this Pix does not offer (unchanged); the value it has (answered, one action).
  * The subject's shutter (#314): taken by the Camera screen (answered, one action); refused by it; no Camera screen in
  * front; two presses in a row, each answered; taken up by the photographer's timer (its start), a cancel (its stop),
  * and one the timer leaves as it is (no action), each answered as the timer's.
@@ -504,6 +508,126 @@ class RemoteControlHandlerTest {
             assertEquals(listOf(FlashMode.AUTO), camera.flashRequests)
             handler.stop()
         }
+
+    // ---- The timer set from the subject's phone (#318) ------------------------------------------------------------
+
+    @Test
+    fun `starting says the timer as chosen, for a subject that connects`() = runTest {
+        handler.timerChoice.set(ShutterTimer.TEN)
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        assertEquals(10, lastFinal().timer)
+        handler.stop()
+    }
+
+    @Test
+    fun `a timer request sets the timer, is echoed as the subject's, and reported once`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        handler.handle(SessionMessage.TimerSet(3))
+        runCurrent()
+
+        assertEquals(ShutterTimer.THREE, handler.timerChoice.timer.value)
+        assertEquals(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, timer = 3),
+            echoes().single(),
+        )
+        assertEquals(listOf<RemoteAction>(RemoteAction.Timer(ShutterTimer.THREE)), actions)
+        handler.stop()
+    }
+
+    @Test
+    fun `the photographer's own change of the timer is echoed as theirs, and is no action`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        // The menu on Camera, through CameraViewModel.
+        handler.timerChoice.set(ShutterTimer.THREE)
+        runCurrent()
+
+        assertEquals(
+            SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, timer = 3),
+            echoes().single(),
+        )
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
+    fun `a timer request while the countdown runs is answered unchanged, and applies after`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        handler.timerChoice.set(ShutterTimer.THREE)
+        runCurrent()
+        handler.countdownHere(3)
+        session.sent.clear()
+
+        handler.handle(SessionMessage.TimerSet(0))
+        runCurrent()
+
+        // Camera's own Timer waits while it counts down (FR-1.17), and so does the subject's.
+        assertEquals(ShutterTimer.THREE, handler.timerChoice.timer.value)
+        assertEquals(
+            SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, timer = 3),
+            echoes().single(),
+        )
+        assertTrue(actions.isEmpty())
+
+        handler.countdownHere(0)
+        handler.handle(SessionMessage.TimerSet(0))
+        runCurrent()
+        assertEquals(ShutterTimer.OFF, handler.timerChoice.timer.value)
+        handler.stop()
+    }
+
+    @Test
+    fun `a timer request for seconds this Pix does not offer is answered unchanged`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        handler.handle(SessionMessage.TimerSet(5))
+        runCurrent()
+
+        assertEquals(ShutterTimer.OFF, handler.timerChoice.timer.value)
+        assertEquals(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true), echoes().single())
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
+    fun `a timer request for the value it has is answered as the subject's, with one action`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.timerChoice.set(ShutterTimer.TEN)
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        // Both people chose 10 s at the same moment: the subject's phone still gets its answer.
+        handler.handle(SessionMessage.TimerSet(10))
+        runCurrent()
+
+        assertEquals(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, timer = 10),
+            echoes().single(),
+        )
+        assertEquals(listOf<RemoteAction>(RemoteAction.Timer(ShutterTimer.TEN)), actions)
+        handler.stop()
+    }
 
     @Test
     fun `a guide move is clamped by the repository, attributed to the subject, and reported once per gesture`() =

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.FlashMode
@@ -81,6 +81,9 @@ class ChannelRouterTest {
         assertFalse(router.latestOnly(SessionMessage.PhotographerDid("zoom", zoom = 2f)))
         // The countdown's seconds in order, its end among them (FR-1.17).
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.Countdown(3)))
+        // The timer's choice is a final value, as the flash's (#318).
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.TimerSet(3)))
+        assertFalse(router.latestOnly(SessionMessage.TimerSet(3)))
         assertFalse(router.latestOnly(SessionMessage.Countdown(3)))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ControlPermission(false)))
         assertTrue(router.latestOnly(SessionMessage.GuideMove("g", 0.4f, 0.5f, 0.8f)))

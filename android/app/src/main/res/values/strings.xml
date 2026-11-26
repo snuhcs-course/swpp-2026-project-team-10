@@ -180,6 +180,8 @@
     <string name="remote_brightness_notice">%1$s set brightness to %2$s</string>
     <string name="remote_focus_notice">%1$s set the focus</string>
     <string name="remote_shutter_notice">%1$s took a photo</string>
+    <string name="remote_timer_notice">%1$s set the timer to %2$d s</string>
+    <string name="remote_timer_off_notice">%1$s turned the timer off</string>
     <string name="remote_shutter_pressed_notice">%1$s pressed the shutter</string>
     <string name="remote_timer_cancel_notice">%1$s cancelled the timer</string>
     <string name="remote_pose_start_notice">%1$s started AI poses</string>
@@ -523,6 +525,7 @@
     <string name="caption_separator" translatable="false">·</string>
     <string name="subject_receiving_photo">Receiving photo…</string>
     <string name="subject_shutter">Take a photo with %1$s\'s camera</string>
+    <string name="subject_shutter_timer">Take a photo with %1$s\'s camera, %2$d s timer</string>
     <string name="subject_shutter_refused">Can\'t take a photo right now</string>
     <string name="subject_poses_asking">Waiting for %1$s to agree</string>
     <string name="subject_poses_started">%1$s takes the scene photo for the poses</string>

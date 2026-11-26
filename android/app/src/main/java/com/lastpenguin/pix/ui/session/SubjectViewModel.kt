@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -13,6 +13,7 @@ import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.PhoneTurns
 import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.camera.PhotoDeletion
+import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.camera.isAtZoomStep
 import com.lastpenguin.pix.camera.nextZoomStep
@@ -179,6 +180,8 @@ data class SubjectUiState(
     val menuOpen: Boolean = false,
     /** The seconds the photographer's timer has left before its photo (FR-1.17), from `camera.timer`; null otherwise. */
     val countdown: Int? = null,
+    /** The photographer's timer as chosen, on either phone (FR-1.17, #318). */
+    val timer: ShutterTimer = ShutterTimer.OFF,
 ) {
     /** The thumbnail's photo, none until the session's first. */
     val lastPhoto: Uri?
@@ -476,6 +479,8 @@ class SubjectViewModel(
                         zoom = shownZoom(message.zoom, message.by, shown = it.zoom),
                         exposure = if (exposureSender.adjusting) it.exposure else message.exposure,
                         flash = message.flash,
+                        // Seconds this Pix does not offer, from a later one, show as off, which this menu can name.
+                        timer = ShutterTimer.ofSeconds(message.timer) ?: ShutterTimer.OFF,
                     )
                 }
                 if (message.by == Role.SUBJECT && message.final) {
@@ -948,6 +953,19 @@ class SubjectViewModel(
         _uiState.update { it.copy(flash = next) }
         session.send(SessionMessage.FlashSet(next))
         Timings.mark("flash.sent", "$next")
+    }
+
+    /**
+     * The menu's Timer cycles the photographer's timer off, 3 s, 10 s, like their own (FR-1.17, #318); the echo
+     * confirms or reverts it. Not while the timer counts down, as on their phone.
+     */
+    fun onTimerTap() {
+        val ui = _uiState.value
+        if (!ui.connected || ui.countdown != null) return
+        val next = ui.timer.next()
+        _uiState.update { it.copy(timer = next) }
+        session.send(SessionMessage.TimerSet(next.seconds))
+        Timings.mark("timer.sent", "${next.seconds}")
     }
 
     private fun endInteractions() {

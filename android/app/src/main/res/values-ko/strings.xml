@@ -170,6 +170,8 @@
     <string name="remote_brightness_notice">%1$s님이 밝기를 %2$s에 맞췄어요</string>
     <string name="remote_focus_notice">%1$s님이 초점을 맞췄어요</string>
     <string name="remote_shutter_notice">%1$s님이 사진을 찍었어요</string>
+    <string name="remote_timer_notice">%1$s님이 타이머를 %2$d초로 설정했어요</string>
+    <string name="remote_timer_off_notice">%1$s님이 타이머를 껐어요</string>
     <string name="remote_shutter_pressed_notice">%1$s님이 셔터를 눌렀어요</string>
     <string name="remote_timer_cancel_notice">%1$s님이 타이머를 취소했어요</string>
     <string name="remote_pose_start_notice">%1$s님이 AI 포즈를 시작했어요</string>
@@ -487,6 +489,7 @@
     <string name="subject_live">실시간으로 보는 중</string>
     <string name="subject_receiving_photo">사진 받는 중…</string>
     <string name="subject_shutter">%1$s님의 카메라로 사진 찍기</string>
+    <string name="subject_shutter_timer">%1$s님의 카메라로 사진 찍기, 타이머 %2$d초</string>
     <string name="subject_shutter_refused">지금은 사진을 찍을 수 없어요</string>
     <string name="subject_poses_asking">%1$s님의 동의를 기다리고 있어요</string>
     <string name="subject_poses_started">%1$s님이 배경 사진을 찍으면 포즈를 만들어요</string>

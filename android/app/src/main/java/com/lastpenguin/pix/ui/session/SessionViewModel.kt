@@ -14,6 +14,7 @@ import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.account.SentInvitation
 import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.session.ConfirmSyncer
 import com.lastpenguin.pix.session.DescriptionSyncer
@@ -60,6 +61,9 @@ sealed interface SessionNotice {
 
     /** The subject changed the zoom: "Joonhyung set zoom to 2×" (FR-7.4). */
     data class RemoteZoom(val name: String, val ratio: Float) : SessionNotice
+
+    /** The subject set this phone's timer: "Joonhyung set the timer to 3 s", or "… turned the timer off" (#318). */
+    data class RemoteTimer(val name: String, val timer: ShutterTimer) : SessionNotice
 
     /** The subject's shutter took a photo: "Joonhyung took a photo" (FR-7.8, #314). */
     data class RemoteShutter(val name: String) : SessionNotice
@@ -559,6 +563,9 @@ class SessionViewModel(
                                     _notices.tryEmit(SessionNotice.RemoteBrightness(name, action.index))
 
                                 is RemoteAction.Flash -> _notices.tryEmit(SessionNotice.RemoteFlash(name, action.mode))
+
+                                is RemoteAction.Timer ->
+                                    _notices.tryEmit(SessionNotice.RemoteTimer(name, action.timer))
 
                                 is RemoteAction.Shutter -> _notices.tryEmit(SessionNotice.RemoteShutter(name))
 

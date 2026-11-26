@@ -133,6 +133,10 @@ import org.robolectric.shadows.ShadowDialog
  * wait).
  * A result under a sheet: a start's answer and a refused press that come while Add a pose guide covers the screen,
  * said once it is gone; and under this screen's own dialogs, "Leave the session?" and the tutorial's tips.
+ * The photographer's timer (#318): the menu's Timer between Flash and Grid, off and each value, a tap sending the
+ * request with the menu left open; the timer's and the flash's icons beside the menu's button while on, in Camera's
+ * order, each value's icon, a tap opening the menu; the shutter named for the timer; the menu's Timer waiting during
+ * the countdown; the photographer's change said where the lines show, set and off.
  * This phone's start of AI poses (FR-6.15, #276): the answer said where the lines show, begun (who takes the scene
  * photo), not begun, or the photographer asked to agree first; no answer, said after the wait.
  */
@@ -1020,6 +1024,126 @@ class SubjectFragmentRenderTest {
 
         assertTrue(modules.session.sent.any { it == SessionMessage.FlashSet(FlashMode.AUTO) })
         onScreen { binding, _ -> assertEquals(View.VISIBLE, binding.cameraMenu.visibility) }
+    }
+
+    // ---- The photographer's timer in the menu and beside its button (#318) ----------------------------------------
+
+    private fun state(modules: TestAppContainer, timer: Int = 0, flash: FlashMode = FlashMode.OFF) {
+        modules.session.deliver(
+            SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, flash = flash, timer = timer),
+        )
+        idle()
+    }
+
+    @Test
+    fun theMenusTimer_isBetweenFlashAndGrid_andSetsThePhotographersTimer() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, hasFlash = true)
+        onScreen { binding, _ -> binding.cameraMenuButton.performClick() }
+        idle()
+
+        onScreen { binding, _ ->
+            // Camera's order: Flash, Timer, Grid.
+            val items = (0 until binding.cameraMenu.childCount).map { binding.cameraMenu.getChildAt(it) }
+            assertEquals(items.indexOf(binding.menuFlash) + 1, items.indexOf(binding.menuTimer))
+            assertEquals(items.indexOf(binding.menuTimer) + 1, items.indexOf(binding.menuGrid))
+            assertTrue(binding.menuTimer.isShown)
+            assertFalse(binding.menuTimer.isActivated)
+            assertEquals(string(R.string.timer_off), binding.menuTimer.contentDescription.toString())
+            assertEquals(R.drawable.ic_menu_timer_off, binding.menuTimerIcon.tag)
+            binding.menuTimer.performClick()
+        }
+        idle()
+
+        assertEquals(listOf(3), modules.session.sent.filterIsInstance<SessionMessage.TimerSet>().map { it.seconds })
+        onScreen { binding, _ ->
+            // The menu stays open, and its item says what the timer is now.
+            assertEquals(View.VISIBLE, binding.cameraMenu.visibility)
+            assertTrue(binding.menuTimer.isActivated)
+            assertEquals(string(R.string.timer_seconds, 3), binding.menuTimer.contentDescription.toString())
+            assertEquals(R.drawable.ic_menu_timer_3, binding.menuTimerIcon.tag)
+        }
+        state(modules, timer = 10)
+        onScreen { binding, _ -> assertEquals(R.drawable.ic_menu_timer_10, binding.menuTimerIcon.tag) }
+    }
+
+    @Test
+    fun theTimer_andTheFlash_showBesideTheMenusButtonWhileOn_asOnCamera_andATapOpensTheMenu() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, hasFlash = true)
+        onScreen { binding, _ ->
+            assertFalse(binding.timerIndicator.isShown)
+            assertFalse(binding.flashIndicator.isShown)
+        }
+
+        state(modules, timer = 3)
+        onScreen { binding, _ ->
+            assertTrue(binding.timerIndicator.isShown)
+            assertEquals(R.drawable.ic_timer_3, binding.timerIndicator.tag)
+            assertFalse(binding.flashIndicator.isShown)
+        }
+        state(modules, timer = 10, flash = FlashMode.AUTO)
+        onScreen { binding, _ ->
+            assertEquals(R.drawable.ic_timer_10, binding.timerIndicator.tag)
+            assertTrue(binding.flashIndicator.isShown)
+            assertEquals(R.drawable.ic_flash_auto, binding.flashIndicator.tag)
+            // The flash first, then the timer, as in Camera's bar.
+            val flash = IntArray(2).also { binding.flashIndicator.getLocationInWindow(it) }
+            val timer = IntArray(2).also { binding.timerIndicator.getLocationInWindow(it) }
+            assertTrue(flash[0] + binding.flashIndicator.width <= timer[0])
+            binding.timerIndicator.performClick()
+        }
+        idle()
+        onScreen { binding, _ -> assertEquals(View.VISIBLE, binding.cameraMenu.visibility) }
+
+        state(modules)
+        onScreen { binding, _ ->
+            assertFalse(binding.timerIndicator.isShown)
+            assertFalse(binding.flashIndicator.isShown)
+        }
+    }
+
+    @Test
+    fun withTheTimerOn_theShutterIsNamedForIt_andTheMenusTimerWaitsWhileItCountsDown() {
+        val modules = launch()
+        connectWithVideo(modules)
+        state(modules, timer = 3)
+        onScreen { binding, _ ->
+            assertEquals(
+                string(R.string.subject_shutter_timer, "Dongje", 3),
+                binding.shutterButton.contentDescription.toString(),
+            )
+            assertTrue(binding.menuTimer.isEnabled)
+        }
+
+        modules.session.deliver(SessionMessage.Countdown(3))
+        idle()
+        onScreen { binding, _ ->
+            // As Camera's own Timer waits while it counts down (FR-1.17).
+            assertFalse(binding.menuTimer.isEnabled)
+            binding.menuTimer.performClick()
+        }
+        idle()
+        assertTrue(modules.session.sent.none { it is SessionMessage.TimerSet })
+    }
+
+    @Test
+    fun whatThePhotographerSetTheTimerTo_isSaidWhereTheLinesShow() {
+        val modules = launch()
+        connectWithVideo(modules)
+
+        modules.session.deliver(SessionMessage.PhotographerDid("timer", seconds = 3))
+        idle()
+        onScreen { binding, _ ->
+            assertTrue(binding.toggleLabel.isShown)
+            assertEquals(string(R.string.remote_timer_notice, "Dongje", 3), binding.toggleLabel.text.toString())
+        }
+
+        modules.session.deliver(SessionMessage.PhotographerDid("timer", seconds = 0))
+        idle()
+        onScreen { binding, _ ->
+            assertEquals(string(R.string.remote_timer_off_notice, "Dongje"), binding.toggleLabel.text.toString())
+        }
     }
 
     @Test

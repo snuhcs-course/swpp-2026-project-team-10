@@ -70,6 +70,7 @@ import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.PhotoAccess
+import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.camera.photoPermissions
 import com.lastpenguin.pix.core.Timings
@@ -597,6 +598,12 @@ class CameraFragment :
                             is SessionNotice.RemoteGuide -> getString(R.string.remote_guide_notice, notice.name)
 
                             is SessionNotice.RemoteFocus -> getString(R.string.remote_focus_notice, notice.name)
+
+                            is SessionNotice.RemoteTimer -> if (notice.timer == ShutterTimer.OFF) {
+                                getString(R.string.remote_timer_off_notice, notice.name)
+                            } else {
+                                getString(R.string.remote_timer_notice, notice.name, notice.timer.seconds)
+                            }
 
                             is SessionNotice.RemoteShutter -> getString(R.string.remote_shutter_notice, notice.name)
 

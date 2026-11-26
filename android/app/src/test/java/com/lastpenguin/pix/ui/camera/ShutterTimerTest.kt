@@ -5,8 +5,11 @@ import androidx.lifecycle.ViewModelStore
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.ShutterTimer
+import com.lastpenguin.pix.camera.ShutterTimerChoice
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.FakeGuideRepository
+import com.lastpenguin.pix.session.PhotographerAction
 import com.lastpenguin.pix.session.ShutterOutcome
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -29,7 +32,9 @@ import org.junit.Test
 /*
  * The shutter's timer and the camera menu (FR-1.17) in CameraViewModel, in virtual time.
  * Partitions. The timer's choice: off, 3 s, and 10 s, each tap the next and off again after 10 s, each with its notice;
- * a tap while it counts down changes nothing. The shutter with the timer off: the photo at once, and no countdown.
+ * a tap while it counts down changes nothing. The choice shared with the session (#318): each tap sets it and is told
+ * to the subject's phone; one set from the subject's phone shows here and serves the shutter, with no notice of the
+ * menu's and nothing told back. The shutter with the timer off: the photo at once, and no countdown.
  * With 3 s and with 10 s: the countdown from the timer's seconds to 1, one a second, each told to the subject's phone,
  * and at its end 0 told, one photo, and one blink; boundaries 1 ms before the end (no photo) and at it. A second tap
  * while it counts down: cancelled, no photo, 0 told. Leaving the screen (cancelCountdown): the same; with no countdown,
@@ -47,12 +52,20 @@ class ShutterTimerTest {
     private val store = ViewModelStore()
     private val camera = FakeCameraController(hasFlash = true)
     private val told = mutableListOf<Int>()
+    private val did = mutableListOf<PhotographerAction>()
+    private val choice = ShutterTimerChoice()
     private lateinit var model: CameraViewModel
 
     @Before
     fun setup() {
         Dispatchers.setMain(dispatcher)
-        model = CameraViewModel(camera, FakeGuideRepository(), onCountdown = { told += it })
+        model = CameraViewModel(
+            camera,
+            FakeGuideRepository(),
+            timerChoice = choice,
+            onDid = { did += it },
+            onCountdown = { told += it },
+        )
         store.put("camera", model)
     }
 
@@ -98,6 +111,42 @@ class ShutterTimerTest {
 
         assertEquals(listOf(ShutterTimer.THREE, ShutterTimer.TEN, ShutterTimer.OFF), chosen)
         assertEquals(chosen.map { MenuNotice.Timer(it) }, notices)
+    }
+
+    @Test
+    fun timerTaps_setTheSharedChoice_andTellTheSubjectsPhoneEachTime() = runTest {
+        runCurrent()
+
+        model.onTimerTap()
+        model.onTimerTap()
+        runCurrent()
+
+        assertEquals(ShutterTimer.TEN, choice.timer.value)
+        assertEquals(
+            listOf<PhotographerAction>(
+                PhotographerAction.Timer(ShutterTimer.THREE),
+                PhotographerAction.Timer(ShutterTimer.TEN),
+            ),
+            did,
+        )
+    }
+
+    @Test
+    fun aTimerSetFromTheSubjectsPhone_showsHere_andServesTheShutter_withoutTellingItBack() = runTest {
+        val notices = notices()
+        runCurrent()
+
+        // RemoteControlHandler, for the menu on the subject's phone.
+        choice.set(ShutterTimer.THREE)
+        runCurrent()
+
+        assertEquals(ShutterTimer.THREE, model.uiState.value.timer)
+        assertTrue(did.isEmpty())
+        // The line that says who set it is the session's, not the menu's own.
+        assertTrue(notices.isEmpty())
+        assertFalse(model.onShutter())
+        runCurrent()
+        assertEquals(3, model.uiState.value.countdown)
     }
 
     @Test

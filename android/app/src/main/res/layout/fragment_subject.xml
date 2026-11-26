@@ -38,6 +38,40 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
+        <!-- The photographer's flash while it is on or auto, and their timer while it is on (FR-1.12, FR-1.17, #318):
+             what a press of the shutter will do, with the menu closed, as Camera shows its own, in its sizes and
+             places: centered above the bar's overhang, where the buttons center their icons. A tap on one opens the
+             menu. -->
+        <ImageView
+            android:id="@+id/flashIndicator"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginBottom="@dimen/top_bar_overhang"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_flash_on"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toEndOf="@id/cameraMenuButton"
+            app:layout_constraintTop_toTopOf="parent"
+            app:tint="@color/pix_accent"
+            tools:visibility="visible" />
+
+        <ImageView
+            android:id="@+id/timerIndicator"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginStart="6dp"
+            android:layout_marginBottom="@dimen/top_bar_overhang"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_timer_3"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toEndOf="@id/flashIndicator"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_goneMarginStart="0dp"
+            app:tint="@color/pix_accent"
+            tools:visibility="visible" />
+
         <!-- The latency indicator, when Settings turns it on (FR-10.3). -->
         <TextView
             android:id="@+id/latencyChip"
@@ -65,8 +99,8 @@
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- The camera menu (FR-1.17), opened from its button in the top bar, as on the Camera screen: the photographer's flash
-         (FR-7.3), each tap its next choice, this phone's grid (FR-1.9), on or off, and Settings (FR-10.1). No timer, which
-         is the photographer's own shutter's (FR-7.8), and no horizon bar, which this screen does not draw. A touch anywhere else,
+         (FR-7.3) and timer (#318), each tap its next choice, this phone's grid (FR-1.9), on or off, and Settings
+         (FR-10.1). No horizon bar, which this screen does not draw. A touch anywhere else,
          or Back, closes it. -->
     <LinearLayout
         android:id="@+id/cameraMenu"
@@ -102,6 +136,24 @@
             <TextView
                 style="@style/Widget.Pix.CameraMenuOption.Label"
                 android:text="@string/menu_flash" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/menuTimer"
+            style="@style/Widget.Pix.CameraMenuOption"
+            android:layout_width="72dp"
+            android:layout_weight="0"
+            android:contentDescription="@string/timer_off">
+
+            <ImageView
+                android:id="@+id/menuTimerIcon"
+                style="@style/Widget.Pix.CameraMenuOption.Icon"
+                android:src="@drawable/ic_menu_timer_off"
+                tools:ignore="ContentDescription" />
+
+            <TextView
+                style="@style/Widget.Pix.CameraMenuOption.Label"
+                android:text="@string/menu_timer" />
         </LinearLayout>
 
         <LinearLayout

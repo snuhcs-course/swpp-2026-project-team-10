@@ -1,7 +1,8 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.session.PhotographerAction
 import com.lastpenguin.pix.session.Role
@@ -24,6 +25,9 @@ import org.junit.Test
  * that cancels the photographer's timer, the answer of a press the timer took, and both fields left out.
  * The subject's start of AI poses (#276): the situation's name, and the answer, begun or not.
  * The photographer's countdown (`camera.timer`, FR-1.17): the Design's example decodes, and a round trip keeps it.
+ * The timer set from the subject's phone (#318): `camera.timer.set`, the timer in `camera.state` (none from a phone of
+ * before it, which is off), and the photographer's own change as a `camera.did` of each value; seconds this Pix does
+ * not offer are no action.
  */
 class RemoteControlMessagesTest {
     private val codec = MessageCodec(clock = { 1_759_212_345_678L })
@@ -118,12 +122,14 @@ class RemoteControlMessagesTest {
             PhotographerAction.Zoom(2f),
             PhotographerAction.Brightness(-3),
             PhotographerAction.Flash(FlashMode.AUTO),
+            PhotographerAction.Timer(ShutterTimer.TEN),
+            PhotographerAction.Timer(ShutterTimer.OFF),
             PhotographerAction.GuideMove,
             PhotographerAction.Guide,
         )
 
         assertEquals(
-            listOf("zoom", "brightness", "flash", "guide.move", "guide"),
+            listOf("zoom", "brightness", "flash", "timer", "timer", "guide.move", "guide"),
             actions.map { it.toMessage().action },
         )
         for (action in actions) {
@@ -142,11 +148,33 @@ class RemoteControlMessagesTest {
     @Test
     fun anActionThisPhoneDoesNotKnow_isNoAction_andStillDecodes() {
         val newer = """{ "v": 3, "t": "camera.did", "seq": 8, "ts": 1759212355000,
-            "b": { "action": "timer", "seconds": 3 } }"""
+            "b": { "action": "lens", "lens": "tele" } }"""
 
         val received = decode(newer) as SessionMessage.PhotographerDid
 
         assertNull(received.toAction())
+        // A timer of seconds this Pix does not offer, as a later one may: no line either.
+        assertNull(SessionMessage.PhotographerDid("timer", seconds = 5).toAction())
+    }
+
+    @Test
+    fun theTimer_setFromTheSubjectsPhone_designExamples_decode() {
+        val set = """{ "v": 3, "t": "camera.timer.set", "seq": 13, "ts": 1759212355000, "b": { "seconds": 3 } }"""
+        val state = """{ "v": 3, "t": "camera.state", "seq": 21, "ts": 1759212355100,
+            "b": { "zoom": 1.0, "by": "SUBJECT", "final": true, "timer": 3 } }"""
+        val did = """{ "v": 3, "t": "camera.did", "seq": 22, "ts": 1759212356000,
+            "b": { "action": "timer", "seconds": 10 } }"""
+
+        assertEquals(SessionMessage.TimerSet(3), decode(set))
+        assertEquals(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, timer = 3), decode(state))
+        assertEquals(
+            PhotographerAction.Timer(ShutterTimer.TEN),
+            (decode(did) as SessionMessage.PhotographerDid).toAction(),
+        )
+        // A photographer's phone of before the timer's state says none, which is off.
+        val before = """{ "v": 3, "t": "camera.state", "seq": 2, "ts": 1759212355100,
+            "b": { "zoom": 1.0, "by": "PHOTOGRAPHER", "final": true } }"""
+        assertEquals(0, (decode(before) as SessionMessage.CameraStateUpdate).timer)
     }
 
     @Test
@@ -197,6 +225,7 @@ class RemoteControlMessagesTest {
             SessionMessage.FocusSet(0.62f, 0.4f),
             SessionMessage.Focused(0.38f, 0.4f),
             SessionMessage.Countdown(3),
+            SessionMessage.TimerSet(10),
             SessionMessage.ControlPermission(true),
             SessionMessage.ShutterPress(press = 7),
             SessionMessage.ShutterAnswer(taken = true, press = 7),

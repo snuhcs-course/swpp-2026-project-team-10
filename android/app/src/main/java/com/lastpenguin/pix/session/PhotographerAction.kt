@@ -1,7 +1,8 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.session.protocol.SessionMessage
 
 /**
@@ -19,6 +20,9 @@ sealed interface PhotographerAction {
 
     data class Flash(val mode: FlashMode) : PhotographerAction
 
+    /** A tap on the menu's Timer: what the timer is now (FR-1.17, #318). */
+    data class Timer(val timer: ShutterTimer) : PhotographerAction
+
     /** The end of a drag or a pinch that moved the guide. */
     data object GuideMove : PhotographerAction
 
@@ -29,6 +33,7 @@ sealed interface PhotographerAction {
 private const val ZOOM = "zoom"
 private const val BRIGHTNESS = "brightness"
 private const val FLASH = "flash"
+private const val TIMER = "timer"
 private const val GUIDE_MOVE = "guide.move"
 private const val GUIDE = "guide"
 
@@ -37,6 +42,7 @@ fun PhotographerAction.toMessage(): SessionMessage.PhotographerDid = when (this)
     is PhotographerAction.Zoom -> SessionMessage.PhotographerDid(ZOOM, zoom = ratio)
     is PhotographerAction.Brightness -> SessionMessage.PhotographerDid(BRIGHTNESS, exposure = index)
     is PhotographerAction.Flash -> SessionMessage.PhotographerDid(FLASH, flash = mode)
+    is PhotographerAction.Timer -> SessionMessage.PhotographerDid(TIMER, seconds = timer.seconds)
     PhotographerAction.GuideMove -> SessionMessage.PhotographerDid(GUIDE_MOVE)
     PhotographerAction.Guide -> SessionMessage.PhotographerDid(GUIDE)
 }
@@ -46,6 +52,7 @@ fun SessionMessage.PhotographerDid.toAction(): PhotographerAction? = when (actio
     ZOOM -> PhotographerAction.Zoom(zoom).takeIf { zoom.isFinite() && zoom > 0f }
     BRIGHTNESS -> PhotographerAction.Brightness(exposure)
     FLASH -> PhotographerAction.Flash(flash)
+    TIMER -> ShutterTimer.ofSeconds(seconds)?.let { PhotographerAction.Timer(it) }
     GUIDE_MOVE -> PhotographerAction.GuideMove
     GUIDE -> PhotographerAction.Guide
     else -> null

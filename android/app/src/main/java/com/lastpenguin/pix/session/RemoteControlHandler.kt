@@ -1,9 +1,11 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.ShutterTimer
+import com.lastpenguin.pix.camera.ShutterTimerChoice
 import com.lastpenguin.pix.camera.baseExposureIndex
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.generation.Situation
@@ -63,6 +65,9 @@ sealed interface RemoteAction {
     /** The subject's tap set the focus at [x], [y] of the photographer's frame, 0..1 (FR-7.7). */
     data class Focus(val x: Float, val y: Float) : RemoteAction
 
+    /** The subject set the photographer's timer (#318). */
+    data class Timer(val timer: ShutterTimer) : RemoteAction
+
     /** The subject's shutter took a photo (FR-7.8, #314). */
     data object Shutter : RemoteAction
 
@@ -104,6 +109,9 @@ sealed interface RemoteAction {
  * a change of exposure, flash, aspect ratio, or the camera in use (#201), from either phone, is sent as soon as the
  * camera reports it, attributed to the subject when it matches the subject's pending request.
  *
+ * **Timer (It 5, FR-1.17, #318).** `camera.timer.set` sets the photographer's timer ([timerChoice]), which every
+ * `camera.state` carries, so both menus show one value, whoever chose it and on whatever screen the photographer is.
+ *
  * **Focus (It 5, FR-7.7).** `camera.focus.set` is the subject's tap, in fractions of the photographer's frame as the
  * photographer's preview shows it. It does what a tap on Camera does (FR-1.4): the camera focuses and meters there
  * when it can focus on a point, and the brightness goes back to the base, 0 EV (FR-1.11).
@@ -138,6 +146,8 @@ class RemoteControlHandler(
     private val clock: () -> Long = System::currentTimeMillis,
     /** Who holds the zoom; `CameraViewModel` takes it for the photographer's own pinch. */
     val zoomHold: ZoomHold = ZoomHold(),
+    /** The timer as chosen; `CameraViewModel` sets it for the menu on Camera, and counts down with it. */
+    val timerChoice: ShutterTimerChoice = ShutterTimerChoice(),
 ) {
     /**
      * Takes up a press of the subject's shutter (FR-7.8, #314), a press for a photo or one to cancel the timer's
@@ -176,6 +186,9 @@ class RemoteControlHandler(
     private var pendingExposure: PendingValue<Int>? = null
     private var pendingFlash: PendingValue<FlashMode>? = null
 
+    // The timer the subject asked for, until its change is echoed: that echo is the subject's.
+    private var pendingTimer: ShutterTimer? = null
+
     // True while the photographer's timer counts down (countdownHere): the subject's flash waits, as theirs does.
     private var photographerCounting = false
 
@@ -190,10 +203,11 @@ class RemoteControlHandler(
         zoomJob = scope.launch { camera.zoom.collect { zoom -> onApplied(zoom) } }
         // The first zoom echo above already carries the current values.
         settingsJob = scope.launch {
-            combine(camera.state.map { Triple(it.exposure, it.flash, it.aspect) }, camera.facing, ::Pair)
+            val applied = camera.state.map { Triple(it.exposure, it.flash, it.aspect) }
+            combine(applied, camera.facing, timerChoice.timer, ::Triple)
                 .distinctUntilChanged()
                 .drop(1)
-                .collect { (settings, _) -> onSettingsApplied(settings.first, settings.second) }
+                .collect { (settings, _, _) -> onSettingsApplied(settings.first, settings.second) }
         }
         // The current holder first, so a subject that connects or reconnects mid-pinch knows it.
         holderJob = scope.launch { zoomHold.holder.collect { session.send(SessionMessage.ZoomHoldUpdate(it)) } }
@@ -229,6 +243,7 @@ class RemoteControlHandler(
         pending = null
         pendingExposure = null
         pendingFlash = null
+        pendingTimer = null
         pendingBase = null
         scope = null
     }
@@ -270,6 +285,7 @@ class RemoteControlHandler(
             is SessionMessage.ZoomSet -> if (message.cancel) handleZoomCancel() else handleZoom(message)
             is SessionMessage.ExposureSet -> handleExposure(message)
             is SessionMessage.FlashSet -> handleFlash(message)
+            is SessionMessage.TimerSet -> handleTimer(message)
             is SessionMessage.FocusSet -> handleFocus(message)
             is SessionMessage.GuideMove -> handleGuideMove(message)
             is SessionMessage.ShutterPress -> handleShutter(message)
@@ -511,6 +527,29 @@ class RemoteControlHandler(
     }
 
     /**
+     * `camera.timer.set`: the timer as the subject's menu chose it (#318), for both shutters. It is this phone's one
+     * timer ([timerChoice]), so the change shows on Camera, or waits there for the photographer to come back from
+     * another screen. Seconds this Pix does not offer, and a request while the timer counts down, when Camera's own
+     * Timer waits too (FR-1.17), are answered with the unchanged state, which puts the subject's item back.
+     */
+    private fun handleTimer(request: SessionMessage.TimerSet) {
+        val timer = ShutterTimer.ofSeconds(request.seconds)
+        Timings.mark("timer.received", "${request.seconds}")
+        if (timer == null || photographerCounting) {
+            send(camera.zoom.value, Role.PHOTOGRAPHER, final = true)
+            return
+        }
+        if (timerChoice.timer.value == timer) {
+            // Both people chose it at once: no change follows, so the answer goes here.
+            confirm(RemoteAction.Timer(timer), "timer.applied", "${timer.seconds}")
+            send(camera.zoom.value, Role.SUBJECT, final = true)
+            return
+        }
+        pendingTimer = timer
+        timerChoice.set(timer)
+    }
+
+    /**
      * `camera.focus.set`: camera.setFocusPoint where the camera takes a point, and the base brightness again. Only a
      * point the camera took is an action: without point focus the tap is only where the brightness bar comes up.
      */
@@ -634,7 +673,11 @@ class RemoteControlHandler(
             pendingBase = null
             baseTimeoutJob?.cancel()
         }
-        val bySubject = exposureRequest != null || flashRequest != null || baseRequest != null
+        val timer = timerChoice.timer.value
+        val timerRequest = pendingTimer?.takeIf { it == timer }
+        pendingTimer = null
+        if (timerRequest != null) confirm(RemoteAction.Timer(timer), "timer.applied", "${timer.seconds}")
+        val bySubject = exposureRequest != null || flashRequest != null || baseRequest != null || timerRequest != null
         send(
             camera.zoom.value,
             if (bySubject) Role.SUBJECT else Role.PHOTOGRAPHER,
@@ -661,6 +704,7 @@ class RemoteControlHandler(
                 aspect = applied.aspect,
                 facing = camera.facing.value,
                 focused = focused,
+                timer = timerChoice.timer.value.seconds,
             ),
         )
     }

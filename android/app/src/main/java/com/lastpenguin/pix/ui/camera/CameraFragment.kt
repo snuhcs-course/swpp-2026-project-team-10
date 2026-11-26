@@ -22,6 +22,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.util.TypedValue
 import android.view.MotionEvent
+import android.view.TouchDelegate
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
@@ -1717,10 +1718,11 @@ class CameraFragment :
      * and opens that screen. Back closes it, and so does a touch anywhere else (setupTip).
      */
     private fun setupMenu(controls: FragmentCameraBinding) {
-        val toggle = View.OnClickListener { viewModel.setMenuOpen(!viewModel.uiState.value.menuOpen) }
-        controls.cameraMenuButton.setOnClickListener(toggle)
-        controls.flashIndicator.setOnClickListener(toggle)
-        controls.timerIndicator.setOnClickListener(toggle)
+        controls.cameraMenuButton.setOnClickListener { viewModel.setMenuOpen(!viewModel.uiState.value.menuOpen) }
+        // The flash's and the timer's icons beside the button are 16 dp, too small to take a tap of their own
+        // (NFR-16): the button's area reaches over them, so a tap on either is a tap on the button (#318). Set at each
+        // layout of their row, which an icon coming or going asks for.
+        controls.cameraSettings.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> reachOverIndicators(controls) }
         // During the scene photo, the phone's light, which a frame of the preview takes, where a photo's flash would not
         // reach it (FR-4.1).
         controls.menuFlash.setOnClickListener {
@@ -1735,6 +1737,22 @@ class CameraFragment :
         }
         menuBack = requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, enabled = false) {
             viewModel.setMenuOpen(false)
+        }
+    }
+
+    /**
+     * Lets the menu's button take the taps on the icons beside it: from the button to the last icon that shows, over
+     * the row's height, and no further, so the ratio after them keeps its own. Nothing to reach over while neither
+     * shows.
+     */
+    private fun reachOverIndicators(controls: FragmentCameraBinding) {
+        val row = controls.cameraSettings
+        val button = controls.cameraMenuButton
+        val last = listOf(controls.timerIndicator, controls.flashIndicator).firstOrNull { it.isVisible }
+        row.touchDelegate = if (last == null || !button.isVisible) {
+            null
+        } else {
+            TouchDelegate(Rect(button.left, 0, last.right, row.height), button)
         }
     }
 

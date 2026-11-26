@@ -928,6 +928,9 @@ class CameraLayoutTest {
         guideWithTip()
         session()
         assertEveryControlAtLeast48(controls.root, "a guide with a tip and a session, $font")
+        // The flash's and the timer's icons beside the menu's button are 16 dp: no control of their own (#318).
+        flashAndTimerOn()
+        assertEveryControlAtLeast48(controls.root, "the flash and the timer on, $font")
     }
 
     @Test

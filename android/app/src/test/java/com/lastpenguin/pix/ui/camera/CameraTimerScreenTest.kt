@@ -40,7 +40,8 @@ import org.robolectric.annotation.GraphicsMode
  * The camera menu and the shutter's timer on the Camera screen (FR-1.17, R&S 6.2), on the real Fragment under
  * FragmentScenario with a container of fakes. Partitions: the menu opened by its button and closed by Back, by a touch
  * on the preview, and by its button again; the ratio's button and the menu's each in the bar's pill while its own panel
- * is open, the menu taking the ratios' place; the timer chosen in the menu (its icon beside the menu's button, its notice,
+ * is open, the menu taking the ratios' place; a tap on the timer's icon beside the button, taken as the button's (the
+ * menu opened and closed), and one on the ratio beside it, taken as the ratio's; the timer chosen in the menu (its icon beside the menu's button, its notice,
  * the shutter's spoken label) and off again (both gone); the countdown on the screen (the seconds over the preview,
  * alone, the other controls dimmed and waiting, the shutter's label for cancelling), its end (one photo, all back),
  * the shutter's second tap (no photo), and the screen stopping (no photo); in a session, each second and the end told
@@ -168,6 +169,38 @@ class CameraTimerScreenTest {
             assertFalse(controls.menuTimer.isActivated)
             assertEquals(string(R.string.timer_off), controls.noticeText.text.toString())
             assertEquals(string(R.string.shutter), controls.shutterButton.contentDescription)
+        }
+    }
+
+    @Test
+    fun aTapOnTheTimersIcon_isATapOnTheMenusButton_andOpensTheMenu() {
+        launch()
+        chooseThreeSeconds()
+        onScreen { controls, _ ->
+            assertEquals(View.VISIBLE, controls.timerIndicator.visibility)
+            assertEquals(View.GONE, controls.cameraMenu.visibility)
+            // The icon is 16 dp, so it takes no tap of its own: the button's area reaches over it (NFR-16, #318).
+            assertFalse(controls.timerIndicator.isClickable)
+            tap(controls.root, controls.timerIndicator)
+        }
+
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.cameraMenu.visibility) }
+        // And again closes it, as the button does.
+        onScreen { controls, _ -> tap(controls.root, controls.timerIndicator) }
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.cameraMenu.visibility) }
+    }
+
+    @Test
+    fun aTapOnTheRatioBesideTheIcons_stillOpensTheRatios() {
+        launch()
+        chooseThreeSeconds()
+
+        // The button's area ends at the last icon: the ratio right after it keeps its own taps.
+        onScreen { controls, _ -> tap(controls.root, controls.aspectButton) }
+
+        onScreen { controls, _ ->
+            assertTrue(controls.aspectPanel.isShown)
+            assertEquals(View.GONE, controls.cameraMenu.visibility)
         }
     }
 

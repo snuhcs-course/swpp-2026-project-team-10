@@ -696,6 +696,12 @@
         <item name="android:textColor">@color/pix_accent</item>
     </style>
 
+    <!-- A notice's own theme (ui/Notices.kt): Material's Snackbar fades out over motionDurationMedium1, Material 3's
+         250 ms, which went too fast; here it is the notice's own going, as long as its slide after a swipe. -->
+    <style name="ThemeOverlay.Pix.Notice" parent="">
+        <item name="motionDurationMedium1">@integer/notice_out_ms</item>
+    </style>
+
     <!-- A short notice (#298): a Snackbar, not a Toast, placed by ui/Notices.kt. An info card's 16 dp corners on
          pix_surface_3, so it stands out from the ground and from the glass over the camera's image, with its action,
          such as Undo, in the accent, as every act is. -->

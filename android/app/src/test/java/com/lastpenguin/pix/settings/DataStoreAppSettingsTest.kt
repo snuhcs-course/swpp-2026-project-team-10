@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park
 package com.lastpenguin.pix.settings
 
 import android.content.Context
@@ -32,7 +32,7 @@ import org.junit.runner.RunWith
 
 /*
  * The settings kept across runs (FR-10.1, Design 2.8): the defaults before any choice (usage data shared, FR-10.6; the
- * grid and the horizon bar on, FR-1.9, FR-1.10), then each choice in the flows and read back by a new instance, as after
+ * grid and the horizon bar on, FR-1.9, FR-1.10; the media access not yet offered, FR-1.16), then each choice in the flows and read back by a new instance, as after
  * a restart; two toggles of the grid at once (back where it was) and one of the horizon bar; and a store that cannot be read,
  * whose usage choice stays unread instead of taking the default (FR-10.6) while the other settings take theirs. One test, because the DataStore behind the context extension lives
  * for the process.
@@ -47,6 +47,7 @@ class DataStoreAppSettingsTest {
         assertFalse(settings.showLatency.value)
         assertTrue(settings.showGrid.value)
         assertTrue(settings.showLevel.value)
+        assertFalse(settings.mediaAccessOffered.value)
         assertEquals(
             emptySet<TutorialScreen>(),
             withTimeout(TIMEOUT_MS) {
@@ -61,6 +62,7 @@ class DataStoreAppSettingsTest {
         settings.setShowGrid(false)
         settings.setShowLevel(false)
         settings.setShareUsage(false)
+        settings.setMediaAccessOffered()
         // Each screen's tips on their own: the second keeps the first.
         settings.setTutorialSeen(setOf(TutorialScreen.CAMERA))
         settings.setTutorialSeen(setOf(TutorialScreen.SUBJECT_VIEW))
@@ -72,6 +74,7 @@ class DataStoreAppSettingsTest {
         assertFalse(withTimeout(TIMEOUT_MS) { settings.showLevel.first { !it } })
         assertEquals(seen, withTimeout(TIMEOUT_MS) { settings.tutorialSeen.first { it == seen } })
         assertEquals(false, withTimeout(TIMEOUT_MS) { settings.shareUsage.first { it == false } })
+        assertTrue(withTimeout(TIMEOUT_MS) { settings.mediaAccessOffered.first { it } })
 
         val restarted = DataStoreAppSettings(ApplicationProvider.getApplicationContext<Context>(), scope)
         assertEquals(chosen, withTimeout(TIMEOUT_MS) { restarted.guideLook.first { it == chosen } })
@@ -82,6 +85,8 @@ class DataStoreAppSettingsTest {
         assertEquals(seen, withTimeout(TIMEOUT_MS) { restarted.tutorialSeen.first { it == seen } })
         // Off from the first read: a phone whose user turned it off never sends in between (FR-10.6).
         assertEquals(false, withTimeout(TIMEOUT_MS) { restarted.shareUsage.filterNotNull().first() })
+        // Offered once, never again after a restart (FR-1.16).
+        assertTrue(withTimeout(TIMEOUT_MS) { restarted.mediaAccessOffered.first { it } })
 
         // The camera menu's Grid tapped twice at once, and Horizon once: each toggle reads what the one before it saved,
         // so the grid is back off and the horizon bar on (FR-1.17).

@@ -30,7 +30,9 @@ import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNoticeView
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
+import com.lastpenguin.pix.ui.ScreenTestSupport.windowBox
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.camera.ZoomablePhotoView
 import com.lastpenguin.pix.ui.camera.doubleTapPhoto
@@ -74,8 +76,9 @@ import org.robolectric.shadows.ShadowDialog
  * The photo on its way (state-based, #271): from the photographer's shutter, the slot where Camera's shutter is says
  * it is coming, with a spinner, until it is saved, or the album could not save it; two shutters wait for both photos.
  * The viewer (state-based): the session's photos over the video, opened at the newest under Back, Share, and Delete,
- * with no title and no counter, with the session going on and the screen staying; a swipe shows the earlier ones, with
- * the strip of thumbnails under the photo, the one on screen selected, a tap on one showing it, TalkBack reading which
+ * with no title and no counter, with the session going on and the screen staying; the pages and the strip run newest
+ * first, so a swipe to the left shows the earlier ones, with the strip of thumbnails under the photo, the one on screen
+ * selected, a tap on one showing it, TalkBack reading which
  * photo of how many, and each opening starts at the newest again; one photo has no strip; a newer photo while it is
  * open is one more page, the page on screen staying, and the thumbnail's; its Back and the system's close it without
  * asking to leave; a photo that cannot be read says so; the photographer's step that starts while it is open waits
@@ -84,7 +87,7 @@ import org.robolectric.shadows.ShadowDialog
  * and each opening shows them; a drag down past the line, or a flick, closes it, and a short slow one goes back; a
  * double tap zooms in and another out, and a page swiped away is whole again. Share sends the photo on screen through
  * the share sheet with leave to read it. Delete asks first: Cancel keeps it; Delete takes it from the pages, the strip,
- * and the thumbnail, the last one closing the viewer; a delete that fails keeps it and says so.
+ * and the thumbnail, the last one closing the viewer; a delete that fails keeps it and says so, above the strip.
  * Turned with this phone (equivalence, #207): held sideways, the viewer is a landscape screen, the photo on screen
  * stays, and nothing is sent to the photographer.
  */
@@ -317,9 +320,9 @@ class SubjectSessionPhotoTest {
             assertTrue(binding.viewer().root.isShown)
             assertSame(pictures[saved("p2")], binding.viewerShows())
             assertEquals(of(2, 2), binding.viewer().pageReads())
-            // The strip under the photo, the newest selected.
+            // The strip under the photo, newest first, the newest selected at its left.
             assertEquals(2, binding.viewer().stripCount())
-            assertEquals(1, binding.viewer().stripSelected())
+            assertEquals(0, binding.viewer().stripSelected())
             // No title and no counter: Back, Share, Delete, the photo, and the strip.
             assertEquals(emptyList<String>(), binding.viewer().textsShown())
             assertTrue(binding.viewer().headerShown())
@@ -336,12 +339,13 @@ class SubjectSessionPhotoTest {
         modules.photo("p2")
         openThumbnail()
 
-        onScreen { binding, _ -> binding.viewer().photoViewerPages.setCurrentItem(0, false) }
+        // A swipe to the left: the page to the right, the earlier photo.
+        onScreen { binding, _ -> binding.viewer().photoViewerPages.setCurrentItem(1, false) }
         settle()
         onScreen { binding, _ ->
             assertSame(pictures[saved("p1")], binding.viewerShows())
             assertEquals(of(1, 2), binding.viewer().pageReads())
-            assertEquals(0, binding.viewer().stripSelected())
+            assertEquals(1, binding.viewer().stripSelected())
         }
 
         onScreen { binding, _ -> binding.viewer().photoViewerBack.performClick() }
@@ -371,8 +375,9 @@ class SubjectSessionPhotoTest {
             assertNotNull(binding.viewerShows())
             assertSame(pictures[saved("p1")], binding.viewerShows())
             assertEquals(of(1, 2), binding.viewer().pageReads())
+            // The newer one comes in at the left, before the page on screen.
             assertEquals(2, binding.viewer().stripCount())
-            assertEquals(0, binding.viewer().stripSelected())
+            assertEquals(1, binding.viewer().stripSelected())
             assertSame(thumbnails[saved("p2")], binding.thumbnailShows())
         }
     }
@@ -385,13 +390,14 @@ class SubjectSessionPhotoTest {
         modules.photo("p3")
         openThumbnail()
 
-        onScreen { binding, _ -> binding.viewer().tapStrip(0) }
+        // The strip runs newest first: the oldest is its last thumbnail.
+        onScreen { binding, _ -> binding.viewer().tapStrip(2) }
         settle()
 
         onScreen { binding, _ ->
             assertSame(pictures[saved("p1")], binding.viewerShows())
             assertEquals(of(1, 3), binding.viewer().pageReads())
-            assertEquals(0, binding.viewer().stripSelected())
+            assertEquals(2, binding.viewer().stripSelected())
         }
     }
 
@@ -473,9 +479,9 @@ class SubjectSessionPhotoTest {
             assertTrue(binding.viewer().headerShown())
         }
 
-        onScreen { binding, _ -> binding.viewer().photoViewerPages.setCurrentItem(0, false) }
-        settle()
         onScreen { binding, _ -> binding.viewer().photoViewerPages.setCurrentItem(1, false) }
+        settle()
+        onScreen { binding, _ -> binding.viewer().photoViewerPages.setCurrentItem(0, false) }
         settle()
         onScreen { binding, _ -> assertEquals(1f, binding.viewer().pagePhoto().zoom) }
         onScreen { binding, _ -> binding.viewer().doubleTapPhoto() }
@@ -492,7 +498,7 @@ class SubjectSessionPhotoTest {
         modules.photo("p1")
         modules.photo("p2")
         openThumbnail()
-        onScreen { binding, _ -> binding.viewer().photoViewerPages.setCurrentItem(0, false) }
+        onScreen { binding, _ -> binding.viewer().photoViewerPages.setCurrentItem(1, false) }
         settle()
 
         onScreen { binding, _ -> binding.viewer().photoViewerShare.performClick() }
@@ -537,7 +543,7 @@ class SubjectSessionPhotoTest {
         onScreen { binding, _ ->
             assertTrue(binding.viewer().root.isShown)
             assertEquals(2, binding.viewer().stripCount())
-            assertEquals(1, binding.viewer().stripSelected())
+            assertEquals(0, binding.viewer().stripSelected())
             assertSame(pictures[saved("p2")], binding.viewerShows())
             assertEquals(of(2, 2), binding.viewer().pageReads())
             assertSame(thumbnails[saved("p2")], binding.thumbnailShows())
@@ -580,6 +586,10 @@ class SubjectSessionPhotoTest {
         onScreen { binding, _ ->
             assertEquals(2, binding.viewer().stripCount())
             assertSame(pictures[saved("p2")], binding.viewerShows())
+            // Above the viewer's strip, not over the photo where the zoom row lies under it.
+            val dp = binding.root.resources.displayMetrics.density
+            val strip = windowBox(binding.viewer().photoViewerStrip)
+            assertEquals(strip.top - 12 * dp, windowBox(checkNotNull(shownNoticeView())).bottom.toFloat(), 1f)
         }
     }
 

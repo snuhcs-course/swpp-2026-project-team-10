@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import androidx.lifecycle.ViewModel
@@ -73,6 +73,18 @@ class SettingsViewModel(
 
     fun setShareUsage(share: Boolean) {
         viewModelScope.launch { settings.setShareUsage(share) }
+    }
+
+    // Set at once, as the tips closed are: the stored answer comes back later, and a second delete must not offer again.
+    private val accessOfferedHere = MutableStateFlow(false)
+
+    /** Whether Pix has offered to manage the phone's media for deleting another app's photo (FR-1.16): only once. */
+    fun mediaAccessOffered(): Boolean = accessOfferedHere.value || settings.mediaAccessOffered.value
+
+    /** The media access was offered now, so it never is again. */
+    fun markMediaAccessOffered() {
+        accessOfferedHere.value = true
+        viewModelScope.launch { settings.setMediaAccessOffered() }
     }
 
     /** Set at once: the stored answer comes back later, and a screen shown again must not show its tips twice. */

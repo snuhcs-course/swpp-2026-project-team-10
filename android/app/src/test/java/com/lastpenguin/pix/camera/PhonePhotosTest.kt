@@ -46,9 +46,11 @@ import org.robolectric.Robolectric
  * photos of apps Pix cannot see, every app's photo still shows, and Pix's own still tells apart from another's.
  * Delete (state-based, fault injection; equivalence over the owner and Android's version): Pix's own photo goes from
  * MediaStore after Pix asks, which then tells of the change; a photo already gone counts as deleted; one MediaStore
- * refuses for no reason of ownership is not, with no crash. Another app's photo: from Android 11 Pix does not ask, and
- * Android's question deletes it, MediaStore untouched; on Android 10 Pix asks, and MediaStore's own question lets it
- * delete it. Pix's photo from before a reinstall, which MediaStore refuses as another's: Android's question.
+ * refuses for no reason of ownership is not, with no crash. Another app's photo: on Android 11 Pix does not ask, and
+ * Android's question deletes it, MediaStore untouched; from Android 12 Pix asks for every photo, and another app's
+ * needs the media access until the user allows it, with which Android's request deletes it unasked; on Android 10 Pix
+ * asks, and MediaStore's own question lets it delete it. Pix's photo from before a reinstall, which MediaStore refuses
+ * as another's: Android's question.
  */
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -169,7 +171,10 @@ class PhonePhotosTest {
         store = Robolectric.setupContentProvider(FakeMediaStore::class.java, MediaStore.AUTHORITY)
     }
 
-    private fun TestScope.photos(sdk: Int = Build.VERSION_CODES.UPSIDE_DOWN_CAKE): PhonePhotos {
+    private fun TestScope.photos(
+        sdk: Int = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
+        manages: Boolean = false,
+    ): PhonePhotos {
         val photos = PhonePhotos(
             resolver,
             backgroundScope,
@@ -181,6 +186,7 @@ class PhonePhotosTest {
                 deleteQuestion
             },
             sdk = sdk,
+            canManageMedia = { manages },
         )
         runCurrent()
         return photos
@@ -233,11 +239,27 @@ class PhonePhotosTest {
         assertFalse(read.projection.toString(), MediaStore.MediaColumns.OWNER_PACKAGE_NAME in read.projection)
         assertFalse(read.selection, read.selection!!.contains(MediaStore.MediaColumns.OWNER_PACKAGE_NAME))
         assertTrue(store.queries.any { it.args == listOf(PIX) })
-        // Pix asks before deleting its own, and leaves another's to Android's question.
-        assertTrue(photos.asksFirst(photo(10)))
-        assertFalse(photos.asksFirst(photo(11)))
-        assertFalse(photos.asksFirst(photo(12)))
+        // From Android 12 Pix asks before deleting any photo; another's needs the media access too, or Android asks again.
+        for (id in 10L..12L) assertTrue(photos.asksFirst(photo(id)))
+        assertFalse(photos.needsAccess(photo(10)))
+        assertTrue(photos.needsAccess(photo(11)))
+        assertTrue(photos.needsAccess(photo(12)))
     }
+
+    @Test
+    fun `with the media access allowed, another app's photo needs no more, and Android's request deletes it unasked`() =
+        runTest {
+            store.rows = listOf(Row(10, 1_000, 1), Row(11, 2_000, 2, owner = "com.example.gallery"))
+            val photos = photos(manages = true)
+
+            assertTrue(photos.asksFirst(photo(11)))
+            assertFalse(photos.needsAccess(photo(11)))
+            val result = photos.delete(photo(11))
+
+            // The same request, which Android grants without its question once the access is on.
+            assertTrue("$result", result is PhotoDeletion.NeedsConsent && result.deletesItself)
+            assertEquals(listOf(photo(11)), questions)
+        }
 
     @Test
     fun `a photo edited in place counts an edit, and a new or deleted photo none`() = runTest {
@@ -373,12 +395,14 @@ class PhonePhotosTest {
     }
 
     @Test
-    fun `another app's photo, from Android 11, goes to Android's question alone, which deletes it`() = runTest {
+    fun `another app's photo, on Android 11, goes to Android's question alone, which deletes it`() = runTest {
         store.rows = listOf(Row(10, 1_000, 1, owner = "com.example.gallery"), Row(11, 2_000, 2, owner = null))
         val photos = photos(sdk = Build.VERSION_CODES.R)
 
         for (id in listOf(10L, 11L)) {
             assertFalse(photos.asksFirst(photo(id)))
+            // Android 11 has no media access to allow.
+            assertFalse(photos.needsAccess(photo(id)))
             val result = photos.delete(photo(id))
             assertTrue("$result", result is PhotoDeletion.NeedsConsent && result.deletesItself)
             assertSame(deleteQuestion, (result as PhotoDeletion.NeedsConsent).request)
@@ -395,6 +419,7 @@ class PhonePhotosTest {
             val photos = photos(sdk = Build.VERSION_CODES.Q)
 
             assertTrue(photos.asksFirst(photo(10)))
+            assertFalse(photos.needsAccess(photo(10)))
             val result = photos.delete(photo(10))
 
             assertTrue("$result", result is PhotoDeletion.NeedsConsent && !result.deletesItself)

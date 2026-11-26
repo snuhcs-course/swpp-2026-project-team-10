@@ -1,8 +1,9 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.graphics.Rect
 import android.os.Bundle
 import android.os.Looper
 import android.view.View
@@ -30,6 +31,8 @@ import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.settings.CoachMarkLayout
 import com.lastpenguin.pix.ui.settings.TutorialFragment
 import kotlinx.coroutines.launch
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.robolectric.Shadows.shadowOf
 
 /**
@@ -70,6 +73,29 @@ object ScreenTestSupport {
     /** The action button of the notice on the screen now, such as Undo, or null with none or one without an action. */
     fun noticeAction(): Button? = notices().lastOrNull()?.findViewById<Button>(materialR.id.snackbar_action)
         ?.takeIf { it.isShown }
+
+    /** The view of the notice on the screen now, the newest; null with none. */
+    fun shownNoticeView(): View? = notices().lastOrNull()
+
+    /**
+     * A notice on a camera screen in the zoom row's place (#298): 12 dp above [line], as from the sides, with [line] 6 dp
+     * under the zoom [row], so the notice covers the [readout].
+     */
+    fun assertNoticeInTheZoomRowsPlace(notice: View, row: View, readout: View, line: View) {
+        val dp = notice.resources.displayMetrics.density
+        val lineAt = windowBox(line).top
+        assertEquals("the line under the zoom row", windowBox(row).bottom + 6 * dp, lineAt.toFloat(), 1f)
+        assertEquals("12 dp above the line", lineAt - 12 * dp, windowBox(notice).bottom.toFloat(), 1f)
+        val over = windowBox(readout)
+        val box = windowBox(notice)
+        assertTrue("over the zoom readout", box.top < over.bottom && box.bottom > over.top)
+    }
+
+    /** [view]'s bounds in its window, with its translation. */
+    fun windowBox(view: View): Rect {
+        val at = IntArray(2).also(view::getLocationInWindow)
+        return Rect(at[0], at[1], at[0] + view.width, at[1] + view.height)
+    }
 
     /** Every notice on the screen, oldest first, from every window's views (WindowManagerGlobal keeps them in order). */
     private fun notices(): List<View> {

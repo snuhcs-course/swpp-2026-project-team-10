@@ -641,6 +641,58 @@ class CameraViewModelTest {
     }
 
     @Test
+    fun allowAccess_thenAndroidsScreenCloses_deletesThePhotoAskedFor_throughAndroidsRequest_once() = runTest {
+        val album = MutableStateFlow(listOf(photo(10), photo(11)))
+        val question = PendingIntent.getActivity(
+            ApplicationProvider.getApplicationContext(),
+            0,
+            Intent("delete"),
+            PendingIntent.FLAG_IMMUTABLE,
+        ).intentSender
+        var access = false
+        val asked = mutableListOf<Uri>()
+        val shooting = CameraViewModel(
+            camera,
+            guides,
+            phonePhotos = album,
+            deleter = object : PhotoDeleter {
+                override suspend fun delete(uri: Uri): PhotoDeletion {
+                    asked += uri
+                    return PhotoDeletion.NeedsConsent(question, deletesItself = true)
+                }
+
+                override fun needsAccess(uri: Uri) = !access
+            },
+        )
+        val questions = mutableListOf<IntentSender>()
+        backgroundScope.launch { shooting.deleteQuestions.collect { questions += it } }
+        runCurrent()
+        shooting.openPhotos()
+        assertTrue(shooting.needsAccessToDelete(photo(11)))
+
+        // Nothing goes while Android's screen is open.
+        shooting.deleteAfterAccess(photo(11))
+        runCurrent()
+        assertTrue(asked.isEmpty())
+
+        // The user allowed it: the photo goes through Android's request, which no longer asks.
+        access = true
+        shooting.accessAnswered()
+        runCurrent()
+        assertFalse(shooting.needsAccessToDelete(photo(11)))
+        assertEquals(listOf(photo(11)), asked)
+        assertEquals(listOf(question), questions)
+        shooting.deleteAnswered(yes = true)
+        runCurrent()
+        assertEquals(listOf(photo(10)), shooting.uiState.value.viewerPhotos)
+
+        // The screen closing again, with nothing asked for, deletes nothing more.
+        shooting.accessAnswered()
+        runCurrent()
+        assertEquals(listOf(photo(11)), asked)
+    }
+
+    @Test
     fun deletePhoto_thePhotoJustTaken_leavesThePages_beforeMediaStoreTellsOfIt() = runTest {
         val album = MutableStateFlow(listOf(photo(10)))
         val shooting =

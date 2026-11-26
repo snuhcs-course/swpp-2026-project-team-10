@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.settings
 
 import android.content.Context
@@ -28,8 +28,9 @@ import kotlinx.coroutines.flow.update
 
 /**
  * The choices that outlive the app (FR-10.1, Design 2.8): the guide's look, the grid and the horizon bar (from the camera
- * menu, FR-1.17), the latency indicator, crash reports and usage data (FR-10.6), and which screens' tutorial tips were seen
- * (FR-10.4). Each change applies at once, through the flows.
+ * menu, FR-1.17), the latency indicator, crash reports and usage data (FR-10.6), which screens' tutorial tips were seen
+ * (FR-10.4), and whether the media access for deleting was offered (FR-1.16). Each change applies at once, through the
+ * flows.
  * The language is not here: Android keeps it as Pix's per-app language (`AppCompatDelegate.setApplicationLocales`).
  * Owner: Settings (#123).
  */
@@ -54,6 +55,12 @@ interface AppSettings {
      * until the stored answer is read, so a phone whose user turned it off never sends in between.
      */
     val shareUsage: StateFlow<Boolean?>
+
+    /**
+     * Whether Pix has offered to manage the phone's media, which it does once, at the first delete of another app's photo
+     * that Android would ask about (FR-1.16); false by default.
+     */
+    val mediaAccessOffered: StateFlow<Boolean>
 
     suspend fun setGuideColor(color: GuideColor)
 
@@ -83,6 +90,9 @@ interface AppSettings {
     /** Forgets every tip seen, so each screen shows its tips again (*Show the tutorial again*). */
     suspend fun resetTutorial()
 
+    /** Remembers that the media access was offered, so it never is again. */
+    suspend fun setMediaAccessOffered()
+
     /** Remembers nothing beyond the process; for tests, which start as if every screen's tips were seen. */
     class InMemory(
         look: GuideLook = GuideLook(),
@@ -91,6 +101,7 @@ interface AppSettings {
         level: Boolean = true,
         tutorial: Set<TutorialScreen>? = TutorialScreen.entries.toSet(),
         usage: Boolean? = true,
+        mediaAccess: Boolean = false,
     ) : AppSettings {
         private val _guideLook = MutableStateFlow(look)
         override val guideLook: StateFlow<GuideLook> = _guideLook.asStateFlow()
@@ -109,6 +120,9 @@ interface AppSettings {
 
         private val _shareUsage = MutableStateFlow(usage)
         override val shareUsage: StateFlow<Boolean?> = _shareUsage.asStateFlow()
+
+        private val _mediaAccessOffered = MutableStateFlow(mediaAccess)
+        override val mediaAccessOffered: StateFlow<Boolean> = _mediaAccessOffered.asStateFlow()
 
         override suspend fun setGuideColor(color: GuideColor) {
             _guideLook.value = _guideLook.value.copy(color = color)
@@ -144,6 +158,10 @@ interface AppSettings {
 
         override suspend fun resetTutorial() {
             _tutorialSeen.value = emptySet()
+        }
+
+        override suspend fun setMediaAccessOffered() {
+            _mediaAccessOffered.value = true
         }
     }
 }
@@ -206,6 +224,9 @@ class DataStoreAppSettings(private val store: DataStore<Preferences>, scope: Cor
             }
             .stateIn(scope, SharingStarted.Eagerly, null)
 
+    override val mediaAccessOffered: StateFlow<Boolean> =
+        preferences.map { it[MEDIA_ACCESS_OFFERED] ?: false }.stateIn(scope, SharingStarted.Eagerly, false)
+
     override suspend fun setGuideColor(color: GuideColor) = save { it[GUIDE_COLOR] = color.name }
 
     override suspend fun setGuideThickness(thickness: GuideThickness) = save { it[GUIDE_THICKNESS] = thickness.name }
@@ -228,6 +249,8 @@ class DataStoreAppSettings(private val store: DataStore<Preferences>, scope: Cor
     }
 
     override suspend fun resetTutorial() = save { it.remove(TUTORIAL_SEEN) }
+
+    override suspend fun setMediaAccessOffered() = save { it[MEDIA_ACCESS_OFFERED] = true }
 
     private suspend fun save(change: suspend (MutablePreferences) -> Unit) {
         try {
@@ -252,5 +275,6 @@ class DataStoreAppSettings(private val store: DataStore<Preferences>, scope: Cor
         val SHOW_LEVEL = booleanPreferencesKey("show_level")
         val TUTORIAL_SEEN = stringSetPreferencesKey("tutorial_seen_screens")
         val SHARE_USAGE = booleanPreferencesKey("share_usage")
+        val MEDIA_ACCESS_OFFERED = booleanPreferencesKey("media_access_offered")
     }
 }

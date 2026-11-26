@@ -6,12 +6,14 @@ import android.app.RecoverableSecurityException
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.Context
+import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.provider.Settings
 import android.util.Log
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineDispatcher
@@ -57,10 +59,17 @@ fun interface PhotoDeleter {
     suspend fun delete(uri: Uri): PhotoDeletion
 
     /**
-     * Whether Pix asks before deleting [uri] itself: for its own photos, which it deletes at once. Another app's photo
-     * is asked about by Android's own question ([PhotoDeletion.NeedsConsent]), so Pix does not ask a second time.
+     * Whether Pix asks before deleting [uri] itself: for its own photos, which it deletes at once, and from Android 12
+     * for every photo, since Android's own question for another app's ([PhotoDeletion.NeedsConsent]) can be turned off
+     * there ([needsAccess]). On Android 11 that question cannot, so Pix does not ask a second time.
      */
     fun asksFirst(uri: Uri): Boolean = true
+
+    /**
+     * Whether Android would ask before deleting [uri] every time, as for another app's photo, until Pix may manage the
+     * phone's media, which the user allows once (Android 12 and later; FR-1.16).
+     */
+    fun needsAccess(uri: Uri): Boolean = false
 }
 
 /** One of the phone's albums, a folder of its photos, as a gallery app lists them (FR-1.6). */
@@ -106,6 +115,20 @@ fun photoPermissions(): Array<String> = when {
     else -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
 }
 
+/**
+ * Whether the user let Pix manage the phone's media, Android 12's special access with which Android deletes another
+ * app's photo without its question (FR-1.16); never before Android 12.
+ */
+fun Context.canManageMedia(): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && MediaStore.canManageMedia(this)
+
+/** Android's screen that lets Pix manage the phone's media, or null before Android 12, which has none. */
+fun Context.manageMediaSettings(): Intent? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    Intent(Settings.ACTION_REQUEST_MANAGE_MEDIA, Uri.fromParts("package", packageName, null))
+} else {
+    null
+}
+
 /** How much of the phone's photos this app may read now. */
 fun Context.photoAccess(): PhotoAccess {
     fun granted(permission: String) =
@@ -127,7 +150,8 @@ fun Context.photoAccess(): PhotoAccess {
  * any more. They are read from MediaStore when the app starts, at every MediaStore change, so a photo deleted in the
  * gallery leaves them, and at [refresh]. Ordered by when each was taken, as a gallery app orders them, or when it
  * came to the phone for a photo that does not say. [delete] deletes Pix's own photos at once; another app's only
- * Android's own question may delete ([PhotoDeletion.NeedsConsent]).
+ * Android's own question may delete ([PhotoDeletion.NeedsConsent]), which from Android 12 deletes it without asking once
+ * Pix may manage the phone's media ([canManageMedia]).
  * Owner: Camera/Overlay (#3).
  */
 class PhonePhotos(
@@ -148,6 +172,8 @@ class PhonePhotos(
         }
     },
     private val sdk: Int = Build.VERSION.SDK_INT,
+    /** Whether the user let Pix manage the phone's media (`MediaStore.canManageMedia`, Android 12 and later). */
+    private val canManageMedia: () -> Boolean = { false },
 ) : PhonePhotoSource,
     PhotoDeleter {
     private val _photos = MutableStateFlow<List<Uri>>(emptyList())
@@ -202,7 +228,11 @@ class PhonePhotos(
         _albums.value = read.albums
     }
 
-    override fun asksFirst(uri: Uri): Boolean = sdk < Build.VERSION_CODES.R || uri !in others
+    override fun asksFirst(uri: Uri): Boolean =
+        sdk < Build.VERSION_CODES.R || sdk >= Build.VERSION_CODES.S || uri !in others
+
+    override fun needsAccess(uri: Uri): Boolean =
+        sdk >= Build.VERSION_CODES.S && uri in others && !canManageMedia()
 
     /**
      * Deletes [uri] from MediaStore; [photos] lose it once MediaStore tells of the change. Another app's photo goes to

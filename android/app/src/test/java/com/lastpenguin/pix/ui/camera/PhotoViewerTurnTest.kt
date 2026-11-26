@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -176,8 +176,9 @@ class PhotoViewerTurnTest {
         viewer.assertSideways(-90f)
         viewer.assertBackNear(left = true, top = false, why = "90")
         assertSame(newest, viewer.pageShows())
-        assertEquals(2, viewer.photoViewerPages.currentItem)
-        assertEquals(2, viewer.stripSelected())
+        // The newest is the first page, at the left.
+        assertEquals(0, viewer.photoViewerPages.currentItem)
+        assertEquals(0, viewer.stripSelected())
 
         turn(270)
         viewer.assertSideways(90f)

@@ -30,6 +30,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,10 +44,12 @@ import org.robolectric.annotation.GraphicsMode
  * is open, the menu taking the ratios' place; a tap on the timer's icon beside the button, taken as the button's (the
  * menu opened and closed), and one on the ratio beside it, taken as the ratio's; the timer chosen in the menu (its icon beside the menu's button, its notice,
  * the shutter's spoken label) and off again (both gone); the countdown on the screen (the seconds over the preview,
- * alone, the other controls dimmed and waiting, the shutter's label for cancelling), its end (one photo, all back),
- * the shutter's second tap (no photo), and the screen stopping (no photo); in a session, each second and the end told
- * to the subject's phone, and End session waiting, dimmed, until the end. The scene photo's countdown: at its end, the
- * shutter waits while the frame is taken, so a tap then starts no second countdown.
+ * alone, the other controls dimmed and waiting, the shutter a stop square in the timer's ring, which fills on with the
+ * clock and starts again from each second's place, and its label for cancelling), its end (one photo, all
+ * back, the white shutter again), the shutter's second tap (no photo, the white shutter again), and the screen
+ * stopping (no photo); in a session, each second and the end told to the subject's phone, and End session waiting,
+ * dimmed, until the end. The scene photo's countdown: the ring on its accent shutter, which comes back at the end; at
+ * its end, the shutter waits while the frame is taken, so a tap then starts no second countdown.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -226,19 +229,34 @@ class CameraTimerScreenTest {
             assertFalse(controls.cameraMenuButton.isEnabled)
             assertFalse(controls.aspectButton.isEnabled)
         }
-        pass(1_000)
+        assertRing(fill = 0f)
+        pass(500)
+        assertRing(fill = 1f / 6)
+        pass(500)
         onScreen { controls, _ -> assertEquals("2", controls.countdownNumber.text.toString()) }
+        assertRing(fill = 1f / 3)
         assertTrue(camera.photoTurns.isEmpty())
 
         // Past the last second, which ends as this time does.
         pass(2_100)
 
         assertEquals(1, camera.photoTurns.size)
-        onScreen { controls, _ ->
+        onScreen { controls, fragment ->
             assertEquals(View.GONE, controls.countdownPanel.visibility)
             assertTrue(controls.guideButton.isEnabled)
             assertEquals(1f, controls.guideButton.alpha)
+            assertEquals(R.drawable.bg_shutter, controls.shutterButton.tag)
+            assertFalse(checkNotNull(fragment.shutterRing).drawable.filling)
         }
+    }
+
+    /** The shutter shows the timer's ring, filled [fill] now and filling on. */
+    private fun assertRing(fill: Float) = onScreen { controls, fragment ->
+        val ring = checkNotNull(fragment.shutterRing).drawable
+        assertEquals(CameraFragment.COUNTDOWN_SHUTTER, controls.shutterButton.tag)
+        assertSame(ring, controls.shutterButton.background)
+        assertEquals(fill, ring.fill, 0.001f)
+        assertTrue(ring.filling)
     }
 
     @Test
@@ -249,6 +267,10 @@ class CameraTimerScreenTest {
         pass(1_000)
 
         onScreen { controls, _ -> controls.shutterButton.performClick() }
+        onScreen { controls, fragment ->
+            assertEquals(R.drawable.bg_shutter, controls.shutterButton.tag)
+            assertFalse(checkNotNull(fragment.shutterRing).drawable.filling)
+        }
         pass(5_000)
 
         assertTrue(camera.photoTurns.isEmpty())
@@ -267,10 +289,13 @@ class CameraTimerScreenTest {
         generation.beginScene()
         idle()
 
-        // The countdown ends, and the frame is being taken.
+        // The countdown ends, and the frame is being taken; meanwhile the ring was on the shutter, which is the accent's
+        // again after it.
         onScreen { controls, _ -> controls.shutterButton.performClick() }
+        onScreen { controls, _ -> assertEquals(CameraFragment.COUNTDOWN_SHUTTER, controls.shutterButton.tag) }
         pass(3_500)
         assertTrue(generation.uiState.value.shooting)
+        onScreen { controls, _ -> assertEquals(R.drawable.bg_shutter_scene, controls.shutterButton.tag) }
 
         // A tap meanwhile starts nothing.
         onScreen { controls, _ -> controls.shutterButton.performClick() }

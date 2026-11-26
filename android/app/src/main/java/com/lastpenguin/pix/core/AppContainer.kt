@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -34,6 +34,7 @@ import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.camera.PhotoDeletion
 import com.lastpenguin.pix.camera.PhotoSaver
 import com.lastpenguin.pix.camera.SensorPhoneTurns
+import com.lastpenguin.pix.camera.canManageMedia
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.camera.photoAccess
 import com.lastpenguin.pix.core.network.PixAccountApi
@@ -301,8 +302,13 @@ class AppContainer(
             val promptHistory = DataStorePromptHistory(appContext, appScope)
             promptHistory.followSubjectSets(descriptionSyncer.started, poseSyncer.mirror, poseSyncer.verdicts, appScope)
             val poseTips = PoseTips(poseTipper, guideRepository.guide, appScope, screenLanguage)
-            val phonePhotos =
-                PhonePhotos(appContext.contentResolver, appScope, appContext.packageName, appContext::photoAccess)
+            val phonePhotos = PhonePhotos(
+                appContext.contentResolver,
+                appScope,
+                appContext.packageName,
+                appContext::photoAccess,
+                canManageMedia = appContext::canManageMedia,
+            )
             val photoSyncer = PhotoSyncer(
                 rtcSessionManager,
                 ContentPhotoReader(appContext.contentResolver),
@@ -318,6 +324,8 @@ class AppContainer(
                     ): PhotoDeletion = photoSyncer.delete(uri, phonePhotos, appScope)
 
                     override fun asksFirst(uri: Uri) = phonePhotos.asksFirst(uri)
+
+                    override fun needsAccess(uri: Uri) = phonePhotos.needsAccess(uri)
                 },
                 cameraSettings = DataStoreCameraSettings(appContext),
                 guideRepository = guideRepository,

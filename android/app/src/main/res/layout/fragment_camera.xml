@@ -552,9 +552,9 @@
             tools:visibility="visible" />
 
         <!-- The timer's countdown (FR-1.17): the seconds left, large in the middle of the image, so the people in the photo
-             can read it. That the shutter stops it is the shutter's name meanwhile and the tutorial's tip, not a line
-             here. The number turns with the phone (FR-1.15) in a square, so it fits either way. It passes touches
-             through. -->
+             can read it. That the shutter stops it is the shutter's stop square in the timer's ring meanwhile, its
+             name, and the tutorial's tip, not a line here. The number turns with the phone (FR-1.15) in a square, so it
+             fits either way. It passes touches through. -->
         <LinearLayout
             android:id="@+id/countdownPanel"
             android:layout_width="wrap_content"
@@ -657,8 +657,8 @@
             tools:visibility="visible" />
 
         <!-- How to hold the phone for a generated pose (FR-4.10): open once when its guide comes, "Preparing a
-             tip…" until the tip arrives; a touch anywhere closes it, and the tip button in the top bar opens it
-             again. Translucent, so the preview shows through. -->
+             tip…" until the tip arrives; only the tip button in the zoom row closes and opens it. A touch on it does
+             nothing, and does not reach the image under it. Translucent, so the preview shows through. -->
         <LinearLayout
             android:id="@+id/tipBanner"
             android:layout_width="match_parent"
@@ -666,7 +666,6 @@
             android:layout_marginTop="8dp"
             android:accessibilityLiveRegion="polite"
             android:background="@drawable/bg_glass_panel"
-            android:clickable="true"
             android:focusable="true"
             android:gravity="center_vertical"
             android:minHeight="48dp"
@@ -858,8 +857,9 @@
             android:layout_gravity="end|center_vertical"
             android:gravity="center_vertical">
 
-            <!-- Opens the pose tip again while the guide on the camera has one (FR-4.10); the dot says a tip came
-                 while the banner was closed. Beside the guide's own button, so the top bar fits any phone. -->
+            <!-- Opens and closes the pose tip while the guide on the camera has one (FR-4.10), lit while the tip is
+                 open; nothing else closes it. The dot says a tip came while the banner was closed. Beside the guide's own
+                 button, so the top bar fits any phone. -->
             <FrameLayout
                 android:id="@+id/tipButtonFrame"
                 android:layout_width="wrap_content"
@@ -874,7 +874,10 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:contentDescription="@string/show_tip"
-                    app:icon="@drawable/ic_lightbulb" />
+                    app:backgroundTint="@color/tip_button_background"
+                    app:icon="@drawable/ic_lightbulb"
+                    app:iconTint="@color/tip_button_icon"
+                    app:strokeColor="@color/tip_button_stroke" />
 
                 <ImageView
                     android:id="@+id/tipDot"
@@ -923,6 +926,17 @@
         app:layout_constraintEnd_toEndOf="parent"
         tools:text="@string/pinch_mode_guide"
         tools:visibility="visible" />
+
+    <!-- The line the zoom row stands on, 6 dp under it: the image's bottom, or the top of the panels over it. A notice
+         sits on it, over the zoom row (ui/Notices.kt, NoticeAnchor). Moved with the zoom row in code. -->
+    <View
+        android:id="@+id/noticeLine"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:importantForAccessibility="no"
+        app:layout_constraintBottom_toTopOf="@id/bottomPanel"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
 
     <LinearLayout
         android:id="@+id/bottomPanel"

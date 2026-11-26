@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park
 package com.lastpenguin.pix.ui.camera
 
 import androidx.lifecycle.ViewModelStore
@@ -34,8 +34,8 @@ import org.junit.Test
  * while it counts down: cancelled, no photo, 0 told. Leaving the screen (cancelCountdown): the same; with no countdown,
  * nothing told. A camera not ready at the shutter (nothing starts) and at the countdown's end (no photo, the camera's
  * notice). While it counts down: the camera switch, a ratio, the ratios, the menu, the flash, and the viewer are
- * refused. The menu and the ratios: each opening closes the other; the countdown's start closes both. The flash: each
- * tap with its notice.
+ * refused. The menu and the ratios: each opening closes the other; the countdown's start closes both, and so does the
+ * scene photo's shutter with the timer off, which takes the photo at once. The flash: each tap with its notice.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ShutterTimerTest {
@@ -290,6 +290,25 @@ class ShutterTimerTest {
         model.setMenuOpen(true)
 
         assertTrue(model.uiState.value.menuOpen)
+        assertFalse(model.uiState.value.aspectsOpen)
+    }
+
+    @Test
+    fun theScenePhotosShutter_withTheTimerOff_takesItAtOnce_andClosesTheMenuAndTheRatios() = runTest {
+        runCurrent()
+        model.setMenuOpen(true)
+        var taken = 0
+
+        model.onSceneShutter { taken++ }
+        runCurrent()
+        assertEquals(1, taken)
+        assertFalse(model.uiState.value.menuOpen)
+        assertNull(model.uiState.value.countdown)
+
+        model.setAspectsOpen(true)
+        model.onSceneShutter { taken++ }
+        runCurrent()
+        assertEquals(2, taken)
         assertFalse(model.uiState.value.aspectsOpen)
     }
 

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.animation.AnimatorInflater
@@ -22,6 +22,7 @@ import com.lastpenguin.pix.guide.NoPersonFoundException
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.camera.CameraFragment
+import com.lastpenguin.pix.ui.generation.DescribePoseFragment
 import com.lastpenguin.pix.ui.guide.AddGuideSheet
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
 import com.lastpenguin.pix.ui.settings.SettingsFragment
@@ -45,9 +46,11 @@ import org.robolectric.shadows.ShadowChoreographer
  * The transitions between screens (Design 2.1, R&S 6.9, Iter3-A14) on the real activity and navigation graph, with the
  * display's frames paused where a test looks at a transition's start, since idle() plays each to its end (Testing
  * 2.1.8).
- * Every destination (equivalence partitioning): a screen of a live image, any other screen, or a sheet. KINDS names
- * each, so a destination added to the graph fails here until it is named, and then gets the transitions of its kind.
- * Pairs: to or from a live image fades in place; two other screens share the x axis, the next coming from the right
+ * Every destination (equivalence partitioning): a screen of a live image, a step of the pose flow, any other screen, or
+ * a sheet. KINDS names each, so a destination added to the graph fails here until it is named, and then gets the
+ * transitions of its kind. Pairs: two steps of the pose flow fade over each other in place (#210); Camera to Generate
+ * poses hands the scene photo over, the next screen there at once to unfold from the camera's look, and back fades
+ * through; to or from a live image otherwise fades through in place; two other screens share the x axis, the next coming from the right
  * and, going back, the last coming from the left; a sheet leaves the screen under it as it is.
  * Back: the system's Back, a screen's own Back, and *Back to camera* from two screens deep, which pops both at once; a
  * move that closes the screen shown (popUpTo) goes back with the screen beneath it, not the one it closed; a link's
@@ -143,6 +146,20 @@ class ScreenTransitionsTest {
                     val screen = (destination as FragmentNavigator.Destination).className
                     assertEquals("$name", ScreenMotion.FADE, ScreenMotion.between(camera, screen))
                     assertEquals("$name", ScreenMotion.FADE, ScreenMotion.between(settings, screen))
+                }
+
+                Kind.STEP -> {
+                    val screen = (destination as FragmentNavigator.Destination).className
+                    // The pose flow's steps fade over each other (#210). From the scene photo's Camera, Generate poses
+                    // unfolds; the other steps, and every step back to Camera, fade through.
+                    val handOff = screen == DescribePoseFragment::class.java.name
+                    val fromCamera = if (handOff) ScreenMotion.HAND_OFF else ScreenMotion.FADE
+                    assertEquals("$name", fromCamera, ScreenMotion.between(camera, screen))
+                    assertEquals("$name", ScreenMotion.FADE, ScreenMotion.between(screen, camera))
+                    for (step in ScreenMotion.STEPS) {
+                        assertEquals("$name", ScreenMotion.FLOW, ScreenMotion.between(step, screen))
+                    }
+                    assertEquals("$name", ScreenMotion.SHARED_AXIS, ScreenMotion.between(settings, screen))
                 }
 
                 Kind.SCREEN -> {
@@ -355,7 +372,7 @@ class ScreenTransitionsTest {
         assertEquals(R.id.cameraFragment, pix.nav.currentDestination?.id)
     }
 
-    private enum class Kind { LIVE, SCREEN, SHEET }
+    private enum class Kind { LIVE, STEP, SCREEN, SHEET }
 
     private companion object {
         /** The longest transition. */
@@ -371,9 +388,9 @@ class ScreenTransitionsTest {
             R.id.libraryFragment to Kind.SCREEN,
             R.id.referenceConfirmFragment to Kind.SCREEN,
             R.id.noPersonFoundFragment to Kind.SCREEN,
-            R.id.describePoseFragment to Kind.SCREEN,
-            R.id.generatingFragment to Kind.SCREEN,
-            R.id.pickPoseFragment to Kind.SCREEN,
+            R.id.describePoseFragment to Kind.STEP,
+            R.id.generatingFragment to Kind.STEP,
+            R.id.pickPoseFragment to Kind.STEP,
             R.id.generationFailedFragment to Kind.SCREEN,
             R.id.friendsFragment to Kind.SCREEN,
             R.id.addFriendFragment to Kind.SCREEN,
@@ -392,9 +409,9 @@ class ScreenTransitionsTest {
             R.id.joinCodeFragment to Kind.SCREEN,
             R.id.sessionNotFoundFragment to Kind.SCREEN,
             R.id.subjectFragment to Kind.LIVE,
-            R.id.subjectDescribeFragment to Kind.SCREEN,
-            R.id.subjectGeneratingFragment to Kind.SCREEN,
-            R.id.subjectPickPoseFragment to Kind.SCREEN,
+            R.id.subjectDescribeFragment to Kind.STEP,
+            R.id.subjectGeneratingFragment to Kind.STEP,
+            R.id.subjectPickPoseFragment to Kind.STEP,
             R.id.subjectConfirmFragment to Kind.SCREEN,
             R.id.connectionLostFragment to Kind.SCREEN,
         )

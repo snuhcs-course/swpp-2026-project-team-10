@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Dongje Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Dongje Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -162,7 +162,6 @@ class CameraFragmentRenderTest {
             // (FR-1.11, FR-1.12), nor the flash beside the menu's button.
             assertEquals(View.GONE, controls.menuFlash.visibility)
             assertEquals(View.GONE, controls.flashIndicator.visibility)
-            assertEquals(View.GONE, controls.flashButton.visibility)
             assertEquals(View.GONE, controls.exposureBar.visibility)
             assertFalse(controls.galleryButton.isEnabled)
             // The grid and the horizon bar, on until Settings turns them off (FR-1.9, FR-1.10).
@@ -547,13 +546,14 @@ class CameraFragmentRenderTest {
             assertEquals(string(R.string.scene_title), controls.sceneTitle.text.toString())
             assertEquals(View.VISIBLE, controls.sceneBackButton.visibility)
             assertEquals(View.GONE, controls.sceneStill.visibility)
-            // The flash button stays, as the light for the scene photo, and the ratio, which is the photo's (#231);
-            // brightness goes.
-            assertEquals(View.VISIBLE, controls.flashButton.visibility)
-            assertEquals(string(R.string.scene_light_off), controls.flashButton.contentDescription)
+            // The camera menu stays, its flash the light for the scene photo and without Settings, which would leave
+            // the step, and so does the ratio, which is the photo's (#231); brightness goes.
+            assertEquals(View.VISIBLE, controls.cameraMenuButton.visibility)
+            assertEquals(View.VISIBLE, controls.menuFlash.visibility)
+            assertEquals(string(R.string.scene_light_off), controls.menuFlash.contentDescription)
+            assertEquals(View.GONE, controls.menuSettings.visibility)
+            assertEquals(View.GONE, controls.menuSettingsDivider.visibility)
             assertEquals(View.VISIBLE, controls.aspectButton.visibility)
-            // The camera menu gives way to the light (FR-1.17).
-            assertEquals(View.GONE, controls.cameraMenuButton.visibility)
             assertEquals(View.GONE, controls.exposureBar.visibility)
             assertEquals(View.GONE, controls.guideOverlay.visibility)
             assertEquals(View.GONE, controls.guideControls.visibility)
@@ -607,8 +607,9 @@ class CameraFragmentRenderTest {
             assertEquals(View.VISIBLE, controls.referenceThumbnail.visibility)
             assertEquals(View.VISIBLE, controls.cameraSettings.visibility)
             assertEquals(View.VISIBLE, controls.aspectButton.visibility)
-            assertEquals(View.GONE, controls.flashButton.visibility)
             assertEquals(View.VISIBLE, controls.cameraMenuButton.visibility)
+            assertEquals(View.VISIBLE, controls.menuSettings.visibility)
+            assertEquals(View.VISIBLE, controls.menuSettingsDivider.visibility)
             // The camera as it was: no flow bar, no panel, the white shutter.
             assertEquals(View.GONE, controls.sceneProgress.visibility)
             assertEquals(View.GONE, controls.sceneGuide.visibility)
@@ -668,57 +669,97 @@ class CameraFragmentRenderTest {
     }
 
     @Test
-    fun scenePhoto_flashButtonTurnsTheLightOnAndOff_withoutChangingThePhotosFlash() {
+    fun scenePhoto_theMenusFlashTurnsTheLightOnAndOff_withoutChangingThePhotosFlash() {
         val camera = FakeCameraController(hasFlash = true).apply { frame = bitmap(300, 400) }
         launch(camera)
         onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
         idle()
+        onScreen { controls, _ -> controls.cameraMenuButton.performClick() }
+        idle()
 
-        onScreen { controls, _ -> controls.flashButton.performClick() }
+        onScreen { controls, _ -> controls.menuFlash.performClick() }
         idle()
         assertTrue(camera.torchOn)
         onScreen { controls, _ ->
-            assertEquals(string(R.string.scene_light_on), controls.flashButton.contentDescription)
-            controls.flashButton.performClick()
+            assertEquals(string(R.string.scene_light_on), controls.menuFlash.contentDescription)
+            assertTrue(controls.menuFlash.isActivated)
+            // Beside the menu's button while it is on, as the flash is on Camera.
+            assertEquals(View.VISIBLE, controls.flashIndicator.visibility)
+            controls.menuFlash.performClick()
         }
         idle()
 
         assertFalse(camera.torchOn)
         assertEquals(listOf(true, false), camera.torchRequests.dropWhile { !it })
         assertEquals(emptyList<FlashMode>(), camera.flashRequests)
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.flashIndicator.visibility) }
     }
 
     @Test
-    fun scenePhoto_theLightButtonSaysOnOnlyOnceTheCameraHasTheLightOn() {
+    fun scenePhoto_theMenusFlashSaysOnOnlyOnceTheCameraHasTheLightOn() {
         val camera = FakeCameraController(hasFlash = true).apply { applies = false }
         launch(camera)
         onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
         idle()
 
-        onScreen { controls, _ -> controls.flashButton.performClick() }
+        onScreen { controls, _ -> controls.menuFlash.performClick() }
         idle()
         assertTrue(camera.torchOn)
         onScreen { controls, _ ->
-            assertEquals(string(R.string.scene_light_off), controls.flashButton.contentDescription)
+            assertEquals(string(R.string.scene_light_off), controls.menuFlash.contentDescription)
         }
 
         camera.state.value = camera.state.value.copy(torch = true)
         idle()
         onScreen { controls, _ ->
-            assertEquals(string(R.string.scene_light_on), controls.flashButton.contentDescription)
+            assertEquals(string(R.string.scene_light_on), controls.menuFlash.contentDescription)
         }
     }
 
     @Test
-    fun scenePhoto_onACameraWithoutAFlash_hasNoLightButton() {
+    fun scenePhoto_onACameraWithoutAFlash_hasNoLightInTheMenu() {
         launch(FakeCameraController(hasFlash = false))
         onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
         idle()
 
-        // The ratio stays (#231), without a light beside it.
+        // The menu and the ratio stay (#231), the menu without a light.
         onScreen { controls, _ ->
-            assertEquals(View.GONE, controls.flashButton.visibility)
+            assertEquals(View.VISIBLE, controls.cameraMenuButton.visibility)
+            assertEquals(View.GONE, controls.menuFlash.visibility)
             assertEquals(View.VISIBLE, controls.aspectButton.visibility)
+        }
+    }
+
+    @Test
+    fun scenePhoto_theTimer_countsDownBeforeTheScenePhoto_andBackWaitsMeanwhile() {
+        val camera = FakeCameraController(hasFlash = true).apply { frame = bitmap(300, 400) }
+        val modules = launch(camera)
+        // The check of the photo is held, so the photo taken stays held.
+        modules.persons.gate = CompletableDeferred()
+        onScreen { _, fragment -> generationViewModel(fragment).beginScene() }
+        idle()
+        // The menu's timer, off to 3 s.
+        onScreen { controls, _ -> controls.menuTimer.performClick() }
+        idle()
+
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idle()
+        onScreen { controls, fragment ->
+            assertEquals(GenerationUiState.Phase.FRAMING, generationViewModel(fragment).uiState.value.phase)
+            assertEquals(View.VISIBLE, controls.countdownPanel.visibility)
+            assertFalse(controls.sceneBackButton.isEnabled)
+            controls.sceneBackButton.performClick()
+        }
+        idle()
+        onScreen { _, fragment ->
+            assertEquals(GenerationUiState.Phase.FRAMING, generationViewModel(fragment).uiState.value.phase)
+        }
+
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(3 * CameraViewModel.COUNTDOWN_STEP_MS + 100))
+        idle()
+        onScreen { controls, fragment ->
+            assertEquals(GenerationUiState.Phase.CHECKING, generationViewModel(fragment).uiState.value.phase)
+            assertTrue(controls.sceneBackButton.isEnabled)
         }
     }
 

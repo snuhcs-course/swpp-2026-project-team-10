@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A small thumbnail under a touch, such as one of the photo viewer's strip: the light in its own rounded shape, 8 dp at
+     the corners as ShapeAppearance.Pix.TinyThumbnail. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/colorControlHighlight">
+    <item android:id="@android:id/mask">
+        <shape android:shape="rectangle">
+            <corners android:radius="8dp" />
+            <solid android:color="@color/pix_text" />
+        </shape>
+    </item>
+</ripple>

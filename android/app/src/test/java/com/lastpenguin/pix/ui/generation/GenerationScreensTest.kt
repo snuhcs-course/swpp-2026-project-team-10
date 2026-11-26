@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.animation.Animator
@@ -80,12 +80,12 @@ import org.robolectric.shadows.ShadowChoreographer
  * meanwhile), the one button starts a run, of the text or of suggested poses for an empty field (Iter3-A13), and opens
  * Generating poses; the situation named on the photo's card and its options, Auto naming none and offering its own,
  * and a run of an option's words alone (FR-4.15); a tap on the photo showing it large, once however often it is tapped,
- * closed by its Back and by a tap on it (FR-4.15); straight from the shutter, the photo taken as arrived, so it comes
+ * closed by its Back, which is where the screen's own is, and by a tap on it (FR-4.15); straight from the shutter, the photo taken as arrived, so it comes
  * in once, and none to come when the screen opens again from a set (#296; its move is in SceneArrivalTest); Back and system back to the camera to
  * shoot again, the text kept (#296); Back (the photo's review on Camera, the text kept); in a session, the hint, this
  * phone's typing holding the field, the subject's typing shown and holding it, and the subject's Generate 4 poses that
- * comes first, which opens Generating poses (Design 2.6.5). Generating poses: the set
- * planned, candidates arriving with the count, all ready (to Pick a pose), none ready (to Couldn't create poses),
+ * comes first, which opens Generating poses (Design 2.6.5). Generating poses: the situation named on the photo's card
+ * as on Generate poses, Auto naming none; the set planned, candidates arriving with the count, all ready (to Pick a pose), none ready (to Couldn't create poses),
  * Back and system back, at once (the run stopped, Generate poses with the photo and the text, #297), a pose that came
  * before Back (kept in the library, and Generate poses told). Pick a pose: only the ready
  * candidates, one per page with a counter; the page on screen is the selected pose, so Select works at once and takes
@@ -470,7 +470,15 @@ class GenerationScreensTest {
             val large = checkNotNull(largePhotoOf(fragment)).requireView()
             val photo = large.findViewById<ImageView>(R.id.scenePhotoLarge)
             assertSame(fragment.scenePhoto, (photo.drawable as BitmapDrawable).bitmap)
-            large.findViewById<View>(R.id.scenePhotoBack).performClick()
+            // Its Back exactly over the screen's own, so Back does not move as the photo opens.
+            val back = large.findViewById<View>(R.id.scenePhotoBack)
+            val screens = FragmentDescribePoseBinding.bind(fragment.requireView()).backButton
+            assertEquals(
+                IntArray(2).also(screens::getLocationOnScreen).toList(),
+                IntArray(2).also(back::getLocationOnScreen).toList(),
+            )
+            assertEquals(screens.width, back.width)
+            back.performClick()
         }
         idle()
 
@@ -602,6 +610,21 @@ class GenerationScreensTest {
     // ---- Generating poses ------------------------------------------------------------
 
     @Test
+    fun generating_namesTheSituationOnThePhotosCard_asGeneratePosesDoes() {
+        modules()
+        val (s, _) = launchPrepared<GeneratingFragment>(R.id.generatingFragment) {
+            describing(it, Situation.FULL_BODY).apply { generate("hands on hips") }
+        }
+        scenario = s
+
+        s.onFragment {
+            val binding = FragmentGeneratingBinding.bind(it.requireView())
+            assertEquals(View.VISIBLE, binding.situationTag.visibility)
+            assertEquals(string(R.string.situation_full_body), binding.situationTag.text.toString())
+        }
+    }
+
+    @Test
     fun generating_countsTheCandidatesAsTheyArrive_andOpensPickAPoseWhenDone() {
         val modules = modules()
         val (s, nav) = launchPrepared<GeneratingFragment>(R.id.generatingFragment) { generating(it) }
@@ -612,6 +635,8 @@ class GenerationScreensTest {
             val binding = FragmentGeneratingBinding.bind(fragment.requireView())
             assertNotNull(binding.sceneImage.drawable)
             assertEquals(string(R.string.creating_pose), binding.readyCount.text.toString())
+            // Auto, as Generate poses has it: no situation named.
+            assertEquals(View.GONE, binding.situationTag.visibility)
         }
 
         run.plan(poses)

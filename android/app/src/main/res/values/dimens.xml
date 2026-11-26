@@ -13,6 +13,10 @@
     <dimen name="top_bar_pill_inset_bottom">12dp</dimen>
     <!-- The pose flow's bar under the top bar (R&S 6.3, #210). -->
     <dimen name="flow_progress_height">3dp</dimen>
+    <!-- The camera's top bar during the scene photo (R&S 6.3, #210): Back 8 dp in, as a header's Back 12 dp past its
+         20 dp padding, and the menu and the ratio ending at the 20 dp where a header's action ends. -->
+    <dimen name="scene_bar_start">8dp</dimen>
+    <dimen name="scene_bar_end">20dp</dimen>
     <!-- Between the situations' tiles on Add a pose guide (FR-4.8). -->
     <dimen name="situation_tile_gap">8dp</dimen>
     <!-- A thumbnail of the photo viewer's strip takes taps on 48 dp (NFR-16, item_photo_thumb). -->

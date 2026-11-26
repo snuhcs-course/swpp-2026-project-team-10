@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.animation.ValueAnimator
@@ -39,6 +39,7 @@ import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.partner
 import com.lastpenguin.pix.settings.TutorialScreen
+import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
@@ -91,14 +92,18 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose), ScenePho
             viewModel.sceneArrived()
             if (savedInstanceState == null) {
                 binding.root.doOnLayout {
-                    // As the camera held it: a photo taken sideways turns upright on its way.
+                    // This screen starts as the camera looked and unfolds as the photo moves, the bar growing into the
+                    // header (#210). As the camera held it: a photo taken sideways turns upright on its way.
+                    val unfold = SceneHandOff.take()?.takeIf { Motion.on() }?.let { HeaderUnfold(binding, it) }
                     val arrival =
                         binding.root.showArriving(
                             state.scene,
                             binding.sceneImage,
                             binding.flowProgress,
                             state.sceneTurn,
+                            unfold?.photo,
                         )
+                    if (arrival != null) unfold?.follow(arrival) else unfold?.finish()
                     sceneArrival = arrival?.animator?.also { it.doOnEnd { sceneArrival = null } }
                 }
             }
@@ -230,9 +235,10 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose), ScenePho
  * place. A tap, or a text, opens what is under it: [showOptions]'s chips, each of which writes its words into
  * the field and takes them out again (PoseOptions), and [showHistory]'s, the descriptions used before, all of them or,
  * through the switch, those used with the session's friend; such a chip fills the field, and its ✕ asks [onForget] to
- * drop it. What a tap on the field or on a chip opened stays open when the field is empty again, so a closed keyboard
- * uncovers it and a chip does not go from under the finger, until *Back to Auto* empties the field and folds it; what
- * only a text opened, such as the other phone's, folds when the text goes.
+ * drop it. The field left empty, by Done or a closed keyboard, says Auto again and folds what is under it; left with a
+ * text, it keeps it until *Back to Auto* empties the field and folds it. What a chip opened stays when the chip takes
+ * the last words out, so the chip does not go from under the finger; what only a text opened, such as the other
+ * phone's, folds when the text goes.
  * In a session, the field holds the description while it is focused (Design 2.6.5): Done, a closed keyboard, and
  * leaving the screen end that, and [showShared] shows what the other phone wrote and waits while it types.
  */
@@ -272,7 +278,7 @@ class DescriptionForm(
     private var situation: Situation? = null
     private var options: List<String> = emptyList()
 
-    /** The field or a chip was tapped on this phone: what is under the field shows until *Back to Auto* folds it. */
+    /** The field or a chip was tapped on this phone: what is under it shows until the field is left empty or folded. */
     private var touched = false
 
     /** What is under the field shows: this phone opened it, or the field holds a text, typed or the other phone's. */
@@ -299,6 +305,8 @@ class DescriptionForm(
             render()
         }
         input.setOnFocusChangeListener { _, focused ->
+            // Left empty, by Done or a closed keyboard, the field says Auto again, with nothing under it as before.
+            if (!focused && input.length() == 0) touched = false
             onFocusChanged(focused)
             render()
         }

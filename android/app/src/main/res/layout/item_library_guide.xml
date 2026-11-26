@@ -15,7 +15,7 @@
         android:background="@color/pix_surface_2"
         android:clickable="true"
         android:focusable="true"
-        android:foreground="?attr/selectableItemBackground"
+        android:foreground="@drawable/fg_thumbnail_press"
         android:padding="0.5dp"
         android:scaleType="centerCrop"
         app:layout_constraintDimensionRatio="3:4"

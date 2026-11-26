@@ -1,9 +1,11 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.animation.ValueAnimator
 import android.graphics.Bitmap
+import android.graphics.PointF
 import android.graphics.Rect
+import android.graphics.RectF
 import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
@@ -34,7 +36,10 @@ import org.robolectric.shadows.ShadowChoreographer
  * with the phone's animations off nothing is drawn and nothing plays. A photo taken with the phone held sideways,
  * upright here and so landscape: it starts as the camera held it, the frame's shape and turned back by the quarter
  * turn, to the left or to the right, and is upright on its thumbnail; a photo taken upside down starts turned half
- * round; an upright one is not turned.
+ * round; an upright one is not turned. From Camera's hand-off (#210): the photo starts on the camera's frame and moves
+ * at once, and the screen starts as the camera looked, Back's arrow, the title, and the flow's bar where and as large
+ * as the camera had them, the title and the step's button not in yet, then unfolds with the photo, halfway at halfway,
+ * and ends as itself.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -165,6 +170,79 @@ class SceneArrivalTest {
         assertEquals(180f, kotlin.math.abs(arrival.photo.turn), 0f)
         assertEquals(arrival.photo.bounds, arrival.photo.covers())
         assertEquals(binding.root.width, arrival.photo.bounds.width())
+    }
+
+    @Test
+    fun fromCamerasHandOff_thePhotoMovesAtOnce_andTheBarGrowsIntoTheHeaderWithIt() {
+        val (binding, scene) = screen(768, 1024)
+        val metrics = binding.root.resources.displayMetrics
+        fun View.window() = IntArray(2).also(::getLocationInWindow)
+        val origin = binding.root.window()
+        val back = binding.backButton.window()
+        val title = binding.describeTitle.window()
+        val bar = binding.flowProgress.window()
+        // As the camera's bar had them: 12 dp higher, Back's arrow 16 dp, the title 14 sp and 2 dp further in, and the
+        // photo as wide as the screen right under the bar.
+        val shift = 12 * metrics.density
+        val frameTop = (bar[1] - shift).toInt() + binding.flowProgress.height
+        val frame = Rect(origin[0], frameTop, origin[0] + binding.root.width, frameTop + binding.root.width * 4 / 3)
+        val handOff = SceneHandOff(
+            back = PointF(
+                back[0] + binding.backButton.width / 2f,
+                back[1] + binding.backButton.height / 2f - shift,
+            ),
+            backIcon = 16 * metrics.density,
+            title = Bitmap.createBitmap(200, 40, Bitmap.Config.ARGB_8888),
+            titleBox = RectF(
+                title[0] + 2 * metrics.density,
+                title[1] - shift,
+                title[0] + 2 * metrics.density + 200,
+                title[1] - shift + binding.describeTitle.height,
+            ),
+            titleSize = 14 * metrics.scaledDensity,
+            progressTop = bar[1] - shift,
+            photo = frame,
+        )
+        ShadowChoreographer.setPaused(true)
+
+        val unfold = HeaderUnfold(binding, handOff)
+        val arrival = checkNotNull(
+            binding.root.showArriving(scene, binding.sceneImage, binding.flowProgress, from = unfold.photo),
+        )
+        unfold.follow(arrival)
+
+        // As the camera looked: the photo on its frame, moving at once.
+        assertEquals(0L, arrival.hold)
+        assertEquals(SceneArrival.MOVE_MS, arrival.animator.duration)
+        assertEquals(Rect(frame).apply { offset(-origin[0], -origin[1]) }, arrival.photo.bounds)
+        assertEquals(-shift, binding.backButton.translationY, 0.5f)
+        assertEquals(16f / 24f, binding.backButton.scaleX, 0.01f)
+        assertEquals(14f / 18f, binding.describeTitle.scaleX, 0.01f)
+        assertEquals(2 * metrics.density, binding.describeTitle.translationX, 0.5f)
+        assertEquals(-shift, binding.describeTitle.translationY, 0.5f)
+        assertEquals(0f, binding.describeTitle.alpha, 0f)
+        assertEquals(0f, binding.generateButton.alpha, 0f)
+        assertEquals(-shift, binding.flowProgress.translationY, 0.5f)
+
+        // Halfway through, halfway there, the header with the photo.
+        arrival.animator.currentPlayTime = SceneArrival.MOVE_MS / 2
+        assertEquals(0.5f, arrival.moved, 0.01f)
+        assertEquals(-shift / 2, binding.flowProgress.translationY, 0.5f)
+        assertEquals((16f / 24f + 1f) / 2, binding.backButton.scaleX, 0.01f)
+        assertEquals(0.5f, binding.describeTitle.alpha, 0.01f)
+
+        ShadowChoreographer.setPaused(false)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(SceneArrival.MOVE_MS + 100))
+
+        // As this screen is.
+        assertEquals(binding.placeOf(binding.sceneImage), arrival.photo.bounds)
+        for (view in listOf(binding.backButton, binding.describeTitle, binding.flowProgress)) {
+            assertEquals(0f, view.translationX, 0f)
+            assertEquals(0f, view.translationY, 0f)
+            assertEquals(1f, view.scaleX, 0f)
+            assertEquals(1f, view.alpha, 0f)
+        }
+        assertEquals(1f, binding.generateButton.alpha, 0f)
     }
 
     @Test

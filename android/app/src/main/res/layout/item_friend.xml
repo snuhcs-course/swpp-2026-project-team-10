@@ -6,7 +6,7 @@
     android:layout_height="wrap_content"
     android:layout_marginBottom="8dp"
     android:background="@drawable/bg_list_card"
-    android:foreground="?attr/selectableItemBackground"
+    android:foreground="@drawable/fg_list_card_press"
     android:gravity="center_vertical"
     android:minHeight="72dp"
     android:paddingHorizontal="14dp"

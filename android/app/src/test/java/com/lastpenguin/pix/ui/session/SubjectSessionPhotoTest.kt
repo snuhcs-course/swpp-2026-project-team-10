@@ -476,7 +476,8 @@ class SubjectSessionPhotoTest {
         assertEquals(Intent.ACTION_CHOOSER, chooser.action)
         val send = checkNotNull(IntentCompat.getParcelableExtra(chooser, Intent.EXTRA_INTENT, Intent::class.java))
         assertEquals(Intent.ACTION_SEND, send.action)
-        assertEquals("image/jpeg", send.type)
+        // The type MediaStore says, which has no row for it here.
+        assertEquals("image/*", send.type)
         assertEquals(saved("p1"), IntentCompat.getParcelableExtra(send, Intent.EXTRA_STREAM, Uri::class.java))
         assertTrue(send.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
         // The session and the viewer stay under the share sheet.

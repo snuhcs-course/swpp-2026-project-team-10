@@ -2,11 +2,13 @@
 <!-- A thumbnail's photos (FR-1.6, FR-6.14, FR-1.16; R&S 6.2, 6.5, 6.6), over Camera and over Subject view, as a gallery
      app shows them: one page each, opened at the newest, under a header with Back, no title, and Share and Delete at
      its end, and a strip of their thumbnails below, the one on screen selected. A tap on the photo hides the header and
-     the strip, and another shows them. It covers the screen inside Pix, so a session and its video go on under it; the
-     phone's gallery would show the one photo it is given and put Pix in the background. It takes every touch, so none
-     reaches the screen under it; its holder keeps it above all of the screen. Its content turns with the phone, as a
-     landscape screen while the phone is held sideways (TurningFrame), where the photo takes all of it and the header,
-     on a scrim, and the strip, raised over the pages, lie over the photo. -->
+     the strip, and another shows them. Outside a session the phone's photos open as a grid of them all first, under
+     Back and the Photos and Albums tabs, and a tap on one opens its page; the Albums tab lists the phone's albums, and a
+     tap on one opens its grid under its name. It covers the screen inside Pix, so a session and its video go on under
+     it; the phone's gallery would show the one photo it is given and put Pix in the background. It takes every touch,
+     so none reaches the screen under it; its holder keeps it above all of the screen. Its content turns with the
+     phone, as a landscape screen while the phone is held sideways (TurningFrame), where the photo takes all of it and
+     the header, on a scrim, and the strip, raised over the pages, lie over the photo. -->
 <com.lastpenguin.pix.ui.camera.TurningFrame xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -26,6 +28,7 @@
         android:layout_height="match_parent">
 
         <LinearLayout
+            android:clipToPadding="false"
             android:id="@+id/photoViewerHeader"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -44,6 +47,32 @@
                 style="@style/Widget.Pix.Header.Back"
                 android:contentDescription="@string/back" />
 
+            <!-- An album opened from the Albums tab: its name and how many photos it has. -->
+            <TextView
+                android:id="@+id/photoViewerAlbumName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:accessibilityHeading="true"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textAppearance="@style/TextAppearance.Pix.Header"
+                android:visibility="gone"
+                tools:text="@string/album_camera"
+                tools:visibility="visible" />
+
+            <TextView
+                android:id="@+id/photoViewerAlbumCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:importantForAccessibility="no"
+                android:textAppearance="@style/TextAppearance.Pix.Header"
+                android:textColor="@color/pix_text_faint"
+                android:visibility="gone"
+                tools:text="812"
+                tools:visibility="visible" />
+
             <Space
                 android:layout_width="0dp"
                 android:layout_height="0dp"
@@ -54,7 +83,7 @@
                 android:id="@+id/photoViewerShare"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                android:background="@drawable/bg_header_icon"
                 android:contentDescription="@string/share_photo"
                 android:src="@drawable/ic_share"
                 app:tint="@color/pix_text" />
@@ -65,10 +94,46 @@
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:layout_marginEnd="-12dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                android:background="@drawable/bg_header_icon"
                 android:contentDescription="@string/delete_photo"
                 android:src="@drawable/ic_delete"
                 app:tint="@color/pix_text" />
+        </LinearLayout>
+
+        <!-- The tabs outside a session (FR-1.6), in the header's middle on Back's line: all photos, at each opening, or
+             the phone's albums, each at least 96 dp wide and wider for its words at a large font. Neither over an album
+             opened from them, nor over a page. -->
+        <LinearLayout
+            android:id="@+id/photoViewerTabs"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_segment_track_small"
+            android:outlineProvider="none"
+            android:padding="2dp"
+            android:translationZ="1dp"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="@id/photoViewerHeader"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="@id/photoViewerHeader"
+            tools:visibility="visible">
+
+            <Button
+                android:id="@+id/photoViewerTabPhotos"
+                style="@style/Widget.Pix.Button.Segment.Small"
+                android:layout_width="wrap_content"
+                android:minWidth="96dp"
+                android:layout_height="wrap_content"
+                android:text="@string/gallery_photos" />
+
+            <Button
+                android:id="@+id/photoViewerTabAlbums"
+                style="@style/Widget.Pix.Button.Segment.Small"
+                android:layout_width="wrap_content"
+                android:minWidth="96dp"
+                android:layout_height="wrap_content"
+                android:text="@string/gallery_albums" />
         </LinearLayout>
 
         <androidx.viewpager2.widget.ViewPager2
@@ -102,5 +167,86 @@
             app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
             tools:listitem="@layout/item_photo_thumb"
             tools:visibility="visible" />
+
+        <!-- The phone's photos outside a session (FR-1.6): every photo Pix may read, the newest first, five a row from
+             edge to edge, each a square of it; a tap opens its page, and Back from there comes back here. While Pix
+             may not read them all, a line above them says which show and offers to change it. Over the pages, on the
+             viewer's own background, so it covers them as it fades in. -->
+        <LinearLayout
+            android:id="@+id/photoViewerAlbum"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="@color/camera_bar"
+            android:orientation="vertical"
+            android:outlineProvider="none"
+            android:translationZ="2dp"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/photoViewerHeader"
+            tools:visibility="visible">
+
+            <LinearLayout
+                android:id="@+id/photoViewerAccess"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingEnd="8dp"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <TextView
+                    android:id="@+id/photoViewerAccessText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textAppearance="@style/TextAppearance.Pix.Body.Small"
+                    android:textColor="@color/pix_text_faint"
+                    tools:text="@string/photos_access_own" />
+
+                <Button
+                    android:id="@+id/photoViewerAccessButton"
+                    style="@style/Widget.Pix.Button.Text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:textColor="@color/pix_accent"
+                    tools:text="@string/photos_access_allow" />
+            </LinearLayout>
+
+            <!-- The grid and the Albums tab's list in one place, so one can slide in over the other as it slides out. -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/photoViewerGrid"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingHorizontal="1dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="1dp"
+                    tools:listitem="@layout/item_photo_cell" />
+
+                <!-- The Albums tab: each album as its newest photo, its name, and its count, two a row, the one with the
+                     newest photo first; a tap opens its grid. The items' 6 dp pads leave 20 dp at the sides and 12 dp
+                     between them. -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/photoViewerAlbums"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingHorizontal="14dp"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="14dp"
+                    android:visibility="gone"
+                    tools:listitem="@layout/item_photo_album" />
+            </FrameLayout>
+        </LinearLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 </com.lastpenguin.pix.ui.camera.TurningFrame>

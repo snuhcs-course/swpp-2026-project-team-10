@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Dongje Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Dongje Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -106,7 +106,11 @@ private val LARGE_FONTS = listOf(1.3f, 1.5f, 2f)
  * The session photos' viewer over the whole screen,
  * on Subject view and on Camera.
  * The scene photo just taken, held while it is checked (R&S 6.3, #296): a 3:4 photo exactly over the preview, under
- * the flow's bar. The step's title, while framing and while the photo is held, on Back's line (#204, #210).
+ * the flow's bar, which starts at the image's top edge to the pixel while framing and while the photo is held. The
+ * step's bar the camera's own, in height, the image where it is, and its icons' and texts' sizes, Back's icon the
+ * menu's; Back and the title as far from the edge as every header has them, on the camera's line; the menu and the
+ * ratio at the bar's end, every part whole at font scale 1, 1.3, 1.5, and 2 (#204, #210). The camera switch's icon
+ * 2 dp larger than the bar's others.
  * A photo without a person: the panel that says so, whole above the shutter (#296).
  * The reference thumbnail hidden at the side (#237), in each corner: 16 dp of it in the preview, and its handle 48 dp
  * wide over that strip, inside the preview and above the zoom row; shown again, whole in its corner.
@@ -311,44 +315,86 @@ class CameraLayoutTest {
         return (at[1] + height / 2f) / resources.displayMetrics.density
     }
 
-    // The scene photo step (#231): its bar is the Camera screen's own, in height, icons, and where the image starts,
-    // while framing and on the review; the title on Back's line; the ratio fits beside the light, also at font scale
-    // 1.3; the panel that says what to frame is see-through, below a 4:3 image when its hint is on one line and over
-    // its last dp when the hint takes two (every situation's hint), and over a 16:9 one.
+    // The scene photo step (#231, #210): its bar the camera's own, in height and sizes, with the image where it is,
+    // while framing and on the review, and after it; Back and the title as far from the edge
+    // as a header has them; the menu and the ratio at its end at every font scale; the panel that says what to frame
+    // is see-through, below a 4:3 image when its hint is on one line and over its last dp when the hint takes two
+    // (every situation's hint), and over a 16:9 one.
     @Test
-    fun scenePhoto_theBar_isTheCamerasOwn_whileFramingAndReviewing() {
+    fun scenePhoto_theBar_isTheCamerasOwn_inHeightAndSizes_whileFramingAndReviewing_andAfter() {
         val screen = camera()
         val bar = screen.controls.topBar.box()
         val image = screen.controls.previewContainer.box().top
-        val icon = (screen.controls.cameraMenuButton as MaterialButton).iconSize
         val generation = screen.activity.viewModel<GenerationViewModel>()
+
+        val menu = screen.controls.cameraMenuButton as MaterialButton
+        val density = menu.resources.displayMetrics.density
+        val icon = menu.iconSize / density
+        val ratio = screen.controls.aspectButton.textSize / menu.resources.displayMetrics.scaledDensity
 
         generation.beginScene()
         idle()
+        // The camera's own sizes: the menu's icon, and the ratio's label.
+        assertEquals("framing", icon, menu.iconSize / density, 0.5f)
+        assertEquals(
+            "framing",
+            ratio,
+            screen.controls.aspectButton.textSize / menu.resources.displayMetrics.scaledDensity,
+            0.5f,
+        )
+        // The camera's own height, so the image stays where it is; the next step's header is taller (#210).
         assertEquals("framing", bar, screen.controls.topBar.box())
         assertEquals("framing", image, screen.controls.previewContainer.box().top)
-        assertEquals(icon, (screen.controls.sceneBackButton as MaterialButton).iconSize)
+        // The flow's bar starts where the image does, to the pixel: no strip of the image above it.
+        assertEquals("framing", screen.controls.previewContainer.topPx(), screen.controls.sceneProgress.topPx())
 
         (screen.modules.camera as FakeCameraController).frame = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
         screen.modules.persons.gate = CompletableDeferred()
         generation.takeScene()
         idle()
         assertEquals("the photo held", bar, screen.controls.topBar.box())
+        assertEquals("the photo held", screen.controls.previewContainer.topPx(), screen.controls.sceneProgress.topPx())
+
+        // Back to the camera: its own bar, its icons and the ratio at their sizes, and the image where it was.
+        generation.cancel()
+        idle()
+        assertEquals("after", bar, screen.controls.topBar.box())
+        assertEquals("after", image, screen.controls.previewContainer.box().top)
+        assertEquals("after", icon, menu.iconSize / density, 0.5f)
+        assertEquals(
+            "after",
+            ratio,
+            screen.controls.aspectButton.textSize / menu.resources.displayMetrics.scaledDensity,
+            0.5f,
+        )
     }
 
+    /** Where [this] starts on the screen, its translation included, in px. */
+    private fun View.topPx(): Int = IntArray(2).also(::getLocationInWindow)[1]
+
     @Test
-    fun scenePhoto_theTitle_isOnBacksLine_whileFramingAndWhileThePhotoIsHeld() {
+    fun scenePhoto_back_startsWhereAScreensHeaderHasIt_withTheTitleAfterIt_onTheCamerasLine() {
         val screen = camera()
         val generation = screen.activity.viewModel<GenerationViewModel>()
         generation.beginScene()
         idle()
         val back = screen.controls.sceneBackButton as MaterialButton
         val density = back.resources.displayMetrics.density
-        // Back draws its pill between its insets, centered on the bar above the 4 dp that lie over the image.
+        // Back 8 dp from the edge, where every screen's header has it (FlowProgressViewTest), and the title 4 dp after
+        // it; Back one of the camera bar's buttons, its icon the menu's size, drawing its pill between its insets on the
+        // camera's line, above the 4 dp that lie over the image.
         val backMiddle =
             (back.box().top + back.insetTop / density + back.box().bottom - back.insetBottom / density) / 2f
         assertEquals(24f, backMiddle, 1f)
+        val menu = screen.controls.cameraMenuButton as MaterialButton
+        assertEquals(menu.iconSize, back.iconSize)
+        assertEquals(8, back.box().left)
         assertEquals("framing", backMiddle, screen.controls.sceneTitle.middle(), 1f)
+        assertEquals(back.box().right + 4, screen.controls.sceneTitle.box().left)
+        // The camera bar's 14 sp, smaller only where its words would not fit before the menu and the ratio.
+        val title = screen.controls.sceneTitle
+        assertEquals(14f, title.autoSizeMaxTextSize / back.resources.displayMetrics.scaledDensity, 0.5f)
+        assertEquals(14f, title.textSize / back.resources.displayMetrics.scaledDensity, 0.5f)
 
         (screen.modules.camera as FakeCameraController).frame = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
         screen.modules.persons.gate = CompletableDeferred()
@@ -358,7 +404,7 @@ class CameraLayoutTest {
     }
 
     @Test
-    fun scenePhoto_theBarFits_withTheLightTheRatioAndTheTitle_alsoAtLargeFonts() {
+    fun scenePhoto_theBarFits_backTheTitleTheMenuAndTheRatio_theLastTwoAtItsEnd_alsoAtLargeFonts() {
         for (scale in listOf(1f) + LARGE_FONTS) {
             val screen = camera(fontScale = scale)
             screen.activity.viewModel<GenerationViewModel>().beginScene()
@@ -366,10 +412,12 @@ class CameraLayoutTest {
             val bar = screen.controls.topBar.box()
             val parts = listOf(
                 screen.controls.sceneBackButton,
-                screen.controls.flashButton,
-                screen.controls.aspectButton,
                 screen.controls.sceneTitle,
+                screen.controls.cameraMenuButton,
+                screen.controls.aspectButton,
             )
+            // The menu and the ratio at the bar's end, inside its 20 dp, where the next steps' action ends.
+            assertEquals("$scale", bar.right - 20, screen.controls.aspectButton.box().right)
             for (part in parts) {
                 assertTrue(
                     "$scale: ${part.box()} shown in $bar",
@@ -404,13 +452,7 @@ class CameraLayoutTest {
             // A hint on one line leaves the image whole; a longer one, in English, covers its last dp.
             assertTrue(
                 "$situation: ${panel.box()} over $image",
-                over <= if (hint ==
-                    1
-                ) {
-                    0
-                } else {
-                    SCENE_PANEL_OVER_IMAGE_DP
-                },
+                over <= if (hint == 1) 0 else SCENE_PANEL_OVER_IMAGE_DP,
             )
             assertTrue("$situation: above the shutter", panel.box().bottom <= screen.controls.shutterButton.box().top)
         }
@@ -751,6 +793,15 @@ class CameraLayoutTest {
         screen.assertTopBarFits("a session")
         screen.flashAndTimerOn()
         screen.assertTopBarFits("the flash and the timer on, in a session")
+    }
+
+    // The camera switch draws its icon 2 dp larger than the bar's other icons, whose 16 dp its fine lines read small at.
+    @Test
+    fun theCameraSwitch_drawsItsIconALittleLargerThanTheBarsOthers() {
+        val screen = camera()
+        val density = screen.controls.root.resources.displayMetrics.density
+        assertEquals(18f, (screen.controls.switchCameraButton as MaterialButton).iconSize / density, 0.5f)
+        assertEquals(16f, (screen.controls.cameraMenuButton as MaterialButton).iconSize / density, 0.5f)
     }
 
     @Test

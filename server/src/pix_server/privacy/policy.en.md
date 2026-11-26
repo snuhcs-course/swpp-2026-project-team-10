@@ -2,7 +2,7 @@
 
 The Last Penguin team ("the team") runs the Pix app and handles its users' personal information as described below. This is a translation of the Korean policy; if the two differ, the Korean text applies.
 
-- Effective: November 21, 2026
+- Effective: November 26, 2026
 - Contact: csmking7@gmail.com
 
 ## 1. Personal information we handle, and why
@@ -24,6 +24,7 @@ Before an account is made, the sign-up screen tells you what is collected, why, 
 ## 2. What the server does not keep
 
 - Reference photos and saved guides stay on your phone.
+- With the photo permission, Pix reads the photos on your phone only to show them in its gallery, and sends none of them anywhere by reading them.
 - The live view and the photos taken while sharing the camera go directly between the two phones, encrypted. Without a direct path, they pass through a relay, which cannot read them. The Pix server neither receives nor records them.
 - A photo taken while sharing the camera is also saved to the Pix album on the other phone. A small copy of the guide's reference photo (at most 512 pixels on its long side) goes to the other phone as a preview, and is not saved.
 - Scene photos and pose descriptions are not kept on the Pix server after they are sent to the AI services.
@@ -65,7 +66,7 @@ Pix uses the services below, and personal information is transferred abroad in d
 - **Delete your account:** in the app's Settings › Pix account, "Delete account" deletes it at once, after asking. Other phones signed in to the account are signed out. Guides and photos saved on your phone stay.
 - **Withdraw the AI pose agreement, turn off usage data:** in the app's Settings › Privacy.
 - **See or correct your personal information:** email the contact below. We act on a request without delay.
-- **Camera and notification permissions:** turn them off at any time in your phone's settings.
+- **Camera, photo, and notification permissions:** turn them off at any time in your phone's settings. Without the photo permission, Pix's gallery shows only the photos Pix saved.
 
 ## 6. How we keep it safe
 

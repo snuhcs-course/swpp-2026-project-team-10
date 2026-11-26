@@ -1,14 +1,17 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
 import android.animation.ValueAnimator
+import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.graphics.PointF
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.RenderEffect
 import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
@@ -25,6 +28,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.addCallback
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.ColorRes
 import androidx.annotation.DrawableRes
@@ -34,6 +38,7 @@ import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.camera.view.PreviewView
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.animation.doOnEnd
 import androidx.core.content.ContextCompat
 import androidx.core.view.AccessibilityDelegateCompat
@@ -41,7 +46,9 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
 import androidx.core.view.children
+import androidx.core.view.doOnLayout
 import androidx.core.view.doOnPreDraw
+import androidx.core.view.drawToBitmap
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
@@ -62,7 +69,9 @@ import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.PhotoAccess
 import com.lastpenguin.pix.camera.frameAspect
+import com.lastpenguin.pix.camera.photoPermissions
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.generation.TipState
@@ -70,6 +79,7 @@ import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.settings.TutorialScreen
+import com.lastpenguin.pix.ui.FlowProgressView
 import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.NoticeAction
 import com.lastpenguin.pix.ui.NoticeAnchor
@@ -78,6 +88,7 @@ import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.fadeTo
 import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
+import com.lastpenguin.pix.ui.generation.SceneHandOff
 import com.lastpenguin.pix.ui.generation.framingHint
 import com.lastpenguin.pix.ui.reveal
 import com.lastpenguin.pix.ui.session.RemoteFocus
@@ -210,6 +221,10 @@ class CameraFragment :
     @VisibleForTesting
     internal var photoOf: (Uri) -> Bitmap? = { uri -> requireContext().photoToView(uri) }
 
+    // A square of a photo in the viewer's grid, the px given on each side, the same way.
+    @VisibleForTesting
+    internal var cellOf: (Uri, Int) -> Bitmap? = { uri, px -> requireContext().photoCell(uri, px) }
+
     // Where the preview is, and how much of it the top bar and the controls cover (previewArea).
     private var previewArea = PreviewArea(0f, 0f, 0f)
 
@@ -218,6 +233,16 @@ class CameraFragment :
             render(viewModel.uiState.value)
             if (granted) bindCamera()
         }
+    }
+
+    // The phone's photos (FR-1.6), asked from the thumbnail and the grid; whatever the answer, they are read again.
+    private val photoPermission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        viewModel.photoAccessAnswered()
+    }
+
+    // Android's own question before another app's photo is deleted (FR-1.16).
+    private val deleteQuestion = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
+        viewModel.deleteAnswered(it.resultCode == Activity.RESULT_OK)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -281,8 +306,6 @@ class CameraFragment :
         focusBrightness = FocusBrightness(controls.focusRing, controls.exposureBar, viewLifecycleOwner.lifecycleScope) {
             viewModel.setBrightnessOpen(false)
         }
-        // The flash button shows only while the scene photo is taken, and turns the phone's light on and off (FR-4.1).
-        controls.flashButton.setOnClickListener { generationViewModel.toggleLight() }
         setupMenu(controls)
         // The bar's texts keep their line beside the bar's icons at every font size (#298), and the ratio's pill the
         // icons' height (#272).
@@ -309,7 +332,6 @@ class CameraFragment :
         turningIcons = TurningIcons(
             controls = listOf(
                 controls.sceneBackButton,
-                controls.flashButton,
                 controls.cameraMenuButton,
                 controls.aspectButton,
                 controls.switchCameraButton,
@@ -335,12 +357,7 @@ class CameraFragment :
             ),
         )
         controls.cameraActionButton.setOnClickListener {
-            if (hasCameraPermission()) {
-                bindCamera()
-            } else {
-                val uri = Uri.fromParts("package", requireContext().packageName, null)
-                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, uri))
-            }
+            if (hasCameraPermission()) bindCamera() else openAppSettings()
         }
         controls.requestPermissionButton.setOnClickListener {
             permissionRequested = true
@@ -356,10 +373,18 @@ class CameraFragment :
         controls.shutterButton.setOnClickListener {
             // While the scene photo for poses is framed, the shutter takes that photo and saves nothing.
             if (generationViewModel.uiState.value.phase == GenerationUiState.Phase.FRAMING) {
+                // While the scene photo's frame is being taken, after its countdown, the shutter waits: another tap
+                // would start a second countdown over the photo's check.
+                if (generationViewModel.uiState.value.shooting) return@setOnClickListener
                 // The ratios close, as at the camera's own shutter: a shutter that no touch came with, as with
-                // TalkBack, would leave them open for Back from the review (#231).
+                // TalkBack, would leave them open for Back from the review (#231). The timer counts down for the scene
+                // photo too (FR-1.17), which is taken only if the scene is still framed at its end.
                 viewModel.setAspectsOpen(false)
-                generationViewModel.takeScene()
+                viewModel.onSceneShutter {
+                    if (generationViewModel.uiState.value.phase == GenerationUiState.Phase.FRAMING) {
+                        generationViewModel.takeScene()
+                    }
+                }
             } else if (viewModel.onShutter()) {
                 // The preview blinks as the photo is taken (FR-1.5).
                 blinkPreview(controls.previewScrim)
@@ -375,6 +400,13 @@ class CameraFragment :
                 thumbnail = { thumbnailOf(it) },
                 onBack = viewModel::closePhotos,
                 onDelete = viewModel::deletePhoto,
+                onPick = viewModel::pickPhoto,
+                asksFirst = viewModel::asksBeforeDeleting,
+                onAccess = ::changePhotoAccess,
+                cell = { uri, px -> cellOf(uri, px) },
+                onTab = viewModel::chooseGalleryTab,
+                onOpenAlbum = viewModel::openAlbum,
+                opensFrom = controls.galleryButton,
             )
         // After the other screens' Backs, so it comes first: the viewer is over all of them.
         photosBack = requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, enabled = false) {
@@ -432,6 +464,11 @@ class CameraFragment :
                 launch {
                     viewModel.photoNotDeleted.collect {
                         showNotice(R.string.photo_not_deleted)
+                    }
+                }
+                launch {
+                    viewModel.deleteQuestions.collect { question ->
+                        deleteQuestion.launch(IntentSenderRequest.Builder(question).build())
                     }
                 }
                 // The guide in the settings' color and thickness (FR-3.10).
@@ -635,16 +672,25 @@ class CameraFragment :
                     }
                 }
                 launch {
-                    // A new photo, taken here or received, grows into the thumbnail (FR-1.6).
-                    showPhotoThumbnails(viewModel.uiState.map { it.lastPhoto }, controls.galleryThumbnail) {
-                        thumbnailOf(it)
-                    }
+                    // A new photo, taken here or received, grows into the thumbnail (FR-1.6); one edited in place is read
+                    // again.
+                    showPhotoThumbnails(
+                        viewModel.uiState.map { it.lastPhoto },
+                        controls.galleryThumbnail,
+                        viewModel.uiState.map { it.photoEdits },
+                    ) { thumbnailOf(it) }
                 }
             }
         }
         render(viewModel.uiState.value)
         // A bar left up when the screen was made again still goes after a few seconds.
         if (viewModel.uiState.value.brightnessOpen) focusBrightness?.hold()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // The photo permission may have changed in the phone's settings while Pix was away (FR-1.6).
+        viewModel.readPhotosAgain()
     }
 
     override fun onResume() {
@@ -682,6 +728,7 @@ class CameraFragment :
         dismissUndo()
         photoViewer?.stop()
         photoViewer = null
+        photoEditsShown = null
         photosBack = null
         pinchZoom?.finishInteraction()
         pinchZoom = null
@@ -965,6 +1012,40 @@ class CameraFragment :
         overlay.setLevel(null)
     }
 
+    /**
+     * The bar during the scene photo (#210): the camera's own, its height and its sizes, so the image stays where it is,
+     * with Back and the title as far from the edge as the steps after it have them, and the menu and the ratio at its
+     * end, where their action is. Otherwise the camera's own bar, the menu at its start.
+     */
+    private fun placeSceneBar(controls: FragmentCameraBinding, active: Boolean) {
+        val bar = controls.topBar
+        val plain = plainBar ?: intArrayOf(bar.paddingStart, bar.paddingEnd).also { plainBar = it }
+        val edges = if (active) {
+            intArrayOf(
+                resources.getDimensionPixelSize(R.dimen.scene_bar_start),
+                resources.getDimensionPixelSize(R.dimen.scene_bar_end),
+            )
+        } else {
+            plain
+        }
+        if (bar.paddingStart != edges[0] || bar.paddingEnd != edges[1]) {
+            bar.setPaddingRelative(edges[0], bar.paddingTop, edges[1], bar.paddingBottom)
+        }
+        val params = controls.cameraSettings.layoutParams as ConstraintLayout.LayoutParams
+        val start = if (active) ConstraintLayout.LayoutParams.UNSET else R.id.sceneBackButton
+        val end = if (active) R.id.topBarActions else ConstraintLayout.LayoutParams.UNSET
+        if (params.startToEnd == start && params.endToStart == end) return
+        params.startToEnd = start
+        params.endToStart = end
+        controls.cameraSettings.layoutParams = params
+    }
+
+    /** The photos' edits (`CameraUiState.photoEdits`) at the last render; null before the first. */
+    private var photoEditsShown: Int? = null
+
+    /** The top bar's own start and end padding, from its layout, before the scene photo's. */
+    private var plainBar: IntArray? = null
+
     /** Back of the scene photo step (R&S 6.3, FR-4.1, #199); the step has no other button since #296. */
     private fun setupScenePhoto(controls: FragmentCameraBinding) {
         controls.sceneBackButton.setOnClickListener { sceneStepBack() }
@@ -975,8 +1056,12 @@ class CameraFragment :
         }
     }
 
-    /** Back during the scene photo: while the photo is checked, the live camera again; from the live camera, the camera. */
+    /**
+     * Back during the scene photo: while the photo is checked, the live camera again; from the live camera, the camera.
+     * It waits while the timer counts down, as every way off the camera does (FR-1.17).
+     */
     private fun sceneStepBack() {
+        if (viewModel.uiState.value.countdown != null) return
         if (generationViewModel.uiState.value.phase == GenerationUiState.Phase.CHECKING) {
             generationViewModel.retakeScene()
         } else {
@@ -991,9 +1076,57 @@ class CameraFragment :
     private fun openGeneratePoses(scene: GenerationUiState) {
         if (scene.phase != GenerationUiState.Phase.DESCRIBING || !scene.sceneArriving) return
         val navController = findNavController()
-        if (navController.currentDestination?.id == R.id.cameraFragment) {
+        if (navController.currentDestination?.id != R.id.cameraFragment) return
+        val controls = binding ?: return
+        // After the layout this state asks for, in the same frame, so what is handed over is what the screen shows.
+        controls.root.doOnLayout {
+            if (binding !== controls || navController.currentDestination?.id != R.id.cameraFragment) return@doOnLayout
+            SceneHandOff.pending = handOffOf(controls)
             navController.navigate(R.id.action_camera_to_describePose)
         }
+    }
+
+    /**
+     * How the step looks now, for Generate poses to start as this and unfold from it (#210): Back's arrow, the title,
+     * the flow's bar, and the held photo's frame, in the window's pixels. Null while any of them is not shown.
+     */
+    private fun handOffOf(controls: FragmentCameraBinding): SceneHandOff? {
+        val back = controls.sceneBackButton as MaterialButton
+        val title = controls.sceneTitle
+        val still = controls.sceneStill
+        val image = still.drawable
+        if (!back.isShown || !title.isShown || !still.isShown || image == null || title.width == 0) return null
+        fun View.window() = IntArray(2).also(::getLocationInWindow)
+        val backAt = back.window()
+        val titleAt = title.window()
+        val stillAt = still.window()
+        // The photo's frame: the image as the view fits it, where the view is.
+        val frame = RectF(0f, 0f, image.intrinsicWidth.toFloat(), image.intrinsicHeight.toFloat())
+        still.imageMatrix.mapRect(frame)
+        frame.offset((stillAt[0] + still.paddingLeft).toFloat(), (stillAt[1] + still.paddingTop).toFloat())
+        return SceneHandOff(
+            // The arrow is in the middle of the pill, which is drawn between the button's insets.
+            back = PointF(
+                backAt[0] + back.width / 2f,
+                backAt[1] + (back.insetTop + back.height - back.insetBottom) / 2f,
+            ),
+            backIcon = back.iconSize.toFloat(),
+            title = title.drawToBitmap(),
+            titleBox = RectF(
+                titleAt[0].toFloat(),
+                titleAt[1].toFloat(),
+                (titleAt[0] + title.width).toFloat(),
+                (titleAt[1] + title.height).toFloat(),
+            ),
+            titleSize = title.textSize,
+            progressTop = controls.sceneProgress.window()[1].toFloat(),
+            photo = Rect(
+                frame.left.roundToInt(),
+                frame.top.roundToInt(),
+                frame.right.roundToInt(),
+                frame.bottom.roundToInt(),
+            ),
+        )
     }
 
     private fun render(state: CameraUiState) {
@@ -1095,7 +1228,7 @@ class CameraFragment :
         // In a session End session takes Shoot together's place, and waits as well: ended during the count, the session
         // would be gone before the photo it was counting for.
         controls.endSessionButton.isEnabled = !counting
-        controls.galleryButton.isEnabled = state.lastPhoto != null && !counting
+        controls.galleryButton.isEnabled = state.opensPhotos && !counting
         val dim = if (counting) COUNTDOWN_DIM else 1f
         for (control in listOf(
             controls.cameraSettings,
@@ -1107,7 +1240,17 @@ class CameraFragment :
         )) {
             control.alpha = dim
         }
-        photoViewer?.render(state.viewerPhotos, state.photosOpen)
+        // A photo changed in place since the last render: the viewer's pictures kept by URI are stale.
+        if (photoEditsShown != null && photoEditsShown != state.photoEdits) photoViewer?.forgetPictures()
+        photoEditsShown = state.photoEdits
+        photoViewer?.render(
+            state.viewerPhotos,
+            state.photosOpen,
+            grid = state.photosGrid,
+            at = state.pickedPhoto,
+            access = state.photoAccess,
+            gallery = Gallery(state.galleryTab, state.photoAlbums, state.album).takeIf { state.sessionPhotos == null },
+        )
         photosBack?.isEnabled = state.photosOpen
         // On any phone with a front camera, in a session too; not while the scene photo for poses is framed.
         controls.switchCameraButton.isVisible = state.canSwitchCamera
@@ -1308,19 +1451,16 @@ class CameraFragment :
         // scene is framed, the flash button keeps the phone's light on for it instead (FR-4.1). It says on only once
         // the camera has the light on, so it never claims a light that is not. The ratio is the frame's, so it is
         // chosen here as on Camera (#231), until the photo is taken.
+        placeSceneBar(controls, active)
         if (active) {
-            val light = !held && camera.hasFlash
             controls.cameraSettings.isVisible = !held
             if (held) {
                 controls.aspectPanel.reveal(false)
                 controls.aspectButton.isActivated = false
                 aspectsBack?.isEnabled = false
             }
-            controls.flashButton.isVisible = light
-            controls.flashButton.isEnabled = ready
-            controls.flashButton.setIconResource(if (camera.torch) R.drawable.ic_flash_on else R.drawable.ic_flash_off)
-            controls.flashButton.contentDescription =
-                getString(if (camera.torch) R.string.scene_light_on else R.string.scene_light_off)
+            controls.sceneBackButton.isEnabled = camera.countdown == null
+            controls.sceneBackButton.alpha = if (camera.countdown == null) 1f else COUNTDOWN_DIM
             focusBrightness?.show(false)
         }
         if (active) {
@@ -1338,11 +1478,17 @@ class CameraFragment :
         sceneShown = active
         controls.sceneProgress.isVisible = active
         when {
-            before == null -> controls.sceneProgress.step = SCENE_STEP
+            // The screen made anew, as Back from the next step brings it: the bar empties from where that step had it.
+            before == null -> if (active) {
+                controls.sceneProgress.arrive(SCENE_STEP)
+            } else {
+                controls.sceneProgress.step =
+                    SCENE_STEP
+            }
 
             changed && active -> {
-                controls.sceneProgress.step = 0
-                controls.sceneProgress.moveTo(SCENE_STEP)
+                FlowProgressView.shownStep = 0
+                controls.sceneProgress.arrive(SCENE_STEP)
             }
 
             else -> controls.sceneProgress.moveTo(SCENE_STEP)
@@ -1483,8 +1629,6 @@ class CameraFragment :
     private fun renderCameraSettings(controls: FragmentCameraBinding, state: CameraUiState, ready: Boolean) {
         controls.cameraSettings.isVisible = true
         controls.aspectButton.isVisible = true
-        // The light shows only while the scene photo is taken (renderScenePhoto); the flash is in the menu.
-        controls.flashButton.isVisible = false
         renderMenu(controls, state)
         val aspect = aspectLabel(state.aspect)
         controls.aspectButton.text = aspect
@@ -1528,7 +1672,11 @@ class CameraFragment :
         controls.cameraMenuButton.setOnClickListener(toggle)
         controls.flashIndicator.setOnClickListener(toggle)
         controls.timerIndicator.setOnClickListener(toggle)
-        controls.menuFlash.setOnClickListener { viewModel.onFlashTap() }
+        // During the scene photo, the phone's light, which a frame of the preview takes, where a photo's flash would not
+        // reach it (FR-4.1).
+        controls.menuFlash.setOnClickListener {
+            if (isScenePhotoActive()) generationViewModel.toggleLight() else viewModel.onFlashTap()
+        }
         controls.menuTimer.setOnClickListener { viewModel.onTimerTap() }
         controls.menuGrid.setOnClickListener { settingsViewModel.toggleShowGrid() }
         controls.menuLevel.setOnClickListener { settingsViewModel.toggleShowLevel() }
@@ -1543,30 +1691,40 @@ class CameraFragment :
 
     /**
      * The camera menu's button, the flash and the timer beside it while either is on, and the menu's items, each in the
-     * accent while what it sets is on (FR-1.17). The scene photo has none of it: its light is a button of its own.
+     * accent while what it sets is on (FR-1.17). During the scene photo the flash is the phone's light, on only once the
+     * camera has it on, so it never claims a light that is not (FR-4.1), and Settings, which would leave the step, is
+     * not there; while the photo is checked, none of it is.
      */
     private fun renderMenu(controls: FragmentCameraBinding, state: CameraUiState) {
         val scene = isScenePhotoActive()
+        val held = scene && isScenePhotoHeld(generationViewModel.uiState.value)
         val counting = state.countdown != null
         val ready = hasCameraPermission() && state.cameraStatus == CameraStatus.READY
-        val flashOn = state.hasFlash && state.flash != FlashMode.OFF
+        val flashOn = state.hasFlash && if (scene) state.torch else state.flash != FlashMode.OFF
         val timerOn = state.timer != ShutterTimer.OFF
-        controls.cameraMenuButton.isVisible = !scene
         controls.cameraMenuButton.isActivated = state.menuOpen
         controls.cameraMenuButton.isEnabled = !counting
-        controls.flashIndicator.isVisible = !scene && flashOn
-        controls.timerIndicator.isVisible = !scene && timerOn
-        setImageOnce(controls.flashIndicator, flashIcon(state.flash))
+        controls.flashIndicator.isVisible = flashOn
+        controls.timerIndicator.isVisible = timerOn
+        setImageOnce(controls.flashIndicator, if (scene) R.drawable.ic_flash_on else flashIcon(state.flash))
         setImageOnce(controls.timerIndicator, timerIcon(state.timer))
-        val open = state.menuOpen && !scene
+        val open = state.menuOpen && !held
         controls.cameraMenu.reveal(open)
         menuBack?.isEnabled = open
         // The flash only on a camera with one (FR-1.12).
         controls.menuFlash.isVisible = state.hasFlash
         controls.menuFlash.isEnabled = ready
         controls.menuFlash.isActivated = flashOn
-        setImageOnce(controls.menuFlashIcon, menuFlashIcon(state.flash))
-        controls.menuFlash.contentDescription = getString(flashDescription(state.flash))
+        if (scene) {
+            setImageOnce(controls.menuFlashIcon, if (state.torch) R.drawable.ic_flash_on else R.drawable.ic_flash_off)
+            controls.menuFlash.contentDescription =
+                getString(if (state.torch) R.string.scene_light_on else R.string.scene_light_off)
+        } else {
+            setImageOnce(controls.menuFlashIcon, menuFlashIcon(state.flash))
+            controls.menuFlash.contentDescription = getString(flashDescription(state.flash))
+        }
+        controls.menuSettings.isVisible = !scene
+        controls.menuSettingsDivider.isVisible = !scene
         controls.menuTimer.isActivated = timerOn
         setImageOnce(controls.menuTimerIcon, menuTimerIcon(state.timer))
         controls.menuTimer.contentDescription = timerText(state.timer)
@@ -2137,13 +2295,35 @@ class CameraFragment :
     }
 
     /**
-     * The thumbnail (FR-1.6): its photos over the camera, inside Pix, at the newest: the session's in a session, so the
-     * session and the subject's video go on, and Pix's album otherwise, which the phone's gallery could show only one
-     * photo of.
+     * The thumbnail (FR-1.6): its photos over the camera, inside Pix: the session's in a session, at the newest, so the
+     * session and the subject's video go on, and the phone's otherwise, as a grid of them all first, which the phone's
+     * gallery could show only one photo of. While Pix may read only its own photos, the tap asks for the others first;
+     * Android shows its question until it was refused twice, and then answers at once.
      */
     private fun onThumbnailTap() {
         viewModel.setAspectsOpen(false)
-        viewModel.openPhotos()
+        val state = viewModel.uiState.value
+        if (state.sessionPhotos == null && state.photoAccess == PhotoAccess.OWN && state.countdown == null) {
+            photoPermission.launch(photoPermissions())
+        } else {
+            viewModel.openPhotos()
+        }
+    }
+
+    /**
+     * The grid's line under its header (FR-1.6): the chosen photos are chosen again in Android's question; refused,
+     * Android asks once more, and after that only the phone's settings can allow them.
+     */
+    private fun changePhotoAccess() {
+        val ask = viewModel.uiState.value.photoAccess == PhotoAccess.CHOSEN ||
+            shouldShowRequestPermissionRationale(photoPermissions().first())
+        if (ask) photoPermission.launch(photoPermissions()) else openAppSettings()
+    }
+
+    /** Pix's page in the phone's settings, where its permissions are. */
+    private fun openAppSettings() {
+        val uri = Uri.fromParts("package", requireContext().packageName, null)
+        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, uri))
     }
 
     /** What a notice without a time of its own says, the one that shows first when several are held. */
@@ -2156,6 +2336,7 @@ class CameraFragment :
         private const val SHUTTER_DIM = 0.6f
         private const val STILL_BLUR_DP = 16f
         private const val MIN_BLUR_PX = 0.5f
+
         private const val HALF_TURN = 180f
         private const val FLIP_CAMERA_DISTANCE = 8_000f
         private const val CHIP_ICON_DP = 14f

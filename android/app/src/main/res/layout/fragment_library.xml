@@ -11,6 +11,7 @@
     android:paddingTop="8dp">
 
     <LinearLayout
+        android:clipToPadding="false"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
@@ -51,7 +52,7 @@
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:layout_marginEnd="-12dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/bg_header_icon"
             android:contentDescription="@string/library_more"
             android:src="@drawable/ic_more_vert"
             app:tint="@color/pix_text" />

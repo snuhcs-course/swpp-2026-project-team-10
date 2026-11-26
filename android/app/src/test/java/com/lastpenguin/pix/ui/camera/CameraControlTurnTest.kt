@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -93,7 +93,6 @@ class CameraControlTurnTest {
     private fun FragmentCameraBinding.turningButtons(): List<View> = listOf(
         zoomReadout,
         sceneBackButton,
-        flashButton,
         cameraMenuButton,
         aspectButton,
         switchCameraButton,
@@ -230,16 +229,16 @@ class CameraControlTurnTest {
     }
 
     @Test
-    fun theScenePhotoLightsNextIcon_keepsTheTurn() {
+    fun theScenePhotosLight_fromTheMenu_keepsTheTurn() {
         val screen = camera(turn = 90)
         fragment.requireActivity().viewModel<GenerationViewModel>().beginScene()
         idle()
-        val before = shadowOf(screen.flashButton.plainIcon).createdFromResId
 
-        screen.flashButton.performClick()
+        screen.menuFlash.performClick()
         idle()
 
-        assertNotEquals(before, shadowOf(screen.flashButton.plainIcon).createdFromResId)
+        // The light's indicator beside the menu's button comes in turned as well.
+        assertTrue(screen.flashIndicator.isShown)
         screen.assertIconsAt(-90f)
     }
 }

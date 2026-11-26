@@ -99,6 +99,9 @@ class RtcSessionManager(
     private val _peerCamera = MutableStateFlow<CameraState?>(null)
     override val peerCamera: StateFlow<CameraState?> = _peerCamera.asStateFlow()
 
+    private val _peerTimerSeconds = MutableStateFlow(0)
+    override val peerTimerSeconds: StateFlow<Int> = _peerTimerSeconds.asStateFlow()
+
     private val _peerZoomHolder = MutableStateFlow<Role?>(null)
     override val peerZoomHolder: StateFlow<Role?> = _peerZoomHolder.asStateFlow()
 
@@ -255,6 +258,7 @@ class RtcSessionManager(
         socketFailures = 0
         _peerCapabilities.value = null
         _peerCamera.value = null
+        _peerTimerSeconds.value = 0
         _peerZoomHolder.value = null
         // The photographer stays Idle until the code arrives, or waits for the friend of an invitation; the subject is
         // connecting from the first moment.
@@ -907,6 +911,8 @@ class RtcSessionManager(
             is SessionMessage.CameraStateUpdate -> {
                 _peerCamera.value =
                     CameraState(message.zoom, message.exposure, message.flash, message.aspect, facing = message.facing)
+                // The timer is no value of the camera's, so it is kept beside the state, for a screen that opens late.
+                _peerTimerSeconds.value = message.timer
                 _incoming.send(message)
             }
 
@@ -921,24 +927,33 @@ class RtcSessionManager(
 
     /**
      * Realtime messages go out at once or not at all. Reliable messages wait in order until hello has gone out and
-     * the channel's buffer is below the limit (Design 2.8, Backpressure).
+     * the channel's buffer is below the limit (Design 2.8, Backpressure). With the realtime channel lost, its messages
+     * go on the reliable one and wait there like the rest, except a moment that is wrong late
+     * (`ChannelRouter.neverLate`): that one is not sent at all. The reliable channel retransmits, so even with
+     * nothing ahead of it a message can arrive long after a drop, and "at once or not at all" holds only on the
+     * channel that never retransmits.
      */
     private fun sendNow(message: SessionMessage): Boolean {
         val client = peer ?: return false
         val text = codec.encode(message)
         val routed = router.channelFor(message)
-        val channel = if (routed == Channel.REALTIME && realtimeLost) Channel.RELIABLE else routed
+        val standIn = routed == Channel.REALTIME && realtimeLost
+        val channel = if (standIn) Channel.RELIABLE else routed
         return when (channel) {
             Channel.REALTIME -> client.send(Channel.REALTIME, text)
 
             Channel.RELIABLE -> {
                 val wait = !helloSent || reliableQueue.isNotEmpty() ||
                     client.bufferedAmount(Channel.RELIABLE) >= BACKPRESSURE_BYTES
-                if (wait) {
-                    reliableQueue.addLast(text)
-                    true
-                } else {
-                    client.send(Channel.RELIABLE, text)
+                when {
+                    standIn && router.neverLate(message) -> false
+
+                    wait -> {
+                        reliableQueue.addLast(text)
+                        true
+                    }
+
+                    else -> client.send(Channel.RELIABLE, text)
                 }
             }
         }

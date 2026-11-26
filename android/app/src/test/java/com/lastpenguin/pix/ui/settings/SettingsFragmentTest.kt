@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.content.Intent
@@ -51,7 +51,8 @@ import org.robolectric.shadows.ShadowDialog
  * account signed in and signed out (Sign in; Friends until #188);
  * notifications, How to use Pix, About Pix, and the privacy policy opened; *Show the tutorial again*, which makes every screen's tips due
  * again and says so. The agreement's text right under its row's title, as the indicator's under its own (#204), with the
- * row still 56 dp tall.
+ * row still 56 dp tall, and the row and its text one tap target that lights whole, the row drawing no light of its own.
+ * Every dialog's title 18 sp, the withdrawal's short one as a long one that Android shrinks.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -118,6 +119,11 @@ class SettingsFragmentTest {
             assertTrue("${body.top - titleTextBottom} px", body.top - titleTextBottom <= 6 * density)
             assertTrue(body.top >= row.top + title.bottom - title.paddingBottom - 1)
             assertTrue(row.height >= (56 * density).toInt())
+            // One light over the row and its text, in the card's rounded shape; none of the row's own.
+            val item = binding.consentItem
+            assertEquals(R.drawable.bg_card_row, shadowOf(item.background).createdFromResId)
+            assertNull(row.background)
+            assertTrue(body.bottom <= item.height && row.parent === item && body.parent === item)
         }
     }
 
@@ -230,14 +236,17 @@ class SettingsFragmentTest {
     fun theAgreement_isWithdrawnAfterConfirming() {
         val modules = launch()
 
-        onScreen { it.consentRow.root.performClick() }
+        onScreen { it.consentItem.performClick() }
+        // A short title, at the 18 sp of every dialog's.
+        val title = latestDialog().findViewById<TextView>(androidx.appcompat.R.id.alertTitle)!!
+        assertEquals(18f, title.textSize / title.resources.displayMetrics.scaledDensity, 0.5f)
         latestDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         idle()
 
         assertFalse(modules.consent.given)
         onScreen { binding ->
             assertEquals(string(R.string.settings_consent_not_given), binding.consentRow.settingValue.text.toString())
-            assertFalse(binding.consentRow.root.isClickable)
+            assertFalse(binding.consentItem.isClickable)
         }
     }
 
@@ -248,7 +257,7 @@ class SettingsFragmentTest {
         launch(modules)
         onScreen { binding ->
             assertEquals(string(R.string.settings_consent_not_given), binding.consentRow.settingValue.text.toString())
-            assertFalse(binding.consentRow.root.isClickable)
+            assertFalse(binding.consentItem.isClickable)
         }
 
         modules.consent.gate!!.complete(Unit)
@@ -256,7 +265,7 @@ class SettingsFragmentTest {
 
         onScreen { binding ->
             assertEquals(string(R.string.settings_consent_given), binding.consentRow.settingValue.text.toString())
-            assertTrue(binding.consentRow.root.isClickable)
+            assertTrue(binding.consentItem.isClickable)
         }
     }
 
@@ -267,7 +276,7 @@ class SettingsFragmentTest {
 
         onScreen { binding ->
             assertEquals(string(R.string.settings_consent_not_given), binding.consentRow.settingValue.text.toString())
-            assertFalse(binding.consentRow.root.isClickable)
+            assertFalse(binding.consentItem.isClickable)
             assertFalse(binding.consentRow.settingChevron.isVisible)
             // 16 dp from the card's edge, where the other rows' chevrons end (ChevronTest), not the row's 8 dp.
             val value = binding.consentRow.settingValue

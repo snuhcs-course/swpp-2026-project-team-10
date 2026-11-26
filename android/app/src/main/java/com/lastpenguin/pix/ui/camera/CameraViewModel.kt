@@ -1,6 +1,7 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
+import android.content.IntentSender
 import android.net.Uri
 import android.os.SystemClock
 import androidx.camera.core.ImageCapture
@@ -15,8 +16,13 @@ import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.PhoneAlbum
 import com.lastpenguin.pix.camera.PhoneTurns
+import com.lastpenguin.pix.camera.PhotoAccess
 import com.lastpenguin.pix.camera.PhotoDeleter
+import com.lastpenguin.pix.camera.PhotoDeletion
+import com.lastpenguin.pix.camera.ShutterTimer
+import com.lastpenguin.pix.camera.ShutterTimerChoice
 import com.lastpenguin.pix.camera.baseExposureIndex
 import com.lastpenguin.pix.camera.isAtZoomStep
 import com.lastpenguin.pix.camera.nextZoomStep
@@ -31,6 +37,7 @@ import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.PhotoShare
 import com.lastpenguin.pix.session.PhotographerAction
 import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.ShutterOutcome
 import com.lastpenguin.pix.session.ZoomHold
 import com.lastpenguin.pix.telemetry.Telemetry
 import com.lastpenguin.pix.telemetry.TelemetryEvent
@@ -77,17 +84,6 @@ sealed interface ToggleLabel {
 
     /** The other phone's pinch holds the zoom, so this phone's changed nothing (FR-7.6, #236): "Jaewan is zooming". */
     data object ZoomHeld : ToggleLabel
-}
-
-/** The shutter's timer (FR-1.17): off, or the seconds from the shutter to the photo. */
-enum class ShutterTimer(val seconds: Int) {
-    OFF(0),
-    THREE(3),
-    TEN(10),
-    ;
-
-    /** The choice after this one at a tap on the menu's Timer: off, 3 s, 10 s, and off again. */
-    fun next(): ShutterTimer = entries[(ordinal + 1) % entries.size]
 }
 
 /** What a choice in the camera menu changed (FR-1.17), which the screen says in a short notice. */
@@ -227,25 +223,68 @@ data class CameraUiState(
     /** *Save guide* is writing the guide; the button waits. */
     val savingGuide: Boolean = false,
     /**
-     * The thumbnail's photo (FR-1.6): in a session, the session's newest, none until its first; otherwise the newest in
-     * Pix's album, taken here or received.
+     * The thumbnail's photo (FR-1.6): in a session, the session's newest, none until its first; otherwise the newest
+     * photo on the phone that Pix may read, or the one just taken here.
      */
     val lastPhoto: Uri? = null,
     /** The photos of the session running now, oldest first, for the viewer (FR-1.6); null outside a session. */
     val sessionPhotos: List<Uri>? = null,
-    /** The photos in Pix's album, oldest first, with one just saved here that MediaStore has not told of yet. */
-    val albumPhotos: List<Uri> = emptyList(),
+    /**
+     * The phone's photos that Pix may read, oldest first by when each was taken, with one just saved here that
+     * MediaStore has not told of yet.
+     */
+    val phonePhotos: List<Uri> = emptyList(),
+    /** How much of the phone's photos [phonePhotos] has, which the photo permission decides (FR-1.6). */
+    val photoAccess: PhotoAccess = PhotoAccess.ALL,
+    /** How many times a photo shown was changed in place (`PhonePhotos.edits`): its kept pictures are read again. */
+    val photoEdits: Int = 0,
+    /** The albums of [phonePhotos], the one with the newest photo first, for the Albums tab (FR-1.6). */
+    val photoAlbums: List<PhoneAlbum> = emptyList(),
+    /** The viewer's tab outside a session (FR-1.6): Photos at each opening. */
+    val galleryTab: GalleryTab = GalleryTab.PHOTOS,
+    /** The album opened from the Albums tab, whose photos the grid and its pages show; null otherwise (FR-1.6). */
+    val album: PhoneAlbum? = null,
     /** The viewer of [viewerPhotos] is open over the camera (FR-1.6). */
     val photosOpen: Boolean = false,
+    /**
+     * The photo picked from the grid, which the viewer pages from (FR-1.6); null while the grid shows, and in a
+     * session, whose viewer opens at the newest with no grid.
+     */
+    val pickedPhoto: Uri? = null,
     /** A short notice, such as "Joonhyung set zoom to 2×" (FR-7.4). */
     val notice: String? = null,
     /** The pose tip of the guide on the camera (FR-4.10), or null when it has none. */
     val tip: TipBanner? = null,
 ) {
-    /** What the viewer pages through: the session's photos in a session, Pix's album otherwise. */
+    /** What the viewer pages through: the session's photos in a session, the phone's otherwise, or its [album]'s. */
     val viewerPhotos: List<Uri>
-        get() = sessionPhotos ?: albumPhotos
+        get() = sessionPhotos ?: album?.photos ?: phonePhotos
+
+    /** Outside a session the viewer's tabs and an album's grid show until a photo is picked (FR-1.6). */
+    private val gallery: Boolean
+        get() = photosOpen && sessionPhotos == null && pickedPhoto == null
+
+    /**
+     * A grid of photos shows, of all of them on the Photos tab or of an album opened from the Albums tab, until a
+     * photo is picked from it (FR-1.6).
+     */
+    val photosGrid: Boolean
+        get() = gallery && (galleryTab == GalleryTab.PHOTOS || album != null)
+
+    /** The Albums tab shows the phone's albums, none of them opened (FR-1.6). */
+    val albumsShown: Boolean
+        get() = gallery && galleryTab == GalleryTab.ALBUMS && album == null
+
+    /**
+     * Whether the thumbnail opens the viewer: with a photo in it, and outside a session also while Pix may not read
+     * every photo, so a tap can ask for them and the grid can say what it shows (FR-1.6).
+     */
+    val opensPhotos: Boolean
+        get() = viewerPhotos.isNotEmpty() || (sessionPhotos == null && photoAccess != PhotoAccess.ALL)
 }
+
+/** The photo viewer's tabs outside a session (FR-1.6): every photo, or the phone's albums. */
+enum class GalleryTab { PHOTOS, ALBUMS }
 
 /**
  * Camera screen (Design 2.2, Figure 6).
@@ -260,12 +299,20 @@ class CameraViewModel(
     private val tips: StateFlow<GuideTip?> = MutableStateFlow(null),
     /** Each saved photo, which in a session goes to the subject's phone too (FR-6.14). */
     private val photos: PhotoShare = PhotoShare.None,
-    /** The photos in Pix's album (`PixAlbumPhotos`, FR-1.6), oldest first, taken here or received in a session. */
-    private val albumPhotos: StateFlow<List<Uri>> = MutableStateFlow(emptyList()),
+    /** The phone's photos that Pix may read (`PhonePhotos`, FR-1.6), oldest first, taken here or anywhere else. */
+    private val phonePhotos: StateFlow<List<Uri>> = MutableStateFlow(emptyList()),
+    /** How much of the phone's photos [phonePhotos] has (`PhonePhotos.access`). */
+    private val photoAccess: StateFlow<PhotoAccess> = MutableStateFlow(PhotoAccess.ALL),
+    /** The albums of [phonePhotos] (`PhonePhotos.albums`). */
+    private val photoAlbums: StateFlow<List<PhoneAlbum>> = MutableStateFlow(emptyList()),
+    /** Reads the permission and the phone's photos again (`PhonePhotos.refresh`). */
+    private val rereadPhotos: suspend () -> Unit = {},
+    /** How many times a photo of [phonePhotos] was changed in place (`PhonePhotos.edits`). */
+    private val photoEdits: Flow<Int> = flowOf(0),
     /** The photos of the session running now (`PhotoSyncer.sessionPhotos`, FR-1.6); null outside a session. */
     private val sessionPhotos: Flow<List<Uri>?> = flowOf(null),
-    /** Deletes a photo from the viewer, from the album and the session's photos (`AppContainer.photoDeleter`). */
-    private val deleter: PhotoDeleter = PhotoDeleter { false },
+    /** Deletes a photo from the viewer, from the phone and the session's photos (`AppContainer.photoDeleter`). */
+    private val deleter: PhotoDeleter = PhotoDeleter { PhotoDeletion.Failed },
     private val clock: () -> Long = System::currentTimeMillis,
     /** For durations, the telemetry's times (Design 2.8): never set back, unlike [clock], which dates the photos. */
     private val elapsed: () -> Long = SystemClock::elapsedRealtime,
@@ -273,6 +320,8 @@ class CameraViewModel(
     private val phoneTurns: PhoneTurns = PhoneTurns.Fixed(),
     /** Who holds the zoom in a session (`RemoteControlHandler.zoomHold`, FR-7.6); free outside one. */
     private val zoomHold: ZoomHold = ZoomHold(),
+    /** The timer as chosen, here or on the subject's phone (`RemoteControlHandler.timerChoice`, FR-1.17, #318). */
+    private val timerChoice: ShutterTimerChoice = ShutterTimerChoice(),
     /** Tells the subject's phone where a tap focused (`RemoteControlHandler.focusedHere`, FR-7.7). */
     private val onFocused: (x: Float, y: Float) -> Unit = { _, _ -> },
     /** Tells the subject's phone what was done on this camera (`RemoteControlHandler.didHere`, FR-7.4, #292). */
@@ -319,6 +368,17 @@ class CameraViewModel(
     /** One per photo the viewer could not delete, for its notice; kept until the screen reads it. */
     val photoNotDeleted: Flow<Unit> = _photoNotDeleted.receiveAsFlow()
 
+    private val _deleteQuestions = Channel<IntentSender>(Channel.BUFFERED)
+
+    /**
+     * Android's question for each photo of another app that the viewer's Delete asked for (FR-1.16): the screen shows
+     * it, and its answer goes to [deleteAnswered].
+     */
+    val deleteQuestions: Flow<IntentSender> = _deleteQuestions.receiveAsFlow()
+
+    /** The photo whose Android question is open, and whether its yes deletes it; null while none is. */
+    private var asking: Pair<Uri, Boolean>? = null
+
     private val _menuNotices = Channel<MenuNotice>(Channel.CONFLATED)
 
     /** One per choice in the camera menu, the newest replacing one not yet shown (FR-1.17). */
@@ -340,15 +400,18 @@ class CameraViewModel(
     /** The guide Remove guide took off, and where it was, until it is put back or another guide goes on. */
     private var removed: Pair<ReferenceGuide, GuideState>? = null
 
-    // The thumbnail's and the viewer's sources (FR-1.6): outside a session Pix's album, with the photo just saved here
-    // before MediaStore tells of it; in a session the session's photos alone.
+    // The thumbnail's and the viewer's sources (FR-1.6): outside a session the phone's photos, with the photo just
+    // saved here before MediaStore tells of it; in a session the session's photos alone.
     private var album: List<Uri> = emptyList()
+    private var albums: List<PhoneAlbum> = emptyList()
     private var newestSaved: Uri? = null
     private var thisSession: List<Uri>? = null
 
     init {
         // The last ratio chosen comes back when the screen opens (Design 2.8); before the camera binds, if it can.
         viewModelScope.launch { settings.aspectRatio()?.let(camera::setAspectRatio) }
+        // The timer as chosen, also from the subject's phone while this screen was away (#318).
+        viewModelScope.launch { timerChoice.timer.collect { timer -> _uiState.update { it.copy(timer = timer) } } }
         viewModelScope.launch {
             camera.status.collect { status -> _uiState.update { it.copy(cameraStatus = status) } }
         }
@@ -402,9 +465,20 @@ class CameraViewModel(
             camera.hasFrontCamera.collect { has -> _uiState.update { it.copy(canSwitchCamera = has) } }
         }
         viewModelScope.launch {
-            albumPhotos.collect { photos ->
-                album = photos
-                newestSaved = photos.lastOrNull()
+            phonePhotos.collect(::takePhonePhotos)
+        }
+        viewModelScope.launch {
+            photoAlbums.collect { read ->
+                albums = read
+                showNewestPhoto()
+            }
+        }
+        viewModelScope.launch {
+            photoEdits.collect { edits -> _uiState.update { it.copy(photoEdits = edits) } }
+        }
+        viewModelScope.launch {
+            photoAccess.collect { access ->
+                _uiState.update { it.copy(photoAccess = access) }
                 showNewestPhoto()
             }
         }
@@ -474,54 +548,169 @@ class CameraViewModel(
         }
     }
 
+    /** The phone's photos as read, the newest of them the thumbnail's. */
+    private fun takePhonePhotos(photos: List<Uri>) {
+        album = photos
+        newestSaved = photos.lastOrNull()
+        showNewestPhoto()
+    }
+
     /**
      * In a session, the session's newest photo, none until its first, and the session's photos for the viewer;
-     * otherwise the newest saved here, and Pix's album (FR-1.6).
+     * otherwise the newest saved here, and the phone's photos (FR-1.6).
      */
     private fun showNewestPhoto() {
         val session = thisSession
         val saved = newestSaved
-        val albumPhotos = if (saved != null && saved !in album) album + saved else album
+        val phonePhotos = if (saved != null && saved !in album) album + saved else album
         _uiState.update {
             val next = it.copy(
                 lastPhoto = if (session != null) session.lastOrNull() else saved,
                 sessionPhotos = session,
-                albumPhotos = albumPhotos,
+                phonePhotos = phonePhotos,
+                photoAlbums = albums,
+                // The album as read now; one that has no photo left is gone, and the Albums tab shows again.
+                album = it.album?.let { shown -> albums.firstOrNull { read -> read.id == shown.id } },
             )
             // The viewer closes as a session starts or ends, so it never turns from one's photos to the other's.
             val sameKind = (it.sessionPhotos == null) == (session == null)
-            next.copy(photosOpen = it.photosOpen && sameKind && next.viewerPhotos.isNotEmpty())
+            val open = it.photosOpen && sameKind && next.opensPhotos
+            // An album gone, its last photo deleted, takes its photo with it: the Albums tab shows, not that photo's
+            // place among all the phone's.
+            val albumGone = it.album != null && next.album == null
+            next.copy(
+                photosOpen = open,
+                pickedPhoto = it.pickedPhoto.takeIf { open && !albumGone && next.viewerPhotos.isNotEmpty() },
+                album = next.album.takeIf { open },
+                galleryTab = if (open) next.galleryTab else GalleryTab.PHOTOS,
+            )
         }
     }
 
     /**
-     * A tap on the thumbnail opens its photos over the camera, at the newest (FR-1.6): the session's in a session,
-     * Pix's album otherwise, so Pix stays in front in both.
+     * A tap on the thumbnail opens its photos over the camera (FR-1.6), so Pix stays in front: in a session the
+     * session's, at the newest; otherwise the phone's, as a grid of them all, the newest first.
      */
     fun openPhotos() {
-        _uiState.update { it.copy(photosOpen = it.viewerPhotos.isNotEmpty() && it.countdown == null) }
+        _uiState.update {
+            val all = it.copy(galleryTab = GalleryTab.PHOTOS, album = null)
+            all.copy(photosOpen = all.opensPhotos && it.countdown == null, pickedPhoto = null)
+        }
     }
 
-    /** The viewer's Back, or the system's, closes it. */
-    fun closePhotos() {
-        _uiState.update { it.copy(photosOpen = false) }
+    /** The viewer's tabs (FR-1.6): Photos or Albums, only while one of them shows, not an album or a photo. */
+    fun chooseGalleryTab(tab: GalleryTab) {
+        _uiState.update { state ->
+            val onTab = state.albumsShown || (state.photosGrid && state.album == null)
+            if (onTab) state.copy(galleryTab = tab) else state
+        }
+    }
+
+    /** A tap on an album of the Albums tab opens its photos as a grid (FR-1.6). */
+    fun openAlbum(id: String) {
+        _uiState.update { state ->
+            val album = state.photoAlbums.firstOrNull { it.id == id }
+            if (state.albumsShown && album != null) state.copy(album = album) else state
+        }
     }
 
     /**
-     * The viewer's Delete, once asked (FR-1.6): the photo leaves the viewer and the thumbnail at once, before
-     * MediaStore tells of it, or stays, and [photoNotDeleted] says so. In a session the deleter drops it from the
-     * session's photos too.
+     * The photo permission was just asked, from the thumbnail or the grid (FR-1.6): the phone's photos are read again
+     * with what was allowed, and the viewer opens on them if it is not open yet.
      */
-    fun deletePhoto(uri: Uri) {
+    fun photoAccessAnswered() {
         viewModelScope.launch {
-            if (!deleter.delete(uri)) {
-                _photoNotDeleted.trySend(Unit)
-                return@launch
-            }
-            album = album - uri
-            if (newestSaved == uri) newestSaved = album.lastOrNull()
-            showNewestPhoto()
+            rereadPhotos()
+            // Before the collectors hear of it, so the viewer opens on the photos just allowed.
+            _uiState.update { it.copy(photoAccess = photoAccess.value) }
+            albums = photoAlbums.value
+            takePhonePhotos(phonePhotos.value)
+            if (!_uiState.value.photosOpen) openPhotos()
         }
+    }
+
+    /** As the screen starts: the permission may have changed in the phone's settings meanwhile (FR-1.6). */
+    fun readPhotosAgain() {
+        viewModelScope.launch { rereadPhotos() }
+    }
+
+    /** A tap on a photo of the grid opens it in the viewer, where a swipe shows the others (FR-1.6). */
+    fun pickPhoto(uri: Uri) {
+        _uiState.update { if (it.photosGrid && uri in it.viewerPhotos) it.copy(pickedPhoto = uri) else it }
+    }
+
+    /**
+     * The viewer's Back, or the system's, and a drag down of its photo, one step back (FR-1.6): from a photo picked from
+     * a grid to that grid; from an album's grid to the Albums tab; from either tab, the viewer closes.
+     */
+    fun closePhotos() {
+        _uiState.update {
+            when {
+                it.photosOpen && it.pickedPhoto != null -> it.copy(pickedPhoto = null)
+                it.photosOpen && it.album != null -> it.copy(album = null)
+                else -> it.copy(photosOpen = false, pickedPhoto = null, album = null, galleryTab = GalleryTab.PHOTOS)
+            }
+        }
+    }
+
+    /** Whether the viewer asks before it deletes [uri]: for Pix's own photos, which go at once (FR-1.16). */
+    fun asksBeforeDeleting(uri: Uri): Boolean = deleter.asksFirst(uri)
+
+    /**
+     * The viewer's Delete (FR-1.6, FR-1.16), once Pix asked for its own photo: the photo leaves the viewer and the
+     * thumbnail at once, before MediaStore tells of it, or stays, and [photoNotDeleted] says so. In a session the
+     * deleter drops it from the session's photos too. Another app's photo goes to Android's question
+     * ([deleteQuestions]) instead.
+     */
+    fun deletePhoto(uri: Uri) = delete(uri, answered = false)
+
+    /**
+     * Android's question for another app's photo was answered: a yes deleted it, or, on Android 10, lets Pix delete
+     * it now; a no keeps it, with nothing to say.
+     */
+    fun deleteAnswered(yes: Boolean) {
+        val (uri, deletesItself) = asking ?: return
+        asking = null
+        when {
+            !yes -> Unit
+            deletesItself -> dropPhoto(uri)
+            else -> delete(uri, answered = true)
+        }
+    }
+
+    private fun delete(uri: Uri, answered: Boolean) {
+        viewModelScope.launch {
+            when (val result = deleter.delete(uri)) {
+                PhotoDeletion.Deleted -> dropPhoto(uri)
+
+                PhotoDeletion.Failed -> _photoNotDeleted.trySend(Unit)
+
+                // Asked once already, a second question would never end.
+                is PhotoDeletion.NeedsConsent -> if (answered) {
+                    _photoNotDeleted.trySend(Unit)
+                } else {
+                    asking = uri to result.deletesItself
+                    _deleteQuestions.trySend(result.request)
+                }
+            }
+        }
+    }
+
+    /** [uri] is gone from the phone: from the viewer and the thumbnail at once, before MediaStore tells of it. */
+    private fun dropPhoto(uri: Uri) {
+        album = album - uri
+        albums =
+            albums.map {
+                if (uri in
+                    it.photos
+                ) {
+                    it.copy(photos = it.photos - uri)
+                } else {
+                    it
+                }
+            }.filter { it.photos.isNotEmpty() }
+        if (newestSaved == uri) newestSaved = album.lastOrNull()
+        showNewestPhoto()
     }
 
     /**
@@ -547,14 +736,17 @@ class CameraViewModel(
     }
 
     /**
-     * The menu's Timer (FR-1.17): each tap the next of off, 3 s, and 10 s, which the screen says in a notice. Not while
-     * the timer counts down.
+     * The menu's Timer (FR-1.17): each tap the next of off, 3 s, and 10 s, which the screen says in a notice and the
+     * subject's phone in a line. Not while the timer counts down.
      */
     fun onTimerTap() {
         if (_uiState.value.countdown != null) return
         val next = _uiState.value.timer.next()
+        // The one choice both phones' menus set (#318): here at once, so the next tap goes on from it.
         _uiState.update { it.copy(timer = next) }
+        timerChoice.set(next)
         _menuNotices.trySend(MenuNotice.Timer(next))
+        onDid(PhotographerAction.Timer(next))
     }
 
     /**
@@ -608,11 +800,53 @@ class CameraViewModel(
     }
 
     /**
-     * The timer's countdown (FR-1.17): from [seconds] down to 1, a second each, told to the subject's phone at each
-     * step, then the photo. The shutter's own changes come at its start: the guide's edit mode and the open panels end,
-     * and an earlier photo's notice goes.
+     * The subject's shutter (FR-7.8, #314), which this phone's timer serves as it does its own (FR-1.17): with the
+     * timer off the photo now, with it on the countdown, whose end takes the photo. The subject's phone says what its
+     * press meant, since it may come late. A press to [cancel], made while that phone showed the countdown, stops it
+     * and never takes a photo or starts a countdown: with none left, nothing happens. A press for a photo that meets a
+     * countdown leaves it to its own photo.
      */
-    private fun startCountdown(seconds: Int) {
+    fun onSubjectShutter(cancel: Boolean): ShutterOutcome {
+        val state = _uiState.value
+        if (state.countdown != null) {
+            if (!cancel) return ShutterOutcome.TIMER_KEPT
+            cancelCountdown()
+            return ShutterOutcome.TIMER_STOPPED
+        }
+        if (cancel) return ShutterOutcome.TIMER_KEPT
+        if (state.timer == ShutterTimer.OFF) return if (shoot()) ShutterOutcome.TAKEN else ShutterOutcome.REFUSED
+        if (state.shutterBusy || camera.status.value != CameraStatus.READY) return ShutterOutcome.REFUSED
+        startCountdown(state.timer.seconds)
+        return ShutterOutcome.TIMER_STARTED
+    }
+
+    /**
+     * The scene photo's shutter (FR-4.1, FR-1.17): with the timer off, [take] at once; with it on, the countdown, at
+     * whose end [take] runs, as the photo's shutter does; a tap while it counts down cancels it. Not while the camera is
+     * not ready.
+     */
+    fun onSceneShutter(take: () -> Unit) {
+        val state = _uiState.value
+        when {
+            state.countdown != null -> cancelCountdown()
+
+            state.timer == ShutterTimer.OFF -> {
+                // The open panels close, as at the countdown's start and the camera's own shutter, also for a shutter
+                // that no touch came with (TalkBack, a keyboard), or the menu would show again when framing comes back.
+                _uiState.update { it.copy(aspectsOpen = false, menuOpen = false) }
+                take()
+            }
+
+            camera.status.value == CameraStatus.READY -> startCountdown(state.timer.seconds, take)
+        }
+    }
+
+    /**
+     * The timer's countdown (FR-1.17): from [seconds] down to 1, a second each, told to the subject's phone at each
+     * step, then the photo, or [take] for the scene photo. The shutter's own changes come at its start: the guide's edit
+     * mode and the open panels end, and an earlier photo's notice goes.
+     */
+    private fun startCountdown(seconds: Int, take: (() -> Unit)? = null) {
         _uiState.update {
             it.copy(
                 countdown = seconds,
@@ -631,6 +865,10 @@ class CameraViewModel(
             countdownJob = null
             _uiState.update { it.copy(countdown = null) }
             onCountdown(0)
+            if (take != null) {
+                take()
+                return@launch
+            }
             // A camera that went away during the countdown takes no photo, and says so as a failed one would.
             if (shoot()) {
                 _timedShots.trySend(Unit)

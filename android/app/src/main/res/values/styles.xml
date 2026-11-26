@@ -233,19 +233,19 @@
         <item name="android:minWidth">0dp</item>
     </style>
 
-    <!-- The step's action at a screen's top right, such as Select on Pick a pose (#199): yellow text without a pill
-         (#204), faint while disabled, in a touch area at least 88 dp wide and 48 dp high, in the middle of the 56 dp
-         header. The text ends at the area's right edge, so it lines up with the screen's content below. Back is at
-         the top left. -->
+    <!-- The step's action at a screen's top right, such as Select on Pick a pose (#199): yellow text without a pill at
+         rest (#204), faint while disabled, in the middle of the 56 dp header. Under a touch, a 32 dp pill as wide as
+         the text and 12 dp around it, whose right edge lines up with the screen's content below; the touch area is at
+         least 48 dp each way. Back is at the top left. -->
     <style name="Widget.Pix.Button.Header">
         <item name="android:minHeight">48dp</item>
-        <item name="android:minWidth">88dp</item>
-        <item name="android:insetTop">4dp</item>
-        <item name="android:insetBottom">4dp</item>
-        <item name="android:paddingStart">16dp</item>
-        <item name="android:paddingEnd">0dp</item>
-        <item name="android:gravity">end|center_vertical</item>
-        <item name="cornerRadius">20dp</item>
+        <item name="android:minWidth">48dp</item>
+        <item name="android:insetTop">8dp</item>
+        <item name="android:insetBottom">8dp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:gravity">center</item>
+        <item name="cornerRadius">16dp</item>
         <item name="backgroundTint">@android:color/transparent</item>
         <item name="android:textColor">@color/button_header_text</item>
         <item name="rippleColor">@color/pix_ripple</item>
@@ -360,12 +360,13 @@
     </style>
 
     <!-- A ratio in the ratios under the top bar (FR-1.13): a touch area as tall as the panel, sharing its width with the
-         other ratios, around the ratio's shape. Selection is View.isSelected. -->
+         other ratios, around the ratio's shape, lit inside itself under a touch (bg_panel_option). Selection is
+         View.isSelected. -->
     <style name="Widget.Pix.AspectOption" parent="">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">48dp</item>
         <item name="android:layout_weight">1</item>
-        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+        <item name="android:background">@drawable/bg_panel_option</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
     </style>
@@ -387,7 +388,8 @@
     </style>
 
     <!-- An item of the camera menu under the top bar (FR-1.17): its icon over a one-word label, in a 48 dp wide, 64 dp
-         tall touch area (NFR-16); both in the accent while what it sets is on (activated). -->
+         tall touch area (NFR-16), lit inside itself under a touch (bg_panel_option); both in the accent while what it
+         sets is on (activated). -->
     <style name="Widget.Pix.CameraMenuOption" parent="">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">64dp</item>
@@ -395,7 +397,7 @@
         <item name="android:minWidth">48dp</item>
         <item name="android:orientation">vertical</item>
         <item name="android:gravity">center</item>
-        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+        <item name="android:background">@drawable/bg_panel_option</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
     </style>
@@ -408,13 +410,14 @@
         <item name="tint">@color/camera_menu_option</item>
     </style>
 
-    <!-- The item's label, 11 sp in the medium face, shrinking toward 8 dp only where a large font would not fit it on
+    <!-- The item's label, 10 sp in the medium face, its letters a little narrower (textScaleX) and closer than the
+         face's own, so it stays quiet under its icon; shrinking toward 8 dp only where a large font would not fit it on
          its line (#298). -->
     <style name="Widget.Pix.CameraMenuOption.Label" parent="">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">16dp</item>
         <item name="android:layout_marginTop">6dp</item>
-        <item name="android:autoSizeMaxTextSize">11sp</item>
+        <item name="android:autoSizeMaxTextSize">10sp</item>
         <item name="android:autoSizeMinTextSize">8dp</item>
         <item name="android:autoSizeTextType">uniform</item>
         <item name="android:duplicateParentState">true</item>
@@ -425,6 +428,8 @@
         <item name="android:textAppearance">@style/TextAppearance.Pix.Caption</item>
         <item name="android:fontFamily">@font/pix_medium</item>
         <item name="fontFamily">@font/pix_medium</item>
+        <item name="android:letterSpacing">-0.02</item>
+        <item name="android:textScaleX">0.94</item>
         <item name="android:textColor">@color/camera_menu_option</item>
     </style>
 
@@ -511,10 +516,27 @@
         <item name="android:layout_width">48dp</item>
         <item name="android:layout_height">48dp</item>
         <item name="android:layout_marginStart">-12dp</item>
-        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+        <item name="android:background">@drawable/bg_header_icon</item>
         <item name="android:src">@drawable/ic_arrow_back</item>
         <item name="android:contentDescription">@string/back</item>
         <item name="tint">@color/pix_text</item>
+    </style>
+
+
+    <!-- An item of a menu card that a header's ⋮ opens (bg_menu_card, the library's, #297): a row 48 dp tall
+         (NFR-16) of body text in the text color, its light rounded inside the card. -->
+    <style name="Widget.Pix.MenuItem" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:gravity">center_vertical|start</item>
+        <item name="android:background">@drawable/bg_menu_item</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.BodyLarge</item>
+        <item name="android:textColor">@color/pix_text</item>
     </style>
 
     <!-- The chevron at the end of a row or card that a tap opens (#204). Its tip is drawn 8 dp inside its 24 dp box,
@@ -649,8 +671,11 @@
         <item name="tint">@color/pix_handle</item>
     </style>
 
+    <!-- 18 sp, which Android's dialog title takes by itself when a title does not fit on one line at a larger size: every
+         dialog's title is that size, long or short. -->
     <style name="MaterialAlertDialog.Pix.Title.Text" parent="MaterialAlertDialog.Material3.Title.Text">
         <item name="android:textAppearance">@style/TextAppearance.Pix.SheetTitle</item>
+        <item name="android:textSize">18sp</item>
     </style>
 
     <style name="MaterialAlertDialog.Pix.Body.Text" parent="MaterialAlertDialog.Material3.Body.Text">

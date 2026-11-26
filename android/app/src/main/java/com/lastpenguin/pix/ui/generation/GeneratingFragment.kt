@@ -1,9 +1,10 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
 import android.view.View
 import androidx.activity.addCallback
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
@@ -13,6 +14,7 @@ import androidx.navigation.fragment.findNavController
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentGeneratingBinding
 import com.lastpenguin.pix.generation.PoseRequest
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.ui.PixViewModels
 import kotlinx.coroutines.launch
 
@@ -60,6 +62,9 @@ class GeneratingFragment : Fragment(R.layout.fragment_generating) {
 
     private fun render(binding: FragmentGeneratingBinding, candidates: PoseCandidateAdapter, state: GenerationUiState) {
         binding.sceneImage.showScene(state.scene)
+        // The situation the photo was taken for (FR-4.8), as Generate poses shows it; Auto shows none.
+        binding.situationTag.isVisible = state.situation != Situation.DEFAULT
+        binding.situationTag.setText(state.situation.title)
         candidates.frameAspect = aspectOf(state.scene)
         candidates.submitList(state.slots())
         // Until the poses are there, the number of slots is not known; suggestions take the first seconds.

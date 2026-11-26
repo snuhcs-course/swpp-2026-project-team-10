@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -42,11 +42,16 @@ object PixViewModels {
                 container.savedGuideStore,
                 container.poseTips.onCamera,
                 container.photoSyncer,
-                albumPhotos = container.albumPhotos,
+                phonePhotos = container.phonePhotos.photos,
+                photoAccess = container.phonePhotos.access,
+                photoAlbums = container.phonePhotos.albums,
+                rereadPhotos = container.phonePhotos::refresh,
+                photoEdits = container.phonePhotos.edits,
                 sessionPhotos = container.photoSyncer.sessionPhotos,
                 deleter = container.photoDeleter,
                 phoneTurns = container.phoneTurns,
                 zoomHold = container.remoteControlHandler.zoomHold,
+                timerChoice = container.remoteControlHandler.timerChoice,
                 onFocused = container.remoteControlHandler::focusedHere,
                 onDid = container.remoteControlHandler::didHere,
                 onCountdown = container.remoteControlHandler::countdownHere,

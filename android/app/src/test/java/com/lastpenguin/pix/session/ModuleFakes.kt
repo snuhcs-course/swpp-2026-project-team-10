@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -50,6 +50,9 @@ class FakeSessionManager : SessionManager {
 
     private val _peerCamera = MutableStateFlow<CameraState?>(null)
     override val peerCamera: StateFlow<CameraState?> = _peerCamera.asStateFlow()
+
+    private val _peerTimerSeconds = MutableStateFlow(0)
+    override val peerTimerSeconds: StateFlow<Int> = _peerTimerSeconds.asStateFlow()
 
     private val _peerZoomHolder = MutableStateFlow<Role?>(null)
     override val peerZoomHolder: StateFlow<Role?> = _peerZoomHolder.asStateFlow()
@@ -123,6 +126,7 @@ class FakeSessionManager : SessionManager {
         if (message is SessionMessage.CameraStateUpdate) {
             _peerCamera.value =
                 CameraState(message.zoom, message.exposure, message.flash, message.aspect, facing = message.facing)
+            _peerTimerSeconds.value = message.timer
         }
         if (message is SessionMessage.ZoomHoldUpdate) _peerZoomHolder.value = message.by
         check(_incoming.tryEmit(message))
@@ -253,6 +257,9 @@ class FakeCameraController(
     /** When set, [grabFrame] returns it, so the scene photo step can be driven in a screen test. */
     var frame: Bitmap? = null
 
+    /** When set, [grabFrame] waits for it, as a frame still being taken. */
+    var grabbing: CompletableDeferred<Unit>? = null
+
     /** When set, [takePhoto] fails with it, so a screen test can see each failure's message. */
     var photoFailure: Throwable? = null
 
@@ -276,8 +283,10 @@ class FakeCameraController(
         return saved
     }
 
-    override suspend fun grabFrame(): Result<Bitmap> =
-        frame?.let { Result.success(it) } ?: Result.failure(UnsupportedOperationException())
+    override suspend fun grabFrame(): Result<Bitmap> {
+        grabbing?.await()
+        return frame?.let { Result.success(it) } ?: Result.failure(UnsupportedOperationException())
+    }
 
     override fun setFrameSink(sink: FrameSink?) {
         this.sink = sink

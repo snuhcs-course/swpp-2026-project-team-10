@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -178,6 +178,31 @@ class SubjectSessionPhotoTest {
         root is TextView -> root.text?.toString() == text
         root is ViewGroup -> (0 until root.childCount).any { textShown(root.getChildAt(it), text) }
         else -> false
+    }
+
+    // ---- A result under the photos (#314): a refused press answered while they are open, said once they close --
+
+    @Test
+    fun aRefusedPressThatIsAnsweredUnderThePhotos_isSaidOnceTheyAreClosed() {
+        val modules = launch()
+        modules.photo("p1")
+        onScreen { binding, _ -> binding.shutterButton.performClick() }
+        idle()
+        openThumbnail()
+        onScreen { binding, _ -> assertTrue(binding.viewer().root.isShown) }
+
+        val press = modules.session.sent.filterIsInstance<SessionMessage.ShutterPress>().last().press
+        modules.session.deliver(SessionMessage.ShutterAnswer(taken = false, press = press))
+        idle()
+        // The photos cover the line's place: it waits for them to close.
+        onScreen { binding, _ -> assertFalse(binding.toggleLabel.isShown) }
+
+        onScreen { _, fragment -> fragment.requireActivity().onBackPressedDispatcher.onBackPressed() }
+        settle()
+        onScreen { binding, _ ->
+            assertTrue(binding.toggleLabel.isShown)
+            assertEquals(string(R.string.subject_shutter_refused), binding.toggleLabel.text.toString())
+        }
     }
 
     // ---- The thumbnail ----------------------------------------------------------------------
@@ -476,7 +501,8 @@ class SubjectSessionPhotoTest {
         assertEquals(Intent.ACTION_CHOOSER, chooser.action)
         val send = checkNotNull(IntentCompat.getParcelableExtra(chooser, Intent.EXTRA_INTENT, Intent::class.java))
         assertEquals(Intent.ACTION_SEND, send.action)
-        assertEquals("image/jpeg", send.type)
+        // The type MediaStore says, which has no row for it here.
+        assertEquals("image/*", send.type)
         assertEquals(saved("p1"), IntentCompat.getParcelableExtra(send, Intent.EXTRA_STREAM, Uri::class.java))
         assertTrue(send.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
         // The session and the viewer stay under the share sheet.

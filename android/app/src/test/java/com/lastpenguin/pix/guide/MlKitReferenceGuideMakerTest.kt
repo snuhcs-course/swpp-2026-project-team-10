@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.content.Context
@@ -35,7 +35,8 @@ import org.robolectric.annotation.GraphicsMode
  * A picked image (FR-2.10, step 1), read from a file: a screenshot of a feed post (cut, so the segmenter, the anchor,
  * and the thumbnail have the photo alone, and the guide keeps the screenshot and where the photo was), a screenshot of a
  * photo centered in an image viewer (cut at its sides too), the same with the whole image asked for (not cut), and a
- * camera photo (not cut); a generated pose shaped like a screenshot is never cut.
+ * camera photo (not cut); a generated pose shaped like a screenshot is never cut. A photo used whole keeps itself, at
+ * most 1024 px, for Reference confirm (#295); a cut screenshot keeps its crop instead, and a generated pose neither.
  * Its `guide_made` event (Design 2.8, Telemetry): a guide made, no person (no error sent), another failure (its
  * error sent too), and a guide left while it is made, as Back on Reference confirm does (cancelled, no error).
  */
@@ -208,6 +209,8 @@ class MlKitReferenceGuideMakerTest {
         val reference = guide.reference!!
         assertEquals(512, maxOf(reference.width, reference.height))
         assertEquals(410, minOf(reference.width, reference.height))
+        // Made from a bitmap, as a pose is, it keeps no photo for Reference confirm (#295).
+        assertNull(guide.photo)
     }
 
     @Test
@@ -225,6 +228,8 @@ class MlKitReferenceGuideMakerTest {
         val anchor = checkNotNull(guide.anchor)
         assertTrue("anchor $anchor", abs(anchor.centerY - 0.65f) < 0.05f)
         assertEquals(384 to 512, guide.reference!!.width to guide.reference!!.height)
+        // The screenshot is in the crop, so no photo is kept apart (#295).
+        assertNull(guide.photo)
     }
 
     @Test
@@ -248,6 +253,8 @@ class MlKitReferenceGuideMakerTest {
 
         assertEquals(540 to 1170, segmenter.lastSize)
         assertNull(guide.crop)
+        // The whole image is kept for Reference confirm (#295), as small as a screenshot's crop.
+        assertEquals(473 to 1024, guide.photo?.let { it.width to it.height })
     }
 
     @Test
@@ -258,6 +265,8 @@ class MlKitReferenceGuideMakerTest {
 
         assertEquals(300 to 400, segmenter.lastSize)
         assertNull(guide.crop)
+        // Kept as it is for Reference confirm, which shows it turning into the guide (#295).
+        assertEquals(300 to 400, guide.photo?.let { it.width to it.height })
     }
 
     @Test
@@ -268,6 +277,7 @@ class MlKitReferenceGuideMakerTest {
 
         assertEquals(540 to 1170, segmenter.lastSize)
         assertNull(guide.crop)
+        assertNull(guide.photo)
     }
 
     private fun feedPost(): Bitmap {

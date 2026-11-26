@@ -15,7 +15,7 @@
         android:layout_gravity="center"
         android:background="@color/pix_glass"
         android:duplicateParentState="true"
-        android:foreground="?attr/selectableItemBackground"
+        android:foreground="@drawable/fg_tiny_thumbnail_press"
         android:importantForAccessibility="no"
         android:padding="1dp"
         android:scaleType="centerCrop"

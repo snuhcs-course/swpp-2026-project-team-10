@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.drawable.RotateDrawable
@@ -66,7 +66,10 @@ class SubjectControlTurnTest {
 
     /** The menu's items, Guide, and Pick a pose turn with their labels, each as one block; the thumbnail turns whole. */
     private fun FragmentSubjectBinding.turningViews(): List<View> = listOf(
+        flashIndicator,
+        timerIndicator,
         menuFlash,
+        menuTimer,
         menuGrid,
         menuSettings,
         guideButton,

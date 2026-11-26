@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park and Sungmin Jo
 import java.util.Properties
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
@@ -13,8 +13,8 @@ plugins {
 }
 
 // The Pix server (Design 2.8, Hosting and Configuration). Release builds, the store's build among them, use the AWS
-// main server, which runs main; debug builds default to the AWS dev server, which runs dev. Unlike the course servers,
-// both answer over HTTPS from any network, cellular data included. A debug build can use another server: set
+// main server, which runs main; debug builds default to the AWS dev server, which runs dev. Both answer over HTTPS
+// from any network, cellular data included. A debug build can use another server: set
 // `pix.serverUrl` in local.properties (never committed) or pass -Ppix.serverUrl=...: a laptop on the test Wi-Fi
 // (`http://192.168.0.10:8000/`), or the host machine as seen from the emulator (`http://10.0.2.2:8000/`). Release
 // builds allow no plain HTTP (src/main/res/xml/network_security_config.xml), so their server must use HTTPS.

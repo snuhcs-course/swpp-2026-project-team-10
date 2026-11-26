@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.animation.ValueAnimator
@@ -17,8 +17,18 @@ import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import com.lastpenguin.pix.ui.Motion
 import kotlin.math.abs
 
-/** The scene photo on its way into its place on Generate poses: what is drawn over the screen, and its move. */
-internal class SceneArrival(val photo: ArrivingPhoto, val animator: ValueAnimator) {
+/**
+ * The scene photo on its way into its place on Generate poses: what is drawn over the screen, and its move, which
+ * starts after [hold].
+ */
+internal class SceneArrival(val photo: ArrivingPhoto, val animator: ValueAnimator, val hold: Long = HOLD_MS) {
+    /** How far the photo has moved, 0 to 1: slow to start and slow to settle. */
+    val moved: Float
+        get() {
+            val linear = ((animator.animatedFraction * animator.duration - hold) / MOVE_MS).coerceIn(0f, 1f)
+            return linear * linear * (3f - 2f * linear)
+        }
+
     companion object {
         /** How long the photo stays where the camera held it, so it is seen before it moves. */
         const val HOLD_MS = 300L
@@ -84,12 +94,13 @@ private const val FULL_TURN = 360
 
 /**
  * Shows [scene], the scene photo just taken, coming from the camera into its [place], its thumbnail on this screen
- * (#296): drawn over the screen where the camera held it, as wide as the screen right [under] the header, or as high
- * as the room there for a frame taller than that. It moves as the photo of a screenshot's cut goes to its corner on
- * Reference confirm (ScreenshotCut), so loading a guide and a scene photo look alike: it holds for
- * [SceneArrival.HOLD_MS], then goes to the thumbnail in [SceneArrival.MOVE_MS], slow to start and slow to settle,
- * its corners rounding to the thumbnail's. A first try in 250 ms without the hold was too fast to follow on a phone.
- * Longer than Motion's other lengths, but nothing waits for it: the screen under it takes touches at once.
+ * (#296): drawn over the screen where the camera held it, its frame [from] Camera's hand-off (#210), or else as wide as
+ * the screen right [under] the header, or as high as the room there for a frame taller than that. It moves as a picked
+ * photo goes to its corner on Reference confirm (PhotoToGuide), so loading a guide and a scene photo look alike: it
+ * holds for [SceneArrival.HOLD_MS], then goes to the thumbnail in [SceneArrival.MOVE_MS], slow to start and slow to
+ * settle, its corners rounding to the thumbnail's. A first try in 250 ms without the hold was too fast to follow on a
+ * phone. From Camera's hand-off it moves at once, as the header unfolds around it ([HeaderUnfold]), which is as easy to
+ * follow. Longer than Motion's other lengths, but nothing waits for it: the screen under it takes touches at once.
  *
  * [turn] is how far [scene] was turned clockwise from the frame the camera showed, to be upright as the phone was held
  * (`GenerationUiState.sceneTurn`). The photo starts in the frame's shape, turned back by that much, so nothing changes
@@ -98,7 +109,13 @@ private const val FULL_TURN = 360
  * The thumbnail already shows the photo under it, so nothing is left to set when the move ends, and nothing plays, and
  * null is returned, while animations are off. This screen must be laid out.
  */
-internal fun ViewGroup.showArriving(scene: Bitmap, place: View, under: View, turn: Int = 0): SceneArrival? {
+internal fun ViewGroup.showArriving(
+    scene: Bitmap,
+    place: View,
+    under: View,
+    turn: Int = 0,
+    from: Rect? = null,
+): SceneArrival? {
     if (!Motion.on()) return null
     val thumbnail = Rect(0, 0, place.width, place.height).also { offsetDescendantRectToMyCoords(place, it) }
     val top = Rect(0, 0, under.width, under.height).also { offsetDescendantRectToMyCoords(under, it) }.bottom
@@ -108,7 +125,7 @@ internal fun ViewGroup.showArriving(scene: Bitmap, place: View, under: View, tur
     val frameHeight = if (sideways) scene.width else scene.height
     val wide = minOf(width, (height - top) * frameWidth / frameHeight)
     val left = (width - wide) / 2
-    val frame = Rect(left, top, left + wide, top + wide * frameHeight / frameWidth)
+    val frame = from ?: Rect(left, top, left + wide, top + wide * frameHeight / frameWidth)
     // The photo's own box while it is drawn into that frame turned back.
     val held = if (sideways) {
         val boxLeft = (frame.left + frame.right - frame.height()) / 2
@@ -125,13 +142,13 @@ internal fun ViewGroup.showArriving(scene: Bitmap, place: View, under: View, tur
     }
     val radius = THUMBNAIL_RADIUS_DP * resources.displayMetrics.density
     overlay.add(photo)
-    val total = SceneArrival.HOLD_MS + SceneArrival.MOVE_MS
-    val animator = ValueAnimator.ofFloat(0f, 1f).setDuration(total)
+    val hold = if (from != null) 0L else SceneArrival.HOLD_MS
+    val animator = ValueAnimator.ofFloat(0f, 1f).setDuration(hold + SceneArrival.MOVE_MS)
     // The hold and the easing are in the frames themselves, as in the cut.
     animator.interpolator = LinearInterpolator()
+    val arrival = SceneArrival(photo, animator, hold)
     animator.addUpdateListener {
-        val moved = ((it.animatedFraction * total - SceneArrival.HOLD_MS) / SceneArrival.MOVE_MS).coerceIn(0f, 1f)
-        val t = moved * moved * (3f - 2f * moved)
+        val t = arrival.moved
         fun between(from: Int, to: Int) = (from + (to - from) * t).toInt()
         photo.setBounds(
             between(held.left, thumbnail.left),
@@ -145,5 +162,5 @@ internal fun ViewGroup.showArriving(scene: Bitmap, place: View, under: View, tur
     }
     animator.doOnEnd { overlay.remove(photo) }
     animator.start()
-    return SceneArrival(photo, animator)
+    return arrival
 }

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Subject view (R&S 6.6, FR-6.6, FR-6.7, FR-7.1–7.3). No shutter: only the photographer takes photos. A pinch on
-     the video zooms the photographer's camera while guide-edit mode is off (AD-17); with it on, drags and pinches
+<!-- Subject view (R&S 6.6, FR-6.6, FR-6.7, FR-7.1–7.3, FR-7.8). Its shutter asks the photographer's phone for the
+     photo, which is taken there (#314). A pinch on the video zooms the photographer's camera while guide-edit mode is off (AD-17); with it on, drags and pinches
      move the photographer's guide. The brightness bar and the camera menu's flash are the photographer's controls. The
      video is placed as on the Camera screen (previewArea, in code), and the zoom row and the caption lie above it. The
      root reports the end of every touch, which closes the photographer's tip (FR-4.10). -->
@@ -38,6 +38,51 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
+        <!-- The photographer's flash while it is on or auto, and their timer while it is on (FR-1.12, FR-1.17, #318):
+             what a press of the shutter will do, with the menu closed, as Camera shows its own, in its sizes and
+             places: centered above the bar's overhang, where the buttons center their icons. A tap on them opens the
+             menu (indicatorsTouch). -->
+        <ImageView
+            android:id="@+id/flashIndicator"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginBottom="@dimen/top_bar_overhang"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_flash_on"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toEndOf="@id/cameraMenuButton"
+            app:layout_constraintTop_toTopOf="parent"
+            app:tint="@color/pix_accent"
+            tools:visibility="visible" />
+
+        <ImageView
+            android:id="@+id/timerIndicator"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginStart="6dp"
+            android:layout_marginBottom="@dimen/top_bar_overhang"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_timer_3"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toEndOf="@id/flashIndicator"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_goneMarginStart="0dp"
+            app:tint="@color/pix_accent"
+            tools:visibility="visible" />
+
+        <!-- What takes the tap on those icons, which are 16 dp: 48 dp over both, inside the bar (NFR-16). The menu's
+             button is what TalkBack reads. -->
+        <View
+            android:id="@+id/indicatorsTouch"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:importantForAccessibility="no"
+            android:visibility="gone"
+            app:layout_constraintStart_toEndOf="@id/cameraMenuButton"
+            app:layout_constraintTop_toTopOf="parent" />
+
         <!-- The latency indicator, when Settings turns it on (FR-10.3). -->
         <TextView
             android:id="@+id/latencyChip"
@@ -65,8 +110,8 @@
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- The camera menu (FR-1.17), opened from its button in the top bar, as on the Camera screen: the photographer's flash
-         (FR-7.3), each tap its next choice, this phone's grid (FR-1.9), on or off, and Settings (FR-10.1). No timer, since
-         only the photographer takes photos, and no horizon bar, which this screen does not draw. A touch anywhere else,
+         (FR-7.3) and timer (#318), each tap its next choice, this phone's grid (FR-1.9), on or off, and Settings
+         (FR-10.1). No horizon bar, which this screen does not draw. A touch anywhere else,
          or Back, closes it. -->
     <LinearLayout
         android:id="@+id/cameraMenu"
@@ -102,6 +147,24 @@
             <TextView
                 style="@style/Widget.Pix.CameraMenuOption.Label"
                 android:text="@string/menu_flash" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/menuTimer"
+            style="@style/Widget.Pix.CameraMenuOption"
+            android:layout_width="72dp"
+            android:layout_weight="0"
+            android:contentDescription="@string/timer_off">
+
+            <ImageView
+                android:id="@+id/menuTimerIcon"
+                style="@style/Widget.Pix.CameraMenuOption.Icon"
+                android:src="@drawable/ic_menu_timer_off"
+                tools:ignore="ContentDescription" />
+
+            <TextView
+                style="@style/Widget.Pix.CameraMenuOption.Label"
+                android:text="@string/menu_timer" />
         </LinearLayout>
 
         <LinearLayout
@@ -282,7 +345,8 @@
             tools:visibility="visible" />
 
         <!-- The photographer's timer counting down (FR-1.17), as their Camera screen shows it: the seconds left, large in
-             the middle of the video, and whose photo it is. The number turns with the phone (FR-1.15). -->
+             the middle of the video, and whose photo it is. That this phone's shutter stops it is the tutorial's tip, not a
+             line here (FR-7.8). The number turns with the phone (FR-1.15). -->
         <LinearLayout
             android:id="@+id/countdownPanel"
             android:layout_width="wrap_content"
@@ -313,8 +377,8 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Right above the caption, as the Camera screen's panels sit above its shutter: the photographer's tip
-         (FR-4.10), opened from its button in the zoom row. -->
+    <!-- Right above the shutter, as the Camera screen's panels sit above its own: the photographer's tip (FR-4.10),
+         opened from its button in the zoom row, and under it the line that says whose camera this is (#314). -->
     <LinearLayout
         android:id="@+id/bottomOverlays"
         android:layout_width="0dp"
@@ -365,6 +429,90 @@
                 tools:text="Move a little closer.\nHold the phone at your waist, tilted up a little." />
         </LinearLayout>
 
+
+        <!-- Once connected, right above the shutter (#314; in the shutter's place until then, #271): whose camera this
+             is and that it is live, on one line, or that their photo is on its way here (FR-6.14). At a font too large
+             for one line, the name stands over the rest (SubjectFragment.renderCaption). -->
+        <LinearLayout
+            android:id="@+id/cameraCaption"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:minHeight="24dp"
+            android:orientation="horizontal"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <LinearLayout
+                android:id="@+id/cameraCaptionName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical">
+
+                <!-- Red, as the light over the video, and only while the video is live: it goes with "Live", and its
+                     margin with it, so the name alone stays centered. -->
+                <ImageView
+                    android:id="@+id/cameraCaptionDot"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:layout_marginEnd="6dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_status_dot"
+                    app:tint="@color/pix_recording" />
+
+                <!-- A name too long for the line is cut short so "'s camera" stays (SubjectFragment.cameraTitle). -->
+                <TextView
+                    android:id="@+id/cameraCaptionTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+                    android:textColor="@color/pix_text"
+                    android:textSize="14sp"
+                    tools:text="Dongje's camera" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/cameraCaptionSeparator"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:importantForAccessibility="no"
+                    android:includeFontPadding="false"
+                    android:text="@string/caption_separator"
+                    android:textAppearance="@style/TextAppearance.Pix.Label"
+                    android:textSize="13sp" />
+
+                <!-- While a photo comes, in place of the name. -->
+                <ProgressBar
+                    android:id="@+id/cameraCaptionSpinner"
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:importantForAccessibility="no"
+                    android:indeterminateTint="@color/pix_text_soft"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/cameraCaptionStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:accessibilityLiveRegion="polite"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:text="@string/subject_live"
+                    android:textAppearance="@style/TextAppearance.Pix.Label"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
     </LinearLayout>
 
     <!-- The Camera screen's row: the photographer's tip (FR-4.10) at its start, the zoom readout (FR-7.1), then Save
@@ -494,22 +642,23 @@
         android:outlineProvider="none"
         android:translationZ="1dp"
         android:paddingHorizontal="16dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="22dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="18dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
-        <!-- Camera's row in thirds (R&S 6.6): Guide in the middle of the left third, where Camera's is, and in the
-             middle, where Camera's shutter is, whose camera this is, or a step's button such as Pick a pose (FR-6.15); the
-             session photos' thumbnail, a view of the screen's own, in the middle of the right third. Each is centered
-             on its line, so a longer label grows both ways. Held sideways, Pick a pose turns with its label and stands
-             taller than the row, so neither clips it (FR-1.15). -->
+        <!-- Camera's row in thirds (R&S 6.6), 88 dp as Camera's: Guide in the middle of the left third and the shutter
+             in the middle, each where Camera's is (FR-7.8, #314); the session photos' thumbnail, a view of the screen's
+             own, in the middle of the right third, where Camera's gallery button is, and beside it a step's button
+             such as Pick a pose while the photographer's step lasts (FR-6.15), for which the thumbnail moves aside. Held sideways, Pick a pose turns with
+             its label and stands taller than the row, so neither clips it (FR-1.15). -->
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/guideRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:clipChildren="false">
+            android:clipChildren="false"
+            android:minHeight="88dp">
 
             <androidx.constraintlayout.widget.Guideline
                 android:id="@+id/guideLine"
@@ -534,12 +683,16 @@
                 android:contentDescription="@string/guide_add_description"
                 android:focusable="true"
                 android:gravity="center_horizontal"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="4dp"
                 android:minWidth="48dp"
                 android:minHeight="48dp"
                 android:orientation="vertical"
+                app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="@id/guideLine"
                 app:layout_constraintStart_toStartOf="@id/guideLine"
-                app:layout_constraintTop_toTopOf="parent">
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintVertical_bias="0">
 
                 <ImageView
                     android:id="@+id/guideButtonIcon"
@@ -575,13 +728,14 @@
                 android:contentDescription="@string/pick_pose_title"
                 android:focusable="true"
                 android:gravity="center_horizontal"
+                android:layout_marginTop="24dp"
                 android:minWidth="48dp"
                 android:minHeight="48dp"
                 android:orientation="vertical"
-                android:paddingHorizontal="8dp"
+                android:translationX="-26dp"
                 android:visibility="gone"
-                app:layout_constraintEnd_toEndOf="@id/middleLine"
-                app:layout_constraintStart_toStartOf="@id/middleLine"
+                app:layout_constraintEnd_toEndOf="@id/stepLine"
+                app:layout_constraintStart_toStartOf="@id/stepLine"
                 app:layout_constraintTop_toTopOf="parent"
                 tools:visibility="visible">
 
@@ -596,13 +750,13 @@
                     android:src="@drawable/ic_sparkle"
                     app:tint="@color/guide_button_icon" />
 
-                <!-- At most 128 dp wide, so at a large font a long step's name takes two lines, clear of Guide and the
-                     thumbnail, rather than reaching them (#298). -->
+                <!-- At most 84 dp wide, so a long step's name takes two lines, clear of the shutter, rather than
+                     reaching it (#298, #314). -->
                 <TextView
                     android:id="@+id/pickPoseLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:maxWidth="128dp"
+                    android:maxWidth="84dp"
                     android:layout_marginTop="4dp"
                     android:duplicateParentState="true"
                     android:gravity="center"
@@ -613,98 +767,37 @@
                     android:textColor="@color/pix_text_soft" />
             </LinearLayout>
 
-            <!-- The slot's text, between Guide and the thumbnail, centered on their icons' line, as tall as Guide's icon;
-                 from 28 % to 72 % of the row, clear of Guide's label at a font scale of 200 % (#298). -->
+            <!-- The line of Guide's icon and the thumbnail, which the shutter is centered on. -->
             <Space
                 android:id="@+id/iconLine"
                 android:layout_width="0dp"
                 android:layout_height="40dp"
+                android:layout_marginTop="24dp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />
 
+            <!-- The middle of the row's right third, which the thumbnail is on alone and shares with a step's button. -->
             <androidx.constraintlayout.widget.Guideline
-                android:id="@+id/captionStart"
+                android:id="@+id/stepLine"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                app:layout_constraintGuide_percent="0.28" />
+                app:layout_constraintGuide_percent="0.8333" />
 
-            <androidx.constraintlayout.widget.Guideline
-                android:id="@+id/captionEnd"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                app:layout_constraintGuide_percent="0.72" />
-
-            <!-- Once connected, in the slot where Camera's shutter is (#271): whose camera this is, and that it is live,
-                 or that their photo is on its way here (FR-6.14), centered on the line of Guide's icon and the
-                 thumbnail, not on Guide's label. A step's button takes the slot while it shows. -->
-            <LinearLayout
-                android:id="@+id/cameraCaption"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:gravity="center_horizontal"
-                android:orientation="vertical"
-                android:visibility="gone"
+            <!-- The subject's shutter (FR-7.8, #314): Camera's, in its size and place. A press asks the photographer's
+                 phone for a photo; dimmed while the video does not show or a press waits for its answer. -->
+            <ImageButton
+                android:id="@+id/shutterButton"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:background="@drawable/bg_shutter"
+                android:contentDescription="@string/shutter"
+                android:enabled="false"
                 app:layout_constraintBottom_toBottomOf="@id/iconLine"
-                app:layout_constraintEnd_toEndOf="@id/captionEnd"
-                app:layout_constraintStart_toStartOf="@id/captionStart"
-                app:layout_constraintTop_toTopOf="@id/iconLine"
-                tools:visibility="visible">
-
-                <!-- A long name, or a large font, makes the text smaller, down to 12 dp, not sp, so a line fits at any
-                     font scale, 200 % included (#298); a name still too long is cut short so "'s camera" stays
-                     (SubjectFragment.cameraTitle). 24 dp holds a line of 15 sp, the size it starts at. -->
-                <TextView
-                    android:id="@+id/cameraCaptionTitle"
-                    android:layout_width="match_parent"
-                    android:layout_height="24dp"
-                    android:autoSizeMaxTextSize="15sp"
-                    android:autoSizeMinTextSize="12dp"
-                    android:autoSizeTextType="uniform"
-                    android:ellipsize="end"
-                    android:gravity="center"
-                    android:maxLines="1"
-                    android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
-                    android:textColor="@color/pix_text"
-                    tools:text="Dongje's camera" />
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:gravity="center_vertical">
-
-                    <!-- Red, as the light over the video, while live; a spinner while a photo comes. -->
-                    <ImageView
-                        android:id="@+id/cameraCaptionDot"
-                        android:layout_width="8dp"
-                        android:layout_height="8dp"
-                        android:importantForAccessibility="no"
-                        android:src="@drawable/ic_status_dot"
-                        app:tint="@color/pix_recording" />
-
-                    <ProgressBar
-                        android:id="@+id/cameraCaptionSpinner"
-                        android:layout_width="12dp"
-                        android:layout_height="12dp"
-                        android:importantForAccessibility="no"
-                        android:indeterminateTint="@color/pix_text_soft"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/cameraCaptionStatus"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
-                        android:accessibilityLiveRegion="polite"
-                        android:maxLines="1"
-                        android:text="@string/subject_live"
-                        android:textAppearance="@style/TextAppearance.Pix.Label"
-                        android:textSize="12sp" />
-                </LinearLayout>
-            </LinearLayout>
+                app:layout_constraintEnd_toEndOf="@id/middleLine"
+                app:layout_constraintStart_toStartOf="@id/middleLine"
+                app:layout_constraintTop_toTopOf="@id/iconLine" />
         </androidx.constraintlayout.widget.ConstraintLayout>
 
     </LinearLayout>
@@ -719,13 +812,14 @@
         app:layout_constraintGuide_percent="0.8037" />
 
     <!-- The session's newest photo (FR-6.14), Camera's thumbnail: a 40 dp image in a 48 dp touch area (NFR-16), on
-         Guide's icon line (the panel's 8 dp padding and half the 40 dp icon), centered on the line above. Empty, and
-         taking no tap, until a photo is saved here; a tap then opens the session's photos in the viewer below. -->
+         Guide's icon line (the panel's 4 dp padding, the row's 24 dp, and half the 40 dp icon), centered on the line
+         above, and 26 dp to its right while a step's button shares the third (SubjectFragment.renderPoses). Empty,
+         and taking no tap, until a photo is saved here; a tap then opens the session's photos in the viewer below. -->
     <FrameLayout
         android:id="@+id/galleryButton"
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="24dp"
         android:clickable="true"
         android:contentDescription="@string/open_newest_photo"
         android:focusable="true"
@@ -742,7 +836,7 @@
             android:layout_gravity="center"
             android:background="@color/pix_glass"
             android:duplicateParentState="true"
-            android:foreground="?attr/selectableItemBackground"
+            android:foreground="@drawable/fg_thumbnail_press"
             android:importantForAccessibility="no"
             android:padding="1dp"
             android:scaleType="centerCrop"

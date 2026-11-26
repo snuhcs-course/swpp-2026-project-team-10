@@ -4,6 +4,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:clipToPadding="false"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -14,8 +15,12 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginStart="-12dp"
+        android:layout_marginEnd="-12dp"
+        android:clipToPadding="false"
         android:gravity="center_vertical"
-        android:minHeight="56dp">
+        android:minHeight="56dp"
+        android:paddingHorizontal="12dp">
 
         <ImageButton
             android:id="@+id/backButton"
@@ -65,9 +70,10 @@
                 android:scaleType="fitCenter"
                 android:visibility="gone" />
 
-            <!-- A screenshot cut to its photo (FR-2.10): the cut, then the kept photo in the bottom right corner. -->
-            <com.lastpenguin.pix.ui.guide.ScreenshotCutView
-                android:id="@+id/screenshotCut"
+            <!-- The picked photo turning into its guide (#295), after a screenshot's cut (FR-2.10); then the photo stays
+                 small in the bottom right corner. -->
+            <com.lastpenguin.pix.ui.guide.PhotoToGuideView
+                android:id="@+id/photoToGuide"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:contentDescription="@string/kept_photo_description"

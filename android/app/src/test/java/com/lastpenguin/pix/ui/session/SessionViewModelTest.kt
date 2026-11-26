@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.net.Uri
@@ -11,8 +11,10 @@ import com.lastpenguin.pix.account.AccountError
 import com.lastpenguin.pix.account.FakeInvitationManager
 import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.camera.PhotoAlbum
+import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.generation.GuideTip
 import com.lastpenguin.pix.generation.PoseTip
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.session.EndReason
@@ -28,6 +30,7 @@ import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.PhotoContent
 import com.lastpenguin.pix.session.PhotoReader
 import com.lastpenguin.pix.session.PhotoSyncer
+import com.lastpenguin.pix.session.PoseStartStep
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionEntry
@@ -35,6 +38,7 @@ import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionPlace
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.SharedTip
+import com.lastpenguin.pix.session.ShutterOutcome
 import com.lastpenguin.pix.session.TipSyncer
 import com.lastpenguin.pix.session.fakeGuide
 import com.lastpenguin.pix.session.protocol.SessionMessage
@@ -101,6 +105,15 @@ import org.junit.runner.RunWith
  * link is back; no longer once the wait ends (the room waits again, an invitation's session ends); the subject's
  * phone names no one; a drop whose Connected this reader never saw, named from the state alone and not by an earlier
  * session's name.
+ * The subject's shutter (#314): taken through the Camera screen in front, a notice; with that screen gone, not taken
+ * and no notice.
+ * The subject starts AI poses (#276): on the photographer's phone, begun through the Camera screen in front, a notice,
+ * and refused with that screen gone; on the subject's phone, the situation sent with its own number and its answer
+ * heard, begun or not; no answer, refused after POSE_START_WAIT_MS (1 ms before / at it); of the given-up request, a
+ * late refusal unheard, a late "asked" bringing it back with its answer said, and a late start said once; the
+ * photographer asked, waited for without a limit; one request at a time, and "asked" said again at another tile; a
+ * given-up request's refusal not the next one's answer; an answer no screen read and a request that waits, both
+ * gone with their session; and nothing sent without a link, which counts as refused.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 // Robolectric for ProcessLifecycleOwner, which the ViewModel observes for the background limit.
@@ -837,6 +850,363 @@ class SessionViewModelTest {
 
         assertNull(model.lastCode)
         assertEquals(SessionEntry.NewRoom to Role.PHOTOGRAPHER, session.starts.last())
+    }
+
+    @Test
+    fun theSubjectsShutter_isTakenByTheCameraScreen_andIsANotice() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        var presses = 0
+        model.setRemoteShutter {
+            presses++
+            ShutterOutcome.TAKEN
+        }
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.ShutterPress(1))
+        runCurrent()
+
+        assertEquals(1, presses)
+        assertEquals(listOf<SessionNotice>(SessionNotice.RemoteShutter("Joonhyung")), notices)
+        assertEquals(SessionMessage.ShutterAnswer(taken = true, press = 1), session.sent.last())
+    }
+
+    @Test
+    fun onceTheCameraScreenIsGone_aPressIsNotTaken_andIsNoNotice() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        model.setRemoteShutter { ShutterOutcome.TAKEN }
+        model.setRemoteShutter(null)
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.ShutterPress(1))
+        runCurrent()
+
+        assertTrue(notices.isEmpty())
+        assertEquals(SessionMessage.ShutterAnswer(taken = false, press = 1), session.sent.last())
+    }
+
+    @Test
+    fun theSubjectsPress_thatStartsOrStopsTheTimer_saysWhoPressed_andWhoCancelled() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        model.setRemoteShutter { cancel -> if (cancel) ShutterOutcome.TIMER_STOPPED else ShutterOutcome.TIMER_STARTED }
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.ShutterPress(1))
+        runCurrent()
+        session.deliver(SessionMessage.ShutterPress(2, cancel = true))
+        runCurrent()
+
+        assertEquals(
+            listOf(SessionNotice.RemoteShutterPress("Joonhyung"), SessionNotice.RemoteTimerCancel("Joonhyung")),
+            notices,
+        )
+    }
+
+    @Test
+    fun theSubjectsChangeOfTheTimer_isANotice_withWhatItIsNow() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.TimerSet(3))
+        runCurrent()
+        session.deliver(SessionMessage.TimerSet(0))
+        runCurrent()
+
+        assertEquals(
+            listOf(
+                SessionNotice.RemoteTimer("Joonhyung", ShutterTimer.THREE),
+                SessionNotice.RemoteTimer("Joonhyung", ShutterTimer.OFF),
+            ),
+            notices,
+        )
+    }
+
+    // ---- The subject starts AI poses (FR-6.15, #276) --------------------------------------------------------------
+
+    @Test
+    fun theSubjectsSituation_beginsTheScenePhotoOnTheCameraScreen_andIsANotice() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        val asked = mutableListOf<Situation>()
+        model.setRemotePoseStarter { situation, answer ->
+            asked += situation
+            answer(PoseStartStep.STARTED)
+        }
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.PoseStart("half_body"))
+        runCurrent()
+
+        assertEquals(listOf(Situation.HALF_BODY), asked)
+        assertEquals(listOf<SessionNotice>(SessionNotice.RemotePoseStart("Joonhyung")), notices)
+        assertEquals(SessionMessage.PoseStartAnswer(started = true), session.sent.last())
+    }
+
+    @Test
+    fun onceTheCameraScreenIsGone_theSubjectsStartIsRefused() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        val starter: (Situation, (PoseStartStep) -> Unit) -> Unit = { _, answer -> answer(PoseStartStep.STARTED) }
+        model.setRemotePoseStarter(starter)
+        model.dropRemotePoseStarter(starter)
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.PoseStart("half_body"))
+        runCurrent()
+
+        assertTrue(notices.isEmpty())
+        assertEquals(SessionMessage.PoseStartAnswer(started = false), session.sent.last())
+    }
+
+    private fun TestScope.poseStartAnswers(): MutableList<PoseStartStep> {
+        val answers = mutableListOf<PoseStartStep>()
+        backgroundScope.launch { model.poseStartAnswers.collect { answers += it } }
+        return answers
+    }
+
+    /** The request sent last, whose number its answers name. */
+    private fun asked(): SessionMessage.PoseStart = session.sent.filterIsInstance<SessionMessage.PoseStart>().last()
+
+    private fun answerPoses(started: Boolean, asking: Boolean = false, request: Int = asked().request) {
+        session.deliver(SessionMessage.PoseStartAnswer(started, request, asking))
+    }
+
+    @Test
+    fun theSubject_asksForPosesWithItsSituation_andHearsWhatBecameOfIt() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+        assertEquals("landmark", asked().situation)
+        assertTrue(answers.isEmpty())
+
+        answerPoses(started = true)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.STARTED), answers)
+
+        model.askForPoses(Situation.SELFIE)
+        runCurrent()
+        answerPoses(started = false)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.STARTED, PoseStartStep.REFUSED), answers)
+        // Each request has its own number.
+        assertEquals(2, session.sent.filterIsInstance<SessionMessage.PoseStart>().map { it.request }.distinct().size)
+    }
+
+    @Test
+    fun aStartWithoutAnAnswer_countsAsRefusedAfterItsWait_andNotBefore() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+
+        advanceTimeBy(SessionViewModel.POSE_START_WAIT_MS - 1)
+        runCurrent()
+        assertTrue(answers.isEmpty())
+        advanceTimeBy(1)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED), answers)
+
+        // A refusal comes after all: the request was given up, and nothing more is said.
+        answerPoses(started = false)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED), answers)
+    }
+
+    @Test
+    fun whileThePhotographerIsAsked_theSubjectWaitsWithoutATimeLimit_forTheirAnswer() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+
+        // The AI notice is up on the photographer's phone, which says so at once.
+        answerPoses(started = false, asking = true)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.ASKING), answers)
+        // However long they read it.
+        advanceTimeBy(60_000)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.ASKING), answers)
+
+        answerPoses(started = true)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.ASKING, PoseStartStep.STARTED), answers)
+    }
+
+    @Test
+    fun whileARequestWaits_anotherIsNotSent_andTheFirstsAnswerIsTheOneSaid() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+        val first = asked().request
+
+        // The sheet again, and another tile, before the photographer's phone answered: one request at a time.
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+        assertEquals(1, session.sent.count { it is SessionMessage.PoseStart })
+        assertTrue(answers.isEmpty())
+
+        answerPoses(started = true, request = first)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.STARTED), answers)
+
+        // Decided: the next tile asks again.
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+        assertEquals(2, session.sent.count { it is SessionMessage.PoseStart })
+    }
+
+    @Test
+    fun whileThePhotographerIsAsked_anotherTileSaysSoAgain_andAsksNothing() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+        answerPoses(started = false, asking = true)
+        runCurrent()
+
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+
+        assertEquals(1, session.sent.count { it is SessionMessage.PoseStart })
+        assertEquals(listOf(PoseStartStep.ASKING, PoseStartStep.ASKING), answers)
+    }
+
+    @Test
+    fun aLateWordThatThePhotographerIsAsked_bringsTheGivenUpRequestBack_andItsAnswerIsSaid() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+        val request = asked().request
+        advanceTimeBy(SessionViewModel.POSE_START_WAIT_MS)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED), answers)
+
+        // The answer was kept behind a full buffer: the photographer's phone has had its notice up all along.
+        answerPoses(started = false, asking = true, request = request)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED, PoseStartStep.ASKING), answers)
+        // The request waits again, so another tile asks nothing.
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+        assertEquals(1, session.sent.count { it is SessionMessage.PoseStart })
+
+        answerPoses(started = true, request = request)
+        runCurrent()
+        assertEquals(PoseStartStep.STARTED, answers.last())
+    }
+
+    @Test
+    fun aLateStartOfAGivenUpRequest_isSaid_andALateRefusalIsNotSaidAgain() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+        val first = asked().request
+        advanceTimeBy(SessionViewModel.POSE_START_WAIT_MS)
+        runCurrent()
+
+        // The poses did begin on the photographer's phone: the subject hears it after all.
+        answerPoses(started = true, request = first)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED, PoseStartStep.STARTED), answers)
+        // Once: the same answer again says nothing.
+        answerPoses(started = true, request = first)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED, PoseStartStep.STARTED), answers)
+
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+        val second = asked().request
+        advanceTimeBy(SessionViewModel.POSE_START_WAIT_MS)
+        runCurrent()
+        answerPoses(started = false, request = second)
+        runCurrent()
+        // "Can't start AI poses right now" was said at the limit already.
+        assertEquals(listOf(PoseStartStep.REFUSED, PoseStartStep.STARTED, PoseStartStep.REFUSED), answers)
+    }
+
+    @Test
+    fun anAnswerToARequestGivenUp_isNotTheNextOnes() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+        val first = asked().request
+        advanceTimeBy(SessionViewModel.POSE_START_WAIT_MS)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED), answers)
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+
+        // The first's refusal, come late: said at its limit already, and not the second's answer.
+        answerPoses(started = false, request = first)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED), answers)
+
+        answerPoses(started = true)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED, PoseStartStep.STARTED), answers)
+    }
+
+    @Test
+    fun anAnswerNoScreenRead_andARequestThatWaits_goWithTheirSession() = runTest(dispatcher) {
+        // No screen reads the answers: Subject view is under Settings.
+        connected()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+        answerPoses(started = true)
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+
+        // The session ends, and another begins with another photographer.
+        session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        runCurrent()
+        session.setState(SessionState.Connected("s2", PeerInfo("Sungmin"), Role.SUBJECT))
+        runCurrent()
+        val answers = poseStartAnswers()
+        advanceTimeBy(SessionViewModel.POSE_START_WAIT_MS + 1)
+        runCurrent()
+
+        // Neither the old session's answer nor its request's time limit says anything in the new one.
+        assertTrue(answers.isEmpty())
+    }
+
+    @Test
+    fun withoutALink_theSubjectsSituationIsNotSent_andCountsAsRefused() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        session.setState(SessionState.Reconnecting("s1", 0L))
+        runCurrent()
+
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+
+        assertTrue(session.sent.none { it is SessionMessage.PoseStart })
+        assertEquals(listOf(PoseStartStep.REFUSED), answers)
     }
 
     /** A drop as the session says it: with the other phone's name and this phone's role (#293). */

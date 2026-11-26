@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.content.DialogInterface
@@ -10,12 +10,14 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.ViewCompat
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragmentInContainer
 import androidx.lifecycle.Lifecycle
+import androidx.navigation.testing.TestNavHostController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.android.material.button.MaterialButton
 import com.lastpenguin.pix.R
@@ -25,6 +27,7 @@ import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.FakePoseCandidateCodec
 import com.lastpenguin.pix.session.GuideReference
@@ -36,12 +39,15 @@ import com.lastpenguin.pix.session.protocol.ConfirmStep
 import com.lastpenguin.pix.session.protocol.DescriptionStep
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
+import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.camera.ExposureBarView
 import com.lastpenguin.pix.ui.camera.ExposureScale
@@ -49,6 +55,7 @@ import com.lastpenguin.pix.ui.camera.FocusBrightness
 import com.lastpenguin.pix.ui.camera.REFERENCE_HIDDEN_ALPHA
 import com.lastpenguin.pix.ui.camera.REFERENCE_PEEK_DP
 import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
+import com.lastpenguin.pix.ui.settings.TutorialFragment
 import java.time.Duration
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
@@ -110,13 +117,28 @@ import org.robolectric.shadows.ShadowDialog
  * poses opened once per description and then by the same button, opened once Add a pose guide closes when it came
  * under the sheet, a set held here shown before it, and a close after Back, which says so. A tap on the readout while
  * the photographer's pinch holds the zoom: nothing sent, and the label names the photographer (FR-7.6, #236).
- * The UAT's opinions (#271): the slot where Camera's shutter is empty until connected, then whose camera this is and
- * "Live", given up to a step's button, with no notice saying it as well; *Leave* red; the guide-edit toggle one person icon, unlit with the guide plain and lit with it
+ * The UAT's opinions (#271): the line above the shutter (#314; in the shutter's place until then) empty until
+ * connected, then whose camera this is and "Live" on one line, the name alone while a step's button shows beside the
+ * thumbnail, with no notice saying it as well; *Leave* red; the guide-edit toggle one person icon, unlit with the guide plain and lit with it
  * filled. The grid on by default and kept off. The tip, Save guide, and guide-edit buttons on glass, the
  * toggle's tinted while on (#298).
  * What the photographer did (#292): each action a line with their name where the labels show, for a label's time and
  * the focus's for its shorter one; the photographer's pinch named for as long as it, replaced by the ratio's line, gone
  * when it ends without one; another label meanwhile keeps its own time, and the line is back after it.
+ * This phone's shutter (FR-7.8, #314; state-based): dimmed before the session, connected without a frame, while the
+ * link reconnects, and during the photographer's step; while the photographer's timer counts down it cancels, said
+ * in its name and in the tutorial's tip, not under the number, with no refusal for the timer's answer; with the video showing a press asks once
+ * and holds the shutter;
+ * answered taken (free, no line), not taken (free, a line for a label's time), and not answered (the line after the
+ * wait).
+ * A result under a sheet: a start's answer and a refused press that come while Add a pose guide covers the screen,
+ * said once it is gone; and under this screen's own dialogs, "Leave the session?" and the tutorial's tips.
+ * The photographer's timer (#318): the menu's Timer between Flash and Grid, off and each value, a tap sending the
+ * request with the menu left open; the timer's and the flash's icons beside the menu's button while on, in Camera's
+ * order, each value's icon, a tap opening the menu; the shutter named for the timer; the menu's Timer waiting during
+ * the countdown; the photographer's change said where the lines show, set and off.
+ * This phone's start of AI poses (FR-6.15, #276): the answer said where the lines show, begun (who takes the scene
+ * photo), not begun, or the photographer asked to agree first; no answer, said after the wait.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -139,6 +161,14 @@ class SubjectFragmentRenderTest {
         scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix)
         idle()
         return modules
+    }
+
+    /** Subject view with its navigation in place before it starts, as in the app, so it knows what covers it. */
+    private fun launchWithNav(): Pair<TestAppContainer, TestNavHostController> {
+        val modules = TestAppContainer().install()
+        val (launched, nav) = launchPrepared<SubjectFragment>(R.id.subjectFragment) {}
+        scenario = launched
+        return modules to nav
     }
 
     private fun <T> onScreen(block: (FragmentSubjectBinding, SubjectFragment) -> T): T {
@@ -618,7 +648,7 @@ class SubjectFragmentRenderTest {
     @Test
     // At the Galaxy S22's width, where the name fits whole; CameraLayoutTest checks a name that does not.
     @Config(qualifiers = "w360dp-h705dp-xxhdpi")
-    fun theShuttersSlot_isEmptyUntilConnected_thenSaysWhoseCameraItIsAndThatItIsLive() {
+    fun theLineAboveTheShutter_isEmptyUntilConnected_thenSaysWhoseCameraItIsAndThatItIsLive() {
         val modules = launch()
         onScreen { binding, _ -> assertEquals(View.GONE, binding.cameraCaption.visibility) }
 
@@ -631,16 +661,309 @@ class SubjectFragmentRenderTest {
                 binding.cameraCaptionTitle.text.toString(),
             )
             assertEquals(string(R.string.subject_live), binding.cameraCaptionStatus.text.toString())
+            assertTrue(binding.cameraCaptionStatus.isShown)
             assertTrue(binding.cameraCaptionDot.isShown)
             assertFalse(binding.cameraCaptionSpinner.isShown)
-            // The slot names the camera for the whole session, so no notice says it as well.
+            // One line, the name and "Live" with a dot between them, whole above the shutter (#314).
+            assertEquals(LinearLayout.HORIZONTAL, binding.cameraCaption.orientation)
+            assertTrue(binding.cameraCaptionSeparator.isShown)
+            val caption = IntArray(2).also { binding.cameraCaption.getLocationInWindow(it) }
+            val shutter = IntArray(2).also { binding.shutterButton.getLocationInWindow(it) }
+            assertTrue(caption[1] + binding.cameraCaption.height <= shutter[1])
+            // The line names the camera for the whole session, so no notice says it as well.
             assertFalse(binding.toggleLabel.isShown)
         }
 
-        // The link drops: the video says so, and the slot is empty again until it is back.
+        // The link drops: the video says so, and the line is gone until it is back.
         modules.session.setState(SessionState.Reconnecting("s1", 0L))
         idle()
         onScreen { binding, _ -> assertEquals(View.GONE, binding.cameraCaption.visibility) }
+    }
+
+    // ---- This phone's shutter (FR-7.8, #314) ---------------------------------------------------------------------
+
+    private fun presses(modules: TestAppContainer) = modules.session.sent.count { it is SessionMessage.ShutterPress }
+
+    /** The answer to the press sent last, which names that press. */
+    private fun answer(modules: TestAppContainer, taken: Boolean, timer: Boolean = false) {
+        val press = modules.session.sent.filterIsInstance<SessionMessage.ShutterPress>().last().press
+        modules.session.deliver(SessionMessage.ShutterAnswer(taken, press, timer))
+    }
+
+    /** Connected, with the photographer's video showing: the video's state is looked at every 500 ms. */
+    private fun connectWithVideo(modules: TestAppContainer, name: String = "Dongje") {
+        connect(modules, name = name)
+        waitMs(600)
+    }
+
+    @Test
+    fun theShutter_isDimmedUntilThePhotographersVideoShows() {
+        val modules = launch()
+        onScreen { binding, _ ->
+            assertTrue(binding.shutterButton.isShown)
+            assertFalse(binding.shutterButton.isEnabled)
+        }
+
+        // Connected, and no frame yet: "Connecting…" over a dark video.
+        connect(modules, firstFrame = false)
+        waitMs(600)
+        onScreen { binding, _ -> assertFalse(binding.shutterButton.isEnabled) }
+
+        modules.video.deliverFrame()
+        waitMs(600)
+        onScreen { binding, _ ->
+            assertTrue(binding.shutterButton.isEnabled)
+            assertEquals(
+                string(R.string.subject_shutter, "Dongje"),
+                binding.shutterButton.contentDescription.toString(),
+            )
+        }
+    }
+
+    @Test
+    fun aPressOfTheShutter_asksThePhotographersPhoneOnce_andIsHeldUntilTheAnswer() {
+        val modules = launch()
+        connectWithVideo(modules)
+
+        onScreen { binding, _ -> binding.shutterButton.performClick() }
+        idle()
+        assertEquals(1, presses(modules))
+        // Held: a second tap asks nothing.
+        onScreen { binding, _ ->
+            assertFalse(binding.shutterButton.isEnabled)
+            binding.shutterButton.performClick()
+        }
+        idle()
+        assertEquals(1, presses(modules))
+
+        answer(modules, taken = true)
+        idle()
+        onScreen { binding, _ ->
+            assertTrue(binding.shutterButton.isEnabled)
+            // The photo says itself: the blink, "Receiving photo…", and the saved photo. No line of its own.
+            assertFalse(binding.toggleLabel.isShown)
+        }
+    }
+
+    @Test
+    fun aPressThatTookNoPhoto_isSaidWhereTheLinesShow_andFreesTheShutter() {
+        val modules = launch()
+        connectWithVideo(modules)
+        onScreen { binding, _ -> binding.shutterButton.performClick() }
+        idle()
+
+        answer(modules, taken = false)
+        idle()
+
+        assertEquals(string(R.string.subject_shutter_refused) to true, label())
+        onScreen { binding, _ -> assertTrue(binding.shutterButton.isEnabled) }
+        waitMs(SubjectFragment.LABEL_MS + 100)
+        assertFalse(label().second)
+    }
+
+    @Test
+    fun aPressWithoutAnAnswer_isSaidAfterItsWait_andFreesTheShutter() {
+        val modules = launch()
+        connectWithVideo(modules)
+        onScreen { binding, _ -> binding.shutterButton.performClick() }
+        idle()
+
+        waitMs(SubjectViewModel.SHUTTER_WAIT_MS + 100)
+
+        assertEquals(string(R.string.subject_shutter_refused) to true, label())
+        onScreen { binding, _ -> assertTrue(binding.shutterButton.isEnabled) }
+    }
+
+    @Test
+    fun whileTheLinkReconnects_theShutterIsDimmed_andTakesNoPress() {
+        val modules = launch()
+        connectWithVideo(modules)
+
+        modules.session.setState(SessionState.Reconnecting("s1", 0L))
+        waitMs(600)
+
+        onScreen { binding, _ ->
+            assertFalse(binding.shutterButton.isEnabled)
+            binding.shutterButton.performClick()
+        }
+        idle()
+        assertEquals(0, presses(modules))
+    }
+
+    @Test
+    fun whileTheTimerCountsDown_theShutterCancelsIt_andIsNamedSo_withNoLineOfItsOwn() {
+        val modules = launch()
+        connectWithVideo(modules)
+
+        modules.session.deliver(SessionMessage.Countdown(3))
+        idle()
+        onScreen { binding, _ ->
+            // Either phone's shutter stops the countdown (FR-7.8). The tutorial's tip says so, not a line here:
+            // under the number is whose photo it is, and nothing else.
+            assertTrue(binding.shutterButton.isEnabled)
+            assertEquals(
+                string(R.string.shutter_cancel_timer),
+                binding.shutterButton.contentDescription.toString(),
+            )
+            assertEquals(2, binding.countdownPanel.childCount)
+            binding.shutterButton.performClick()
+        }
+        idle()
+        assertEquals(
+            listOf(true),
+            modules.session.sent.filterIsInstance<SessionMessage.ShutterPress>().map { it.cancel },
+        )
+
+        // Stopped: the press is answered as the timer's, and the countdown goes with its 0.
+        answer(modules, taken = false, timer = true)
+        modules.session.deliver(SessionMessage.Countdown(0))
+        idle()
+        onScreen { binding, _ ->
+            assertEquals(View.GONE, binding.countdownPanel.visibility)
+            assertTrue(binding.shutterButton.isEnabled)
+            assertEquals(
+                string(R.string.subject_shutter, "Dongje"),
+                binding.shutterButton.contentDescription.toString(),
+            )
+            // No "Can't take a photo right now": nothing was asked to be taken.
+            assertFalse(binding.toggleLabel.isShown)
+        }
+    }
+
+    // ---- This phone starts AI poses (FR-6.15, #276) --------------------------------------------------------------
+
+    /** This phone picks a situation, as its sheet does, and the photographer's phone answers that request. */
+    private fun askAndAnswer(modules: TestAppContainer, started: Boolean, asking: Boolean = false) {
+        onScreen { _, fragment ->
+            fragment.requireActivity().viewModel<SessionViewModel>().askForPoses(Situation.FULL_BODY)
+        }
+        idle()
+        val request = modules.session.sent.filterIsInstance<SessionMessage.PoseStart>().last().request
+        modules.session.deliver(SessionMessage.PoseStartAnswer(started, request, asking))
+        idle()
+    }
+
+    @Test
+    fun anAnswerThatComesUnderAddAPoseGuide_isSaidOnceTheSheetIsGone() {
+        val (modules, nav) = launchWithNav()
+        connectWithVideo(modules)
+        // The photographer reads the AI notice; meanwhile this phone's user opens the sheet again.
+        askAndAnswer(modules, started = false, asking = true)
+        waitMs(SubjectFragment.LABEL_MS + 100)
+        onScreen { binding, _ -> binding.guideButton.performClick() }
+        idle()
+        assertEquals(R.id.addGuideSheet, nav.currentDestination?.id)
+
+        val request = modules.session.sent.filterIsInstance<SessionMessage.PoseStart>().last().request
+        modules.session.deliver(SessionMessage.PoseStartAnswer(started = true, request = request))
+        idle()
+        // Under the sheet the line would come and go unseen: it waits.
+        assertFalse(label().second)
+        waitMs(SubjectFragment.LABEL_MS + 100)
+
+        nav.popBackStack()
+        idle()
+        assertEquals(string(R.string.subject_poses_started, "Dongje") to true, label())
+    }
+
+    @Test
+    fun aRefusedPressThatIsAnsweredUnderAddAPoseGuide_isSaidOnceTheSheetIsGone() {
+        val (modules, nav) = launchWithNav()
+        connectWithVideo(modules)
+        onScreen { binding, _ -> binding.shutterButton.performClick() }
+        idle()
+        onScreen { binding, _ -> binding.guideButton.performClick() }
+        idle()
+        assertEquals(R.id.addGuideSheet, nav.currentDestination?.id)
+
+        answer(modules, taken = false)
+        idle()
+        assertFalse(label().second)
+
+        nav.popBackStack()
+        idle()
+        assertEquals(string(R.string.subject_shutter_refused) to true, label())
+    }
+
+    @Test
+    fun aRefusedPressThatIsAnsweredUnderLeaveTheSession_isSaidOnceTheQuestionIsGone() {
+        val modules = launch()
+        connectWithVideo(modules)
+        onScreen { binding, _ -> binding.shutterButton.performClick() }
+        idle()
+        onScreen { binding, _ -> binding.leaveButton.performClick() }
+        idle()
+
+        answer(modules, taken = false)
+        idle()
+        // The question covers the line's place, and a touch on it would answer the question.
+        assertFalse(label().second)
+
+        leaveQuestion().getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
+        idle()
+        assertEquals(string(R.string.subject_shutter_refused) to true, label())
+    }
+
+    @Test
+    fun anAnswerThatComesUnderTheTutorialsTips_isSaidOnceTheyAreClosed() {
+        val modules = launch()
+        connectWithVideo(modules)
+        onScreen { _, fragment -> TutorialFragment.show(fragment, TutorialScreen.SUBJECT_VIEW) }
+        idle()
+
+        askAndAnswer(modules, started = true)
+        assertFalse(label().second)
+
+        onScreen { _, fragment -> TutorialFragment.over(fragment)!!.dismiss() }
+        idle()
+        assertEquals(string(R.string.subject_poses_started, "Dongje") to true, label())
+    }
+
+    @Test
+    fun aSituationThePhotographersPhoneTookUp_saysWhoTakesTheScenePhoto() {
+        val modules = launch()
+        connectWithVideo(modules)
+
+        askAndAnswer(modules, started = true)
+
+        assertEquals(string(R.string.subject_poses_started, "Dongje") to true, label())
+        waitMs(SubjectFragment.LABEL_MS + 100)
+        assertFalse(label().second)
+    }
+
+    @Test
+    fun aSituationThePhotographersPhoneCouldNotTakeUp_saysSo() {
+        val modules = launch()
+        connectWithVideo(modules)
+
+        askAndAnswer(modules, started = false)
+
+        assertEquals(string(R.string.subject_poses_refused) to true, label())
+    }
+
+    @Test
+    fun whileThePhotographerIsAskedToAgree_theSubjectIsToldTheyWait() {
+        val modules = launch()
+        connectWithVideo(modules)
+
+        askAndAnswer(modules, started = false, asking = true)
+
+        assertEquals(string(R.string.subject_poses_asking, "Dongje") to true, label())
+    }
+
+    @Test
+    fun aSituationThatGetsNoAnswer_saysAfterItsWaitThatThePosesCannotStart() {
+        val modules = launch()
+        connectWithVideo(modules)
+        onScreen { _, fragment ->
+            fragment.requireActivity().viewModel<SessionViewModel>().askForPoses(Situation.FULL_BODY)
+        }
+        idle()
+        assertFalse(label().second)
+
+        waitMs(SessionViewModel.POSE_START_WAIT_MS + 100)
+
+        assertEquals(string(R.string.subject_poses_refused) to true, label())
     }
 
     @Test
@@ -701,6 +1024,130 @@ class SubjectFragmentRenderTest {
 
         assertTrue(modules.session.sent.any { it == SessionMessage.FlashSet(FlashMode.AUTO) })
         onScreen { binding, _ -> assertEquals(View.VISIBLE, binding.cameraMenu.visibility) }
+    }
+
+    // ---- The photographer's timer in the menu and beside its button (#318) ----------------------------------------
+
+    private fun state(modules: TestAppContainer, timer: Int = 0, flash: FlashMode = FlashMode.OFF) {
+        modules.session.deliver(
+            SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, flash = flash, timer = timer),
+        )
+        idle()
+    }
+
+    @Test
+    fun theMenusTimer_isBetweenFlashAndGrid_andSetsThePhotographersTimer() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, hasFlash = true)
+        onScreen { binding, _ -> binding.cameraMenuButton.performClick() }
+        idle()
+
+        onScreen { binding, _ ->
+            // Camera's order: Flash, Timer, Grid.
+            val items = (0 until binding.cameraMenu.childCount).map { binding.cameraMenu.getChildAt(it) }
+            assertEquals(items.indexOf(binding.menuFlash) + 1, items.indexOf(binding.menuTimer))
+            assertEquals(items.indexOf(binding.menuTimer) + 1, items.indexOf(binding.menuGrid))
+            assertTrue(binding.menuTimer.isShown)
+            assertFalse(binding.menuTimer.isActivated)
+            assertEquals(string(R.string.timer_off), binding.menuTimer.contentDescription.toString())
+            assertEquals(R.drawable.ic_menu_timer_off, binding.menuTimerIcon.tag)
+            binding.menuTimer.performClick()
+        }
+        idle()
+
+        assertEquals(listOf(3), modules.session.sent.filterIsInstance<SessionMessage.TimerSet>().map { it.seconds })
+        onScreen { binding, _ ->
+            // The menu stays open, and its item says what the timer is now.
+            assertEquals(View.VISIBLE, binding.cameraMenu.visibility)
+            assertTrue(binding.menuTimer.isActivated)
+            assertEquals(string(R.string.timer_seconds, 3), binding.menuTimer.contentDescription.toString())
+            assertEquals(R.drawable.ic_menu_timer_3, binding.menuTimerIcon.tag)
+        }
+        state(modules, timer = 10)
+        onScreen { binding, _ -> assertEquals(R.drawable.ic_menu_timer_10, binding.menuTimerIcon.tag) }
+    }
+
+    @Test
+    fun theTimer_andTheFlash_showBesideTheMenusButtonWhileOn_asOnCamera_andATapOpensTheMenu() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, hasFlash = true)
+        onScreen { binding, _ ->
+            assertFalse(binding.timerIndicator.isShown)
+            assertFalse(binding.flashIndicator.isShown)
+        }
+
+        state(modules, timer = 3)
+        onScreen { binding, _ ->
+            assertTrue(binding.timerIndicator.isShown)
+            assertEquals(R.drawable.ic_timer_3, binding.timerIndicator.tag)
+            assertFalse(binding.flashIndicator.isShown)
+        }
+        state(modules, timer = 10, flash = FlashMode.AUTO)
+        onScreen { binding, _ ->
+            assertEquals(R.drawable.ic_timer_10, binding.timerIndicator.tag)
+            assertTrue(binding.flashIndicator.isShown)
+            assertEquals(R.drawable.ic_flash_auto, binding.flashIndicator.tag)
+            // The flash first, then the timer, as in Camera's bar.
+            val flash = IntArray(2).also { binding.flashIndicator.getLocationInWindow(it) }
+            val timer = IntArray(2).also { binding.timerIndicator.getLocationInWindow(it) }
+            assertTrue(flash[0] + binding.flashIndicator.width <= timer[0])
+            // The icons are 16 dp: what takes the tap is an area of its own over them (NFR-16).
+            assertFalse(binding.timerIndicator.isClickable)
+            assertTrue(binding.indicatorsTouch.isShown)
+            binding.indicatorsTouch.performClick()
+        }
+        idle()
+        onScreen { binding, _ -> assertEquals(View.VISIBLE, binding.cameraMenu.visibility) }
+
+        state(modules)
+        onScreen { binding, _ ->
+            assertFalse(binding.timerIndicator.isShown)
+            assertFalse(binding.flashIndicator.isShown)
+            assertFalse(binding.indicatorsTouch.isShown)
+        }
+    }
+
+    @Test
+    fun withTheTimerOn_theShutterIsNamedForIt_andTheMenusTimerWaitsWhileItCountsDown() {
+        val modules = launch()
+        connectWithVideo(modules)
+        state(modules, timer = 3)
+        onScreen { binding, _ ->
+            assertEquals(
+                string(R.string.subject_shutter_timer, "Dongje", 3),
+                binding.shutterButton.contentDescription.toString(),
+            )
+            assertTrue(binding.menuTimer.isEnabled)
+        }
+
+        modules.session.deliver(SessionMessage.Countdown(3))
+        idle()
+        onScreen { binding, _ ->
+            // As Camera's own Timer waits while it counts down (FR-1.17).
+            assertFalse(binding.menuTimer.isEnabled)
+            binding.menuTimer.performClick()
+        }
+        idle()
+        assertTrue(modules.session.sent.none { it is SessionMessage.TimerSet })
+    }
+
+    @Test
+    fun whatThePhotographerSetTheTimerTo_isSaidWhereTheLinesShow() {
+        val modules = launch()
+        connectWithVideo(modules)
+
+        modules.session.deliver(SessionMessage.PhotographerDid("timer", seconds = 3))
+        idle()
+        onScreen { binding, _ ->
+            assertTrue(binding.toggleLabel.isShown)
+            assertEquals(string(R.string.remote_timer_notice, "Dongje", 3), binding.toggleLabel.text.toString())
+        }
+
+        modules.session.deliver(SessionMessage.PhotographerDid("timer", seconds = 0))
+        idle()
+        onScreen { binding, _ ->
+            assertEquals(string(R.string.remote_timer_off_notice, "Dongje"), binding.toggleLabel.text.toString())
+        }
     }
 
     @Test
@@ -1455,8 +1902,19 @@ class SubjectFragmentRenderTest {
             assertEquals(string(R.string.peer_creating_poses, "Dongje"), binding.connectingText.text.toString())
             assertEquals(View.VISIBLE, binding.pickPoseButton.visibility)
             assertEquals(string(R.string.generating_title), binding.pickPoseLabel.text.toString())
-            // The step's button takes the slot where the camera's name is (#271).
-            assertEquals(View.GONE, binding.cameraCaption.visibility)
+            // The step's button has its own place, beside the thumbnail (#314), so the camera's name stays; "Live"
+            // goes, since the video's text says what the photographer does, and so does the shutter's use.
+            assertEquals(View.VISIBLE, binding.cameraCaption.visibility)
+            assertTrue(binding.cameraCaptionTitle.isShown)
+            assertFalse(binding.cameraCaptionStatus.isShown)
+            // The red dot says "live", as the light over the video does: it goes with "Live".
+            assertFalse(binding.cameraCaptionDot.isShown)
+            assertFalse(binding.shutterButton.isEnabled)
+            val step = IntArray(2).also { binding.pickPoseButton.getLocationInWindow(it) }
+            val shutter = IntArray(2).also { binding.shutterButton.getLocationInWindow(it) }
+            val thumbnail = IntArray(2).also { binding.galleryThumbnail.getLocationInWindow(it) }
+            assertTrue(shutter[0] + binding.shutterButton.width <= step[0])
+            assertTrue(step[0] < thumbnail[0])
         }
 
         // Back keeps it closed, though Subject view renders again; its button opens it again.

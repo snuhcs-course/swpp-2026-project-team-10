@@ -1,12 +1,14 @@
-# AI-generated with Claude Code, 2026-10-13, reviewed by Jaewan Park
+# AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park
 name: server-deploy
 
 # GitHub cannot push to the course servers, so each server pulls its branch and deploys it by itself.
-# This workflow only watches: it waits until the server reports the pushed commit at /version,
-# so a deploy that failed or never ran shows on the commit.
+# This workflow only watches: it waits until the server reports the commit at /version,
+# so a deploy that failed or never ran shows on the commit. Run by hand on main or dev, it watches that branch's
+# newest commit, for one pushed while the workflow was off.
 on:
   push:
     branches: [dev, main]
+  workflow_dispatch:
 
 permissions: {}
 
@@ -18,12 +20,14 @@ concurrency:
 jobs:
   wait:
     name: server-deploy
+    # Only main and dev have a server; any other branch's commit would never show.
+    if: github.ref_name == 'main' || github.ref_name == 'dev'
     runs-on: ubuntu-latest
     # A deploy builds the image and may wait up to 10 minutes for open rooms before it switches.
     timeout-minutes: 30
     env:
-      # Server A runs main, Server B runs dev (Design 2.8, Hosting).
-      SERVER_URL: ${{ github.ref_name == 'main' && 'http://swpp26t10.147-46-242-169.sslip.io' || 'http://swpp26t10.147-46-242-174.sslip.io' }}
+      # Server A runs main, Server B runs dev, each behind the course's HTTPS proxy (Design 2.8, Hosting).
+      SERVER_URL: ${{ github.ref_name == 'main' && 'https://team10.swpp-2026-a.snu.ac.kr' || 'https://team10.swpp-2026-b.snu.ac.kr' }}
     steps:
       - name: Wait until the server reports this commit
         run: |

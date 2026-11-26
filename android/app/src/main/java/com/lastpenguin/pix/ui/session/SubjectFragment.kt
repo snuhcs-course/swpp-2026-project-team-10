@@ -1,8 +1,9 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.animation.Animator
 import android.animation.ValueAnimator
+import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
@@ -11,6 +12,8 @@ import android.text.TextUtils
 import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.annotation.ColorRes
@@ -23,6 +26,7 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.Accessibilit
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -35,13 +39,16 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.PhotographerAction
+import com.lastpenguin.pix.session.PoseStartStep
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.settings.TutorialScreen
+import com.lastpenguin.pix.ui.FlowProgressView
 import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.NoticeAnchor
 import com.lastpenguin.pix.ui.NoticeLength
@@ -97,9 +104,16 @@ import java.text.DecimalFormat
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.webrtc.RendererCommon
@@ -111,15 +125,16 @@ import org.webrtc.VideoSink
  * Subject view (R&S 6.6): the photographer's live video, fitted to their frame, with their name and *Leave*.
  * A pinch on the video zooms the photographer's camera while guide-edit mode is off, with the Camera screen's
  * readout (FR-7.1, AD-17); with the mode on, drags and pinches move the photographer's guide (FR-7.2). The
- * brightness slider and the flash button are the photographer's controls on this phone (FR-7.3), and the guide's
+ * brightness bar and the camera menu's flash are the photographer's controls on this phone (FR-7.3), and the guide's
  * reference photo sits in a corner as on their Camera screen (FR-3.9). *Guide* opens Add a pose guide, whose guide
  * goes to the photographer (FR-6.15, Design 2.6.5), and *Save guide* keeps the guide on this phone (FR-6.16). While
  * the photographer describes or creates poses, picks one, or checks its guide, the video says so, and their *Generate
  * poses*, candidates, and the chosen pose's outline open on this phone's screens of the same steps (Design 2.6.5).
  * The bottom row is Camera's: *Guide* at the left, and the session's newest photo as a thumbnail at the right, empty
  * until the first, which opens the session's photos in a viewer over the screen, inside Pix, so the session goes on
- * (FR-6.14). In the middle, where Camera's shutter is, it says whose camera this is and that it is live, or that a
- * photo is coming (#271), for the whole session, so no notice says it again.
+ * (FR-6.14). In the middle, Camera's shutter asks the photographer's phone for a photo (FR-7.8, #314), and the line
+ * right above it says whose camera this is and that it is live, or that a photo is coming (#271), for the whole
+ * session, so no notice says it again.
  * System back closes the viewer, or else asks first (R&S 6.9). The first time the video shows, the tutorial's tips of
  * this screen come over it (FR-10.4). The video fades in, dims under a text, moves to the photographer's new ratio as
  * their frame does, and blinks at their shutter (Design 2.6.4). Leaving for another screen, the video goes at once and
@@ -143,6 +158,9 @@ class SubjectFragment :
     private var watchdog: FrameWatchdog? = null
     private var referenceDrag: ReferenceDragController? = null
     private var leaveDialog: AlertDialog? = null
+
+    // True while "Leave the session?" is up: it covers this screen without being another destination ([uncovered]).
+    private val leaveAsked = MutableStateFlow(false)
     private var turningIcons: TurningIcons? = null
     private var photoViewer: PhotoViewer? = null
     private var toggleLabelJob: Job? = null
@@ -207,10 +225,10 @@ class SubjectFragment :
         }
         // The zoom row stays above the tip as it opens and closes.
         binding.bottomOverlays.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeZoomRow(binding) }
-        // The camera's name is fitted to the slot's width, known only after layout.
-        binding.cameraCaptionTitle.addOnLayoutChangeListener { title, left, _, right, _, oldLeft, _, oldRight, _ ->
+        // The camera's name is fitted to the width above the shutter, known only after layout.
+        binding.bottomOverlays.addOnLayoutChangeListener { overlays, left, _, right, _, oldLeft, _, oldRight, _ ->
             if (right - left != oldRight - oldLeft) {
-                title.post { if (view != null) renderCaption(binding, viewModel.uiState.value) }
+                overlays.post { if (view != null) renderCaption(binding, viewModel.uiState.value) }
             }
         }
         binding.root.addOnLayoutChangeListener(placeVideo)
@@ -243,7 +261,10 @@ class SubjectFragment :
                 binding.countdownNumber,
             ),
             views = listOf(
+                binding.flashIndicator,
+                binding.timerIndicator,
                 binding.menuFlash,
+                binding.menuTimer,
                 binding.menuGrid,
                 binding.menuSettings,
                 binding.guideButton,
@@ -263,6 +284,8 @@ class SubjectFragment :
             viewModel.setBrightnessOpen(false)
         }
         setupMenu(binding)
+        // The pose flow's bar starts empty on the subject's first step (#210), whatever this phone showed before.
+        FlowProgressView.shownStep = 0
         // The session's photos open over the video, inside Pix, so the session goes on (FR-6.14).
         binding.galleryButton.setOnClickListener { viewModel.openPhotos() }
         val photoViewer =
@@ -273,11 +296,15 @@ class SubjectFragment :
                 thumbnail = { thumbnailOf(it) },
                 onBack = viewModel::closePhotos,
                 onDelete = viewModel::deletePhoto,
+                opensFrom = binding.galleryButton,
             )
         this.photoViewer = photoViewer
         binding.guideButton.setOnClickListener { findNavController().navigate(R.id.action_subject_to_addGuide) }
         binding.saveGuideButton.setOnClickListener { viewModel.onSaveGuide() }
         setupTip(binding)
+        // This phone's shutter (FR-7.8, #314): the photographer's phone takes the photo and tells of it as of any
+        // other, so the blink, "Receiving photo…", and the saved photo follow as they do for the photographer's own.
+        binding.shutterButton.setOnClickListener { viewModel.onShutter() }
         binding.pickPoseButton.setOnClickListener {
             val ui = viewModel.uiState.value
             when {
@@ -369,6 +396,7 @@ class SubjectFragment :
                         photoViewer.render(ui.photos, ui.photosOpen)
                         renderPoses(binding, ui)
                         renderCaption(binding, ui)
+                        renderShutter(binding, ui)
                         renderCameraControls(binding, ui)
                         val ratio = zoomFormat.format(ui.zoom)
                         binding.zoomReadout.text = getString(R.string.zoom_ratio, ratio)
@@ -419,6 +447,29 @@ class SubjectFragment :
                 launch { viewModel.photographerFocus.collect { showPhotographerFocus(binding, it) } }
                 // What the photographer did on their own camera, said where this screen's labels show (FR-7.4, #292).
                 launch { viewModel.photographerLines.collect { showPhotographerLine(binding, it) } }
+                // What became of this phone's own asks, each in a line of a label's time: said only while this screen
+                // is what its user looks at. Under Add a pose guide, another screen, or the photos, the line would
+                // come and go unseen, so it is left where it waits until the screen is uncovered.
+                launch {
+                    uncovered().collectLatest { shown ->
+                        if (!shown) return@collectLatest
+                        coroutineScope {
+                            // The situation this phone picked for AI poses (FR-6.15, #276).
+                            launch { sessionViewModel.poseStartAnswers.collect { showPoseStart(binding, it) } }
+                            // A press that took no photo (FR-7.8, #314).
+                            launch {
+                                viewModel.shutterRefusals.collect {
+                                    showToggleLabel(
+                                        binding,
+                                        getString(R.string.subject_shutter_refused),
+                                        R.drawable.ic_alert_small,
+                                        R.color.pix_text,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
                 launch {
                     // The photographer's pinch is named from its first step to its end; the ratio's line replaces it.
                     viewModel.photographerZooming.collect { zooming ->
@@ -655,6 +706,7 @@ class SubjectFragment :
         binding.liveDot.isVisible = streaming && !stalled
         // Not while a pose step's text or the session photo covers the video, which then is not what the tips show.
         videoShowing.value = streaming && !stalled && poses == null && !viewModel.uiState.value.photosOpen
+        renderShutter(binding, viewModel.uiState.value)
         binding.connectingText.text = when {
             reconnecting -> getString(R.string.reconnecting)
             !connected || (!frames.hasFrame() && poses == null) -> getString(R.string.connecting)
@@ -892,7 +944,19 @@ class SubjectFragment :
         val generating = generating(ui)
         val confirming = confirming(ui)
         val describing = describing(ui)
-        binding.pickPoseButton.isVisible = picking || generating || confirming || describing
+        val step = picking || generating || confirming || describing
+        binding.pickPoseButton.isVisible = step
+        // The right third is the thumbnail's alone, in its middle as Camera's gallery button, or the step's button's
+        // and the thumbnail's, each as far from that middle (#314).
+        val density = resources.displayMetrics.density
+        binding.galleryButton.translationX = if (step) STEP_BESIDE_THUMBNAIL_DP * density else 0f
+        // The step's name is centered under its icon and may be wider than it, never as far as the shutter: on a
+        // narrow phone it takes two lines sooner.
+        val row = binding.guideRow.width
+        if (row > 0) {
+            val toShutter = row / 3f - (STEP_BESIDE_THUMBNAIL_DP + SHUTTER_HALF_DP + STEP_CLEAR_OF_SHUTTER_DP) * density
+            binding.pickPoseLabel.maxWidth = (2 * toShutter).toInt().coerceAtLeast((MIN_TOUCH_DP * density).toInt())
+        }
         val label = when {
             confirming -> R.string.pose_guide_title
             describing -> R.string.describe_title
@@ -920,36 +984,165 @@ class SubjectFragment :
     }
 
     /**
-     * The slot where Camera's shutter is (#271), once connected and while no step's button takes it: whose camera this
-     * is and that it is live, or, from the photographer's shutter until the photo is saved here, that it is coming
-     * (FR-6.14).
+     * Whether this screen itself is what its user looks at: the current destination, so not under a sheet such as Add
+     * a pose guide, which leaves it started, and not under its own photos or a dialog of its own, "Leave the session?"
+     * or the tutorial's tips. A new dialog of this screen belongs here too.
      */
-    private fun renderCaption(binding: FragmentSubjectBinding, ui: SubjectUiState) {
-        binding.cameraCaption.isVisible = ui.connected && !binding.pickPoseButton.isVisible
-        val title = cameraTitle(binding.cameraCaptionTitle, ui.photographerName)
-        if (binding.cameraCaptionTitle.text.toString() != title) binding.cameraCaptionTitle.text = title
-        binding.cameraCaptionDot.isVisible = !ui.receivingPhoto
-        binding.cameraCaptionSpinner.isVisible = ui.receivingPhoto
-        binding.cameraCaptionStatus.setText(
-            if (ui.receivingPhoto) R.string.subject_receiving_photo else R.string.subject_live,
-        )
+    private fun uncovered(): Flow<Boolean> {
+        // Without a navigation controller, as in a screen test, nothing can cover it but its photos.
+        val nav = runCatching { findNavController() }.getOrNull()
+        val onTop = if (nav == null) {
+            flowOf(true)
+        } else {
+            callbackFlow {
+                val listener = NavController.OnDestinationChangedListener { _, destination, _ ->
+                    trySend(destination.id == R.id.subjectFragment)
+                }
+                nav.addOnDestinationChangedListener(listener)
+                awaitClose { nav.removeOnDestinationChangedListener(listener) }
+            }
+        }
+        val photos = viewModel.uiState.map { it.photosOpen }
+        return combine(onTop, photos, leaveAsked, tutorialOver()) { top, open, leaving, tips ->
+            top && !open && !leaving && !tips
+        }.distinctUntilChanged()
+    }
+
+    /** Whether the tutorial's tips are over this screen: a child dialog, so the destination stays this one. */
+    private fun tutorialOver(): Flow<Boolean> = callbackFlow {
+        val fragments = childFragmentManager
+        val watcher = object : FragmentManager.FragmentLifecycleCallbacks() {
+            override fun onFragmentAttached(manager: FragmentManager, fragment: Fragment, context: Context) {
+                if (fragment is TutorialFragment) trySend(true)
+            }
+
+            override fun onFragmentDetached(manager: FragmentManager, fragment: Fragment) {
+                if (fragment is TutorialFragment) trySend(false)
+            }
+        }
+        trySend(TutorialFragment.over(this@SubjectFragment) != null)
+        fragments.registerFragmentLifecycleCallbacks(watcher, false)
+        awaitClose { fragments.unregisterFragmentLifecycleCallbacks(watcher) }
     }
 
     /**
-     * "Dongje's camera" for the slot: the name is the photographer's account, or their phone's while signed out, which
-     * can be long, such as "길동의 Galaxy S23 Ultra". The text gets smaller down to its smallest size first; a name
-     * that still does not fit is cut short, so "'s camera" stays.
+     * What became of the situation this phone picked for AI poses (FR-6.15, #276): the photographer takes the scene
+     * photo next, is asked to agree first, or their phone could not begin.
      */
-    private fun cameraTitle(view: TextView, name: String?): String {
-        if (name == null) return getString(R.string.subject_title_placeholder)
-        val full = getString(R.string.subject_title, name)
-        val width = (view.width - view.totalPaddingLeft - view.totalPaddingRight).toFloat()
-        if (width <= 0f) return full
-        val paint = TextPaint(view.paint).apply { textSize = view.autoSizeMinTextSize.toFloat() }
+    private fun showPoseStart(binding: FragmentSubjectBinding, step: PoseStartStep) {
+        val name = viewModel.uiState.value.photographerName
+        when (step) {
+            // Their phone shows the AI notice first: this one waits, and says so.
+            PoseStartStep.ASKING -> if (name != null) {
+                showToggleLabel(
+                    binding,
+                    getString(R.string.subject_poses_asking, name),
+                    R.drawable.ic_sparkle,
+                    R.color.pix_text,
+                )
+            }
+
+            PoseStartStep.STARTED -> if (name != null) {
+                showToggleLabel(
+                    binding,
+                    getString(R.string.subject_poses_started, name),
+                    R.drawable.ic_sparkle,
+                    R.color.pix_text,
+                )
+            }
+
+            PoseStartStep.REFUSED -> showToggleLabel(
+                binding,
+                getString(R.string.subject_poses_refused),
+                R.drawable.ic_alert_small,
+                R.color.pix_text,
+            )
+        }
+    }
+
+    /**
+     * The line right above the shutter, once connected (#314; in the shutter's place before it, #271): whose camera
+     * this is and that it is live, or, from the photographer's shutter until the photo is saved here, that it is coming
+     * (FR-6.14). While a step's button shows, the video's own text says what the photographer does, so the line is
+     * the name alone, without the red dot. The open tip takes the line's place until a touch closes it: at the largest font the two do not
+     * fit above the shutter together.
+     */
+    private fun renderCaption(binding: FragmentSubjectBinding, ui: SubjectUiState) {
+        binding.cameraCaption.isVisible = ui.connected && ui.tip?.open != true
+        val receiving = ui.receivingPhoto
+        val live = !receiving && !binding.pickPoseButton.isVisible
+        binding.cameraCaptionName.isVisible = !receiving
+        // The red dot says "live", as the light over the video does: not beside the name of a camera that is off.
+        binding.cameraCaptionDot.isVisible = live
+        binding.cameraCaptionSpinner.isVisible = receiving
+        binding.cameraCaptionStatus.isVisible = receiving || live
+        binding.cameraCaptionStatus.setText(
+            if (receiving) R.string.subject_receiving_photo else R.string.subject_live,
+        )
+        fitCaption(binding, ui.photographerName, live)
+    }
+
+    /**
+     * One line while the name and "Live" fit the width above the shutter; at a font too large for that, the name
+     * stands over "Live". The name is the photographer's account, or their phone's while signed out, which can be
+     * long, such as "길동의 Galaxy S23 Ultra": one that does not fit its line is cut short, so "'s camera" stays.
+     */
+    private fun fitCaption(binding: FragmentSubjectBinding, name: String?, live: Boolean) {
+        val title = binding.cameraCaptionTitle
+        val overlays = binding.bottomOverlays
+        val dot = binding.cameraCaptionDot
+        val gap = (dot.layoutParams as ViewGroup.MarginLayoutParams).marginEnd
+        val room = overlays.width - overlays.paddingLeft - overlays.paddingRight -
+            if (live) dot.layoutParams.width + gap else 0
+        val full =
+            if (name == null) getString(R.string.subject_title_placeholder) else getString(R.string.subject_title, name)
+        val status = if (live) {
+            val separator = binding.cameraCaptionSeparator
+            separator.paint.measureText(separator.text.toString()) +
+                binding.cameraCaptionStatus.paint.measureText(getString(R.string.subject_live)) + 2 * gap
+        } else {
+            0f
+        }
+        // Before the first layout the width is not known: the whole name, fitted once it is.
+        val oneLine = room <= 0 || title.paint.measureText(full) + status <= room
+        binding.cameraCaption.orientation = if (oneLine) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+        binding.cameraCaptionSeparator.isVisible = live && oneLine
+        val text = cameraTitle(title, name, full, if (oneLine) room - status else room.toFloat())
+        if (title.text.toString() != text) title.text = text
+    }
+
+    /** [full], or with [name] cut short when it is wider than [width], so "'s camera" stays. */
+    private fun cameraTitle(view: TextView, name: String?, full: String, width: Float): String {
+        if (name == null || width <= 0f) return full
+        val paint = TextPaint(view.paint)
         if (paint.measureText(full) <= width) return full
         val rest = paint.measureText(getString(R.string.subject_title, ""))
         val short = TextUtils.ellipsize(name, paint, (width - rest).coerceAtLeast(0f), TextUtils.TruncateAt.END)
         return getString(R.string.subject_title, short)
+    }
+
+    /**
+     * This phone's shutter (FR-7.8, #314): dimmed while the photographer's video does not show, as while the link
+     * reconnects or their camera is off for a pose's step, and while a press waits for its answer. While the
+     * photographer's timer counts down it stops the countdown, as Camera's own does, and is named so (FR-1.17); the
+     * tutorial's tip on it says so, and no line on the screen.
+     */
+    private fun renderShutter(binding: FragmentSubjectBinding, ui: SubjectUiState) {
+        binding.shutterButton.isEnabled = ui.connected && videoShowing.value && !ui.shutterWaiting
+        val name = ui.photographerName
+        val timer = ui.timer
+        binding.shutterButton.contentDescription = when {
+            ui.countdown != null -> getString(R.string.shutter_cancel_timer)
+
+            // With the photographer's timer on, a press starts its countdown (FR-7.8, #318), and the shutter says so.
+            name == null && timer != ShutterTimer.OFF -> getString(R.string.shutter_timer, timer.seconds)
+
+            name == null -> getString(R.string.shutter)
+
+            timer != ShutterTimer.OFF -> getString(R.string.subject_shutter_timer, name, timer.seconds)
+
+            else -> getString(R.string.subject_shutter, name)
+        }
     }
 
     /**
@@ -1061,8 +1254,12 @@ class SubjectFragment :
      * one and comes back to it when the session ends (#204).
      */
     private fun setupMenu(binding: FragmentSubjectBinding) {
-        binding.cameraMenuButton.setOnClickListener { viewModel.setMenuOpen(!viewModel.uiState.value.menuOpen) }
+        val toggle = View.OnClickListener { viewModel.setMenuOpen(!viewModel.uiState.value.menuOpen) }
+        binding.cameraMenuButton.setOnClickListener(toggle)
+        // A tap on the icons beside the button opens the menu too, as on Camera, through the area over them.
+        binding.indicatorsTouch.setOnClickListener(toggle)
         binding.menuFlash.setOnClickListener { viewModel.onFlashTap() }
+        binding.menuTimer.setOnClickListener { viewModel.onTimerTap() }
         binding.menuGrid.setOnClickListener { settingsViewModel.toggleShowGrid() }
         binding.menuSettings.setOnClickListener {
             viewModel.setMenuOpen(false)
@@ -1072,16 +1269,42 @@ class SubjectFragment :
     }
 
     /**
-     * The camera menu's button and items, each in the accent while what it sets is on (FR-1.17): the photographer's
-     * flash, only when their camera has one (FR-7.3), and this phone's grid.
+     * The camera menu's button, the photographer's flash and timer beside it while either is on, as Camera shows its
+     * own, and the menu's items, each in the accent while what it sets is on (FR-1.17): the photographer's flash, only
+     * when their camera has one (FR-7.3), their timer (#318), and this phone's grid.
      */
     private fun renderMenu(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         binding.cameraMenuButton.isActivated = ui.menuOpen
         binding.cameraMenu.reveal(ui.menuOpen)
+        val flashOn = ui.hasFlash && ui.flash != FlashMode.OFF
+        val timerOn = ui.timer != ShutterTimer.OFF
+        binding.flashIndicator.isVisible = flashOn
+        binding.timerIndicator.isVisible = timerOn
+        binding.indicatorsTouch.isVisible = flashOn || timerOn
+        setImageOnce(
+            binding.flashIndicator,
+            when (ui.flash) {
+                FlashMode.OFF -> R.drawable.ic_flash_off
+                FlashMode.AUTO -> R.drawable.ic_flash_auto
+                FlashMode.ON -> R.drawable.ic_flash_on
+            },
+        )
+        setImageOnce(binding.timerIndicator, timerIcon(ui.timer))
         binding.menuFlash.isVisible = ui.hasFlash
-        // The photographer's flash waits while their timer counts down, as on their phone (FR-1.17).
+        // The photographer's flash and timer wait while their timer counts down, as on their phone (FR-1.17).
         binding.menuFlash.isEnabled = ui.connected && ui.countdown == null
-        binding.menuFlash.isActivated = ui.flash != FlashMode.OFF
+        binding.menuFlash.isActivated = flashOn
+        binding.menuTimer.isEnabled = ui.connected && ui.countdown == null
+        binding.menuTimer.isActivated = timerOn
+        setImageOnce(
+            binding.menuTimerIcon,
+            when (ui.timer) {
+                ShutterTimer.OFF -> R.drawable.ic_menu_timer_off
+                ShutterTimer.THREE -> R.drawable.ic_menu_timer_3
+                ShutterTimer.TEN -> R.drawable.ic_menu_timer_10
+            },
+        )
+        binding.menuTimer.contentDescription = timerText(ui.timer)
         val icon = when (ui.flash) {
             FlashMode.OFF -> R.drawable.ic_menu_flash_off
             FlashMode.AUTO -> R.drawable.ic_menu_flash_auto
@@ -1101,6 +1324,25 @@ class SubjectFragment :
         val grid = settingsViewModel.showGrid.value
         binding.menuGrid.isActivated = grid
         binding.menuGrid.contentDescription = getString(if (grid) R.string.grid_on else R.string.grid_off)
+    }
+
+    /** The timer beside the menu's button, at the weight of the top bar's icons; never off, which shows none. */
+    @DrawableRes
+    private fun timerIcon(timer: ShutterTimer): Int =
+        if (timer == ShutterTimer.TEN) R.drawable.ic_timer_10 else R.drawable.ic_timer_3
+
+    /** "Timer off", or "Timer 3 s": the menu's item as TalkBack reads it, as on Camera. */
+    private fun timerText(timer: ShutterTimer): String = if (timer == ShutterTimer.OFF) {
+        getString(R.string.timer_off)
+    } else {
+        getString(R.string.timer_seconds, timer.seconds)
+    }
+
+    /** Sets [image]'s drawable only when it changes, which the tag remembers: a render comes with every zoom step. */
+    private fun setImageOnce(image: ImageView, @DrawableRes icon: Int) {
+        if (image.tag == icon) return
+        image.tag = icon
+        image.setImageResource(icon)
     }
 
     /** The photographer's timer counting down (FR-1.17): the seconds left over the video, and whose photo it is. */
@@ -1311,7 +1553,9 @@ class SubjectFragment :
             .setTitle(R.string.leave_session_title)
             .setPositiveButton(R.string.leave) { _, _ -> leaveNow() }
             .setNegativeButton(R.string.cancel, null)
+            .setOnDismissListener { leaveAsked.value = false }
             .show()
+        leaveAsked.value = true
     }
 
     private fun leaveNow() {
@@ -1415,6 +1659,22 @@ class SubjectFragment :
                     white,
                 )
 
+                is PhotographerAction.Timer -> if (action.timer == ShutterTimer.OFF) {
+                    showToggleLabel(
+                        binding,
+                        getString(R.string.remote_timer_off_notice, name),
+                        R.drawable.ic_menu_timer_off,
+                        white,
+                    )
+                } else {
+                    showToggleLabel(
+                        binding,
+                        getString(R.string.remote_timer_notice, name, action.timer.seconds),
+                        timerIcon(action.timer),
+                        white,
+                    )
+                }
+
                 is PhotographerAction.Flash -> when (action.mode) {
                     FlashMode.OFF -> showToggleLabel(
                         binding,
@@ -1490,6 +1750,16 @@ class SubjectFragment :
     }
 
     internal companion object {
+        /** How far the thumbnail and a step's button each stand from the right third's middle while a step lasts. */
+        const val STEP_BESIDE_THUMBNAIL_DP = 26f
+
+        /** Half the shutter, and what a step's name keeps clear of it. */
+        const val SHUTTER_HALF_DP = 36f
+        const val STEP_CLEAR_OF_SHUTTER_DP = 4f
+
+        /** A control's smallest width (NFR-16), which a step's name may always take. */
+        const val MIN_TOUCH_DP = 48f
+
         const val STALL_NANOS = 2_000_000_000L
         const val STALL_CHECK_MS = 500L
 

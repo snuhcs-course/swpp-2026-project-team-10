@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.SystemClock
@@ -14,6 +14,8 @@ import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.account.SentInvitation
 import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.ShutterTimer
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.session.ConfirmSyncer
 import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.EndReason
@@ -21,6 +23,7 @@ import com.lastpenguin.pix.session.GuideSyncer
 import com.lastpenguin.pix.session.IcePath
 import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.PhotoSyncer
+import com.lastpenguin.pix.session.PoseStartStep
 import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteAction
 import com.lastpenguin.pix.session.RemoteControlHandler
@@ -30,6 +33,7 @@ import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionPlace
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.ShutterOutcome
 import com.lastpenguin.pix.session.TipSyncer
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.camera.CameraViewModel
@@ -57,6 +61,21 @@ sealed interface SessionNotice {
 
     /** The subject changed the zoom: "Joonhyung set zoom to 2×" (FR-7.4). */
     data class RemoteZoom(val name: String, val ratio: Float) : SessionNotice
+
+    /** The subject set this phone's timer: "Joonhyung set the timer to 3 s", or "… turned the timer off" (#318). */
+    data class RemoteTimer(val name: String, val timer: ShutterTimer) : SessionNotice
+
+    /** The subject's shutter took a photo: "Joonhyung took a photo" (FR-7.8, #314). */
+    data class RemoteShutter(val name: String) : SessionNotice
+
+    /** The subject's shutter started this phone's timer: "Joonhyung pressed the shutter" (FR-7.8, FR-1.17). */
+    data class RemoteShutterPress(val name: String) : SessionNotice
+
+    /** The subject's shutter stopped the timer's countdown: "Joonhyung cancelled the timer" (FR-7.8, FR-1.17). */
+    data class RemoteTimerCancel(val name: String) : SessionNotice
+
+    /** The subject started AI poses, and this phone now takes the scene photo: "Joonhyung started AI poses" (#276). */
+    data class RemotePoseStart(val name: String) : SessionNotice
 
     /** The subject moved or resized the guide: "Joonhyung moved the guide" (FR-7.2, FR-7.4). */
     data class RemoteGuideMove(val name: String) : SessionNotice
@@ -164,6 +183,29 @@ class SessionViewModel(
      * wait up, which [SessionNotice.PeerGone] then says.
      */
     val reconnectingWith: StateFlow<String?> = _reconnectingWith.asStateFlow()
+
+    private val _poseStartAnswers = Channel<PoseStartStep>(Channel.BUFFERED)
+
+    /** How many times this phone asked for AI poses, the number of its last request; and the request that waits. */
+    private var poseRequests = 0
+    private var poseRequestWaiting: Int? = null
+
+    /** True once the photographer's phone said that its user is asked to agree, for the request that waits. */
+    private var poseRequestAsked = false
+
+    /** The last request the time limit gave up: its answer may still come, kept behind a full buffer or a drop. */
+    private var poseRequestGivenUp: Int? = null
+
+    /** Runs while a request waits for the photographer's phone to say anything ([POSE_START_WAIT_MS]). */
+    private var poseStartWait: Job? = null
+
+    /**
+     * Subject: what became of each situation this phone picked for AI poses (FR-6.15, #276): the photographer's phone
+     * began the scene photo, could not, or asks its user to agree first, after which one of the two follows. No word
+     * within [POSE_START_WAIT_MS], and nothing that could be asked, count as refused. Subject view says each in a
+     * line; buffered, so one that comes under another screen is said when Subject view is back, in the same session.
+     */
+    val poseStartAnswers: Flow<PoseStartStep> = _poseStartAnswers.receiveAsFlow()
 
     private val _remoteFocus = MutableSharedFlow<RemoteFocus>(extraBufferCapacity = 16)
 
@@ -424,6 +466,7 @@ class SessionViewModel(
         val dropped = state as? SessionState.Reconnecting
         _reconnectingWith.value = dropped?.peer?.displayName.takeIf { dropped?.role == Role.PHOTOGRAPHER }
         val inSession = state is SessionState.Connecting || connected != null || reconnecting
+        if (!inSession) forgetPoseStarts()
 
         // Frames start while the peer connection is still being set up, so the first video arrives sooner, and go on
         // while it reconnects, so the video comes back with the link (Design 2.6.7).
@@ -520,6 +563,18 @@ class SessionViewModel(
                                     _notices.tryEmit(SessionNotice.RemoteBrightness(name, action.index))
 
                                 is RemoteAction.Flash -> _notices.tryEmit(SessionNotice.RemoteFlash(name, action.mode))
+
+                                is RemoteAction.Timer ->
+                                    _notices.tryEmit(SessionNotice.RemoteTimer(name, action.timer))
+
+                                is RemoteAction.Shutter -> _notices.tryEmit(SessionNotice.RemoteShutter(name))
+
+                                is RemoteAction.TimerStart ->
+                                    _notices.tryEmit(SessionNotice.RemoteShutterPress(name))
+
+                                is RemoteAction.TimerStop -> _notices.tryEmit(SessionNotice.RemoteTimerCancel(name))
+
+                                is RemoteAction.PoseStart -> _notices.tryEmit(SessionNotice.RemotePoseStart(name))
 
                                 is RemoteAction.Focus -> {
                                     _remoteFocus.tryEmit(RemoteFocus(action.x, action.y))
@@ -647,7 +702,118 @@ class SessionViewModel(
         viewModelScope.launch { mobileDataNotice.markShown() }
     }
 
+    /**
+     * The Camera screen, while it is in front, takes up the presses of the subject's shutter and says what it did
+     * with each (FR-7.8, #314); null once it is not, and a press is then answered as not taken.
+     */
+    fun setRemoteShutter(taker: ((cancel: Boolean) -> ShutterOutcome)?) {
+        remoteControl.shutter = taker
+    }
+
+    /**
+     * The Camera screen, while it is in front, begins the scene photo for the situation the subject picked (FR-6.15,
+     * #276), and says whether it began; null once it is not, and a request is then answered as not begun.
+     */
+    fun setRemotePoseStarter(starter: ((Situation, (PoseStartStep) -> Unit) -> Unit)?) {
+        remoteControl.poseStarter = starter
+    }
+
+    /** [starter]'s screen is no longer in front; a screen that came after it keeps its own. */
+    fun dropRemotePoseStarter(starter: (Situation, (PoseStartStep) -> Unit) -> Unit) {
+        if (remoteControl.poseStarter === starter) remoteControl.poseStarter = null
+    }
+
+    /**
+     * Subject: asks the photographer's phone to begin AI poses for [situation] (FR-6.15, #276). The photographer takes
+     * the scene photo, and the steps after it show on both phones as when the photographer starts them.
+     */
+    fun askForPoses(situation: Situation) {
+        val connected = state.value as? SessionState.Connected
+        if (connected?.role != Role.SUBJECT) {
+            // Nothing can be asked: the link dropped while the sheet was open.
+            _poseStartAnswers.trySend(PoseStartStep.REFUSED)
+            return
+        }
+        if (poseRequestWaiting != null) {
+            // One request at a time: a second one would wait behind the first on the photographer's phone, which
+            // begins the first and refuses the second, and this phone would say the refusal. The first's answer comes.
+            if (poseRequestAsked) _poseStartAnswers.trySend(PoseStartStep.ASKING)
+            return
+        }
+        // Numbered, so only its own answers count: an earlier request's, come late, is not this one's.
+        val request = ++poseRequests
+        poseRequestWaiting = request
+        session.send(SessionMessage.PoseStart(situation.apiName, request))
+        poseStartWait?.cancel()
+        poseStartWait = viewModelScope.launch {
+            delay(POSE_START_WAIT_MS)
+            // No word of it in time, not even that the photographer is asked: as far as this phone knows, nothing began.
+            if (poseRequestWaiting == request) {
+                poseRequestWaiting = null
+                poseRequestGivenUp = request
+                _poseStartAnswers.trySend(PoseStartStep.REFUSED)
+            }
+        }
+    }
+
+    /**
+     * What the photographer's phone says of the request that waits. An answer to the request the limit gave up is
+     * heard too, since the photographer's phone acted on it: that its user is asked brings the request back, with
+     * "Waiting for … to agree" after the refusal this phone said too soon, and that the poses began is said. Its
+     * refusal was said at the limit. Any other request's answer is dropped.
+     */
+    private fun onPoseStartAnswer(answer: SessionMessage.PoseStartAnswer) {
+        if (answer.request != poseRequestWaiting) {
+            if (answer.request != poseRequestGivenUp) return
+            if (answer.asking) {
+                // Only while no later request waits: that one's own answer comes.
+                if (poseRequestWaiting != null) return
+                poseRequestGivenUp = null
+                poseRequestWaiting = answer.request
+                poseRequestAsked = true
+                _poseStartAnswers.trySend(PoseStartStep.ASKING)
+            } else if (answer.started) {
+                poseRequestGivenUp = null
+                _poseStartAnswers.trySend(PoseStartStep.STARTED)
+            }
+            return
+        }
+        poseStartWait?.cancel()
+        poseStartWait = null
+        if (answer.asking) {
+            // The photographer reads the AI notice: the request waits for their answer, however long that takes.
+            poseRequestAsked = true
+            _poseStartAnswers.trySend(PoseStartStep.ASKING)
+            return
+        }
+        poseRequestWaiting = null
+        poseRequestAsked = false
+        _poseStartAnswers.trySend(if (answer.started) PoseStartStep.STARTED else PoseStartStep.REFUSED)
+    }
+
+    /**
+     * The session is over: its request no longer waits, and an answer no screen read is not said in the next session,
+     * whose photographer is another.
+     */
+    private fun forgetPoseStarts() {
+        poseStartWait?.cancel()
+        poseStartWait = null
+        poseRequestWaiting = null
+        poseRequestAsked = false
+        poseRequestGivenUp = null
+        while (_poseStartAnswers.tryReceive().isSuccess) Unit
+    }
+
+    /** [taker]'s screen is no longer in front; a screen that came after it keeps its own. */
+    fun dropRemoteShutter(taker: (cancel: Boolean) -> ShutterOutcome) {
+        if (remoteControl.shutter === taker) remoteControl.shutter = null
+    }
+
     private fun onMessage(message: SessionMessage) {
+        if (message is SessionMessage.PoseStartAnswer) {
+            onPoseStartAnswer(message)
+            return
+        }
         if (message !is SessionMessage.Leave) return
         val name = peerName ?: return
         _notices.tryEmit(SessionNotice.PeerGone(name, message.reason))
@@ -668,6 +834,12 @@ class SessionViewModel(
          * wait for the camera (`RemoteControlHandler.ECHO_TIMEOUT_MS`), so the line holds until the ratio's notice.
          */
         const val ZOOMING_LINGER_MS = 1_000L
+
+        /**
+         * How long the subject's start of AI poses waits for the photographer's phone to say anything (#276). That
+         * phone answers at once, also that its user is being asked, so this is the link's time alone.
+         */
+        const val POSE_START_WAIT_MS = 2_000L
 
         private const val BACKGROUND_LIMIT_MS = 60_000L
 

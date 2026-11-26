@@ -1319,6 +1319,57 @@ class RtcSessionManagerTest {
     }
 
     @Test
+    fun `the photographer's timer is kept from the last camera state, and gone with the session`() = runTest {
+        val (manager, peer) = connectedSubject(token = "subject-token")
+        assertEquals(0, manager.peerTimerSeconds.value)
+
+        // Sent as the subject connects, before Subject view exists to read it from the messages (#318).
+        val state = SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, timer = 10)
+        peer.deliver(otherPhone.encode(state))
+        runCurrent()
+        assertEquals(10, manager.peerTimerSeconds.value)
+
+        manager.leave(EndReason.LEFT)
+        runCurrent()
+        manager.start(SessionEntry.RoomCode("482915"), Role.SUBJECT)
+        runCurrent()
+        assertEquals(0, manager.peerTimerSeconds.value)
+        manager.leave(EndReason.LEFT)
+    }
+
+    // ---- With the realtime channel lost, a moment is not sent (#314, #276): the reliable channel retransmits, so
+    // even free it could deliver the press after a drop, once the subject gave it up; a pinch's step still goes.
+
+    @Test
+    fun `with the realtime channel lost, a moment is not sent on the reliable one, even while it is free`() = runTest {
+        val (manager, peer) = connectedSubject(token = "subject-token")
+        peer.push(PeerEvent.ChannelClosed(Channel.REALTIME))
+        runCurrent()
+
+        manager.send(SessionMessage.ShutterPress(1))
+        manager.send(SessionMessage.ShutterPress(2, cancel = true))
+        manager.send(SessionMessage.PoseStart("full_body", request = 1))
+        // A step of a pinch goes there as before: late, it is only an old value.
+        manager.send(SessionMessage.ZoomSet(2f, final = false))
+        runCurrent()
+
+        val sent = peer.sentMessages()
+        assertTrue(sent.none { it is SessionMessage.ShutterPress || it is SessionMessage.PoseStart })
+        assertEquals(SessionMessage.ZoomSet(2f, final = false), sent.last())
+        assertEquals(Channel.RELIABLE, peer.sent.last().first)
+
+        // Nor later, once the channel has been backed up and drained.
+        peer.buffered = backpressureFull
+        manager.send(SessionMessage.ShutterPress(3))
+        runCurrent()
+        peer.buffered = 0
+        peer.push(PeerEvent.BufferedAmount(Channel.RELIABLE, 0))
+        runCurrent()
+        assertTrue(peer.sentMessages().none { it is SessionMessage.ShutterPress })
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
     fun `a realtime channel that closes alone keeps the session, and its messages go reliably`() = runTest {
         val (manager, peer) = connectedSubject(token = "subject-token")
 

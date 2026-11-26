@@ -46,7 +46,7 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 - [Joonhyung, 11-25] "Change the bookmark button here into a heart, filled in red." (*Save guide* on Camera and Subject view, and its notice, now show the ♥ of *Pick a pose* and the library.)
 - [Joonhyung, 11-25] "Apply this review, then commit and push, and update the PR with the changes." (Codex's review of #308 had five findings. The agent fixed each with a test: a pose can be selected though its history cannot be written, *Save guide* marks a history entry written meanwhile, a ♥ that cannot be emptied fills again, "The poses are in My library." waits for a written pose, and TalkBack names the ♥ by Favorites.)
 
-## The self-timer and the camera menu ([#272], [#315])
+## The self-timer and the camera menu ([#315])
 
 - [Jaewan, 11-25] "let's add a timer to the shutter (#272). can you first give me ui mockups for candidates?"
 - [Jaewan, 11-25] "in A, why not just put the number 3 or 10 inside the icon? and i think showing a short notice vs the number 3s in the shutter in design C are an orthogonal choices to A/B/C. can you draw the artifact again"
@@ -74,8 +74,33 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 - [Jaewan, 11-25] "codex left reviews. check them"
 - [Jaewan, 11-25] "push, update the pr description, and respond to the review and resolve them."
 
+## The phone's photos in Pix, and the pose flow's screens as one flow ([#321])
+
+- [Jaewan, 11-25] "i think we have some problems. the progress bar in the scene photo taking screen is slightly lower than the top bar, so there's a slight space in between. i want this removed. also, when we show the gallery (not in a session), i want the full gallery as a 5 column grid to be shown first, and then the user can click which photo to look at (while the thumbnail always shows the latest image). can we do this? check the code if we can make these fixes"
+- [Jaewan, 11-25] "i think you can stop the emulator. i'll just check it in the phone. also, in the gallery, can we show 'all' photos saved in the phone, not only those took with pix? is this possible?"
+- [Jaewan, 11-25] "let's go with all photos (we're not going to deploy to play store so it's okay), and the thumbnail should show just the newest photo on the phone"
+- [Jaewan, 11-25] "1. the progress bar now matches the top bar, but the subsequent steps have different top bar heights so i think we should match this to that of the first step \ 2. can we remove the 'Photos(사진)' title of the gallery grid, but instead a center-aligned dropdown button that chooses between albums? but the first one showing should always be all photos \ 3. the thumbnail in the gallery grid is kinda low resolution i think \ 4. we should update the privacy policy \ 5. docs and wireframes not yet \ i'll install this on my own using android studio, so you don't need to build the apks"
+- [Jaewan, 11-25] "mark the date in the privacy policy by 11/26"
+- [Jaewan, 11-25] "1. when generating poses, after the scene photo, the screen doesn't use all of the phone's width i think, which makes the transition very weird. the font sizes on the top bar is also different too. i think we should match these. \ 2. the dropdown design is truely terrible. give me better ideas \ give me mockups for these fixes first"
+- [Jaewan, 11-25] "1. i don't want the scene photo to stay full width. keep that part same as before. we only need to have one bar for all four steps with full width. it also seems good to move flash and ratio to the right, but here i think we also need to have a tool panel (including flash/timer/grid/horizon, no settings) instead of only a flash icon \ 2. i'll go with B"
+- [Jaewan, 11-25] "1. the animation (light background) when pressing the <- button from is too large \ 2. i want the transitions when pressing the gallery, pressing each photo, pressing each album, switching between photos-album to be smooth. maybe some animation? \ 3. the progress bar is still not fully wide [Image #1] \ 4. in the gallery, fix photos/사진 to all photos/모든 사진"
+- [Jaewan, 11-26] "0. i think all problems are coming from that the top bar's height for the generate photo steps are matched with the main camera screen's header, not the other top bars in settings, album, guide confirm, etc. so i think we should just match these to all other top bars not the main camera screen's header. the size of the <- text and other text should be matched too. instead, then when first entering the scene photo screen the camera view will kinda become lower than the main screen so this transition should be smooth. \ 1. then the <- press highlight in all of these cases should be the same. i think it is slightly big now \ 2. the highlight on the buttons on the upper right region during generate photo ('생성', '선택', '사용') don't match the text size. fix this. also they seem too close to the right end \ 3. when transitioning between the generate photo steps, can we make it more smooth? right now it looks like we are just entering a brand new screen, but we arent- the <- button is always there with the same size, and the progress bar is gradually filling \ 4. transitioning from a specific album back to the 'album' tab is not smooth it shows some intermediate screen (very fast, i don't know that this is) and goes back \ 5. when clicking on a specific photo, the screen doesn't go to that immediately, but first goes to another photo and scrolls very fast to that photo. this also happens very fast and happens occasionally not all the time"
+- [Jaewan, 11-26] "I'm actually curious, do you think matching the top bar's height to the main camera screen's would be better? or keep them in two heights like now is better? considering other buttons too"
+- [Jaewan, 11-26] "1. make the menu and ratio icons bigger during the scene step \ 2. [Image #2] this happens in some places"
+- [Jaewan, 11-26] "this is good, but the scene photo step is also a camera screen, but making the header size different only for this might kinda seem weird, isn't it? whats your thoughts"
+- [Jaewan, 11-26] "0. i'd rather just make the change at scene photo -> generate poses. let's keep the scene photo step's header size same as the main camera screen \ 1. the highlight for the share and trash buttons in photo view, and the vertical ellipsis button in the 보관함 are too big too \ 2. the highlight when clicking on a photo in the 보관함 doesn't have rounded borders \ also some more fixes \ 1. can we remove the '인물과 배경은 그대로 . 최대 60초' text in the '포즈 생성 중' step? instead keep the situation choice as in the '포즈 생성' step \ 2. in the 보관함, the drop down box design for '선택' and '모두 선택' doesn't match the overall tone of the app. fix this. \ 3. the text in the tool panel for flash/timer/... are too big i think. i think we can make their aspect ratio and letter spacing slightly more tighter, and make the text thickness or size slightly smaller too if needed."
+- [Jaewan, 11-26] "1. in the scene photo screen we should also have the text and icon sizes smaller as before. and we may need a different transition to the next screen (generate poses)? \ 2. some highlights for panels in the settings screen also have wrong sizes or corners"
+- [Jaewan, 11-26] "1. can we make the header expand gradually, while the captured image shrink gradually to the position? not just first go to the generate poses with the photo large and then shrink the photo with the animation \ 2. the 'AI 포즈 생성 동의함' panel in the settings should have full background highlight i think, including the description part too \ 3. make the tap to copy Pix ID also have rounded corners \ 4. and i think we can have the selfie transition icon slightly bigger. very slightly \ 5. also i think the font size in [Image #7] this popup and [Image #8] [Image #9] these are different. there may be other popups too. i prefer the smaller font size, can you make these all the same?"
+- [Jaewan, 11-26] "the transition between 전체 and 즐겨찾기 in the 보관함 is weird. can we make this always go to the very top? or the position the user was before moving to the other tab (if possible)"
+- [Jaewan, 11-26] "update the docs and wireframes now"
+- [Jaewan, 11-26] "once done, commit and push this, and create a pr for this. also create an issue for this (Iter5-A13) and link it"
+- [Jaewan, 11-26] "if we click on the photo in the '포즈 생성' screen, the <- button's position changes. it slightly moves inwards"
+- [Jaewan, 11-26] "is this the same for all situations? settings, gallery, guide from uploading a photo, etc?"
+- [Jaewan, 11-26] "in the settings, the header doesn't stay there if we scroll down. actually it kinda does try i think, but it's weird"
+- [Jaewan, 11-26] "seems like this is still slightly, very slightly moved inwards can you check this? the screenshots show"
+- [Jaewan, 11-26] "yes"
+
 [#270]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/270
-[#272]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/272
 [#292]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/292
 [#294]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/294
 [#297]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/297
@@ -85,3 +110,4 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 [#308]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/308
 [#310]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/310
 [#315]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/315
+[#321]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/321

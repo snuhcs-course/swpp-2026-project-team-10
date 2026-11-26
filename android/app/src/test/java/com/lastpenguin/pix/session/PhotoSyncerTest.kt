@@ -4,6 +4,7 @@ package com.lastpenguin.pix.session
 import android.net.Uri
 import com.lastpenguin.pix.camera.PhotoAlbum
 import com.lastpenguin.pix.camera.PhotoDeleter
+import com.lastpenguin.pix.camera.PhotoDeletion
 import com.lastpenguin.pix.session.protocol.PhotoRefusal
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import java.io.ByteArrayInputStream
@@ -124,10 +125,10 @@ class PhotoSyncerTest {
     private val deleted = mutableListOf<Uri>()
     private var deleteFails = false
     private val deleter = PhotoDeleter { uri ->
-        if (deleteFails) return@PhotoDeleter false
+        if (deleteFails) return@PhotoDeleter PhotoDeletion.Failed
         deleted += uri
         photos.remove(uri)
-        true
+        PhotoDeletion.Deleted
     }
 
     private val parts: File get() = File(folder.root, "parts")
@@ -1098,6 +1099,33 @@ class PhotoSyncerTest {
     }
 
     @Test
+    fun `a photo the photographer dropped is said as not saved, once`() = runTest {
+        val (_, _, received) = receiver()
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        runCurrent()
+        assertTrue(received.isEmpty())
+
+        // The camera failed after its shutter, or the photo could not be read or sent (#314).
+        session.deliver(SessionMessage.PhotoDropped("a"))
+        runCurrent()
+        assertEquals(listOf(false), received)
+
+        session.deliver(SessionMessage.PhotoDropped("a"))
+        runCurrent()
+        assertEquals(listOf(false), received)
+    }
+
+    @Test
+    fun `a dropped photo whose shutter was lost is said too`() = runTest {
+        val (_, _, received) = receiver()
+
+        session.deliver(SessionMessage.PhotoDropped("b"))
+        runCurrent()
+
+        assertEquals(listOf(false), received)
+    }
+
+    @Test
     fun `a dropped photo whose shutter was lost ends no other photo's wait`() = runTest {
         val (syncer, _, _) = receiver()
         // The second shutter is lost on the realtime channel, or was pressed while the link reconnected.
@@ -1317,8 +1345,8 @@ class PhotoSyncerTest {
             runCurrent()
 
             // Photo 1 is going, photo 2 waits behind it: both leave the viewer, and both stay to be read.
-            assertTrue(syncer.delete(uri("1"), deleter, backgroundScope))
-            assertTrue(syncer.delete(uri("2"), deleter, backgroundScope))
+            assertEquals(PhotoDeletion.Deleted, syncer.delete(uri("1"), deleter, backgroundScope))
+            assertEquals(PhotoDeletion.Deleted, syncer.delete(uri("2"), deleter, backgroundScope))
             runCurrent()
             assertEquals(emptyList<Uri>(), syncer.sessionPhotos.first())
             assertTrue(deleted.isEmpty())
@@ -1364,15 +1392,15 @@ class PhotoSyncerTest {
             runCurrent()
 
             deleteFails = true
-            assertFalse(syncer.delete(uri("1"), deleter, backgroundScope))
+            assertEquals(PhotoDeletion.Failed, syncer.delete(uri("1"), deleter, backgroundScope))
             assertEquals(listOf(uri("1"), uri("2")), syncer.sessionPhotos.first())
 
             deleteFails = false
-            assertTrue(syncer.delete(uri("1"), deleter, backgroundScope))
+            assertEquals(PhotoDeletion.Deleted, syncer.delete(uri("1"), deleter, backgroundScope))
             assertEquals(listOf(uri("1")), deleted)
             assertEquals(listOf(uri("2")), syncer.sessionPhotos.first())
 
-            assertTrue(syncer.delete(uri("9"), deleter, backgroundScope))
+            assertEquals(PhotoDeletion.Deleted, syncer.delete(uri("9"), deleter, backgroundScope))
             assertEquals(listOf(uri("2")), syncer.sessionPhotos.first())
         }
 

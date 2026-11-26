@@ -1,8 +1,9 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
 import android.app.Application
+import android.graphics.Bitmap
 import android.os.Looper
 import android.os.SystemClock
 import android.view.MotionEvent
@@ -19,11 +20,16 @@ import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
+import com.lastpenguin.pix.ui.generation.GenerationUiState
+import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import java.time.Duration
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,11 +40,13 @@ import org.robolectric.annotation.GraphicsMode
  * The camera menu and the shutter's timer on the Camera screen (FR-1.17, R&S 6.2), on the real Fragment under
  * FragmentScenario with a container of fakes. Partitions: the menu opened by its button and closed by Back, by a touch
  * on the preview, and by its button again; the ratio's button and the menu's each in the bar's pill while its own panel
- * is open, the menu taking the ratios' place; the timer chosen in the menu (its icon beside the menu's button, its notice,
+ * is open, the menu taking the ratios' place; a tap on the timer's icon beside the button, taken as the button's (the
+ * menu opened and closed), and one on the ratio beside it, taken as the ratio's; the timer chosen in the menu (its icon beside the menu's button, its notice,
  * the shutter's spoken label) and off again (both gone); the countdown on the screen (the seconds over the preview,
- * the hint, the other controls dimmed and waiting, the shutter's label for cancelling), its end (one photo, all back),
+ * alone, the other controls dimmed and waiting, the shutter's label for cancelling), its end (one photo, all back),
  * the shutter's second tap (no photo), and the screen stopping (no photo); in a session, each second and the end told
- * to the subject's phone, and End session waiting, dimmed, until the end.
+ * to the subject's phone, and End session waiting, dimmed, until the end. The scene photo's countdown: at its end, the
+ * shutter waits while the frame is taken, so a tap then starts no second countdown.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -164,6 +172,38 @@ class CameraTimerScreenTest {
         }
     }
 
+    @Test
+    fun aTapOnTheTimersIcon_isATapOnTheMenusButton_andOpensTheMenu() {
+        launch()
+        chooseThreeSeconds()
+        onScreen { controls, _ ->
+            assertEquals(View.VISIBLE, controls.timerIndicator.visibility)
+            assertEquals(View.GONE, controls.cameraMenu.visibility)
+            // The icon is 16 dp, so it takes no tap of its own: the button's area reaches over it (NFR-16, #318).
+            assertFalse(controls.timerIndicator.isClickable)
+            tap(controls.root, controls.timerIndicator)
+        }
+
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.cameraMenu.visibility) }
+        // And again closes it, as the button does.
+        onScreen { controls, _ -> tap(controls.root, controls.timerIndicator) }
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.cameraMenu.visibility) }
+    }
+
+    @Test
+    fun aTapOnTheRatioBesideTheIcons_stillOpensTheRatios() {
+        launch()
+        chooseThreeSeconds()
+
+        // The button's area ends at the last icon: the ratio right after it keeps its own taps.
+        onScreen { controls, _ -> tap(controls.root, controls.aspectButton) }
+
+        onScreen { controls, _ ->
+            assertTrue(controls.aspectPanel.isShown)
+            assertEquals(View.GONE, controls.cameraMenu.visibility)
+        }
+    }
+
     // ---- The countdown --------------------------------------------------------------------------------------------
 
     @Test
@@ -175,7 +215,8 @@ class CameraTimerScreenTest {
         onScreen { controls, _ ->
             assertEquals(View.VISIBLE, controls.countdownPanel.visibility)
             assertEquals("3", controls.countdownNumber.text.toString())
-            assertEquals(string(R.string.countdown_cancel_hint), controls.countdownHint.text.toString())
+            // The number alone: that the shutter cancels is its name here and the tutorial's tip, not a line.
+            assertEquals(1, controls.countdownPanel.childCount)
             assertEquals(string(R.string.shutter_cancel_timer), controls.shutterButton.contentDescription)
             assertTrue(controls.shutterButton.isEnabled)
             for (waiting in listOf(controls.guideButton, controls.galleryButton, controls.switchCameraButton)) {
@@ -211,6 +252,39 @@ class CameraTimerScreenTest {
         pass(5_000)
 
         assertTrue(camera.photoTurns.isEmpty())
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.countdownPanel.visibility) }
+    }
+
+    @Test
+    fun theScenePhotosShutter_waitsWhileItsFrameIsTaken_soATapStartsNoSecondCountdown() {
+        val modules = launch()
+        chooseThreeSeconds()
+        camera.frame = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
+        camera.grabbing = CompletableDeferred()
+        // The photo's check waits, so the step stays on Camera.
+        modules.persons.gate = CompletableDeferred()
+        val generation = onScreen { _, fragment -> fragment.requireActivity().viewModel<GenerationViewModel>() }
+        generation.beginScene()
+        idle()
+
+        // The countdown ends, and the frame is being taken.
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        pass(3_500)
+        assertTrue(generation.uiState.value.shooting)
+
+        // A tap meanwhile starts nothing.
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        pass(500)
+        onScreen { controls, fragment ->
+            assertEquals(View.GONE, controls.countdownPanel.visibility)
+            assertNull(fragment.requireActivity().viewModel<CameraViewModel>().uiState.value.countdown)
+        }
+
+        // The frame comes, and its check goes on, with no countdown over it.
+        camera.grabbing!!.complete(Unit)
+        idle()
+        assertEquals(GenerationUiState.Phase.CHECKING, generation.uiState.value.phase)
+        pass(5_000)
         onScreen { controls, _ -> assertEquals(View.GONE, controls.countdownPanel.visibility) }
     }
 

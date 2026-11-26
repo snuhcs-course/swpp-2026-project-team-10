@@ -1091,7 +1091,10 @@ class SubjectFragmentRenderTest {
             val flash = IntArray(2).also { binding.flashIndicator.getLocationInWindow(it) }
             val timer = IntArray(2).also { binding.timerIndicator.getLocationInWindow(it) }
             assertTrue(flash[0] + binding.flashIndicator.width <= timer[0])
-            binding.timerIndicator.performClick()
+            // The icons are 16 dp: what takes the tap is an area of its own over them (NFR-16).
+            assertFalse(binding.timerIndicator.isClickable)
+            assertTrue(binding.indicatorsTouch.isShown)
+            binding.indicatorsTouch.performClick()
         }
         idle()
         onScreen { binding, _ -> assertEquals(View.VISIBLE, binding.cameraMenu.visibility) }
@@ -1100,6 +1103,7 @@ class SubjectFragmentRenderTest {
         onScreen { binding, _ ->
             assertFalse(binding.timerIndicator.isShown)
             assertFalse(binding.flashIndicator.isShown)
+            assertFalse(binding.indicatorsTouch.isShown)
         }
     }
 

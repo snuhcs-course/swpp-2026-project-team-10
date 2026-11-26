@@ -1238,6 +1238,25 @@ class RtcSessionManagerTest {
         assertTrue(peer.closed)
     }
 
+    @Test
+    fun `the photographer's timer is kept from the last camera state, and gone with the session`() = runTest {
+        val (manager, peer) = connectedSubject(token = "subject-token")
+        assertEquals(0, manager.peerTimerSeconds.value)
+
+        // Sent as the subject connects, before Subject view exists to read it from the messages (#318).
+        val state = SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, timer = 10)
+        peer.deliver(otherPhone.encode(state))
+        runCurrent()
+        assertEquals(10, manager.peerTimerSeconds.value)
+
+        manager.leave(EndReason.LEFT)
+        runCurrent()
+        manager.start(SessionEntry.RoomCode("482915"), Role.SUBJECT)
+        runCurrent()
+        assertEquals(0, manager.peerTimerSeconds.value)
+        manager.leave(EndReason.LEFT)
+    }
+
     // ---- With the realtime channel lost, a moment is not sent (#314, #276): the reliable channel retransmits, so
     // even free it could deliver the press after a drop, once the subject gave it up; a pinch's step still goes.
 

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Sungmin Jo and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -23,6 +23,12 @@ interface SessionManager {
 
     /** Subject: the applied camera values from the last `camera.state`, for the same reason; null until one arrives. */
     val peerCamera: StateFlow<CameraState?>
+
+    /**
+     * Subject: the seconds of the photographer's timer from the last `camera.state`, kept for the same reason (#318);
+     * 0 while it is off, and until a state arrives.
+     */
+    val peerTimerSeconds: StateFlow<Int>
 
     /** Subject: whose pinch holds the photographer's zoom, from the last `camera.zoom.hold` (FR-7.6); null when free. */
     val peerZoomHolder: StateFlow<Role?>

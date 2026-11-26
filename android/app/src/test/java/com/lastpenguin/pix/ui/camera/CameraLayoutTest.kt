@@ -1017,6 +1017,13 @@ class CameraLayoutTest {
         assertTrue(binding.flashIndicator.isShown && binding.timerIndicator.isShown)
         assertEquals(camerasFlash, binding.flashIndicator.box())
         assertEquals(camerasTimer, binding.timerIndicator.box())
+        // A tap on the icons opens the menu: the area that takes it is 48 dp, over both, inside the bar (NFR-16).
+        val touch = binding.indicatorsTouch.box()
+        assertTrue("$touch", touch.width() >= 48 && touch.height() >= 48)
+        assertTrue("$touch over the icons", touch.contains(binding.flashIndicator.box()))
+        assertTrue("$touch over the icons", touch.contains(binding.timerIndicator.box()))
+        assertTrue("$touch in the bar", binding.topBar.box().contains(touch))
+        assertEveryControlAtLeast48(binding.root, "Subject view with the flash and the timer on")
 
         photographers(FlashMode.OFF)
         assertFalse(binding.flashIndicator.isShown)

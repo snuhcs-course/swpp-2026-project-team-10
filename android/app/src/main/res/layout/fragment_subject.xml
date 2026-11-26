@@ -40,8 +40,8 @@
 
         <!-- The photographer's flash while it is on or auto, and their timer while it is on (FR-1.12, FR-1.17, #318):
              what a press of the shutter will do, with the menu closed, as Camera shows its own, in its sizes and
-             places: centered above the bar's overhang, where the buttons center their icons. A tap on one opens the
-             menu. -->
+             places: centered above the bar's overhang, where the buttons center their icons. A tap on them opens the
+             menu (indicatorsTouch). -->
         <ImageView
             android:id="@+id/flashIndicator"
             android:layout_width="16dp"
@@ -71,6 +71,17 @@
             app:layout_goneMarginStart="0dp"
             app:tint="@color/pix_accent"
             tools:visibility="visible" />
+
+        <!-- What takes the tap on those icons, which are 16 dp: 48 dp over both, inside the bar (NFR-16). The menu's
+             button is what TalkBack reads. -->
+        <View
+            android:id="@+id/indicatorsTouch"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:importantForAccessibility="no"
+            android:visibility="gone"
+            app:layout_constraintStart_toEndOf="@id/cameraMenuButton"
+            app:layout_constraintTop_toTopOf="parent" />
 
         <!-- The latency indicator, when Settings turns it on (FR-10.3). -->
         <TextView

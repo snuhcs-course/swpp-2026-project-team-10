@@ -1256,9 +1256,8 @@ class SubjectFragment :
     private fun setupMenu(binding: FragmentSubjectBinding) {
         val toggle = View.OnClickListener { viewModel.setMenuOpen(!viewModel.uiState.value.menuOpen) }
         binding.cameraMenuButton.setOnClickListener(toggle)
-        // The icons beside the button open the menu too, as on Camera.
-        binding.flashIndicator.setOnClickListener(toggle)
-        binding.timerIndicator.setOnClickListener(toggle)
+        // A tap on the icons beside the button opens the menu too, as on Camera, through the area over them.
+        binding.indicatorsTouch.setOnClickListener(toggle)
         binding.menuFlash.setOnClickListener { viewModel.onFlashTap() }
         binding.menuTimer.setOnClickListener { viewModel.onTimerTap() }
         binding.menuGrid.setOnClickListener { settingsViewModel.toggleShowGrid() }
@@ -1281,6 +1280,7 @@ class SubjectFragment :
         val timerOn = ui.timer != ShutterTimer.OFF
         binding.flashIndicator.isVisible = flashOn
         binding.timerIndicator.isVisible = timerOn
+        binding.indicatorsTouch.isVisible = flashOn || timerOn
         setImageOnce(
             binding.flashIndicator,
             when (ui.flash) {

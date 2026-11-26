@@ -26,8 +26,9 @@ const val PROTOCOL_VERSION = 3
 /**
  * Data channel messages between the two phones (Design 2.5.1).
  * The @SerialName goes into `t`, the class discriminator; the other fields form the body `b` of the
- * JSON envelope in Design 2.5.1. Only the photographer takes photos; the subject sends requests (zoom, brightness,
- * flash, guide moves), which the photographer applies and echoes (AD-7).
+ * JSON envelope in Design 2.5.1. Photos are taken on the photographer's phone; the subject sends requests (zoom,
+ * brightness, flash, guide moves, the shutter, a start of AI poses), which the photographer applies and echoes or
+ * answers (AD-7).
  */
 @OptIn(ExperimentalSerializationApi::class)
 @JsonClassDiscriminator("t")
@@ -457,6 +458,52 @@ sealed interface SessionMessage {
     @Serializable
     @SerialName("camera.focus")
     data class Focused(val x: Float, val y: Float) : SessionMessage
+
+    /**
+     * S → P: the subject pressed *Subject view*'s shutter (FR-7.8, #314). The photographer's phone takes a photo as
+     * its own shutter does, at once, and answers with `camera.shutter.answer`; the photo itself is told and sent as
+     * any other (`photo.shutter`, `photo.begin`). A press is one moment, so it goes on the realtime channel, at once
+     * or not at all: one that came late would take a photo the subject no longer waits for. [press] numbers this
+     * phone's presses, and the answer names it. [cancel] is true for a press made while this phone showed the
+     * photographer's countdown (FR-1.17): it stops the countdown, and never takes a photo or starts one.
+     */
+    @Serializable
+    @SerialName("camera.shutter")
+    data class ShutterPress(val press: Int, val cancel: Boolean = false) : SessionMessage
+
+    /**
+     * P → S: what became of the subject's `camera.shutter` numbered [press] (#314). [taken] is true when the
+     * photographer's camera was asked for the photo; one that fails after that is told by `photo.dropped`. [timer] is
+     * true when the press was the photographer's timer's instead (FR-1.17): it started the countdown, whose end takes
+     * the photo, stopped it, or left it as it was. With neither, the press was refused: the Camera screen is not in
+     * front, it frames a pose's scene photo, or its camera is still taking the photo before. The subject's shutter is
+     * held until the answer to its own press; one that comes after that press was given up answers no later press.
+     */
+    @Serializable
+    @SerialName("camera.shutter.answer")
+    data class ShutterAnswer(val taken: Boolean, val press: Int, val timer: Boolean = false) : SessionMessage
+
+    /**
+     * S → P: the subject picked a situation on its *Add a pose guide* (FR-6.15, #276). The photographer's phone begins
+     * the scene photo for it, as if its own user had picked it, and answers with `pose.start.answer`. [situation] is
+     * the situation's name on the server (`Situation.apiName`), kept a string so that a phone that does not know one
+     * refuses that request alone. [request] numbers this phone's requests, and each answer names its request.
+     */
+    @Serializable
+    @SerialName("pose.start")
+    data class PoseStart(val situation: String, val request: Int = 0) : SessionMessage
+
+    /**
+     * P → S: whether the scene photo's step began for the subject's `pose.start` numbered [request] (#276). False when
+     * the photographer's phone could not begin it: its Camera screen is not in front or already in a step, it has no
+     * front camera for a selfie, or its user did not agree to the AI notice. While that notice is up, an answer with
+     * [asking] says so at once, so the subject's phone waits for the answer that follows and does not give the
+     * request up.
+     */
+    @Serializable
+    @SerialName("pose.start.answer")
+    data class PoseStartAnswer(val started: Boolean, val request: Int = 0, val asking: Boolean = false) :
+        SessionMessage
 
     /**
      * P→S: the photographer's shutter timer (FR-1.17): the seconds [left] while it counts down, one message a second

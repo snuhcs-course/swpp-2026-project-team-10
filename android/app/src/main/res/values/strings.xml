@@ -133,7 +133,6 @@
     <string name="level_off">Horizon bar off</string>
     <string name="shutter_timer">Shutter, %1$d s timer</string>
     <string name="shutter_cancel_timer">Cancel the timer</string>
-    <string name="countdown_cancel_hint">Tap the shutter to cancel</string>
     <string name="aspect_ratio_description">Aspect ratio %1$s</string>
     <string name="aspect_ratios">Aspect ratios</string>
     <string name="aspect_3_4" translatable="false">3:4</string>
@@ -153,6 +152,19 @@
     <string name="session_photo">Photo</string>
     <string name="session_photo_unavailable">This photo is no longer in your album.</string>
     <string name="photo_page_counter_description">Photo %1$d of %2$d</string>
+    <string name="gallery_photos">All photos</string>
+    <string name="gallery_albums">Albums</string>
+    <plurals name="photo_album_description">
+        <item quantity="one">%1$s, %2$d photo</item>
+        <item quantity="other">%1$s, %2$d photos</item>
+    </plurals>
+    <string name="album_camera">Camera</string>
+    <string name="album_screenshots">Screenshots</string>
+    <string name="album_downloads">Downloads</string>
+    <string name="photos_access_own">Only the photos Pix saved show here.</string>
+    <string name="photos_access_chosen">Only the photos you allowed show here.</string>
+    <string name="photos_access_allow">Allow all</string>
+    <string name="photos_access_change">Change</string>
     <string name="share_photo">Share photo</string>
     <string name="delete_photo">Delete photo</string>
     <string name="delete_photo_title">Delete this photo?</string>
@@ -167,6 +179,10 @@
     <string name="peer_watching_notice">%1$s is watching your camera</string>
     <string name="remote_brightness_notice">%1$s set brightness to %2$s</string>
     <string name="remote_focus_notice">%1$s set the focus</string>
+    <string name="remote_shutter_notice">%1$s took a photo</string>
+    <string name="remote_shutter_pressed_notice">%1$s pressed the shutter</string>
+    <string name="remote_timer_cancel_notice">%1$s cancelled the timer</string>
+    <string name="remote_pose_start_notice">%1$s started AI poses</string>
     <string name="remote_flash_on_notice">%1$s turned the flash on</string>
     <string name="remote_flash_off_notice">%1$s turned the flash off</string>
     <string name="remote_flash_auto_notice">%1$s set the flash to auto</string>
@@ -207,6 +223,8 @@
     <string name="generating_title">Generating poses</string>
     <string name="consent_title">Send this photo to an AI service?</string>
     <string name="consent_message">To create poses, Pix sends the scene photo you take next through the Pix server to an external AI image service. The Pix server does not keep the photo.</string>
+    <string name="pose_start_asked">%1$s asked for AI poses.</string>
+    <string name="consent_message_subject">To create poses, Pix sends the scene photo the photographer takes next through the Pix server to an external AI image service. The Pix server does not keep the photo.</string>
     <string name="consent_agree">Agree and continue</string>
     <string name="not_now">Not now</string>
     <string name="scene_title">Take the scene photo</string>
@@ -276,7 +294,6 @@
     <string name="creating_pose">Creating…</string>
     <string name="pose_failed">Couldn\'t create</string>
     <string name="ready_count">%1$d of %2$d ready</string>
-    <string name="generating_scene_caption">Same person and place · up to 60 s</string>
     <string name="pick_pose_title">Pick a pose</string>
     <string name="pose_page_counter" translatable="false">%1$d / %2$d</string>
     <string name="pose_page_counter_description">Pose %1$d of %2$d</string>
@@ -503,7 +520,13 @@
     <string name="subject_title_placeholder">Photographer\'s camera</string>
     <!-- Under the camera's name in the slot where Camera's shutter is (#271): the video is live, or a photo is coming. -->
     <string name="subject_live">Live</string>
+    <string name="caption_separator" translatable="false">·</string>
     <string name="subject_receiving_photo">Receiving photo…</string>
+    <string name="subject_shutter">Take a photo with %1$s\'s camera</string>
+    <string name="subject_shutter_refused">Can\'t take a photo right now</string>
+    <string name="subject_poses_asking">Waiting for %1$s to agree</string>
+    <string name="subject_poses_started">%1$s takes the scene photo for the poses</string>
+    <string name="subject_poses_refused">Can\'t start AI poses right now</string>
     <string name="leave">Leave</string>
     <string name="leave_session_title">Leave the session?</string>
     <string name="focus_and_brightness_action">Focus and set the brightness</string>
@@ -603,7 +626,7 @@
     <string name="help_together_title">Shoot together</string>
     <string name="help_together_body">On Shoot together, choose who takes the photo. Invite a Pix friend or show a code to the person in the photo, and their phone shows your camera live, with the same guide.</string>
     <string name="help_remote_title">From the subject\'s phone</string>
-    <string name="help_remote_body">The person in the photo can zoom, set the focus, change the brightness and the flash, and move the guide from their own phone. Only the photographer takes the photo.</string>
+    <string name="help_remote_body">The person in the photo can zoom, set the focus, change the brightness and the flash, move the guide, and take the photo from their own phone.</string>
     <string name="about_title">About Pix</string>
     <string name="about_version">Version</string>
     <string name="about_licenses">Open-source licenses</string>
@@ -614,7 +637,7 @@
     <string name="tutorial_menu">Flash, timer, grid, and Settings</string>
     <string name="tutorial_together">Share your camera live with another phone</string>
     <string name="tutorial_guide">Add a photo or AI pose guide</string>
-    <string name="tutorial_shutter">Only the photo is saved, never the guide</string>
+    <string name="tutorial_shutter">Only the photo is saved, never the guide. Tap again to cancel a timer</string>
     <string name="tutorial_switch">Change to the front camera</string>
     <string name="tutorial_upload">Pix traces the person in your photo</string>
     <string name="tutorial_generate">Pick a situation, and AI makes four poses for it</string>
@@ -632,4 +655,5 @@
     <string name="tutorial_friend_focus">Tap to focus, then set the brightness beside it</string>
     <string name="tutorial_friend_move">Move the guide yourself</string>
     <string name="tutorial_friend_guide">Choose a guide from this phone</string>
+    <string name="tutorial_friend_shutter">Take the photo, or cancel a timer</string>
 </resources>

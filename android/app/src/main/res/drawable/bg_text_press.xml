@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A text that a tap acts on, such as the Pix ID that a tap copies, under a touch: the light rounded 16 dp, as a text
+     button's (Widget.Pix.Button.Text). -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/colorControlHighlight">
+    <item android:id="@android:id/mask">
+        <shape android:shape="rectangle">
+            <corners android:radius="16dp" />
+            <solid android:color="@color/pix_text" />
+        </shape>
+    </item>
+</ripple>

@@ -1,9 +1,10 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.Bundle
 import android.view.View
 import androidx.activity.addCallback
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
@@ -14,6 +15,7 @@ import androidx.navigation.fragment.findNavController
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentGeneratingBinding
 import com.lastpenguin.pix.generation.PlannedPose
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.ui.PixViewModels
@@ -22,6 +24,7 @@ import com.lastpenguin.pix.ui.generation.PoseCandidateAdapter
 import com.lastpenguin.pix.ui.generation.PoseSlot
 import com.lastpenguin.pix.ui.generation.aspectOf
 import com.lastpenguin.pix.ui.generation.showScene
+import com.lastpenguin.pix.ui.generation.title
 import com.lastpenguin.pix.ui.showNotice
 import kotlinx.coroutines.launch
 
@@ -92,6 +95,11 @@ class SubjectGeneratingFragment : Fragment(R.layout.fragment_generating) {
             return
         }
         binding.sceneImage.showScene(ui.scene)
+        // The situation the photographer's photo was taken for (FR-4.8), as the subject's Generate poses shows it;
+        // none for Auto, nor from an older photographer.
+        val named = ui.situation?.takeIf { it != Situation.DEFAULT }
+        binding.situationTag.isVisible = named != null
+        named?.let { binding.situationTag.setText(it.title) }
         candidates.frameAspect = aspectOf(ui.scene)
         // No pose names travel; a screen reader says which of the slots it is instead.
         candidates.submitList(

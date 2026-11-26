@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Rect
@@ -6,6 +6,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import androidx.annotation.StringRes
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.android.material.chip.Chip
 import com.lastpenguin.pix.R
@@ -33,13 +35,14 @@ import org.robolectric.annotation.GraphicsMode
  * switch on the screen). The last description rejected or not. The one button: *Generate* for an empty field, spaces
  * only, and a text (FR-4.15); it sends the field as typed.
  * Auto (FR-4.15): an empty field left alone says Auto, with the line that says to tap it and nothing under it; tapped,
- * it shows the example, the counter, the options, and the history, which stay once it is left empty again; a kept text
+ * it shows the example, the counter, the options, and the history, which fold again once it is left empty, by a closed
+ * keyboard or Done, with nothing typed or what was typed deleted, and stay once it is left with a text; a kept text
  * opens them without a tap; a refused empty field shows the refusal, not the line; the field is as high saying Auto as
  * with an option. *Back to Auto*: shown with text, hidden with none and while the field waits; it empties the field as
  * typing would and folds what is under it; it stands under the field where the line to tap it stood, a touch target
  * high, with nothing in the field but its text, and a chosen option moves nothing under the field; a refusal shows
- * over it, and over the line to tap an empty field. What only the other phone's text opened folds when the text goes, and
- * stays if this field was tapped.
+ * over it, and over the line to tap an empty field. What only the other phone's text opened folds when the text goes,
+ * also after this field was tapped and left empty, and stays if a chip here opened it.
  * The options (FR-4.15): each situation's own, in their order, and Auto's without a situation; another situation, and
  * the same one again (the chips kept as they are); an option into an empty field, a second one after a comma, a
  * checked one tapped again, the last one taken out; checked by typed text and by the other phone's, not by a longer
@@ -99,6 +102,12 @@ class DescriptionFormTest {
     /** A tap on the field, which opens what is under it. */
     private fun FragmentDescribePoseBinding.tapField() {
         descriptionInput.requestFocus()
+    }
+
+    /** The keyboard opening or closing, as the window's insets tell the field. */
+    private fun FragmentDescribePoseBinding.keyboard(shown: Boolean) {
+        val insets = WindowInsetsCompat.Builder().setVisible(WindowInsetsCompat.Type.ime(), shown).build()
+        ViewCompat.dispatchApplyWindowInsets(descriptionInput, insets)
     }
 
     /** Where [view] is in the form, in px. */
@@ -342,17 +351,46 @@ class DescriptionFormTest {
     }
 
     @Test
-    fun onceTapped_theOptionsAndTheHistoryStay_whenTheEmptyFieldIsLeft() {
+    fun aTappedField_leftEmpty_saysAutoAgain_withNothingUnderIt() {
         val binding = form()
         shared.showOptions(Situation.FULL_BODY)
         shared.showHistory(listOf(entry("Wave")), partner = null)
         binding.tapField()
+        binding.keyboard(shown = true)
 
-        shared.stopTyping()
+        // Nothing typed, and the keyboard closed.
+        binding.keyboard(shown = false)
 
-        // The field says Auto again, and what a closed keyboard uncovers is still there to choose.
+        assertFalse(binding.descriptionInput.hasFocus())
         assertEquals(binding.string(R.string.describe_auto), binding.descriptionInput.hint.toString().lines().first())
         assertEquals(View.VISIBLE, binding.descriptionHelper.visibility)
+        assertEquals(View.GONE, binding.optionsSection.visibility)
+        assertEquals(View.GONE, binding.historySection.visibility)
+
+        // Typed, deleted again, and Done: the same.
+        binding.tapField()
+        binding.descriptionInput.setText("jump")
+        binding.descriptionInput.setText("")
+        binding.descriptionInput.onEditorAction(EditorInfo.IME_ACTION_DONE)
+
+        assertEquals(View.VISIBLE, binding.descriptionHelper.visibility)
+        assertEquals(View.GONE, binding.optionsSection.visibility)
+        assertEquals(View.GONE, binding.historySection.visibility)
+    }
+
+    @Test
+    fun aTappedField_leftWithAText_keepsWhatIsUnderIt() {
+        val binding = form()
+        shared.showOptions(Situation.FULL_BODY)
+        shared.showHistory(listOf(entry("Wave")), partner = null)
+        binding.tapField()
+        binding.keyboard(shown = true)
+        binding.descriptionInput.setText("jump")
+
+        binding.keyboard(shown = false)
+
+        assertFalse(binding.descriptionInput.hasFocus())
+        assertEquals(View.VISIBLE, binding.clearDescriptionButton.visibility)
         assertEquals(View.VISIBLE, binding.optionsSection.visibility)
         assertEquals(View.VISIBLE, binding.historySection.visibility)
     }
@@ -620,7 +658,7 @@ class DescriptionFormTest {
     }
 
     @Test
-    fun whatOnlyTheOtherPhonesTextOpened_foldsWhenTheTextGoes_andStaysIfThisFieldWasTapped() {
+    fun whatOnlyTheOtherPhonesTextOpened_foldsWhenTheTextGoes_andStaysIfAChipHereOpenedIt() {
         val binding = form()
         shared.showOptions(Situation.FULL_BODY)
 
@@ -632,10 +670,15 @@ class DescriptionFormTest {
         assertEquals(View.GONE, binding.optionsSection.visibility)
         assertEquals(View.VISIBLE, binding.descriptionHelper.visibility)
 
-        // Tapped here: what the tap opened is this phone's own.
+        // Tapped here and left empty, which says Auto again: their text opens it, and folds it as it goes.
         binding.tapField()
         shared.stopTyping()
         shared.showShared("Peace sign", typing = null, sharedWith = "Dongje")
+        shared.showShared("", typing = null, sharedWith = "Dongje")
+        assertEquals(View.GONE, binding.optionsSection.visibility)
+
+        // Opened here by a chip: what the chip opened is this phone's own.
+        binding.option(R.string.pose_option_peace_sign).performClick()
         shared.showShared("", typing = null, sharedWith = "Dongje")
         assertEquals(View.VISIBLE, binding.optionsSection.visibility)
     }

@@ -35,9 +35,11 @@ import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.account.SentRequest
 import com.lastpenguin.pix.camera.CameraCapabilities
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.PhotoAccess
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
+import com.lastpenguin.pix.databinding.SheetAddGuideBinding
 import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.generation.GenerationError
 import com.lastpenguin.pix.generation.Situation
@@ -102,6 +104,7 @@ import com.lastpenguin.pix.ui.session.InviteSentSheet
 import com.lastpenguin.pix.ui.session.JoinCodeFragment
 import com.lastpenguin.pix.ui.session.RoomCodeSheet
 import com.lastpenguin.pix.ui.session.SessionNotFoundFragment
+import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.session.ShadowSurfaceViewRenderer
 import com.lastpenguin.pix.ui.session.ShootTogetherSheet
 import com.lastpenguin.pix.ui.session.SubjectConfirmFragment
@@ -152,7 +155,7 @@ import org.robolectric.shadows.ShadowDialog
  * and while the photographer picks a pose, with a guide to save, and with the session's photos open in the viewer,
  * readable or not (Iter4-A2); the subject's Pick a pose; Connection lost; Camera in a session with its photos open in the
  * viewer (Iter4-A2), with the delay shown, and with the notice of the subject's tap to focus (FR-7.7); Camera with
- * Pix's album open in the viewer; Settings, signed in; How
+ * the phone's photos open in the viewer, as their grid with each line of what shows and at a photo; Settings, signed in; How
  * to use Pix; About Pix; the privacy policy, failed to load. On each, no visible text, hint, or content
  * description has an English word but what Korean keeps (KEPT) and the test's own data (names, Pix IDs, the server's
  * pose texts), and no text is cut off: none is ellipsized, has lines dropped, or is taller than its view, except a name
@@ -324,12 +327,31 @@ class KoreanScreensTest {
             Uri.parse("content://media/external/images/media/1"),
             Uri.parse("content://media/external/images/media/2"),
         )
+        modules.photoAccess.value = PhotoAccess.CHOSEN
         idle()
         scenario!!.onFragment { FragmentCameraBinding.bind(it.requireView()).galleryButton.performClick() }
         // The pictures are read off the main thread.
         idle()
         Thread.sleep(200)
+        idle()
+        // Its grid first, with the line for the chosen photos and then for Pix's own, then a photo tapped there.
         assertKorean(screen())
+        modules.photoAccess.value = PhotoAccess.OWN
+        idle()
+        assertKorean(screen())
+        openAlbumsNewest()
+        assertKorean(screen())
+    }
+
+    /** A tap on the newest photo of Pix's album, open as its grid on Camera. */
+    private fun openAlbumsNewest() {
+        scenario!!.onFragment { fragment ->
+            val grid = fragment.requireView().findViewById<RecyclerView>(R.id.photoViewerGrid)
+            checkNotNull(grid.findViewHolderForAdapterPosition(0)) { "No photo in the grid" }.itemView.performClick()
+        }
+        idle()
+        Thread.sleep(200)
+        idle()
     }
 
     @Test
@@ -344,6 +366,8 @@ class KoreanScreensTest {
         scenario!!.onFragment { FragmentCameraBinding.bind(it.requireView()).galleryButton.performClick() }
         idle()
         Thread.sleep(200)
+        idle()
+        openAlbumsNewest()
         scenario!!.onFragment { it.requireView().findViewById<View>(R.id.photoViewerDelete).performClick() }
         idle()
 
@@ -364,6 +388,96 @@ class KoreanScreensTest {
         val root = screen()
         assertEquals(true, FragmentCameraBinding.bind(root).noticeText.isShown)
         assertKorean(root, *people)
+    }
+
+    @Test
+    fun camera_whenTheSubjectTookAPhoto_isInKorean() {
+        val modules = TestAppContainer(
+            camera = FakeCameraController().apply { photo = Uri.parse("content://media/external/images/9") },
+        ).install()
+        shadowOf(ApplicationProvider.getApplicationContext<Application>()).grantPermissions(Manifest.permission.CAMERA)
+        scenario = launchFragmentInContainer<CameraFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        idle()
+
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idle()
+
+        val root = screen()
+        val notice = FragmentCameraBinding.bind(root).noticeText
+        assertEquals(true, notice.isShown)
+        assertEquals(root.context.getString(R.string.remote_shutter_notice, "Test Account 2"), notice.text.toString())
+        assertKorean(root, *people)
+    }
+
+    @Test
+    fun camera_whenTheSubjectsPressStartsAndStopsTheTimer_isInKorean() {
+        val modules = TestAppContainer(
+            camera = FakeCameraController().apply { photo = Uri.parse("content://media/external/images/9") },
+        ).install()
+        shadowOf(ApplicationProvider.getApplicationContext<Application>()).grantPermissions(Manifest.permission.CAMERA)
+        scenario = launchFragmentInContainer<CameraFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        idle()
+        // The timer at 3 s, through the camera menu.
+        scenario!!.onFragment {
+            val controls = FragmentCameraBinding.bind(it.requireView())
+            controls.cameraMenuButton.performClick()
+            controls.menuTimer.performClick()
+            controls.cameraMenuButton.performClick()
+        }
+        idle()
+
+        // The countdown the subject's press starts, and its stop by the subject's next press (FR-7.8).
+        val lines = listOf(
+            SessionMessage.ShutterPress(1) to R.string.remote_shutter_pressed_notice,
+            SessionMessage.ShutterPress(2, cancel = true) to R.string.remote_timer_cancel_notice,
+        )
+        for ((press, line) in lines) {
+            modules.session.deliver(press)
+            idle()
+            val root = screen()
+            val notice = FragmentCameraBinding.bind(root).noticeText
+            assertEquals(true, notice.isShown)
+            assertEquals(root.context.getString(line, "Test Account 2"), notice.text.toString())
+            assertKorean(root, *people)
+        }
+    }
+
+    @Test
+    fun camera_whenTheSubjectStartedAiPoses_isInKorean() {
+        val modules = camera()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        idle()
+
+        modules.session.deliver(SessionMessage.PoseStart("full_body"))
+        idle()
+
+        val root = screen()
+        val notice = FragmentCameraBinding.bind(root).noticeText
+        assertEquals(
+            root.context.getString(R.string.remote_pose_start_notice, "Test Account 2"),
+            notice.text.toString(),
+        )
+        assertKorean(root, *people)
+    }
+
+    @Test
+    fun camera_askedForTheAgreementByTheSubjectsStart_isInKorean() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
+        val modules = TestAppContainer().apply { consent.given = false }.install()
+        scenario = launchFragmentInContainer<CameraFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        idle()
+
+        modules.session.deliver(SessionMessage.PoseStart("default"))
+        idle()
+
+        assertKorean(checkNotNull(ShadowDialog.getLatestDialog().window).decorView, *people)
     }
 
     @Test
@@ -412,6 +526,25 @@ class KoreanScreensTest {
         runBlocking { modules.saved.save(guide(), GuideState(guideId = "guide-1")) }
         scenario = launchFragment<AddGuideSheet>(themeResId = R.style.Theme_Pix)
         assertKorean(screen())
+    }
+
+    @Test
+    fun addGuide_fromSubjectView_withTheSituations_andItsAgreement_isInKorean() {
+        val modules = TestAppContainer().apply { consent.given = false }.install()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.SUBJECT))
+        scenario = launchFragment<AddGuideSheet>(
+            fragmentArgs = bundleOf(AddGuideSheet.ARG_FROM_SUBJECT to true),
+            themeResId = R.style.Theme_Pix,
+        )
+        idle()
+        val sheet = screen()
+        assertEquals(true, SheetAddGuideBinding.bind(sheet).newPosesSection.isShown)
+        assertKorean(sheet)
+
+        // A tile, before this phone agreed: the notice in the subject's words (#276).
+        SheetAddGuideBinding.bind(sheet).situationRowTop.getChildAt(0).performClick()
+        idle()
+        assertKorean(checkNotNull(ShadowDialog.getLatestDialog().window).decorView)
     }
 
     @Test
@@ -1006,6 +1139,56 @@ class KoreanScreensTest {
             assertEquals(true, FragmentSubjectBinding.bind(root).toggleLabel.isShown)
             // The brightness's value is a number with its sign, as on the bar.
             assertKorean(root, *people, "+1.0")
+        }
+    }
+
+    @Test
+    @Config(shadows = [ShadowSurfaceViewRenderer::class], instrumentedPackages = ["org.webrtc"])
+    fun subjectView_whenItsShutterTookNoPhoto_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.SUBJECT))
+        modules.video.deliverFrame()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+        val binding = FragmentSubjectBinding.bind(screen())
+        assertEquals(true, binding.shutterButton.isEnabled)
+
+        binding.shutterButton.performClick()
+        idle()
+        val press = modules.session.sent.filterIsInstance<SessionMessage.ShutterPress>().last().press
+        modules.session.deliver(SessionMessage.ShutterAnswer(taken = false, press = press))
+        idle()
+
+        val root = screen()
+        assertEquals(true, FragmentSubjectBinding.bind(root).toggleLabel.isShown)
+        assertKorean(root, *people)
+    }
+
+    @Test
+    @Config(shadows = [ShadowSurfaceViewRenderer::class], instrumentedPackages = ["org.webrtc"])
+    fun subjectView_whenItsStartOfPosesIsAnswered_isInKorean() {
+        val modules = TestAppContainer().install()
+        scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.SUBJECT))
+        modules.video.deliverFrame()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+
+        // Asked to agree, begun, and not begun: each answers a request this phone made.
+        for ((started, asking) in listOf(false to true, true to false, false to false)) {
+            scenario!!.onFragment { it.requireActivity().viewModel<SessionViewModel>().askForPoses(Situation.DEFAULT) }
+            idle()
+            val request = modules.session.sent.filterIsInstance<SessionMessage.PoseStart>().last().request
+            modules.session.deliver(SessionMessage.PoseStartAnswer(started, request, asking))
+            idle()
+            val root = screen()
+            assertEquals(
+                "started $started, asking $asking",
+                true,
+                FragmentSubjectBinding.bind(root).toggleLabel.isShown,
+            )
+            assertKorean(root, *people)
         }
     }
 

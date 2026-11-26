@@ -3,9 +3,11 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:background="@color/pix_ground"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:clipToPadding="false"
     android:paddingHorizontal="20dp"
     android:paddingTop="8dp"
     android:paddingBottom="20dp">
@@ -13,8 +15,12 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginStart="-12dp"
+        android:layout_marginEnd="-12dp"
+        android:clipToPadding="false"
         android:gravity="center_vertical"
-        android:minHeight="56dp">
+        android:minHeight="56dp"
+        android:paddingHorizontal="12dp">
 
         <ImageButton
             android:id="@+id/backButton"
@@ -57,8 +63,9 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Where this screen is in the pose flow (R&S 6.3, #210): the set being generated, 3 of 4. Across the screen, past this
-         layout's padding. -->
+    <!-- Where this screen is in the pose flow (R&S 6.3, #210): the set being generated, 3 of 4. Across the screen, past
+         this layout's padding. The layout draws past its padding, so the bar reaches the edges on screen
+         too. -->
     <com.lastpenguin.pix.ui.FlowProgressView
         android:id="@+id/flowProgress"
         android:layout_width="match_parent"
@@ -67,7 +74,7 @@
         android:layout_marginEnd="-20dp"
         app:flowStep="3" />
 
-    <!-- The scene photo the poses are made from; a waiting state says how long it may take (R&S 6.9). -->
+    <!-- The scene photo the poses are made from, with its situation, as on Generate poses (R&S 6.9). -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -99,12 +106,22 @@
                 android:textAppearance="@style/TextAppearance.Pix.Action.Small"
                 android:textColor="@color/pix_text" />
 
+            <!-- The situation the photo was taken for (FR-4.8), as Generate poses shows it; none for Auto, nor from an
+                 older photographer. -->
             <TextView
+                android:id="@+id/situationTag"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:text="@string/generating_scene_caption"
-                android:textAppearance="@style/TextAppearance.Pix.Body.Small" />
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_situation_tag"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="2dp"
+                android:textAppearance="@style/TextAppearance.Pix.Label"
+                android:textColor="@color/pix_accent"
+                android:textSize="12sp"
+                android:visibility="gone"
+                tools:text="Landmark"
+                tools:visibility="visible" />
         </LinearLayout>
     </LinearLayout>
 

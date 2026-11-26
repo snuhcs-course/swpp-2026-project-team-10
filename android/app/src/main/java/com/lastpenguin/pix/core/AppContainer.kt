@@ -27,12 +27,15 @@ import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraXController
 import com.lastpenguin.pix.camera.DataStoreCameraSettings
 import com.lastpenguin.pix.camera.NARROWEST_FRAME_ASPECT
+import com.lastpenguin.pix.camera.PhonePhotoSource
+import com.lastpenguin.pix.camera.PhonePhotos
 import com.lastpenguin.pix.camera.PhoneTurns
 import com.lastpenguin.pix.camera.PhotoDeleter
+import com.lastpenguin.pix.camera.PhotoDeletion
 import com.lastpenguin.pix.camera.PhotoSaver
-import com.lastpenguin.pix.camera.PixAlbumPhotos
 import com.lastpenguin.pix.camera.SensorPhoneTurns
 import com.lastpenguin.pix.camera.frameAspect
+import com.lastpenguin.pix.camera.photoAccess
 import com.lastpenguin.pix.core.network.PixAccountApi
 import com.lastpenguin.pix.core.network.PixApi
 import com.lastpenguin.pix.core.network.PixAuthApi
@@ -118,9 +121,9 @@ class AppContainer(
     // ---- Camera (#3) ----------------------------------------------------------
     val cameraController: CameraController,
     val cameraSettings: CameraSettings,
-    /** The newest photo in Pix's album, taken here or received in a session, for Camera's thumbnail (FR-1.6). */
-    val albumPhotos: StateFlow<List<Uri>>,
-    /** Deletes a photo from the viewer: from Pix's album, and from the session's photos too (FR-1.6). */
+    /** The phone's photos Pix may read, for Camera's thumbnail, the newest, and its viewer (FR-1.6). */
+    val phonePhotos: PhonePhotoSource,
+    /** Deletes a photo from the viewer: from the phone, and from the session's photos too (FR-1.6). */
     val photoDeleter: PhotoDeleter,
     // ---- Guide (#5, #6) -------------------------------------------------------
     /** The photographer's guide, clamped to the frame of the chosen aspect ratio (AD-10). */
@@ -298,7 +301,8 @@ class AppContainer(
             val promptHistory = DataStorePromptHistory(appContext, appScope)
             promptHistory.followSubjectSets(descriptionSyncer.started, poseSyncer.mirror, poseSyncer.verdicts, appScope)
             val poseTips = PoseTips(poseTipper, guideRepository.guide, appScope, screenLanguage)
-            val album = PixAlbumPhotos(appContext.contentResolver, appScope)
+            val phonePhotos =
+                PhonePhotos(appContext.contentResolver, appScope, appContext.packageName, appContext::photoAccess)
             val photoSyncer = PhotoSyncer(
                 rtcSessionManager,
                 ContentPhotoReader(appContext.contentResolver),
@@ -307,8 +311,14 @@ class AppContainer(
             )
             return AppContainer(
                 cameraController = cameraController,
-                albumPhotos = album.photos,
-                photoDeleter = PhotoDeleter { uri -> photoSyncer.delete(uri, album, appScope) },
+                phonePhotos = phonePhotos,
+                photoDeleter = object : PhotoDeleter {
+                    override suspend fun delete(
+                        uri: Uri,
+                    ): PhotoDeletion = photoSyncer.delete(uri, phonePhotos, appScope)
+
+                    override fun asksFirst(uri: Uri) = phonePhotos.asksFirst(uri)
+                },
                 cameraSettings = DataStoreCameraSettings(appContext),
                 guideRepository = guideRepository,
                 mirrorGuideRepository = mirrorGuideRepository,

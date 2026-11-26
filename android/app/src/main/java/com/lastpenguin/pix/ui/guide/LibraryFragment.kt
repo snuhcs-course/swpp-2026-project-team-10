@@ -1,14 +1,20 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.guide
 
 import android.os.Bundle
+import android.os.Parcelable
 import android.text.InputFilter
 import android.text.InputType
+import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Button
-import android.widget.PopupMenu
+import android.widget.PopupWindow
 import androidx.activity.addCallback
+import androidx.annotation.VisibleForTesting
+import androidx.core.content.ContextCompat
+import androidx.core.view.doOnNextLayout
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
@@ -18,25 +24,31 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.chip.Chip
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.DialogTextInputBinding
 import com.lastpenguin.pix.databinding.FragmentLibraryBinding
+import com.lastpenguin.pix.databinding.ViewLibraryMoreBinding
 import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.SavedGuide
 import com.lastpenguin.pix.guide.SavedGuideStore
+import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.NoticeLength
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.fadeTo
 import com.lastpenguin.pix.ui.generation.title
 import com.lastpenguin.pix.ui.showNotice
 import java.text.NumberFormat
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 /**
  * The library (FR-3.11, R&S 6.2), from *All* on Add a pose guide's *My library*: every guide kept, newest first, with
  * its kind, under *All*, which it opens on, or *Favorites* (#297), and filtered by the situation a pose was made for
- * (#270). Each guide's ♥ adds it to Favorites or takes it out, and it shows its
+ * (#270); each tab and situation shows its list where it was left. Each guide's ♥ adds it to Favorites or takes it
+ * out, and it shows its
  * situation and memo; its pencil edits the memo, which is kept and shown only here. A tap puts the guide on the camera
  * as a saved guide does on the sheet, or, opened from Subject view, offers it to the photographer (FR-6.16). A long
  * press, or *Select* under ⋮, selects guides as a gallery app does (#297): a tap then selects one or no longer does,
@@ -76,6 +88,8 @@ class LibraryFragment : Fragment(R.layout.fragment_library) {
         )
         binding.libraryGrid.layoutManager = GridLayoutManager(requireContext(), COLUMNS)
         binding.libraryGrid.adapter = adapter
+        gridMotion = binding.libraryGrid.itemAnimator
+        places.clear()
         leaveWhenTheSessionEnds(viewModel)
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -114,6 +128,7 @@ class LibraryFragment : Fragment(R.layout.fragment_library) {
      */
     override fun onDestroyView() {
         if (activity?.isChangingConfigurations != true) viewModel.cancelOpening()
+        moreMenu?.dismiss()
         super.onDestroyView()
     }
 
@@ -126,7 +141,7 @@ class LibraryFragment : Fragment(R.layout.fragment_library) {
             button.isSelected = filter == page.filter
         }
         renderSituations(binding, page)
-        adapter.submitList(page.guides)
+        showList(binding, adapter, page)
         adapter.selection = page.selection
         binding.emptyState.isVisible = page.guides.isEmpty()
         // Nothing kept yet, or no favorite yet.
@@ -171,19 +186,67 @@ class LibraryFragment : Fragment(R.layout.fragment_library) {
         binding.deleteSelectedButton.isEnabled = !selection.isNullOrEmpty()
     }
 
-    /** ⋮ (#297): *Select*, as a long press does, and *Select all*, which selects every guide listed. */
-    private fun showMore(anchor: View) {
-        PopupMenu(requireContext(), anchor).apply {
-            menuInflater.inflate(R.menu.library_more, menu)
-            setOnMenuItemClickListener { item ->
-                when (item.itemId) {
-                    R.id.selectGuides -> viewModel.onStartSelecting()
-                    R.id.selectAllGuides -> viewModel.onSelectAll()
-                }
-                true
-            }
-            show()
+    /** The grid's own motion for a change within a list, a guide added, deleted, or moved. */
+    private var gridMotion: RecyclerView.ItemAnimator? = null
+
+    /** Where each list was left, by its tab and situation, while this screen is shown, and the list the grid shows. */
+    private val places = ListPlaces<Pair<LibraryFilter, Situation?>, Parcelable>()
+
+    /**
+     * The page's guides in the grid. A change within the list moves its guides; another tab or situation (#297, #270)
+     * shows its own list in place of the last, where it was left or at its top the first time, fading in, rather than
+     * the last list's guides moving into the new one's places under the last one's scroll.
+     */
+    private fun showList(binding: FragmentLibraryBinding, adapter: LibraryAdapter, page: LibraryPage) {
+        val grid = binding.libraryGrid
+        val list = page.filter to page.situation
+        if (places.ask(list) { grid.layoutManager?.onSaveInstanceState() }) {
+            grid.stopScroll()
+            grid.itemAnimator = null
         }
+        // Only the newest list's callback runs, so a change that comes before a turn is done still ends it.
+        adapter.submitList(page.guides) {
+            val arrival = places.committed(list) ?: return@submitList
+            val layout = grid.layoutManager ?: return@submitList
+            arrival.place?.let(layout::onRestoreInstanceState) ?: layout.scrollToPosition(0)
+            grid.doOnNextLayout { grid.itemAnimator = gridMotion }
+            if (Motion.on()) {
+                grid.alpha = 0f
+                grid.fadeTo(1f, Motion.FADE_MS)
+            }
+        }
+    }
+
+    /** ⋮'s menu while it is open. */
+    @VisibleForTesting
+    internal var moreMenu: PopupWindow? = null
+        private set
+
+    /**
+     * ⋮ (#297): *Select*, as a long press does, and *Select all*, which selects every guide listed, in a card of the
+     * screens' own look (`view_library_more`) rather than Android's menu, under the button and ending at the content's
+     * edge. A tap outside or Back closes it.
+     */
+    private fun showMore(anchor: View) {
+        val menu = ViewLibraryMoreBinding.inflate(layoutInflater)
+        val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
+        val popup = PopupWindow(menu.root, wrap, wrap, true).apply {
+            setBackgroundDrawable(ContextCompat.getDrawable(requireContext(), R.drawable.bg_menu_card))
+            elevation = MENU_ELEVATION_DP * resources.displayMetrics.density
+            isOutsideTouchable = true
+            setOnDismissListener { if (moreMenu === this) moreMenu = null }
+        }
+        fun choose(action: () -> Unit) = View.OnClickListener {
+            popup.dismiss()
+            action()
+        }
+        menu.selectGuides.setOnClickListener(choose(viewModel::onStartSelecting))
+        menu.selectAllGuides.setOnClickListener(choose(viewModel::onSelectAll))
+        moreMenu = popup
+        // ⋮ reaches 12 dp past the header's padding: the card ends that much further in, where the content does.
+        val inset = (MENU_INSET_DP * resources.displayMetrics.density).roundToInt()
+        val x = if (anchor.layoutDirection == View.LAYOUT_DIRECTION_RTL) inset else -inset
+        popup.showAsDropDown(anchor, x, 0, Gravity.END)
     }
 
     /**
@@ -263,5 +326,11 @@ class LibraryFragment : Fragment(R.layout.fragment_library) {
 
     private companion object {
         const val COLUMNS = 2
+
+        /** How far ⋮ reaches past the header's padding, which the menu card stays inside, in dp. */
+        const val MENU_INSET_DP = 12
+
+        /** The menu card's lift over the screen, its shadow, in dp. */
+        const val MENU_ELEVATION_DP = 8f
     }
 }

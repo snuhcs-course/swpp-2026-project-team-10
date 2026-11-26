@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.animation.ValueAnimator
@@ -9,12 +9,15 @@ import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import java.time.Duration
+import kotlin.math.roundToInt
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
@@ -23,15 +26,22 @@ import org.robolectric.shadows.ShadowChoreographer
 
 /*
  * The pose flow's bar (FlowProgressView, R&S 6.3, #210). Partitions: a step inside the flow, none, and past either end
- * (boundary); a move to another step, to the same step during a move, and with the phone's animations off; the screens
+ * (boundary); a move to another step, to the same step during a move, and with the phone's animations off; a step coming
+ * in from the one before it, from a later one going back, and from itself (#210); the screens
  * that show it from their layout, Generate poses, the set being generated, and Pick a pose, each at its step and across
- * the screen's width, past the layout's padding; four steps, since the scene photo's review went (#296). The camera's
- * scene photo step is in CameraFragmentRenderTest, and
- * the bar filling as the step starts in CameraTransitionTest.
+ * the screen's width, past the layout's padding, which the layout draws past, under a screen's header 64 dp from the
+ * top, with Back and the title where every header has them, as the scene photo's camera bar has them too
+ * (CameraLayoutTest); four steps, since the scene photo's review went (#296). The camera's scene photo step is in
+ * CameraFragmentRenderTest, and the bar filling as the step starts in CameraTransitionTest.
  */
 @RunWith(AndroidJUnit4::class)
 @Config(qualifiers = "w360dp-h705dp-xxhdpi")
 class FlowProgressViewTest {
+    private companion object {
+        /** Where the flow's bar starts on every step: under a screen's header, 8 dp and 56 dp from the top. */
+        const val STEPS_BAR_TOP_DP = 64
+    }
+
     private val context: Context =
         ContextThemeWrapper(ApplicationProvider.getApplicationContext<Context>(), R.style.Theme_Pix)
 
@@ -94,7 +104,28 @@ class FlowProgressViewTest {
     }
 
     @Test
-    fun generatePoses_generating_andPickAPose_showTheirStep_acrossTheScreen() {
+    fun aStepComingIn_fillsOnFromWhereTheLastLeftTheBar_orIsThereAtOnceForTheSameStep() {
+        // Forward from the scene photo to Generate poses, and back from Pick a pose to it.
+        for ((last, next) in listOf(1 to 2, 4 to 2)) {
+            FlowProgressView.shownStep = last
+            val bar = FlowProgressView(context)
+            bar.arrive(next)
+            assertEquals("$last to $next", next, bar.step)
+            assertEquals("$last to $next", last / 4f, bar.filled, 0.001f)
+            assertEquals(next, FlowProgressView.shownStep)
+            play(Motion.MOVE_MS * 2)
+            assertEquals("$last to $next", next / 4f, bar.filled, 0.001f)
+        }
+
+        // The same step again, as after a new view of the same screen: there at once.
+        val again = FlowProgressView(context)
+        again.arrive(2)
+        assertEquals(0.5f, again.filled, 0.001f)
+        FlowProgressView.shownStep = 0
+    }
+
+    @Test
+    fun generatePoses_generating_andPickAPose_showTheirStep_acrossTheScreen_underTheirHeader() {
         val density = context.resources.displayMetrics.density
         val width = (360 * density).toInt()
         val height = (705 * density).toInt()
@@ -116,6 +147,21 @@ class FlowProgressViewTest {
             assertEquals("left of $layout", 0, box.left)
             assertEquals("right of $layout", width, box.right)
             assertEquals("height of $layout", (3 * density).toInt(), box.height())
+            // Under a screen's header, 64 dp from the top, where the scene photo's camera bar has it too, so it never
+            // jumps from step to step; Back in the header's middle 8 dp from the edge, and the title 4 dp after it at a
+            // header's size (CameraLayoutTest).
+            assertEquals("top of $layout", (STEPS_BAR_TOP_DP * density).toInt(), box.top)
+            val back = root.findViewById<View>(R.id.backButton)
+            val backBox = Rect(0, 0, back.width, back.height).also { root.offsetDescendantRectToMyCoords(back, it) }
+            assertEquals("Back of $layout", 36f, backBox.exactCenterY() / density, 1f)
+            assertEquals("Back of $layout", 8, (backBox.left / density).roundToInt())
+            assertEquals("Back of $layout", 48, (backBox.width() / density).roundToInt())
+            val title = (back.parent as ViewGroup).getChildAt(1) as TextView
+            val titleBox = Rect(0, 0, title.width, title.height).also { root.offsetDescendantRectToMyCoords(title, it) }
+            assertEquals("title of $layout", 60, (titleBox.left / density).roundToInt())
+            assertEquals("title of $layout", 18f, title.textSize / context.resources.displayMetrics.scaledDensity, 0.5f)
+            // The bar reaches past the layout's padding on screen too: drawn there, not only laid out.
+            assertFalse("$layout clips to its padding", (bar.parent as ViewGroup).clipToPadding)
         }
     }
 }

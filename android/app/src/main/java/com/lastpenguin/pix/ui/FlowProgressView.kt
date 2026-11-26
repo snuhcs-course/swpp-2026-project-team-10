@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.animation.ValueAnimator
@@ -15,8 +15,9 @@ import com.lastpenguin.pix.R
 /**
  * Where a screen is in the pose flow (R&S 6.3, #210): a thin bar under the top bar, filled to the screen's [step] of
  * [STEPS], the scene photo, Generate poses, the set being generated, and Pick a pose. The accent, dimmed,
- * on a dark track, filled from the start edge; [moveTo] moves the fill there in [Motion.MOVE_MS]. Each screen's title
- * already says where it is, so TalkBack skips it.
+ * on a dark track, filled from the start edge; [moveTo] moves the fill there in [Motion.MOVE_MS]. A screen of the flow
+ * that comes in fills on from where the last one left the bar ([arrive]), so the steps read as one screen whose bar
+ * fills. Each screen's title already says where it is, so TalkBack skips it.
  * Owner: Pose generation (#210).
  */
 class FlowProgressView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
@@ -44,11 +45,35 @@ class FlowProgressView @JvmOverloads constructor(context: Context, attrs: Attrib
     /** How much of the bar is filled, 0 to 1. */
     val fraction: Float get() = step.toFloat() / STEPS
 
+    /** The screen's own step from its layout, which the bar arrives at; 0 for one its screen sets (Camera's). */
+    private val ownStep: Int
+
     init {
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
         context.withStyledAttributes(attrs, R.styleable.FlowProgressView) {
             step = getInt(R.styleable.FlowProgressView_flowStep, 0)
         }
+        ownStep = step
+    }
+
+    /**
+     * The screen comes in at [to]: the fill moves there from where the last screen of the flow left it ([shownStep]), or
+     * is there at once when that was this step.
+     */
+    fun arrive(to: Int = ownStep) {
+        val from = shownStep
+        if (from != to && from in 0..STEPS) {
+            step = from
+            moveTo(to)
+        } else {
+            step = to
+        }
+        shownStep = this.step
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (ownStep > 0) arrive()
     }
 
     /**
@@ -97,5 +122,11 @@ class FlowProgressView @JvmOverloads constructor(context: Context, attrs: Attrib
          * photo's review went (#296).
          */
         const val STEPS = 4
+
+        /**
+         * The step the flow's bar last arrived at, on any screen, for the next screen to fill on from (#210); 0 once
+         * the flow starts again, and on Subject view, which starts the subject's steps.
+         */
+        var shownStep = 0
     }
 }

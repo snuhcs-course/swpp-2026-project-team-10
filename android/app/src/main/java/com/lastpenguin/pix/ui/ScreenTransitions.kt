@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui
 
 import android.content.Context
@@ -13,7 +13,13 @@ import androidx.navigation.fragment.FragmentNavigator
 import androidx.navigation.fragment.NavHostFragment
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.ui.camera.CameraFragment
+import com.lastpenguin.pix.ui.generation.DescribePoseFragment
+import com.lastpenguin.pix.ui.generation.GeneratingFragment
+import com.lastpenguin.pix.ui.generation.PickPoseFragment
+import com.lastpenguin.pix.ui.session.SubjectDescribeFragment
 import com.lastpenguin.pix.ui.session.SubjectFragment
+import com.lastpenguin.pix.ui.session.SubjectGeneratingFragment
+import com.lastpenguin.pix.ui.session.SubjectPickPoseFragment
 
 /**
  * The host of every screen (Design 2.1, Iter3-A14): Navigation's own, with [ScreenNavigator] as its fragment
@@ -92,6 +98,22 @@ internal enum class ScreenMotion(
     FADE(R.animator.screen_fade_in, R.animator.screen_fade_out, R.animator.screen_fade_in, R.animator.screen_fade_out),
 
     /**
+     * Between two steps of the pose flow after the scene photo (#210): the next step fades in over the last, and back,
+     * the step goes as it fades out over the one before, so the header they share, Back and the flow's bar, stays where
+     * it is and only what changes changes. The step coming forward is drawn over the last, and the one going back over
+     * the one under it (FragmentContainerView); each step paints its own ground, so the last shows only through the
+     * fade. The scene photo's Camera, whose bar is the camera's, unfolds into Generate poses ([HAND_OFF]).
+     */
+    FLOW(R.animator.screen_flow_in, R.animator.screen_hold, R.animator.screen_hold, R.animator.screen_flow_out),
+
+    /**
+     * From the scene photo's Camera to Generate poses, the photo just taken in hand (#210): Generate poses is there at
+     * once, drawn as the camera looked, and unfolds from it as its photo shrinks into its place, the camera's bar
+     * growing into its header (`HeaderUnfold`). Back fades through, as [FADE].
+     */
+    HAND_OFF(R.animator.screen_hold, R.animator.screen_hold, R.animator.screen_fade_in, R.animator.screen_fade_out),
+
+    /**
      * Between any other two (Material's shared axis along x): the next screen comes 30 dp in from the right and the
      * last goes 30 dp to the left, and back the other way.
      */
@@ -107,7 +129,25 @@ internal enum class ScreenMotion(
         /** The screens of a live image, Camera's preview and Subject view's video, by their class names. */
         val LIVE = setOf(CameraFragment::class.java.name, SubjectFragment::class.java.name)
 
-        /** The motion between the screens of the classes [one] and [other], in either direction. */
-        fun between(one: String, other: String) = if (one in LIVE || other in LIVE) FADE else SHARED_AXIS
+        /** The steps of the pose flow after the scene photo, on either phone, by their class names (#210). */
+        val STEPS = setOf(
+            DescribePoseFragment::class.java.name,
+            GeneratingFragment::class.java.name,
+            PickPoseFragment::class.java.name,
+            SubjectDescribeFragment::class.java.name,
+            SubjectGeneratingFragment::class.java.name,
+            SubjectPickPoseFragment::class.java.name,
+        )
+
+        /** The motion from the screen of the class [one] to that of [other]; the same back, but for [HAND_OFF]. */
+        fun between(one: String, other: String) = when {
+            one == CAMERA && other == DESCRIBE -> HAND_OFF
+            one in STEPS && other in STEPS -> FLOW
+            one in LIVE || other in LIVE -> FADE
+            else -> SHARED_AXIS
+        }
+
+        private val CAMERA = CameraFragment::class.java.name
+        private val DESCRIBE = DescribePoseFragment::class.java.name
     }
 }

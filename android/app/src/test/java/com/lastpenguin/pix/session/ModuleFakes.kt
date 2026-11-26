@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.graphics.Bitmap
@@ -253,6 +253,9 @@ class FakeCameraController(
     /** When set, [grabFrame] returns it, so the scene photo step can be driven in a screen test. */
     var frame: Bitmap? = null
 
+    /** When set, [grabFrame] waits for it, as a frame still being taken. */
+    var grabbing: CompletableDeferred<Unit>? = null
+
     /** When set, [takePhoto] fails with it, so a screen test can see each failure's message. */
     var photoFailure: Throwable? = null
 
@@ -276,8 +279,10 @@ class FakeCameraController(
         return saved
     }
 
-    override suspend fun grabFrame(): Result<Bitmap> =
-        frame?.let { Result.success(it) } ?: Result.failure(UnsupportedOperationException())
+    override suspend fun grabFrame(): Result<Bitmap> {
+        grabbing?.await()
+        return frame?.let { Result.success(it) } ?: Result.failure(UnsupportedOperationException())
+    }
 
     override fun setFrameSink(sink: FrameSink?) {
         this.sink = sink

@@ -1,6 +1,9 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui
 
+import android.app.PendingIntent
+import android.content.Intent
+import android.content.IntentSender
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
@@ -10,8 +13,12 @@ import com.lastpenguin.pix.account.FakeFriendsRepository
 import com.lastpenguin.pix.account.FakeGoogleIdTokens
 import com.lastpenguin.pix.account.FakeInvitationManager
 import com.lastpenguin.pix.camera.CameraSettings
+import com.lastpenguin.pix.camera.PhoneAlbum
+import com.lastpenguin.pix.camera.PhonePhotoSource
 import com.lastpenguin.pix.camera.PhoneTurns
+import com.lastpenguin.pix.camera.PhotoAccess
 import com.lastpenguin.pix.camera.PhotoDeleter
+import com.lastpenguin.pix.camera.PhotoDeletion
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.AppContainer
 import com.lastpenguin.pix.generation.GenerationConsent
@@ -65,6 +72,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flow
 import org.robolectric.RuntimeEnvironment
 
@@ -162,28 +170,79 @@ class TestAppContainer(
     /** Whether the subject's album refuses the photographer's photos, as a full disk does (FR-6.14). */
     var albumFails = false
 
-    /** The photos in Pix's album (FR-1.6), oldest first, which a test sets: no MediaStore here tells of a saved photo. */
+    /**
+     * The phone's photos that Pix may read (FR-1.6), oldest first, which a test sets: no MediaStore here tells of a
+     * saved photo.
+     */
     val album = MutableStateFlow<List<Uri>>(emptyList())
+
+    /** How much of the phone's photos [album] has; all of them unless a test says otherwise. */
+    val photoAccess = MutableStateFlow(PhotoAccess.ALL)
+
+    /** The albums of [album], which a test sets with it. */
+    val albums = MutableStateFlow<List<PhoneAlbum>>(emptyList())
+
+    /** What reading the photos again brings, as after the permission was asked; [rereads] counts them. */
+    var onReread: () -> Unit = {}
+    var rereads = 0
+        private set
+
+    /** How many times a photo of [album] was changed in place, as an app's edit saved over it; a test moves it. */
+    val photoEdits = MutableStateFlow(0)
+
+    private val phonePhotos = object : PhonePhotoSource {
+        override val photos: StateFlow<List<Uri>> = album
+        override val access: StateFlow<PhotoAccess> = photoAccess
+        override val albums: StateFlow<List<PhoneAlbum>> = this@TestAppContainer.albums
+        override val edits: StateFlow<Int> = photoEdits
+
+        override suspend fun refresh() {
+            rereads++
+            onReread()
+        }
+    }
 
     /** The photos the viewer deleted, in order; each leaves [album] and the session's photos unless [deleteFails]. */
     val deleted = mutableListOf<Uri>()
 
-    /** Whether a delete fails, as for a photo another app owns. */
+    /** Whether a delete fails, as when MediaStore refuses. */
     var deleteFails = false
 
-    /** Pix's album's own delete, as `PixAlbumPhotos.delete`. */
+    /** Other apps' photos, which only Android's question deletes, [deleteQuestion]; its yes deletes them. */
+    var othersPhotos: Set<Uri> = emptySet()
+
+    /** Stands in for Android's question before another app's photo is deleted. */
+    val deleteQuestion: IntentSender = PendingIntent.getActivity(
+        ApplicationProvider.getApplicationContext(),
+        0,
+        Intent("com.lastpenguin.pix.test.DELETE_QUESTION"),
+        PendingIntent.FLAG_IMMUTABLE,
+    ).intentSender
+
+    /** The phone's own delete, as `PhonePhotos.delete`. */
     private val albumDeleter = PhotoDeleter { uri ->
-        if (deleteFails) return@PhotoDeleter false
-        deleted += uri
-        album.value -= uri
-        true
+        when {
+            uri in othersPhotos -> PhotoDeletion.NeedsConsent(deleteQuestion, deletesItself = true)
+
+            deleteFails -> PhotoDeletion.Failed
+
+            else -> {
+                deleted += uri
+                album.value -= uri
+                PhotoDeletion.Deleted
+            }
+        }
     }
 
     /**
      * The viewer's delete, through the real `PhotoSyncer` as in the app. A screen test starts no sender, so a photo
      * taken in a session waits to go and is deleted only after its session.
      */
-    private val deleter = PhotoDeleter { uri -> photos.delete(uri, albumDeleter, CoroutineScope(Dispatchers.Main)) }
+    private val deleter = object : PhotoDeleter {
+        override suspend fun delete(uri: Uri) = photos.delete(uri, albumDeleter, CoroutineScope(Dispatchers.Main))
+
+        override fun asksFirst(uri: Uri) = uri !in othersPhotos
+    }
 
     /** The candidates kept as history through [maker], so a test finishes each cut it waits for. */
     val poseLibrary = PoseLibrary(maker, saved, CoroutineScope(Dispatchers.Main))
@@ -191,7 +250,7 @@ class TestAppContainer(
     val container = AppContainer(
         cameraController = camera,
         cameraSettings = settings,
-        albumPhotos = album,
+        phonePhotos = phonePhotos,
         photoDeleter = deleter,
         guideRepository = guides,
         mirrorGuideRepository = mirror,
@@ -242,6 +301,8 @@ class TestAppContainer(
      */
     fun install(): TestAppContainer {
         RuntimeEnvironment.setQualifiers("+night")
+        // Camera's hand-off to Generate poses lives with the process; one an earlier test left is not this test's.
+        com.lastpenguin.pix.ui.generation.SceneHandOff.pending = null
         ApplicationProvider.getApplicationContext<PixApplication>().installContainer(container)
         return this
     }

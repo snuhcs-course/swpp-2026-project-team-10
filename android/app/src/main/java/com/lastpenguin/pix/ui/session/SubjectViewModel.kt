@@ -150,6 +150,11 @@ data class SubjectUiState(
      * #314): the shutter takes no other press meanwhile.
      */
     val shutterWaiting: Boolean = false,
+    /**
+     * The guide this phone offered (*Add a pose guide*) while the photographer's phone has not adopted it yet
+     * (`GuideSyncer.offering`); null otherwise. That phone would drop a request for it, so the panel waits (FR-7.2).
+     */
+    val offeredGuide: String? = null,
     /** Whether the guide on the video is a favorite in this phone's library (FR-6.16, #297): *Save guide* is filled. */
     val guideSaved: Boolean = false,
     val savingGuide: Boolean = false,
@@ -189,6 +194,10 @@ data class SubjectUiState(
 
     val canZoom: Boolean
         get() = connected && minZoom.isFinite() && maxZoom.isFinite() && minZoom > 0f && maxZoom > minZoom
+
+    /** The guide on the video is this phone's offer, not yet the photographer's: its panel's shared controls wait. */
+    val guideWaiting: Boolean
+        get() = guide != null && guide.id == offeredGuide
 
     /** Whether the photographer's camera has a brightness range to set (FR-7.3). */
     val hasBrightness: Boolean
@@ -239,6 +248,8 @@ class SubjectViewModel(
     private val deleter: PhotoDeleter = PhotoDeleter { PhotoDeletion.Failed },
     /** Whether a photo of the photographer's is on its way here (`PhotoSyncer.receiving`, #271). */
     private val receivingPhoto: Flow<Boolean> = flowOf(false),
+    /** The guide this phone offered and the photographer has not adopted yet (`GuideSyncer.offering`). */
+    private val offering: Flow<String?> = flowOf(null),
     /** How this phone is held, which its own controls' icons turn with; nothing is sent (FR-1.15). */
     private val phoneTurns: PhoneTurns = PhoneTurns.Fixed(),
     /** For the time between two lines about the photographer's focus (#292). */
@@ -375,6 +386,9 @@ class SubjectViewModel(
     init {
         viewModelScope.launch {
             receivingPhoto.collect { receiving -> _uiState.update { it.copy(receivingPhoto = receiving) } }
+        }
+        viewModelScope.launch {
+            offering.collect { id -> _uiState.update { it.copy(offeredGuide = id) } }
         }
         viewModelScope.launch {
             sessionPhotos.collect { photos ->
@@ -714,7 +728,7 @@ class SubjectViewModel(
     fun onHideToggle() {
         val ui = _uiState.value
         val guide = ui.guide ?: return
-        if (!ui.connected) return
+        if (!ui.connected || ui.guideWaiting) return
         session.send(SessionMessage.GuideVisibleSet(guide.id, !ui.guideState.visible))
         Timings.mark("guide.visible.sent", "${!ui.guideState.visible}")
     }
@@ -726,7 +740,7 @@ class SubjectViewModel(
     fun onOpacityChange(opacity: Float, final: Boolean) {
         val ui = _uiState.value
         val guide = ui.guide
-        if (guide == null || !ui.connected || !ui.guideState.visible) {
+        if (guide == null || !ui.connected || !ui.guideState.visible || ui.guideWaiting) {
             if (final) opacitySender.cancel()
             return
         }
@@ -743,7 +757,7 @@ class SubjectViewModel(
     fun onRemoveGuide() {
         val ui = _uiState.value
         val guide = ui.guide ?: return
-        if (!ui.connected) return
+        if (!ui.connected || ui.guideWaiting) return
         session.send(SessionMessage.GuideRemove(guide.id))
         Timings.mark("guide.remove.sent", guide.id)
     }

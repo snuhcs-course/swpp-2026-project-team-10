@@ -113,6 +113,7 @@ object PixViewModels {
                 sessionPhotos = container.photoSyncer.sessionPhotos,
                 deleter = container.photoDeleter,
                 receivingPhoto = container.photoSyncer.receiving,
+                offering = container.guideSyncer.offering,
                 phoneTurns = container.phoneTurns,
             )
         }

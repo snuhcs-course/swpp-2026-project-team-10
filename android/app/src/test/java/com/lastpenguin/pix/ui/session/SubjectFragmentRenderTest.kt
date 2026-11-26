@@ -28,6 +28,7 @@ import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
 import com.lastpenguin.pix.generation.Situation
+import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.FakePoseCandidateCodec
 import com.lastpenguin.pix.session.GuideReference
@@ -130,7 +131,8 @@ import org.robolectric.shadows.ShadowDialog
  * thumbnail, with no notice saying it as well; *Leave* red; the guide-edit toggle one person icon, unlit with the guide plain and lit with it
  * filled. The grid on by default and kept off. The tip and guide-edit buttons on glass, the toggle's tinted while on
  * (#298). The guide's panel (FR-7.2): hidden without a guide; with one, above the line that names the camera, Hide and
- * ✕ asking the photographer's phone; a hidden guide (Show, the opacity off). 1:1 (R&S 6.6): the 4:3 around the frame
+ * ✕ asking the photographer's phone; a hidden guide (Show, the opacity off); a guide this phone offered, whose Hide,
+ * opacity, and ✕ wait until the photographer adopts it, ♥ not. 1:1 (R&S 6.6): the 4:3 around the frame
  * dimmed; 3:4 not.
  * What the photographer did (#292): each action a line with their name where the labels show, for a label's time and
  * the focus's for its shorter one; the photographer's pinch named for as long as it, replaced by the ratio's line, gone
@@ -1932,6 +1934,35 @@ class SubjectFragmentRenderTest {
             listOf(SessionMessage.GuideVisibleSet("guide-1", false), SessionMessage.GuideRemove("guide-1")),
             modules.session.sent.filter { it is SessionMessage.GuideVisibleSet || it is SessionMessage.GuideRemove },
         )
+    }
+
+    @Test
+    fun theGuidePanel_ofAGuideThisPhoneOffered_waitsForThePhotographerToAdoptIt() {
+        val modules = launch()
+        connect(modules)
+        modules.syncer.startAsReceiver(receiving)
+        idle()
+
+        modules.syncer.offer(guide(withReference = false))
+        idle()
+        onScreen { binding, _ ->
+            assertTrue(binding.guideControls.isShown)
+            assertFalse(binding.hideGuideButton.isEnabled)
+            assertFalse(binding.opacitySlider.isEnabled)
+            assertFalse(binding.removeGuideButton.isEnabled)
+            // ♥ keeps the guide on this phone, which has it already.
+            assertTrue(binding.saveGuideButton.isEnabled)
+        }
+
+        modules.session.deliver(
+            SessionMessage.GuideStateUpdate(GuideState("guide-1"), final = true, by = Role.SUBJECT),
+        )
+        idle()
+        onScreen { binding, _ ->
+            assertTrue(binding.hideGuideButton.isEnabled)
+            assertTrue(binding.opacitySlider.isEnabled)
+            assertTrue(binding.removeGuideButton.isEnabled)
+        }
     }
 
     @Test

@@ -86,7 +86,8 @@ import org.junit.Test
  * the photographer's change as a line.
  * The guide's panel (FR-7.2): Hide and Show, each a request for the other state that the echo settles; the opacity
  * shown at once, sent in steps, kept over an echo during the drag and settled by the first echo after it, clamped to
- * 10–90 %; ✕ a request; none sent without a guide or a connection, and no opacity for a hidden guide. The
+ * 10–90 %; ✕ a request; none sent without a guide or a connection, no opacity for a hidden guide, and none for a
+ * guide this phone offered that the photographer has not adopted yet, which would drop it (then sent once it has). The
  * photographer's hide, show, opacity, and removal each a line.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -729,6 +730,31 @@ class SubjectViewModelTest {
         // The guide goes with the photographer's `guide.clear`, on both phones at once.
         assertEquals("g1", viewModel.uiState.value.guide?.id)
     }
+
+    @Test
+    fun `the panel asks nothing for a guide this phone offered until the photographer has adopted it`() =
+        runTest(dispatcher) {
+            val offering = MutableStateFlow<String?>("g1")
+            val offered = SubjectViewModel(session, mirror, references, FakeRemoteVideo(), offering = offering)
+            connect()
+            mirror.setGuide(fakeGuide("g1"))
+            runCurrent()
+            assertTrue(offered.uiState.value.guideWaiting)
+
+            offered.onHideToggle()
+            offered.onOpacityChange(0.7f, final = true)
+            offered.onRemoveGuide()
+            assertTrue(session.sent.none { it is SessionMessage.GuideVisibleSet || it is SessionMessage.GuideRemove })
+            assertTrue(opacities().isEmpty())
+
+            offering.value = null
+            runCurrent()
+            offered.onHideToggle()
+            assertEquals(
+                listOf(SessionMessage.GuideVisibleSet("g1", false)),
+                session.sent.filterIsInstance<SessionMessage.GuideVisibleSet>(),
+            )
+        }
 
     @Test
     fun `the panel asks nothing without a guide or a connection, nor an opacity for a hidden guide`() =

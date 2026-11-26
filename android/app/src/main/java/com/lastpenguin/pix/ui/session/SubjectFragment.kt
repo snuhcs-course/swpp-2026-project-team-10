@@ -940,7 +940,8 @@ class SubjectFragment :
     /**
      * The guide's panel above the shutter while a guide is on the video, as Camera's (FR-7.2): Hide, the opacity, and ✕
      * show the photographer's guide as both phones have it, and go to the photographer's phone; the opacity is off while
-     * the guide is hidden, and the three while not connected. ♥ is this phone's own *Save guide*.
+     * the guide is hidden, and the three while not connected or while a guide this phone offered waits for the
+     * photographer's phone to adopt it. ♥ is this phone's own *Save guide*.
      */
     private fun renderGuideControls(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         // The open tip comes first, as the line that names the camera gives way to it: at a large font the panel steps
@@ -948,7 +949,8 @@ class SubjectFragment :
         binding.guideControls.isVisible =
             ui.guide != null && (!binding.tipBanner.isVisible || panelFitsBesideTheTip(binding))
         val hidden = !ui.guideState.visible
-        val opacityEnabled = ui.connected && ui.guide != null && !hidden
+        val shared = ui.connected && !ui.guideWaiting
+        val opacityEnabled = shared && ui.guide != null && !hidden
         opacitySlider?.render(GuideState.MIN_OPACITY, GuideState.MAX_OPACITY, ui.guideState.opacity, opacityEnabled)
         binding.opacityValue.isEnabled = opacityEnabled
         binding.opacityValue.text =
@@ -960,8 +962,8 @@ class SubjectFragment :
             binding.hideGuideButton.tag = hideIcon
         }
         binding.hideGuideButton.contentDescription = getString(if (hidden) R.string.show_guide else R.string.hide_guide)
-        binding.hideGuideButton.isEnabled = ui.connected
-        binding.removeGuideButton.isEnabled = ui.connected
+        binding.hideGuideButton.isEnabled = shared
+        binding.removeGuideButton.isEnabled = shared
         renderSaveGuide(binding, ui)
     }
 

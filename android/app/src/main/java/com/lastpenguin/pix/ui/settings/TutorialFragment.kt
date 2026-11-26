@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.settings
 
 import android.app.Dialog
@@ -157,19 +157,37 @@ private fun guideOn(@IdRes overlay: Int): (View) -> Rect? = { root ->
     }
 }
 
-/** The touch point's size on the guide. */
+/**
+ * A touch point on the view [id], [x] of the way across it and [y] of the way down, while it shows: where to tap a
+ * view that is no control, as the video that a tap focuses (FR-7.7).
+ */
+private fun pointOn(@IdRes id: Int, x: Float, y: Float): (View) -> Rect? = { root ->
+    root.findViewById<View>(id)?.let(::boundsOnScreen)?.let { box ->
+        val half = (TOUCH_POINT_DP * root.resources.displayMetrics.density / 2).toInt()
+        val atX = box.left + (box.width() * x).toInt()
+        val atY = box.top + (box.height() * y).toInt()
+        Rect(atX - half, atY - half, atX + half, atY + half)
+    }
+}
+
+/** The touch point's size on the guide and on the video. */
 private const val TOUCH_POINT_DP = 56
+
+/** Where Subject view's focus tip points on the video: left of its middle, a third of the way down. */
+private const val FOCUS_TIP_X = 0.28f
+private const val FOCUS_TIP_Y = 0.33f
 
 /** The tips of each screen (FR-10.4), in the order they are placed: a caption placed first keeps the nearest place. */
 internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
     TutorialScreen.CAMERA to TutorialTips(
         title = null,
         tips = listOf(
-            TutorialTip(R.string.tutorial_settings, CaptionSide.BELOW, locate = control(R.id.settingsButton)),
+            // The camera menu holds the flash, the timer, the grid, the horizon bar, and Settings (FR-1.17).
+            TutorialTip(R.string.tutorial_menu, CaptionSide.BELOW, locate = control(R.id.cameraMenuButton)),
+            TutorialTip(R.string.tutorial_switch, CaptionSide.BELOW, locate = control(R.id.switchCameraButton)),
             TutorialTip(R.string.tutorial_together, CaptionSide.BELOW, locate = control(R.id.shootTogetherButton)),
             // Rings around the button's icon, not its label, so the closing line fits below it (#204).
             TutorialTip(R.string.tutorial_guide, CaptionSide.ABOVE, locate = control(R.id.guideButtonIcon)),
-            TutorialTip(R.string.tutorial_switch, CaptionSide.ABOVE, locate = control(R.id.switchCameraButton)),
             TutorialTip(R.string.tutorial_shutter, CaptionSide.ABOVE, locate = control(R.id.shutterButton)),
         ),
     ),
@@ -235,13 +253,17 @@ internal val TUTORIAL_TIPS: Map<TutorialScreen, TutorialTips> = mapOf(
     TutorialScreen.SUBJECT_VIEW to TutorialTips(
         title = R.string.tutorial_friend_title,
         tips = listOf(
-            // Guide is at the left, as on Camera, so its caption takes the empty middle.
-            TutorialTip(R.string.tutorial_friend_guide, CaptionSide.END, locate = control(R.id.guideButtonIcon)),
+            // Guide and the shutter are where Camera's are (#314), so their captions stand above them as there.
+            TutorialTip(R.string.tutorial_friend_guide, CaptionSide.ABOVE, locate = control(R.id.guideButtonIcon)),
+            TutorialTip(R.string.tutorial_friend_shutter, CaptionSide.ABOVE, locate = control(R.id.shutterButton)),
             TutorialTip(R.string.tutorial_friend_zoom, CaptionSide.ABOVE, locate = control(R.id.zoomReadout)),
+            // No button: a tap on the video focuses, and the brightness comes up beside it (#273). In the video's
+            // upper half with its caption beside it: above it is the title, and below it the zoom row's caption, which
+            // the guide's panel raises.
             TutorialTip(
-                R.string.tutorial_friend_brightness,
-                CaptionSide.ABOVE,
-                locate = control(R.id.brightnessButton),
+                R.string.tutorial_friend_focus,
+                CaptionSide.END,
+                locate = pointOn(R.id.videoContainer, FOCUS_TIP_X, FOCUS_TIP_Y),
             ),
             TutorialTip(R.string.tutorial_friend_move, CaptionSide.ABOVE, locate = control(R.id.editGuideButton)),
         ),

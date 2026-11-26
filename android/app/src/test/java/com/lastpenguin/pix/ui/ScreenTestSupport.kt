@@ -1,11 +1,15 @@
-// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.ui
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.graphics.Rect
 import android.os.Bundle
 import android.os.Looper
 import android.view.View
+import android.view.ViewGroup
+import android.widget.Button
+import android.widget.TextView
 import androidx.annotation.IdRes
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
@@ -16,6 +20,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
+import com.google.android.material.R as materialR
+import com.google.android.material.snackbar.Snackbar
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.guide.GuideSource
@@ -25,6 +31,8 @@ import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.settings.CoachMarkLayout
 import com.lastpenguin.pix.ui.settings.TutorialFragment
 import kotlinx.coroutines.launch
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.robolectric.Shadows.shadowOf
 
 /**
@@ -53,6 +61,59 @@ object ScreenTestSupport {
 
     fun bitmap(width: Int = 40, height: Int = 80): Bitmap =
         Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+
+    /**
+     * The text of the notice on the screen now (`showNotice`, #298), the newest when one is going as another comes, or
+     * null with none: a Snackbar in any window, the activity's or a sheet's. It stays while it shows, so a test that
+     * moves the clock past its length sees it go, as on a phone.
+     */
+    fun shownNotice(): String? = notices().lastOrNull()?.findViewById<TextView>(materialR.id.snackbar_text)
+        ?.text?.toString()
+
+    /** The action button of the notice on the screen now, such as Undo, or null with none or one without an action. */
+    fun noticeAction(): Button? = notices().lastOrNull()?.findViewById<Button>(materialR.id.snackbar_action)
+        ?.takeIf { it.isShown }
+
+    /** The view of the notice on the screen now, the newest; null with none. */
+    fun shownNoticeView(): View? = notices().lastOrNull()
+
+    /**
+     * A notice on a camera screen in the zoom row's place (#298): 12 dp above [line], as from the sides, with [line] 6 dp
+     * under the zoom [row], so the notice covers the [readout].
+     */
+    fun assertNoticeInTheZoomRowsPlace(notice: View, row: View, readout: View, line: View) {
+        val dp = notice.resources.displayMetrics.density
+        val lineAt = windowBox(line).top
+        assertEquals("the line under the zoom row", windowBox(row).bottom + 6 * dp, lineAt.toFloat(), 1f)
+        assertEquals("12 dp above the line", lineAt - 12 * dp, windowBox(notice).bottom.toFloat(), 1f)
+        val over = windowBox(readout)
+        val box = windowBox(notice)
+        assertTrue("over the zoom readout", box.top < over.bottom && box.bottom > over.top)
+    }
+
+    /** [view]'s bounds in its window, with its translation. */
+    fun windowBox(view: View): Rect {
+        val at = IntArray(2).also(view::getLocationInWindow)
+        return Rect(at[0], at[1], at[0] + view.width, at[1] + view.height)
+    }
+
+    /** Every notice on the screen, oldest first, from every window's views (WindowManagerGlobal keeps them in order). */
+    private fun notices(): List<View> {
+        val global = Class.forName("android.view.WindowManagerGlobal")
+        val instance = global.getMethod("getInstance").invoke(null)
+        val roots = global.getDeclaredField("mViews").apply { isAccessible = true }.get(instance) as List<*>
+        val found = mutableListOf<View>()
+        fun walk(view: View) {
+            if (!view.isShown) return
+            if (view is Snackbar.SnackbarLayout) {
+                found += view
+                return
+            }
+            if (view is ViewGroup) for (i in 0 until view.childCount) walk(view.getChildAt(i))
+        }
+        roots.filterIsInstance<View>().forEach(::walk)
+        return found
+    }
 
     /** The screen whose tutorial tips are over [host], or null with none there (FR-10.4). */
     fun tutorialOver(host: Fragment): TutorialScreen? = TutorialFragment.over(host)?.screen

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -26,8 +26,9 @@ const val PROTOCOL_VERSION = 3
 /**
  * Data channel messages between the two phones (Design 2.5.1).
  * The @SerialName goes into `t`, the class discriminator; the other fields form the body `b` of the
- * JSON envelope in Design 2.5.1. Only the photographer takes photos; the subject sends requests (zoom, brightness,
- * flash, guide moves), which the photographer applies and echoes (AD-7).
+ * JSON envelope in Design 2.5.1. Photos are taken on the photographer's phone; the subject sends requests (zoom,
+ * brightness, flash, the guide's moves, hiding, opacity, and removal, the shutter, a start of AI poses), which the
+ * photographer applies and echoes or answers (AD-7).
  */
 @OptIn(ExperimentalSerializationApi::class)
 @JsonClassDiscriminator("t")
@@ -53,7 +54,9 @@ sealed interface SessionMessage {
     /**
      * [format] is `mask-png` (Design 2.5.1); [aspect] is the mask's width / height. [anchor] and [source] come from the
      * subject for a guide made on its phone, which the photographer starts at [anchor] (Iter3-P9), and from the
-     * photographer for the subject's *Save guide*, whose guide its `guide.state` still places (Iter3-P16).
+     * photographer for the subject's *Save guide*, whose guide its `guide.state` still places (Iter3-P16), with
+     * [situation], a generated pose's situation by its name on the server, which that save keeps (FR-3.11, #270); a
+     * name this phone does not know reads as none.
      */
     @Serializable
     @SerialName("guide.image.begin")
@@ -67,6 +70,7 @@ sealed interface SessionMessage {
         val aspect: Float? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val anchor: NormalizedRect? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val source: GuideSource? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val situation: String? = null,
     ) : SessionMessage
 
     /** [data] is Base64 of at most 12 KiB, so one message stays under 16 KiB. */
@@ -130,6 +134,39 @@ sealed interface SessionMessage {
         val final: Boolean = false,
     ) : SessionMessage
 
+    /**
+     * The subject's *Hide* or *Show* for the guide [guideId] (FR-7.2): the photographer applies it, and the echo is a
+     * `guide.state` with `by: SUBJECT`. Dropped for a guide the photographer no longer shows, as a `guide.move`.
+     */
+    @Serializable
+    @SerialName("guide.visible.set")
+    data class GuideVisibleSet(val guideId: String, val visible: Boolean) : SessionMessage
+
+    /**
+     * The subject's opacity slider for the guide [guideId] (FR-7.2): realtime while the drag runs and reliable when
+     * [final], as a `guide.move`. The photographer keeps it within 10–90 % and echoes it as `guide.state`; a hidden guide
+     * keeps its opacity.
+     */
+    @Serializable
+    @SerialName("guide.opacity.set")
+    data class GuideOpacitySet(val guideId: String, val opacity: Float, val final: Boolean = false) : SessionMessage
+
+    /**
+     * The subject's ✕ for the guide [guideId] (FR-7.2): the photographer removes it, as its own ✕ does, and sends
+     * `guide.clear`.
+     */
+    @Serializable
+    @SerialName("guide.remove")
+    data class GuideRemove(val guideId: String) : SessionMessage
+
+    /**
+     * The subject's *Undo* after the guide [guideId] was removed, by either phone (FR-7.2): the photographer puts it
+     * back where it was, as its own *Undo* does, unless another guide went on since.
+     */
+    @Serializable
+    @SerialName("guide.restore")
+    data class GuideRestore(val guideId: String) : SessionMessage
+
     @Serializable
     @SerialName("guide.clear")
     data object GuideClear : SessionMessage
@@ -155,7 +192,10 @@ sealed interface SessionMessage {
      * a server error; none when the user closed it, and none from a photographer of an older version. With GENERATING,
      * [sceneTurn] is how the photographer held the scene photo (`PhoneTurns`: 0, 90, 180, or 270; #206), so a ♥ on the
      * subject's *Pick a pose* saves the guide as it goes on the camera; 0 is left out, and a subject reads anything
-     * else, or none from an older photographer, as 0. A set ends once, with CHOSEN or CLOSED.
+     * else, or none from an older photographer, as 0. With GENERATING, [situation] is the situation the set is made for,
+     * by its `situation` name on the server (FR-4.8, #270), so a ♥ on the subject's *Pick a pose* keeps it in the
+     * library; a string, so a name this phone does not know reads as none, as does none from an older photographer.
+     * A set ends once, with CHOSEN or CLOSED.
      */
     @Serializable
     @SerialName("pose.step")
@@ -167,6 +207,7 @@ sealed interface SessionMessage {
         @EncodeDefault(EncodeDefault.Mode.NEVER) val by: Role? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val failure: String? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER) val sceneTurn: Int = 0,
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val situation: String? = null,
     ) : SessionMessage
 
     /**
@@ -293,7 +334,8 @@ sealed interface SessionMessage {
 
     /**
      * A photo taken in a session, for the subject's "Pix" album (FR-6.14, Design 2.6.5): the JPEG as it was saved, of
-     * [bytes] in [chunks] chunks, taken at [takenAt].
+     * [bytes] in [chunks] chunks, taken at [takenAt]. [shot] is its shutter's, as in [PhotoShutter]; null from a phone
+     * before #271.
      */
     @Serializable
     @SerialName("photo.begin")
@@ -303,6 +345,7 @@ sealed interface SessionMessage {
         val bytes: Long,
         val chunks: Int,
         val takenAt: Long,
+        val shot: String? = null,
     ) : SessionMessage
 
     /** [data] is Base64 of at most 12 KiB, as for the guide image; the chunks come in order, one photo at a time. */
@@ -322,11 +365,23 @@ sealed interface SessionMessage {
     /**
      * The photographer pressed the shutter in a session (Design 2.5.1, Iter3-A12): the subject's video blinks then, as
      * the photographer's preview does, and not seconds later with the photo's `photo.begin`. It goes on the realtime
-     * channel, since a blink that comes late shows a moment that has passed, and one lost shows none.
+     * channel, since a blink that comes late shows a moment that has passed, and one lost shows none. [shot] names the
+     * photo, as its `photo.begin` or `photo.dropped` does, so the subject waits for each photo by name (#271); null
+     * from a phone before #271, whose shutters the subject counts instead.
      */
     @Serializable
     @SerialName("photo.shutter")
-    data object PhotoShutter : SessionMessage
+    data class PhotoShutter(val shot: String? = null) : SessionMessage
+
+    /**
+     * The photo of the shutter [shot] will not come after all (#271): its save failed, or it could not be read or is
+     * too large, before its `photo.begin`. The subject stops waiting for that photo, and only that one, so Subject view
+     * no longer says a photo is on its way once none is. Reliable, since a lost one leaves the subject waiting until its
+     * 30 s end; a phone that does not know it ignores it, and waits as long.
+     */
+    @Serializable
+    @SerialName("photo.dropped")
+    data class PhotoDropped(val shot: String) : SessionMessage
 
     /** Whether the photo is in the subject's album; without it, [reason] says why not. */
     @Serializable
@@ -419,10 +474,101 @@ sealed interface SessionMessage {
     @SerialName("camera.flash.set")
     data class FlashSet(val mode: FlashMode) : SessionMessage
 
-    /** The subject's focus point in frame coordinates (FR-7.7, Could). No echo: focus has no lasting state. */
+    /**
+     * The subject's tap to focus, in fractions of the photographer's frame as the photographer's preview shows it
+     * (FR-7.7). The point has no echo, since focus has no lasting state; the answer is the `camera.state` with the
+     * brightness the tap put back.
+     */
     @Serializable
     @SerialName("camera.focus.set")
     data class FocusSet(val x: Float, val y: Float) : SessionMessage
+
+    /**
+     * P→S: where the photographer's own tap focused, in fractions of the photographer's frame as its preview shows
+     * it (FR-7.7, #273), so the subject sees the focus box too. Not kept: a phone that connects later gets none, and
+     * an older subject ignores the type.
+     */
+    @Serializable
+    @SerialName("camera.focus")
+    data class Focused(val x: Float, val y: Float) : SessionMessage
+
+    /**
+     * S → P: the subject pressed *Subject view*'s shutter (FR-7.8, #314). The photographer's phone takes a photo as
+     * its own shutter does, at once, and answers with `camera.shutter.answer`; the photo itself is told and sent as
+     * any other (`photo.shutter`, `photo.begin`). A press is one moment, so it goes on the realtime channel, at once
+     * or not at all: one that came late would take a photo the subject no longer waits for. [press] numbers this
+     * phone's presses, and the answer names it. [cancel] is true for a press made while this phone showed the
+     * photographer's countdown (FR-1.17): it stops the countdown, and never takes a photo or starts one.
+     */
+    @Serializable
+    @SerialName("camera.shutter")
+    data class ShutterPress(val press: Int, val cancel: Boolean = false) : SessionMessage
+
+    /**
+     * P → S: what became of the subject's `camera.shutter` numbered [press] (#314). [taken] is true when the
+     * photographer's camera was asked for the photo; one that fails after that is told by `photo.dropped`. [timer] is
+     * true when the press was the photographer's timer's instead (FR-1.17): it started the countdown, whose end takes
+     * the photo, stopped it, or left it as it was. With neither, the press was refused: the Camera screen is not in
+     * front, it frames a pose's scene photo, or its camera is still taking the photo before. The subject's shutter is
+     * held until the answer to its own press; one that comes after that press was given up answers no later press.
+     */
+    @Serializable
+    @SerialName("camera.shutter.answer")
+    data class ShutterAnswer(val taken: Boolean, val press: Int, val timer: Boolean = false) : SessionMessage
+
+    /**
+     * S → P: the subject picked a situation on its *Add a pose guide* (FR-6.15, #276). The photographer's phone begins
+     * the scene photo for it, as if its own user had picked it, and answers with `pose.start.answer`. [situation] is
+     * the situation's name on the server (`Situation.apiName`), kept a string so that a phone that does not know one
+     * refuses that request alone. [request] numbers this phone's requests, and each answer names its request.
+     */
+    @Serializable
+    @SerialName("pose.start")
+    data class PoseStart(val situation: String, val request: Int = 0) : SessionMessage
+
+    /**
+     * P → S: whether the scene photo's step began for the subject's `pose.start` numbered [request] (#276). False when
+     * the photographer's phone could not begin it: its Camera screen is not in front or already in a step, it has no
+     * front camera for a selfie, or its user did not agree to the AI notice. While that notice is up, an answer with
+     * [asking] says so at once, so the subject's phone waits for the answer that follows and does not give the
+     * request up.
+     */
+    @Serializable
+    @SerialName("pose.start.answer")
+    data class PoseStartAnswer(val started: Boolean, val request: Int = 0, val asking: Boolean = false) :
+        SessionMessage
+
+    /**
+     * P→S: the photographer's shutter timer (FR-1.17): the seconds [left] while it counts down, one message a second
+     * from the timer's seconds to 1, then 0 as it ends, with its photo or cancelled. The subject's phone shows the
+     * number. Not kept: a phone that connects during a countdown sees it from its next second, and an older subject
+     * ignores the type.
+     */
+    @Serializable
+    @SerialName("camera.timer")
+    data class Countdown(val left: Int) : SessionMessage
+
+    @Serializable
+    @SerialName("camera.timer.set")
+    data class TimerSet(val seconds: Int) : SessionMessage
+
+    /**
+     * What the photographer did on their own camera (P → S, #292): the subject's phone says it in a line, as the
+     * photographer's phone says the subject's (FR-7.4). [action] is a name, kept a string so that a phone that does
+     * not know one drops only that line: `zoom` with [zoom], `brightness` with [exposure], `flash` with [flash],
+     * `timer` with [seconds], `guide.move`, `guide`, `guide.hide`, `guide.show`, `guide.opacity` with [opacity],
+     * `guide.remove`, and `guide.restore` (`PhotographerAction`). The photographer's own focus goes as `camera.focus`.
+     */
+    @Serializable
+    @SerialName("camera.did")
+    data class PhotographerDid(
+        val action: String,
+        val zoom: Float = 0f,
+        val exposure: Int = 0,
+        val flash: FlashMode = FlashMode.OFF,
+        val seconds: Int = 0,
+        val opacity: Float = 0f,
+    ) : SessionMessage
 
     /** Whether the photographer allows remote control (FR-7.5, Could). */
     @Serializable
@@ -433,7 +579,9 @@ sealed interface SessionMessage {
      * The camera values actually applied, and who changed them. Iteration 2 adds [exposure], [flash], and [aspect],
      * so the subject always has the whole camera state and fits its video, grid, and guide to [aspect] (AD-10).
      * [facing] is the camera in use (#201): the subject shows the rear camera's video as a mirror. An older phone
-     * sends none, which means the rear camera.
+     * sends none, which means the rear camera. [focused] marks the state that answers the subject's
+     * `camera.focus.set` (#273): its [exposure] is the brightness that tap left, which the subject's bar starts from.
+     * No other state of the subject's is that answer, so a zoom's or a brightness's echo cannot be taken for it.
      */
     @Serializable
     @SerialName("camera.state")
@@ -445,6 +593,8 @@ sealed interface SessionMessage {
         val flash: FlashMode = FlashMode.OFF,
         val aspect: AspectRatio = AspectRatio.R4_3,
         val facing: CameraFacing = CameraFacing.BACK,
+        val focused: Boolean = false,
+        val timer: Int = 0,
     ) : SessionMessage
 
     @Serializable

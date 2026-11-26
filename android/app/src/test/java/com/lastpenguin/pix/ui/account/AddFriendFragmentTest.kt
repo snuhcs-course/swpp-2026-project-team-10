@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-23, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.view.View
@@ -16,6 +16,7 @@ import com.lastpenguin.pix.account.UserLookup
 import com.lastpenguin.pix.databinding.FragmentAddFriendBinding
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import org.junit.After
@@ -24,7 +25,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
-import org.robolectric.shadows.ShadowToast
 
 /*
  * Add a friend on the real Fragment (R&S 6.4; FR-5.5, FR-5.6, FR-5.8, US-7), with the friends fake behind the
@@ -150,7 +150,7 @@ class AddFriendFragmentTest {
         onScreen { it.resultButton.performClick() }
         idle()
 
-        assertEquals(string(R.string.unavailable_error), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.unavailable_error), shownNotice())
         onScreen { assertEquals(string(R.string.add), it.resultButton.text.toString()) }
     }
 

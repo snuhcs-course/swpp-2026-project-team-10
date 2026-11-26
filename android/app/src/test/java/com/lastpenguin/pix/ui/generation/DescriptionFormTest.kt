@@ -1,16 +1,20 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
+import android.graphics.Rect
 import android.view.LayoutInflater
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import androidx.annotation.StringRes
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.android.material.chip.Chip
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
 import com.lastpenguin.pix.generation.DESCRIPTION_MAX_LENGTH
-import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.PromptEntry
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.ui.OwnActivities
@@ -28,9 +32,22 @@ import org.robolectric.annotation.GraphicsMode
  * hidden); one chip each in their order, without the switch outside a session; a chip's tap on a field with text; its
  * ✕; in a session, the switch between all and the friend's, nothing used with the friend yet, and the friend gone; the
  * same history again (the chips kept as they are); a friend's name of 30 characters (cut short, both halves of the
- * switch on the screen). The last description rejected or not. The one button (Iter3-A13): its label for an empty
- * field, spaces only, a typed text, a kept text, a chip, and the other phone's text; it sends the field as typed. The
- * ✕: shown with text, hidden with none and while the field waits; it empties the field as typing would.
+ * switch on the screen). The last description rejected or not. The one button: *Generate* for an empty field, spaces
+ * only, and a text (FR-4.15); it sends the field as typed.
+ * Auto (FR-4.15): an empty field left alone says Auto, with the line that says to tap it and nothing under it; tapped,
+ * it shows the example, the counter, the options, and the history, which fold again once it is left empty, by a closed
+ * keyboard or Done, with nothing typed or what was typed deleted, and stay once it is left with a text; a kept text
+ * opens them without a tap; a refused empty field shows the refusal, not the line; the field is as high saying Auto as
+ * with an option. *Back to Auto*: shown with text, hidden with none and while the field waits; it empties the field as
+ * typing would and folds what is under it; it stands under the field where the line to tap it stood, a touch target
+ * high, with nothing in the field but its text, and a chosen option moves nothing under the field; a refusal shows
+ * over it, and over the line to tap an empty field. What only the other phone's text opened folds when the text goes,
+ * also after this field was tapped and left empty, and stays if a chip here opened it.
+ * The options (FR-4.15): each situation's own, in their order, and Auto's without a situation; another situation, and
+ * the same one again (the chips kept as they are); an option into an empty field, a second one after a comma, a
+ * checked one tapped again, the last one taken out; checked by typed text and by the other phone's, not by a longer
+ * word; one that would pass 100 characters; waiting while the other person types. A description used before that is
+ * an option on the screen is not listed twice, alone or among others.
  * In a session (FR-6.15): the other phone's text shown, but not over this field's typing; the field, the chips, and
  * the buttons waiting while the other person types or the link is paused, and the buttons while an answer is awaited;
  * the hint; Done and the buttons ending the typing; outside a session, nothing waits.
@@ -71,6 +88,41 @@ class DescriptionFormTest {
         (0 until historyChips.childCount).map { historyChips.getChildAt(it) as Chip }
 
     private fun FragmentDescribePoseBinding.chipTexts() = chips().map { it.text.toString() }
+
+    private fun FragmentDescribePoseBinding.options(): List<Chip> =
+        (0 until optionChips.childCount).map { optionChips.getChildAt(it) as Chip }
+
+    private fun FragmentDescribePoseBinding.optionTexts() = options().map { it.text.toString() }
+
+    private fun FragmentDescribePoseBinding.string(@StringRes id: Int) = root.context.getString(id)
+
+    private fun FragmentDescribePoseBinding.option(@StringRes label: Int): Chip =
+        options().single { it.text.toString() == string(label) }
+
+    /** A tap on the field, which opens what is under it. */
+    private fun FragmentDescribePoseBinding.tapField() {
+        descriptionInput.requestFocus()
+    }
+
+    /** The keyboard opening or closing, as the window's insets tell the field. */
+    private fun FragmentDescribePoseBinding.keyboard(shown: Boolean) {
+        val insets = WindowInsetsCompat.Builder().setVisible(WindowInsetsCompat.Type.ime(), shown).build()
+        ViewCompat.dispatchApplyWindowInsets(descriptionInput, insets)
+    }
+
+    /** Where [view] is in the form, in px. */
+    private fun FragmentDescribePoseBinding.placeOf(view: View): Rect =
+        Rect(0, 0, view.width, view.height).also { root.offsetDescendantRectToMyCoords(view, it) }
+
+    /** Lays the form out at the Galaxy S22's width. */
+    private fun FragmentDescribePoseBinding.layOut() {
+        val width = (360 * root.resources.displayMetrics.density).toInt()
+        root.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+        )
+        root.layout(0, 0, width, root.measuredHeight)
+    }
 
     @Test
     fun emptyField_showsTheCounterAtZeroAndNoError() {
@@ -135,6 +187,7 @@ class DescriptionFormTest {
     @Test
     fun descriptionsUsedBefore_areOneChipEachInTheirOrder_withoutTheSwitchOutsideASession() {
         val binding = form()
+        binding.tapField()
 
         shared.showHistory(listOf(entry("Wave"), entry("Jump", "u_2")), partner = null)
 
@@ -184,6 +237,7 @@ class DescriptionFormTest {
     @Test
     fun aLongFriendsName_isCutShort_soBothHalvesOfTheSwitchStayOnTheScreen() {
         val binding = form()
+        binding.tapField()
         shared.showHistory(listOf(entry("Wave")), SessionPartner("u_2", "가".repeat(30)))
         val width = 360
         binding.root.measure(
@@ -201,6 +255,7 @@ class DescriptionFormTest {
     @Test
     fun inASession_theSwitchShowsAllOrTheOnesUsedWithTheFriend_andSaysWhenThereAreNone() {
         val binding = form()
+        binding.tapField()
         val friend = SessionPartner("u_2", "Joonhyung")
 
         shared.showHistory(listOf(entry("Wave", "u_2"), entry("Jump", "u_3")), friend)
@@ -245,23 +300,17 @@ class DescriptionFormTest {
         assertEquals("피 흘리는 모습", binding.descriptionInput.text.toString())
     }
 
-    private fun FragmentDescribePoseBinding.label() = generateButton.text.toString()
-
-    private fun FragmentDescribePoseBinding.suggest() = root.context.getString(R.string.suggest_poses)
-
-    private fun FragmentDescribePoseBinding.describe() = root.context.getString(R.string.generate_from_description)
-
     @Test
-    fun theButton_sendsTheFieldAsTyped_andItsLabelSaysWhatItStarts() {
+    fun theButton_readsGenerateWhateverTheFieldHolds_andSendsTheFieldAsTyped() {
         val binding = form()
-        assertEquals(binding.suggest(), binding.label())
+        val generate = binding.string(R.string.generate_from_description)
+        assertEquals(generate, binding.generateButton.text.toString())
         binding.generateButton.performClick()
 
-        // Spaces alone ask for suggested poses too (PoseRequest.of).
         binding.descriptionInput.setText("   ")
-        assertEquals(binding.suggest(), binding.label())
+        assertEquals(generate, binding.generateButton.text.toString())
         binding.descriptionInput.setText("  Waving  ")
-        assertEquals(binding.describe(), binding.label())
+        assertEquals(generate, binding.generateButton.text.toString())
         binding.generateButton.performClick()
 
         // The ViewModel decides what an empty or padded text means.
@@ -269,41 +318,390 @@ class DescriptionFormTest {
     }
 
     @Test
-    fun theLabel_followsAKeptText_theOtherPhonesText_andAChip() {
-        val binding = form(text = "jump")
-        assertEquals(binding.describe(), binding.label())
-
-        shared.showShared("", typing = "Dongje", sharedWith = "Dongje")
-        assertEquals(binding.suggest(), binding.label())
-        shared.showShared("wave", typing = null, sharedWith = "Dongje")
-        assertEquals(binding.describe(), binding.label())
-
-        binding.descriptionInput.setText("")
+    fun anEmptyFieldLeftAlone_saysAuto_withTheLineToTapIt_andNothingUnderIt() {
+        val binding = form()
+        shared.showOptions(Situation.FULL_BODY)
         shared.showHistory(listOf(entry("Wave")), partner = null)
-        binding.chips().single().performClick()
-        assertEquals(binding.describe(), binding.label())
+
+        val auto = binding.string(R.string.describe_auto) + "\n" + binding.string(R.string.describe_auto_body)
+        assertEquals(auto, binding.descriptionInput.hint.toString())
+        // Its outline is in the accent's tint, as the chosen value's.
+        assertTrue(binding.descriptionInput.isActivated)
+        assertEquals(View.VISIBLE, binding.descriptionHelper.visibility)
+        assertEquals(binding.string(R.string.describe_auto_helper), binding.descriptionHelper.text.toString())
+        assertEquals(View.GONE, binding.descriptionCounter.visibility)
+        assertEquals(View.GONE, binding.optionsSection.visibility)
+        assertEquals(View.GONE, binding.historySection.visibility)
     }
 
     @Test
-    fun theClear_emptiesTheFieldAsTypingWould_andShowsOnlyWithTextItCanTake() {
+    fun aTappedField_showsTheExample_theCounter_theOptions_andTheHistory() {
         val binding = form()
-        val clear = binding.clearDescriptionButton
-        assertEquals(View.GONE, clear.visibility)
+        shared.showOptions(Situation.FULL_BODY)
+        shared.showHistory(listOf(entry("Wave")), partner = null)
+
+        binding.tapField()
+
+        assertEquals(binding.string(R.string.describe_hint), binding.descriptionInput.hint.toString())
+        assertFalse(binding.descriptionInput.isActivated)
+        assertEquals(View.GONE, binding.descriptionHelper.visibility)
+        assertEquals(View.VISIBLE, binding.descriptionCounter.visibility)
+        assertEquals(View.VISIBLE, binding.optionsSection.visibility)
+        assertEquals(View.VISIBLE, binding.historySection.visibility)
+    }
+
+    @Test
+    fun aTappedField_leftEmpty_saysAutoAgain_withNothingUnderIt() {
+        val binding = form()
+        shared.showOptions(Situation.FULL_BODY)
+        shared.showHistory(listOf(entry("Wave")), partner = null)
+        binding.tapField()
+        binding.keyboard(shown = true)
+
+        // Nothing typed, and the keyboard closed.
+        binding.keyboard(shown = false)
+
+        assertFalse(binding.descriptionInput.hasFocus())
+        assertEquals(binding.string(R.string.describe_auto), binding.descriptionInput.hint.toString().lines().first())
+        assertEquals(View.VISIBLE, binding.descriptionHelper.visibility)
+        assertEquals(View.GONE, binding.optionsSection.visibility)
+        assertEquals(View.GONE, binding.historySection.visibility)
+
+        // Typed, deleted again, and Done: the same.
+        binding.tapField()
+        binding.descriptionInput.setText("jump")
+        binding.descriptionInput.setText("")
+        binding.descriptionInput.onEditorAction(EditorInfo.IME_ACTION_DONE)
+
+        assertEquals(View.VISIBLE, binding.descriptionHelper.visibility)
+        assertEquals(View.GONE, binding.optionsSection.visibility)
+        assertEquals(View.GONE, binding.historySection.visibility)
+    }
+
+    @Test
+    fun aTappedField_leftWithAText_keepsWhatIsUnderIt() {
+        val binding = form()
+        shared.showOptions(Situation.FULL_BODY)
+        shared.showHistory(listOf(entry("Wave")), partner = null)
+        binding.tapField()
+        binding.keyboard(shown = true)
+        binding.descriptionInput.setText("jump")
+
+        binding.keyboard(shown = false)
+
+        assertFalse(binding.descriptionInput.hasFocus())
+        assertEquals(View.VISIBLE, binding.clearDescriptionButton.visibility)
+        assertEquals(View.VISIBLE, binding.optionsSection.visibility)
+        assertEquals(View.VISIBLE, binding.historySection.visibility)
+    }
+
+    @Test
+    fun aKeptText_opensTheOptionsAndTheHistory_withoutATap() {
+        val binding = form(text = "jump")
+        shared.showOptions(Situation.FULL_BODY)
+        shared.showHistory(listOf(entry("Wave")), partner = null)
+
+        assertFalse(binding.descriptionInput.isActivated)
+        assertEquals(View.GONE, binding.descriptionHelper.visibility)
+        assertEquals(View.VISIBLE, binding.descriptionCounter.visibility)
+        assertEquals(View.VISIBLE, binding.optionsSection.visibility)
+        assertEquals(View.VISIBLE, binding.historySection.visibility)
+    }
+
+    @Test
+    fun aRefusedEmptyField_showsTheRefusal_overTheLineToTapIt() {
+        val binding = form(text = "", rejected = true)
+        binding.layOut()
+
+        assertEquals(View.VISIBLE, binding.descriptionError.visibility)
+        assertEquals(View.VISIBLE, binding.descriptionHelper.visibility)
+        assertTrue(binding.placeOf(binding.descriptionError).bottom <= binding.placeOf(binding.descriptionHelper).top)
+    }
+
+    @Test
+    fun aRefusedText_showsTheRefusal_overBackToAuto() {
+        val binding = form(text = "피 흘리는 모습", rejected = true)
+        binding.layOut()
+
+        assertEquals(View.VISIBLE, binding.descriptionError.visibility)
+        assertEquals(View.VISIBLE, binding.clearDescriptionButton.visibility)
+        val refusal = binding.placeOf(binding.descriptionError)
+        assertTrue(refusal.bottom <= binding.placeOf(binding.clearDescriptionButton).top)
+        assertTrue(refusal.top >= binding.placeOf(binding.descriptionInput).bottom)
+    }
+
+    @Test
+    fun backToAuto_standsUnderTheField_whereTheLineToTapItStood_andTheFieldKeepsItsWidthForText() {
+        val binding = form()
+        shared.showOptions(Situation.FULL_BODY)
+        binding.layOut()
+        val line = binding.placeOf(binding.descriptionHelper)
 
         binding.descriptionInput.setText("wave")
-        assertEquals(View.VISIBLE, clear.visibility)
-        clear.performClick()
+        binding.layOut()
+
+        // One line under the field says how to get to the other way: to typing, or back to Auto.
+        val back = binding.placeOf(binding.clearDescriptionButton)
+        assertEquals(View.GONE, binding.descriptionHelper.visibility)
+        assertEquals(line.left, back.left)
+        assertTrue("$back under the field", back.top >= binding.placeOf(binding.descriptionInput).bottom)
+        assertEquals(line.centerY().toFloat(), back.centerY().toFloat(), 1f)
+        // A touch target high (NFR-16), with the counter still at the row's end.
+        val density = binding.root.resources.displayMetrics.density
+        assertTrue(back.height() >= (48 * density).toInt())
+        assertEquals(binding.placeOf(binding.descriptionInput).right, binding.placeOf(binding.descriptionCounter).right)
+        // Nothing stands in the field but its text.
+        assertEquals(binding.descriptionInput.paddingStart, binding.descriptionInput.paddingEnd)
+    }
+
+    @Test
+    fun aChosenOption_andBackToAutoInItsLine_moveNothingUnderTheField() {
+        val binding = form()
+        shared.showOptions(Situation.FULL_BODY)
+        binding.tapField()
+        binding.layOut()
+        val options = binding.placeOf(binding.optionsSection).top
+
+        binding.option(R.string.pose_option_peace_sign).performClick()
+        binding.layOut()
+
+        assertEquals(View.VISIBLE, binding.clearDescriptionButton.visibility)
+        assertEquals(options, binding.placeOf(binding.optionsSection).top)
+    }
+
+    @Test
+    fun theField_isAsHighSayingAutoAsWithAnOption() {
+        val binding = form()
+        shared.showOptions(Situation.FULL_BODY)
+        binding.layOut()
+        val saysAuto = binding.descriptionInput.height
+
+        binding.option(R.string.pose_option_peace_sign).performClick()
+        binding.layOut()
+
+        assertTrue(saysAuto > 0)
+        assertEquals(saysAuto, binding.descriptionInput.height)
+    }
+
+    @Test
+    fun backToAuto_emptiesTheFieldAsTypingWould_foldsWhatIsUnderIt_andShowsOnlyWithTextItCanTake() {
+        val binding = form()
+        shared.showOptions(Situation.FULL_BODY)
+        val back = binding.clearDescriptionButton
+        assertEquals(View.GONE, back.visibility)
+
+        binding.tapField()
+        binding.descriptionInput.setText("wave")
+        assertEquals(View.VISIBLE, back.visibility)
+        assertEquals(binding.string(R.string.back_to_auto), back.text.toString())
+        back.performClick()
 
         assertEquals("", binding.descriptionInput.text.toString())
         assertEquals("", changes.last())
-        assertEquals(binding.suggest(), binding.label())
-        assertEquals(View.GONE, clear.visibility)
+        assertFalse(binding.descriptionInput.hasFocus())
+        assertEquals(View.GONE, back.visibility)
+        assertEquals(View.VISIBLE, binding.descriptionHelper.visibility)
+        assertEquals(View.GONE, binding.optionsSection.visibility)
 
         // While the other person types, this field takes nothing.
         shared.showShared("jump", typing = "Dongje", sharedWith = "Dongje")
-        assertEquals(View.GONE, clear.visibility)
+        assertEquals(View.GONE, back.visibility)
         shared.showShared("jump", typing = null, sharedWith = "Dongje")
-        assertEquals(View.VISIBLE, clear.visibility)
+        assertEquals(View.VISIBLE, back.visibility)
+    }
+
+    @Test
+    fun options_areTheSituationsOwn_inTheirOrder() {
+        val binding = form()
+
+        shared.showOptions(Situation.FULL_BODY)
+
+        val labels = listOf(
+            R.string.pose_option_peace_sign,
+            R.string.pose_option_hand_in_pocket,
+            R.string.pose_option_looking_back,
+            R.string.pose_option_walking,
+            R.string.pose_option_arms_up,
+            R.string.pose_option_thumbs_up,
+        )
+        assertEquals(labels.map { binding.string(it) }, binding.optionTexts())
+        assertTrue(binding.options().none { it.isCloseIconVisible })
+    }
+
+    @Test
+    fun withoutASituation_theOptionsAreAutos() {
+        val binding = form()
+
+        shared.showOptions(null)
+        val none = binding.optionTexts()
+        shared.showOptions(Situation.DEFAULT)
+
+        assertEquals(none, binding.optionTexts())
+        assertEquals(binding.string(R.string.pose_option_peace_sign), none.first())
+        assertEquals(binding.string(R.string.pose_option_arms_up), none.last())
+    }
+
+    @Test
+    fun anotherSituation_replacesTheOptions_andTheSameOneAgainKeepsTheChips() {
+        val binding = form()
+        shared.showOptions(Situation.FULL_BODY)
+        val chips = binding.options()
+
+        shared.showOptions(Situation.FULL_BODY)
+        assertEquals(chips, binding.options())
+
+        shared.showOptions(Situation.SELFIE)
+        assertEquals(binding.string(R.string.pose_option_wink), binding.optionTexts()[2])
+    }
+
+    @Test
+    fun anOption_goesIntoTheEmptyField_andIsChecked() {
+        val binding = form()
+        shared.showOptions(Situation.FULL_BODY)
+        val peace = binding.option(R.string.pose_option_peace_sign)
+        assertFalse(peace.isChecked)
+
+        peace.performClick()
+
+        val text = binding.string(R.string.pose_option_peace_sign)
+        assertEquals(text, binding.descriptionInput.text.toString())
+        assertEquals(text.length, binding.descriptionInput.selectionStart)
+        assertEquals(text, changes.last())
+        assertTrue(peace.isChecked)
+        assertFalse(binding.option(R.string.pose_option_walking).isChecked)
+    }
+
+    @Test
+    fun aSecondOption_followsAfterAComma_andACheckedOneTappedAgainLeaves() {
+        val binding = form()
+        shared.showOptions(Situation.FULL_BODY)
+        val peace = binding.option(R.string.pose_option_peace_sign)
+        val pocket = binding.option(R.string.pose_option_hand_in_pocket)
+
+        peace.performClick()
+        pocket.performClick()
+        assertEquals("Peace sign, Hand in pocket", binding.descriptionInput.text.toString())
+        assertTrue(peace.isChecked && pocket.isChecked)
+
+        peace.performClick()
+        assertEquals("Hand in pocket", binding.descriptionInput.text.toString())
+        assertFalse(peace.isChecked)
+        assertTrue(pocket.isChecked)
+        assertEquals("Hand in pocket", changes.last())
+    }
+
+    @Test
+    fun theLastOptionTakenOut_leavesAuto_withTheOptionsStillThere() {
+        val binding = form()
+        shared.showOptions(Situation.FULL_BODY)
+        val peace = binding.option(R.string.pose_option_peace_sign)
+        peace.performClick()
+
+        peace.performClick()
+
+        assertEquals("", binding.descriptionInput.text.toString())
+        assertEquals(View.VISIBLE, binding.descriptionHelper.visibility)
+        // The chip just tapped does not go from under the finger.
+        assertEquals(View.VISIBLE, binding.optionsSection.visibility)
+        assertFalse(peace.isChecked)
+    }
+
+    @Test
+    fun anOption_isCheckedByTypedText_andNotByALongerWord() {
+        val binding = form()
+        shared.showOptions(Situation.FULL_BODY)
+        val peace = binding.option(R.string.pose_option_peace_sign)
+
+        binding.descriptionInput.setText("smiling, peace sign")
+        assertTrue(peace.isChecked)
+
+        binding.descriptionInput.setText("Peace signs with both hands")
+        assertFalse(peace.isChecked)
+    }
+
+    @Test
+    fun anOption_thatWouldPassTheLongestDescription_cannotBeChosen() {
+        val binding = form()
+        shared.showOptions(Situation.FULL_BODY)
+        val walking = binding.option(R.string.pose_option_walking)
+        val room = DESCRIPTION_MAX_LENGTH - ", Walking".length
+
+        binding.descriptionInput.setText("a".repeat(room))
+        assertTrue(walking.isEnabled)
+
+        binding.descriptionInput.setText("a".repeat(room + 1))
+        assertFalse(walking.isEnabled)
+        walking.performClick()
+        assertEquals("a".repeat(room + 1), binding.descriptionInput.text.toString())
+        assertFalse(walking.isChecked)
+
+        // One already in the description can always be taken out.
+        binding.descriptionInput.setText("Walking, " + "a".repeat(DESCRIPTION_MAX_LENGTH - "Walking, ".length))
+        assertTrue(walking.isEnabled)
+    }
+
+    @Test
+    fun inASession_theOtherPhonesOptionIsChecked_andTheOptionsWaitWhileTheyType() {
+        val binding = form()
+        shared.showOptions(Situation.FULL_BODY)
+        val peace = binding.option(R.string.pose_option_peace_sign)
+
+        shared.showShared("Peace sign", typing = "Dongje", sharedWith = "Dongje")
+
+        assertEquals(View.VISIBLE, binding.optionsSection.visibility)
+        assertTrue(peace.isChecked)
+        assertTrue(binding.options().none { it.isEnabled })
+
+        shared.showShared("Peace sign", typing = null, sharedWith = "Dongje")
+
+        assertTrue(binding.options().all { it.isEnabled })
+    }
+
+    @Test
+    fun whatOnlyTheOtherPhonesTextOpened_foldsWhenTheTextGoes_andStaysIfAChipHereOpenedIt() {
+        val binding = form()
+        shared.showOptions(Situation.FULL_BODY)
+
+        shared.showShared("Peace sign", typing = null, sharedWith = "Dongje")
+        assertEquals(View.VISIBLE, binding.optionsSection.visibility)
+
+        // They went back to Auto: this phone, which touched nothing, says Auto with nothing under it too.
+        shared.showShared("", typing = null, sharedWith = "Dongje")
+        assertEquals(View.GONE, binding.optionsSection.visibility)
+        assertEquals(View.VISIBLE, binding.descriptionHelper.visibility)
+
+        // Tapped here and left empty, which says Auto again: their text opens it, and folds it as it goes.
+        binding.tapField()
+        shared.stopTyping()
+        shared.showShared("Peace sign", typing = null, sharedWith = "Dongje")
+        shared.showShared("", typing = null, sharedWith = "Dongje")
+        assertEquals(View.GONE, binding.optionsSection.visibility)
+
+        // Opened here by a chip: what the chip opened is this phone's own.
+        binding.option(R.string.pose_option_peace_sign).performClick()
+        shared.showShared("", typing = null, sharedWith = "Dongje")
+        assertEquals(View.VISIBLE, binding.optionsSection.visibility)
+    }
+
+    @Test
+    fun aDescriptionUsedBefore_thatIsAnOptionOnTheScreen_isNotListedTwice() {
+        val binding = form()
+        shared.showOptions(Situation.FULL_BODY)
+        binding.tapField()
+
+        shared.showHistory(listOf(entry("peace sign"), entry("Wave"), entry("Peace sign, Wave")), partner = null)
+        assertEquals(listOf("Wave", "Peace sign, Wave"), binding.chipTexts())
+
+        // Nothing else was used: no section for it.
+        shared.showHistory(listOf(entry("Peace sign")), partner = null)
+        assertEquals(View.GONE, binding.historySection.visibility)
+
+        // Selfie has no walking pose, so a description of it is listed there.
+        shared.showHistory(listOf(entry("Walking")), partner = null)
+        assertEquals(View.GONE, binding.historySection.visibility)
+        shared.showOptions(Situation.SELFIE)
+        assertEquals(listOf("Walking"), binding.chipTexts())
+        assertEquals(View.VISIBLE, binding.historySection.visibility)
     }
 
     @Test

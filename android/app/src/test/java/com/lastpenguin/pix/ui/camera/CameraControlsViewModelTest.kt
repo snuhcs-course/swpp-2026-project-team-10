@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -18,8 +18,10 @@ import com.lastpenguin.pix.camera.FrameSink
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideSource
+import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.ReferenceGuide
+import com.lastpenguin.pix.session.PhotographerAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -35,6 +37,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -45,11 +48,18 @@ import org.junit.Test
  * Aspect ratio (chosen from the ratios under the top bar since Iter3-A12; before, each tap moved to the next): each
  * ratio chosen goes to the camera, is saved, and closes the ratios; the ratio the camera has only closes them; a choice
  * while a photo is saved is ignored, and the shutter closes the ratios; a saved ratio is restored at start, and none
- * leaves the default; a ratio change re-clamps a guide and sends a final change.
+ * leaves the default; a ratio change re-clamps a guide and sends a final change, and closes an open brightness bar.
  * Exposure: an index inside the range, beyond each end (clamped), and a camera without compensation (ignored); the
  * brightness slider opens only with compensation.
  * Focus: a tap inside the frame on a ready camera that supports it; a camera that is not ready, a camera without a
  * focus point, and a point outside the frame are ignored.
+ * What the photographer did, told for the subject's phone (#292): a pinch (nothing at its steps, its last value
+ * clamped to the camera's range) and a quick step (its step); a drag for the brightness (nothing at its steps, its end
+ * clamped) and each tap on the flash; not the base brightness a tap to focus puts back; a gesture on the guide that
+ * moved it (once, at its end) and one that did not (nothing); a camera without a flash or without brightness
+ * (nothing). The guide's panel (FR-7.4): Hide and Show each, the opacity once at the drag's end with its clamped value,
+ * and ✕; nothing without a guide. The subject's ✕ undone: the guide back where it was, and not over a newer guide.
+ * This phone's ✕ handed on with where the guide was, for the subject's Undo; this phone's Undo told.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CameraControlsViewModelTest {
@@ -190,6 +200,19 @@ class CameraControlsViewModelTest {
     }
 
     @Test
+    fun ratioChange_withTheBrightnessBarOpen_closesIt() = runTest(dispatcher) {
+        start()
+        runCurrent()
+        model.setBrightnessOpen(true)
+
+        // The rebind drops the focus point the bar stands beside.
+        model.onAspectChosen(AspectRatio.R1_1)
+        runCurrent()
+
+        assertFalse(model.uiState.value.brightnessOpen)
+    }
+
+    @Test
     fun onExposureChange_indexOutsideTheRange_isClampedToTheNearestEnd() = runTest(dispatcher) {
         start()
         runCurrent()
@@ -203,35 +226,27 @@ class CameraControlsViewModelTest {
     }
 
     @Test
-    fun theBaseBrightness_isSetWhenTheRangeIsKnown_whenItChanges_andAtEachTapToFocus() = runTest(dispatcher) {
-        // 1/6 EV per index.
-        val base = MutableStateFlow(1f)
-        model = CameraViewModel(camera, guides, settings, baseBrightness = base)
+    fun theBaseBrightness_0Ev_isSetWhenTheRangeIsKnown_atEachTapToFocus_andForANewRange() = runTest(dispatcher) {
+        model = CameraViewModel(camera, guides, settings)
         store.put("camera", model)
         runCurrent()
-        assertEquals(listOf(6), camera.exposureRequests)
+        assertEquals(listOf(0), camera.exposureRequests)
 
-        // A drag adds to it, and a tap to focus takes that away again.
+        // A drag changes it, and a tap to focus takes that away again.
         model.onExposureChange(9)
         model.onFocusTap(0.5f, 0.5f)
-        assertEquals(listOf(6, 9, 6), camera.exposureRequests)
+        assertEquals(listOf(0, 9, 0), camera.exposureRequests)
 
-        base.value = -0.5f
+        // Another camera's range, without 0: the base again, clamped to it.
+        camera.capabilities.value = capabilities(exposureRange = 2..8)
         runCurrent()
-        assertEquals(-3, camera.exposureRequests.last())
-
-        // Another camera's range: the base again, clamped to it.
-        base.value = 2f
-        runCurrent()
-        camera.capabilities.value = capabilities(exposureRange = -4..4)
-        runCurrent()
-        assertEquals(4, camera.exposureRequests.last())
+        assertEquals(2, camera.exposureRequests.last())
     }
 
     @Test
     fun aTapOnACameraThatCannotFocusOnAPoint_stillTakesTheBrightnessBackToTheBase() = runTest(dispatcher) {
         camera.capabilities.value = capabilities(supportsFocusPoint = false)
-        model = CameraViewModel(camera, guides, settings, baseBrightness = MutableStateFlow(0.5f))
+        model = CameraViewModel(camera, guides, settings)
         store.put("camera", model)
         runCurrent()
         model.onExposureChange(8)
@@ -239,13 +254,13 @@ class CameraControlsViewModelTest {
         model.onFocusTap(0.5f, 0.5f)
 
         assertTrue(camera.focusRequests.isEmpty())
-        assertEquals(listOf(3, 8, 3), camera.exposureRequests)
+        assertEquals(listOf(0, 8, 0), camera.exposureRequests)
     }
 
     @Test
     fun theBaseBrightness_withoutExposureCompensation_setsNothing() = runTest(dispatcher) {
         camera.capabilities.value = capabilities(exposureRange = 0..0)
-        model = CameraViewModel(camera, guides, settings, baseBrightness = MutableStateFlow(1f))
+        model = CameraViewModel(camera, guides, settings)
         store.put("camera", model)
         runCurrent()
         model.onFocusTap(0.5f, 0.5f)
@@ -285,6 +300,181 @@ class CameraControlsViewModelTest {
         model.onFocusTap(0.25f, 0.75f)
 
         assertEquals(listOf(0.25f to 0.75f), camera.focusRequests)
+    }
+
+    @Test
+    fun onFocusTap_tellsWhereItFocused_onlyWhenTheCameraTookThePoint() = runTest(dispatcher) {
+        val told = mutableListOf<Pair<Float, Float>>()
+        model = CameraViewModel(camera, guides, settings, onFocused = { x, y -> told += x to y })
+        store.put("camera", model)
+        runCurrent()
+
+        model.onFocusTap(0.25f, 0.75f)
+        assertEquals(listOf(0.25f to 0.75f), told)
+
+        // Outside the frame, and on a camera that cannot focus on a point: nothing focused, so nothing told.
+        model.onFocusTap(1.2f, 0.5f)
+        camera.capabilities.value = capabilities(supportsFocusPoint = false)
+        runCurrent()
+        model.onFocusTap(0.5f, 0.5f)
+        assertEquals(1, told.size)
+    }
+
+    private fun startTelling(): MutableList<PhotographerAction> {
+        val did = mutableListOf<PhotographerAction>()
+        model = CameraViewModel(camera, guides, settings, onDid = { did += it })
+        store.put("camera", model)
+        return did
+    }
+
+    @Test
+    fun aPinch_isToldOnce_atItsLastValue_andAQuickStepAtItsStep() = runTest(dispatcher) {
+        val did = startTelling()
+        runCurrent()
+
+        model.onZoomChanged(1.4f, final = false)
+        model.onZoomChanged(1.8f, final = false)
+        assertTrue(did.isEmpty())
+        // Its last value, as the camera can show it.
+        model.onZoomChanged(9f, final = true)
+        assertEquals(listOf<PhotographerAction>(PhotographerAction.Zoom(4f)), did)
+
+        did.clear()
+        model.onZoomTap()
+        assertEquals(listOf<PhotographerAction>(PhotographerAction.Zoom(2f)), did)
+    }
+
+    @Test
+    fun aDragForTheBrightness_isToldOnce_atItsEnd_andTheFlashAtEachTap() = runTest(dispatcher) {
+        val did = startTelling()
+        runCurrent()
+
+        model.onExposureChange(3, final = false)
+        model.onExposureChange(5, final = false)
+        assertTrue(did.isEmpty())
+        model.onExposureChange(40, final = true)
+        assertEquals(listOf<PhotographerAction>(PhotographerAction.Brightness(12)), did)
+
+        did.clear()
+        model.onFlashTap()
+        assertEquals(listOf<PhotographerAction>(PhotographerAction.Flash(FlashMode.AUTO)), did)
+    }
+
+    @Test
+    fun theBaseBrightnessAtATapToFocus_isNotTold_asABrightnessTheUserSet() = runTest(dispatcher) {
+        val did = startTelling()
+        runCurrent()
+
+        model.onFocusTap(0.5f, 0.5f)
+
+        assertTrue(did.none { it is PhotographerAction.Brightness })
+    }
+
+    @Test
+    fun aGestureThatMovedTheGuide_isToldOnce_atItsEnd_andOneThatDidNotIsNot() = runTest(dispatcher) {
+        val did = startTelling()
+        runCurrent()
+        guides.setGuide(guide())
+        runCurrent()
+
+        model.onGuideGesture(0.01f, 0f, 1f, final = false)
+        model.onGuideGesture(0.01f, 0f, 1f, final = false)
+        assertTrue(did.isEmpty())
+        model.onGuideGesture(0f, 0f, 1f, final = true)
+        assertEquals(listOf<PhotographerAction>(PhotographerAction.GuideMove), did)
+
+        // A touch on the guide that moved nothing.
+        did.clear()
+        model.onGuideGesture(0f, 0f, 1f, final = true)
+        assertTrue(did.isEmpty())
+    }
+
+    @Test
+    fun theGuidePanel_isToldAtEachTap_andTheOpacityOnceAtItsEnd() = runTest(dispatcher) {
+        val did = startTelling()
+        runCurrent()
+        model.onHideToggle()
+        model.onOpacityChange(0.7f, final = true)
+        model.onRemoveGuide()
+        assertTrue(did.isEmpty())
+        guides.setGuide(guide())
+        runCurrent()
+
+        model.onHideToggle()
+        model.onHideToggle()
+        model.onOpacityChange(0.6f, final = false)
+        model.onOpacityChange(0.95f, final = true)
+        model.onRemoveGuide()
+
+        assertEquals(
+            listOf(
+                PhotographerAction.GuideVisible(false),
+                PhotographerAction.GuideVisible(true),
+                PhotographerAction.GuideOpacity(GuideState.MAX_OPACITY),
+                PhotographerAction.GuideRemove,
+            ),
+            did,
+        )
+    }
+
+    @Test
+    fun thisPhonesRemove_isHandedOnWithWhereItWas_andItsUndoIsTold() = runTest(dispatcher) {
+        val removedHere = mutableListOf<Pair<ReferenceGuide, GuideState>>()
+        val did = mutableListOf<PhotographerAction>()
+        model = CameraViewModel(
+            camera,
+            guides,
+            settings,
+            onDid = { did += it },
+            onRemoved = { guide, state -> removedHere += guide to state },
+        )
+        store.put("camera", model)
+        val guide = guide()
+        guides.setGuide(guide)
+        guides.update(final = true) { it.copy(cx = 0.3f) }
+        val where = guides.state.value
+        runCurrent()
+
+        model.onRemoveGuide()
+        model.onUndoRemoveGuide()
+        runCurrent()
+
+        assertEquals(listOf(guide to where), removedHere)
+        assertEquals(listOf(PhotographerAction.GuideRemove, PhotographerAction.GuideRestore), did)
+    }
+
+    @Test
+    fun undoOfTheSubjectsRemove_putsTheGuideBackWhereItWas_butNotOverANewerGuide() = runTest(dispatcher) {
+        start()
+        val removed = guide()
+        guides.setGuide(removed)
+        guides.update(final = true) { it.copy(cx = 0.3f, opacity = 0.8f) }
+        val where = guides.state.value
+        guides.setGuide(null)
+        runCurrent()
+
+        model.onUndoRemoteRemove(removed, where)
+        runCurrent()
+        assertSame(removed, model.uiState.value.guide)
+        assertEquals(where, model.uiState.value.guideState)
+
+        val newer = guide()
+        guides.setGuide(newer)
+        model.onUndoRemoteRemove(removed, where)
+        runCurrent()
+        assertSame(newer, model.uiState.value.guide)
+    }
+
+    @Test
+    fun aCameraWithoutAFlash_orWithoutBrightness_tellsNothingForThem() = runTest(dispatcher) {
+        val did = startTelling()
+        camera.capabilities.value = capabilities(hasFlash = false, exposureRange = 0..0)
+        runCurrent()
+
+        model.onFlashTap()
+        model.onExposureChange(2, final = true)
+
+        assertTrue(did.isEmpty())
     }
 
     @Test

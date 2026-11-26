@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-13, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.animation.ValueAnimator
@@ -27,6 +27,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.TestAppContainer
@@ -42,25 +43,28 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowChoreographer
-import org.robolectric.shadows.ShadowToast
 
 /*
  * Reference confirm's render paths (R&S 6.2, FR-2.3, FR-2.4; Testing Documentation 2.1.6), on the real Fragment.
  * Partitions on the reference state: nothing yet, working (the person is being found), ready (the outline shown
  * and Use this guide enabled, which puts the guide on the camera), no person found (to that screen), and a photo
- * that could not be used (a toast and the camera). Back on a generated pose's guide, or another photo from the
- * gallery in its place, stops the ask for its tip. Opened from Subject view: the session ending goes back to Subject
+ * that could not be used (a notice and the camera). Back on a generated pose's guide, or another photo from the
+ * gallery in its place, stops the ask for its tip. Back by where the reference was chosen (#294): a photo from the
+ * camera's Add a pose guide (that sheet again over the camera, without its gallery, the guide on the camera the same
+ * one; the system's Back too), from Subject view's (its sheet over Subject view), and a generated pose (one step back, no sheet). Opened from Subject view: the session ending goes back to Subject
  * view, which shows what ended it, and stops finding the person; opened from the camera, it stays. A candidate the
  * subject picked says whose pick it is under the title; this phone's own pick and an uploaded photo say nothing. The
  * title: Guide Outline for both an uploaded photo and a generated pose (#204).
  * In a session (FR-6.15, Design 2.6.5): a chosen pose's outline goes to the subject, with the hint, and Choose another
  * photo keeps it there; a photo from Add a pose guide is not shared and has no hint; the subject's Use this guide that
  * comes first puts the guide on the camera with a notice, as this phone's own tap.
- * A screenshot cut to its photo (FR-2.10): the cut plays once, the outline waiting until the photo leaves for the corner,
- * with the chip and Use the whole image; a view made anew shows its end without playing again; Use the whole image
- * makes the guide again from all of it, ends the cut while it plays, and on a chosen pose's confirm keeps it shared.
- * A photo used whole has no cut, chip, or Use the whole image. A photo's outline fades in as its person is found
- * (Iter3-A13), and is there at once with the phone's animations off.
+ * The picked image turning into its guide (FR-2.3, #295), on what was picked: a photo used whole (it plays once in
+ * 1.3 s and ends small in the corner, the outline's view taking over the line at the end; no chip or Use the whole
+ * image), a screenshot cut to its photo (FR-2.10: its cut, then the same, in 2 s, with the chip and Use the whole image),
+ * and a generated pose (no photo: its outline fades in as its person is found, Iter3-A13). With the phone's animations
+ * off, each shows its end at once. A view made anew shows the end without playing again. Use while it plays puts the
+ * guide on the camera without the picked image. Use the whole image makes the guide again from all of it, which then
+ * plays as a photo, ends the cut while it plays, and on a chosen pose's confirm keeps it shared.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -122,6 +126,15 @@ class ReferenceConfirmFragmentTest {
 
         assertTrue(confirmSteps(modules).isEmpty())
         assertFalse(onScreen { it.sharedHint.isShown })
+
+        // Used, it is told as a guide the photographer set, which the subject's phone says in a line (#292).
+        assertTrue(modules.session.sent.none { it is SessionMessage.PhotographerDid })
+        onScreen { it.useGuideButton.performClick() }
+        idle()
+        assertEquals(
+            listOf(SessionMessage.PhotographerDid("guide")),
+            modules.session.sent.filterIsInstance<SessionMessage.PhotographerDid>(),
+        )
     }
 
     @Test
@@ -147,7 +160,7 @@ class ReferenceConfirmFragmentTest {
 
         assertSame(made, modules.guides.guide.value)
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
-        assertEquals(string(R.string.peer_used_guide, "Joonhyung"), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.peer_used_guide, "Joonhyung"), shownNotice())
         assertEquals(
             SessionMessage.GuideConfirm(confirmId, ConfirmStep.USED, made.id, Role.SUBJECT),
             confirmSteps(modules).last(),
@@ -278,7 +291,7 @@ class ReferenceConfirmFragmentTest {
             assertEquals(View.VISIBLE, binding.referenceImage.visibility)
             assertEquals(string(R.string.person_found), binding.referenceStatus.text.toString())
             assertTrue(binding.useGuideButton.isEnabled)
-            assertFalse(binding.screenshotCut.isShown)
+            assertFalse(binding.photoToGuide.isShown)
             assertFalse(binding.cutChip.isShown)
             assertFalse(binding.useWholeImageButton.isShown)
             binding.useGuideButton.performClick()
@@ -289,10 +302,14 @@ class ReferenceConfirmFragmentTest {
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
     }
 
+    private fun animationsOff() {
+        ValueAnimator::class.java.getDeclaredMethod("setDurationScale", Float::class.javaPrimitiveType).invoke(null, 0f)
+    }
+
     @Test
-    fun aPhotosOutline_fadesInAsItsPersonIsFound() {
+    fun aPosesOutline_fadesInAsItsPersonIsFound() {
         val modules = launch()
-        pickPhoto()
+        pickCandidate()
         ShadowChoreographer.setPaused(true)
 
         modules.maker.finish(Result.success(guide()))
@@ -301,6 +318,7 @@ class ReferenceConfirmFragmentTest {
         onScreen { binding ->
             assertTrue(binding.referenceImage.isShown)
             assertEquals(0f, binding.referenceImage.alpha, 0f)
+            assertFalse(binding.photoToGuide.isShown)
         }
         ShadowChoreographer.setPaused(false)
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
@@ -308,10 +326,10 @@ class ReferenceConfirmFragmentTest {
     }
 
     @Test
-    fun withAnimationsOff_aPhotosOutlineIsThereAtOnce() {
+    fun withAnimationsOff_aPosesOutlineIsThereAtOnce() {
         val modules = launch()
-        pickPhoto()
-        ValueAnimator::class.java.getDeclaredMethod("setDurationScale", Float::class.javaPrimitiveType).invoke(null, 0f)
+        pickCandidate()
+        animationsOff()
         ShadowChoreographer.setPaused(true)
 
         modules.maker.finish(Result.success(guide()))
@@ -320,36 +338,118 @@ class ReferenceConfirmFragmentTest {
         assertEquals(1f, onScreen { it.referenceImage.alpha }, 0f)
     }
 
+    /** A guide made from a photo used whole, which it keeps, the person in the middle of it. */
+    private fun photoGuide() =
+        guide().copy(photo = bitmap(60, 80), anchor = NormalizedRect(0.25f, 0.1f, 0.75f, 0.9f))
+
     /** A guide made from a screenshot's photo, rows 15–76 % of it. */
     private fun cutGuide() = guide().copy(crop = PhotoCrop(bitmap(54, 117), NormalizedRect(0f, 0.15f, 1f, 0.76f)))
 
     @Test
-    fun aScreenshotCutToItsPhoto_playsTheCut_thenKeepsThePhotoInTheCorner() {
+    fun aPhoto_turnsIntoItsGuide_endingSmallInTheCorner() {
         val modules = launch()
         pickPhoto()
-        // idle() moves the clock on frame by frame and would play the whole cut; paused, the cut waits at its start.
+        // idle() moves the clock on frame by frame and would play it all; paused, it waits at its start.
+        ShadowChoreographer.setPaused(true)
+
+        modules.maker.finish(Result.success(photoGuide()))
+        idle()
+
+        onScreen { binding ->
+            assertTrue(binding.photoToGuide.isShown)
+            assertEquals(0f, binding.photoToGuide.progress, 0f)
+            // The line is drawn on the photo, so the outline's own view waits.
+            assertEquals(0f, binding.referenceImage.alpha, 0f)
+            assertTrue(binding.useGuideButton.isEnabled)
+            assertFalse(binding.cutChip.isShown)
+            assertFalse(binding.useWholeImageButton.isShown)
+        }
+
+        // Halfway, the line is drawn on the photo, and the outline's view still waits.
+        onScreen { binding ->
+            checkNotNull(binding.photoToGuide.playing).setCurrentFraction(0.5f)
+            assertEquals(0.5f, binding.photoToGuide.progress, 0f)
+            assertEquals(0f, binding.referenceImage.alpha, 0f)
+        }
+        ShadowChoreographer.setPaused(false)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1_400))
+
+        onScreen { binding ->
+            assertTrue(binding.photoToGuide.isShown)
+            assertEquals(1f, binding.photoToGuide.progress, 0f)
+            assertEquals(1f, binding.referenceImage.alpha, 0f)
+        }
+    }
+
+    @Test
+    fun aScreenshotCutToItsPhoto_playsTheCut_thenGoesOnAsAPhoto() {
+        val modules = launch()
+        pickPhoto()
         ShadowChoreographer.setPaused(true)
 
         modules.maker.finish(Result.success(cutGuide()))
         idle()
 
         onScreen { binding ->
-            assertTrue(binding.screenshotCut.isShown)
-            assertEquals(0f, binding.screenshotCut.progress, 0f)
-            // The outline waits until the photo leaves for the corner.
+            assertTrue(binding.photoToGuide.isShown)
+            assertEquals(0f, binding.photoToGuide.progress, 0f)
             assertEquals(0f, binding.referenceImage.alpha, 0f)
             assertTrue(binding.cutChip.isShown)
             assertTrue(binding.useWholeImageButton.isShown)
         }
 
+        // 1.8 s in, the photo is on its way to the corner, its line still drawn here.
+        onScreen { binding ->
+            checkNotNull(binding.photoToGuide.playing).setCurrentFraction(0.9f)
+            assertEquals(0.9f, binding.photoToGuide.progress, 0f)
+            assertEquals(0f, binding.referenceImage.alpha, 0f)
+        }
         ShadowChoreographer.setPaused(false)
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(2_100))
 
         onScreen { binding ->
-            assertTrue(binding.screenshotCut.isShown)
-            assertEquals(1f, binding.screenshotCut.progress, 0f)
+            assertTrue(binding.photoToGuide.isShown)
+            assertEquals(1f, binding.photoToGuide.progress, 0f)
             assertEquals(1f, binding.referenceImage.alpha, 0f)
         }
+    }
+
+    @Test
+    fun withAnimationsOff_aPhotoAndAScreenshot_showTheirEndAtOnce() {
+        val modules = launch()
+        animationsOff()
+        for (made in listOf(photoGuide(), cutGuide())) {
+            pickPhoto()
+            ShadowChoreographer.setPaused(true)
+
+            modules.maker.finish(Result.success(made))
+            idle()
+
+            onScreen { binding ->
+                assertTrue(binding.photoToGuide.isShown)
+                assertEquals(1f, binding.photoToGuide.progress, 0f)
+                assertEquals(1f, binding.referenceImage.alpha, 0f)
+            }
+            ShadowChoreographer.setPaused(false)
+        }
+    }
+
+    @Test
+    fun useWhileAPhotoTurns_putsTheGuideOnTheCamera_withoutThePhoto() {
+        val modules = launch()
+        pickPhoto()
+        ShadowChoreographer.setPaused(true)
+        val made = photoGuide()
+        modules.maker.finish(Result.success(made))
+        idle()
+
+        onScreen { it.useGuideButton.performClick() }
+        ShadowChoreographer.setPaused(false)
+        idle()
+
+        val onCamera = checkNotNull(modules.guides.guide.value)
+        assertEquals(made.copy(photo = null), onCamera)
+        assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
     }
 
     @Test
@@ -367,8 +467,8 @@ class ReferenceConfirmFragmentTest {
         idle()
 
         onScreen { binding ->
-            assertTrue(binding.screenshotCut.isShown)
-            assertEquals(1f, binding.screenshotCut.progress, 0f)
+            assertTrue(binding.photoToGuide.isShown)
+            assertEquals(1f, binding.photoToGuide.progress, 0f)
             assertEquals(1f, binding.referenceImage.alpha, 0f)
         }
     }
@@ -389,23 +489,24 @@ class ReferenceConfirmFragmentTest {
         onScreen { binding ->
             assertEquals(string(R.string.finding_person), binding.referenceStatus.text.toString())
             assertFalse(binding.useGuideButton.isEnabled)
-            assertFalse(binding.screenshotCut.isShown)
+            assertFalse(binding.photoToGuide.isShown)
             assertFalse(binding.cutChip.isShown)
         }
 
-        val whole = guide()
+        // Made from all of it, it turns into its guide as a photo does.
+        val whole = photoGuide()
         modules.maker.finish(Result.success(whole))
         idle()
 
         onScreen { binding ->
-            assertFalse(binding.screenshotCut.isShown)
+            assertTrue(binding.photoToGuide.isShown)
             assertFalse(binding.cutChip.isShown)
             assertFalse(binding.useWholeImageButton.isShown)
             assertEquals(1f, binding.referenceImage.alpha, 0f)
             binding.useGuideButton.performClick()
         }
         idle()
-        assertSame(whole, modules.guides.guide.value)
+        assertEquals(whole.copy(photo = null), modules.guides.guide.value)
     }
 
     @Test
@@ -443,7 +544,7 @@ class ReferenceConfirmFragmentTest {
     }
 
     @Test
-    fun backOnAGeneratedPose_stopsTheAskForItsTip() {
+    fun backOnAGeneratedPose_stopsTheAskForItsTip_andGoesOneStepBack() {
         val modules = launch()
         val request = generatedPose(modules)
 
@@ -451,6 +552,52 @@ class ReferenceConfirmFragmentTest {
         idle()
 
         assertTrue(request.cancelled)
+        // The screen before, here the camera as in a session, and not Add a pose guide: no photo was picked (#294).
+        assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
+    }
+
+    private fun assertOnTheSheetAlone(controller: TestNavHostController, below: Int, fromSubject: Boolean) {
+        assertEquals(R.id.addGuideSheet, controller.currentDestination?.id)
+        val arguments = controller.currentBackStackEntry?.arguments
+        assertEquals(false, arguments?.getBoolean(AddGuideSheet.ARG_OPEN_GALLERY))
+        assertEquals(fromSubject, arguments?.getBoolean(AddGuideSheet.ARG_FROM_SUBJECT))
+        assertEquals(below, controller.previousBackStackEntry?.destination?.id)
+    }
+
+    @Test
+    fun backOnAPhotoFromTheCamerasSheet_opensThatSheetAgain_withoutItsGallery() {
+        val modules = launch()
+        val onCamera = guide()
+        modules.guides.setGuide(onCamera)
+        pickPhoto()
+
+        onScreen { it.backButton.performClick() }
+        idle()
+
+        assertOnTheSheetAlone(nav, below = R.id.cameraFragment, fromSubject = false)
+        assertSame(onCamera, modules.guides.guide.value)
+    }
+
+    @Test
+    fun theSystemsBackOnAPhotoFromTheCamerasSheet_opensThatSheetAgain() {
+        launch()
+        pickPhoto()
+
+        scenario!!.onFragment { it.requireActivity().onBackPressedDispatcher.onBackPressed() }
+        idle()
+
+        assertOnTheSheetAlone(nav, below = R.id.cameraFragment, fromSubject = false)
+    }
+
+    @Test
+    fun backOnAPhotoFromSubjectViewsSheet_opensThatSheetAgainOverSubjectView() {
+        val (_, controller) = launchFromSubject()
+        pickPhoto()
+
+        onScreen { it.backButton.performClick() }
+        idle()
+
+        assertOnTheSheetAlone(controller, below = R.id.subjectFragment, fromSubject = true)
     }
 
     @Test
@@ -482,7 +629,7 @@ class ReferenceConfirmFragmentTest {
         modules.maker.finish(Result.failure(IOException("unreadable")))
         idle()
 
-        assertEquals(string(R.string.couldnt_use_photo), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.couldnt_use_photo), shownNotice())
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
     }
 }

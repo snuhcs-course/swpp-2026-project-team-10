@@ -1,6 +1,7 @@
-// AI-generated with Claude Code, 2026-11-16, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
+import android.os.SystemClock
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -13,6 +14,10 @@ import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.account.SentInvitation
 import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.ShutterTimer
+import com.lastpenguin.pix.generation.Situation
+import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.session.ConfirmSyncer
 import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.EndReason
@@ -20,6 +25,7 @@ import com.lastpenguin.pix.session.GuideSyncer
 import com.lastpenguin.pix.session.IcePath
 import com.lastpenguin.pix.session.MobileDataNotice
 import com.lastpenguin.pix.session.PhotoSyncer
+import com.lastpenguin.pix.session.PoseStartStep
 import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteAction
 import com.lastpenguin.pix.session.RemoteControlHandler
@@ -29,6 +35,7 @@ import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionPlace
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.ShutterOutcome
 import com.lastpenguin.pix.session.TipSyncer
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.camera.CameraViewModel
@@ -49,6 +56,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
+/**
+ * The subject's ✕ took [guide] off the camera, at [state]: "Joonhyung removed the guide", with *Undo*, which puts it
+ * back there (FR-7.2, FR-7.4). Not a [SessionNotice]: it waits for the Camera screen ([SessionViewModel.guideRemovals]).
+ */
+data class SubjectRemovedGuide(val name: String, val guide: ReferenceGuide, val state: GuideState)
+
 /** Short notices for the photographer's camera screen. */
 sealed interface SessionNotice {
     /** The other phone left or dropped: "Joonhyung left" (FR-6.10, FR-6.11). */
@@ -57,8 +70,32 @@ sealed interface SessionNotice {
     /** The subject changed the zoom: "Joonhyung set zoom to 2×" (FR-7.4). */
     data class RemoteZoom(val name: String, val ratio: Float) : SessionNotice
 
+    /** The subject set this phone's timer: "Joonhyung set the timer to 3 s", or "… turned the timer off" (#318). */
+    data class RemoteTimer(val name: String, val timer: ShutterTimer) : SessionNotice
+
+    /** The subject's shutter took a photo: "Joonhyung took a photo" (FR-7.8, #314). */
+    data class RemoteShutter(val name: String) : SessionNotice
+
+    /** The subject's shutter started this phone's timer: "Joonhyung pressed the shutter" (FR-7.8, FR-1.17). */
+    data class RemoteShutterPress(val name: String) : SessionNotice
+
+    /** The subject's shutter stopped the timer's countdown: "Joonhyung cancelled the timer" (FR-7.8, FR-1.17). */
+    data class RemoteTimerCancel(val name: String) : SessionNotice
+
+    /** The subject started AI poses, and this phone now takes the scene photo: "Joonhyung started AI poses" (#276). */
+    data class RemotePoseStart(val name: String) : SessionNotice
+
     /** The subject moved or resized the guide: "Joonhyung moved the guide" (FR-7.2, FR-7.4). */
     data class RemoteGuideMove(val name: String) : SessionNotice
+
+    /** The subject hid the guide or showed it: "Joonhyung hid the guide" (FR-7.2, FR-7.4). */
+    data class RemoteGuideVisible(val name: String, val visible: Boolean) : SessionNotice
+
+    /** The subject set the guide's opacity: "Joonhyung set the guide's opacity to 70%" (FR-7.2, FR-7.4). */
+    data class RemoteGuideOpacity(val name: String, val opacity: Float) : SessionNotice
+
+    /** The subject's *Undo* put the guide back: "Joonhyung put the guide back" (FR-7.2, FR-7.4). */
+    data class RemoteGuideRestore(val name: String) : SessionNotice
 
     /** The subject set the brightness: "Joonhyung set brightness to +1"; [index] is the applied exposure index. */
     data class RemoteBrightness(val name: String, val index: Int) : SessionNotice
@@ -68,9 +105,21 @@ sealed interface SessionNotice {
 
     /** A guide made on the subject's phone is now the guide: "Joonhyung set a pose guide" (FR-6.15, FR-7.4). */
     data class RemoteGuide(val name: String) : SessionNotice
+
+    /**
+     * The subject's tap set the focus: "Joonhyung set the focus" (FR-7.7, FR-7.4). Shown for
+     * [SessionViewModel.FOCUS_NOTICE_MS], and not for every tap (SessionViewModel.remoteFocus).
+     */
+    data class RemoteFocus(val name: String) : SessionNotice
 }
 
-/** The subject's toast about a photo from the photographer (FR-6.14), on whichever screen of the session is in front. */
+/**
+ * Where the other phone's tap set the focus (FR-7.7), for the focus box here: in fractions of the image as this phone
+ * shows it, the photographer's frame on Camera and its mirror on Subject view.
+ */
+data class RemoteFocus(val x: Float, val y: Float)
+
+/** The subject's notice about a photo from the photographer (FR-6.14), on whichever screen of the session is in front. */
 sealed interface PhotoNotice {
     data object Saved : PhotoNotice
 
@@ -111,6 +160,7 @@ class SessionViewModel(
     private val descriptionSyncer: DescriptionSyncer? = null,
     private val photoSyncer: PhotoSyncer? = null,
     private val tipSyncer: TipSyncer? = null,
+    private val clock: () -> Long = SystemClock::elapsedRealtime,
 ) : ViewModel() {
 
     val state: StateFlow<SessionState> = session.state
@@ -125,6 +175,68 @@ class SessionViewModel(
 
     private val _notices = MutableSharedFlow<SessionNotice>(extraBufferCapacity = 16)
     val notices: SharedFlow<SessionNotice> = _notices.asSharedFlow()
+
+    private val _guideRemovals = Channel<SubjectRemovedGuide>(Channel.BUFFERED)
+
+    /**
+     * The subject's ✕, with what *Undo* puts back (FR-7.2): kept until the Camera screen reads it, so a Camera stopped
+     * meanwhile, as under Settings, still offers *Undo* once it is back.
+     */
+    val guideRemovals: Flow<SubjectRemovedGuide> = _guideRemovals.receiveAsFlow()
+
+    /** Runs while a pinch that ended without its last value is still named ([ZOOMING_LINGER_MS]). */
+    private var zoomingLinger: Job? = null
+
+    private val _subjectZooming = MutableStateFlow<String?>(null)
+
+    /**
+     * Photographer: the subject's name while their pinch changes the zoom (FR-7.4, #292), from its first step, for
+     * Camera's line "… is zooming". Null again once the pinch's last value is applied, just before
+     * [SessionNotice.RemoteZoom] says the ratio; a pinch that ends without one stays named [ZOOMING_LINGER_MS]
+     * longer, the time its last value may take to be applied.
+     */
+    val subjectZooming: StateFlow<String?> = _subjectZooming.asStateFlow()
+
+    private val _reconnectingWith = MutableStateFlow<String?>(null)
+
+    /**
+     * Photographer: the subject's name while the link that dropped is tried again (FR-6.12, #293), for Camera's line
+     * "Reconnecting with …". It has no time of its own: null again once the link is back or the session gave the
+     * wait up, which [SessionNotice.PeerGone] then says.
+     */
+    val reconnectingWith: StateFlow<String?> = _reconnectingWith.asStateFlow()
+
+    private val _poseStartAnswers = Channel<PoseStartStep>(Channel.BUFFERED)
+
+    /** How many times this phone asked for AI poses, the number of its last request; and the request that waits. */
+    private var poseRequests = 0
+    private var poseRequestWaiting: Int? = null
+
+    /** True once the photographer's phone said that its user is asked to agree, for the request that waits. */
+    private var poseRequestAsked = false
+
+    /** The last request the time limit gave up: its answer may still come, kept behind a full buffer or a drop. */
+    private var poseRequestGivenUp: Int? = null
+
+    /** Runs while a request waits for the photographer's phone to say anything ([POSE_START_WAIT_MS]). */
+    private var poseStartWait: Job? = null
+
+    /**
+     * Subject: what became of each situation this phone picked for AI poses (FR-6.15, #276): the photographer's phone
+     * began the scene photo, could not, or asks its user to agree first, after which one of the two follows. No word
+     * within [POSE_START_WAIT_MS], and nothing that could be asked, count as refused. Subject view says each in a
+     * line; buffered, so one that comes under another screen is said when Subject view is back, in the same session.
+     */
+    val poseStartAnswers: Flow<PoseStartStep> = _poseStartAnswers.receiveAsFlow()
+
+    private val _remoteFocus = MutableSharedFlow<RemoteFocus>(extraBufferCapacity = 16)
+
+    /**
+     * Each of the subject's taps to focus (FR-7.7), for the box on Camera. Its notice, [SessionNotice.RemoteFocus],
+     * comes with the first tap only: a tap while that notice shows ([FOCUS_NOTICE_MS]) or in the
+     * [FOCUS_NOTICE_QUIET_MS] after it makes none, so taps in a row do not keep saying the same line.
+     */
+    val remoteFocus: SharedFlow<RemoteFocus> = _remoteFocus.asSharedFlow()
 
     private val _photoNotices = Channel<PhotoNotice>(Channel.UNLIMITED)
 
@@ -199,7 +311,14 @@ class SessionViewModel(
     private var role: Role? = null
     private var peerName: String? = null
     private var streaming = false
+
+    /** The link dropped and the session goes on: the next Connected resumes it, with the `hello` it began with. */
+    private var afterDrop = false
+
     private var connectedJob: Job? = null
+
+    /** When this session's last "set the focus" notice began, by [clock]; null before the first. */
+    private var focusNoticeAt: Long? = null
     private var receiverJob: Job? = null
     private var photoJob: Job? = null
     private var backgroundJob: Job? = null
@@ -361,7 +480,12 @@ class SessionViewModel(
         if (state !is SessionState.Connected && !reconnecting) _mobileDataPending.value = false
         val connected = state as? SessionState.Connected
         if (connected != null) peerName = connected.peer.displayName
+        // From the state alone, never from what an earlier Connected said: a state flow may never show this reader
+        // that Connected, and the name kept from it could then be another session's (#293).
+        val dropped = state as? SessionState.Reconnecting
+        _reconnectingWith.value = dropped?.peer?.displayName.takeIf { dropped?.role == Role.PHOTOGRAPHER }
         val inSession = state is SessionState.Connecting || connected != null || reconnecting
+        if (!inSession) forgetPoseStarts()
 
         // Frames start while the peer connection is still being set up, so the first video arrives sooner, and go on
         // while it reconnects, so the video comes back with the link (Design 2.6.7).
@@ -424,7 +548,12 @@ class SessionViewModel(
         // camera's state, the guide and its tip, Generate poses, the pose set, and the Reference confirm again, whatever
         // a drop lost (Design 2.6.7).
         val liveNow = connected?.role == Role.PHOTOGRAPHER
+        // Read for this Connected only: any other state between ends the session, and the next one has its own hello.
+        val resumed = afterDrop && connected != null
+        afterDrop = reconnecting
         if (liveNow && connectedJob == null) {
+            // Another session's first tap to focus is said again; a reconnect is the same session.
+            if (!resumed) focusNoticeAt = null
             connectedJob = viewModelScope.launch {
                 coroutineScope {
                     launch {
@@ -436,14 +565,51 @@ class SessionViewModel(
                         remoteControl.actions.collect { action ->
                             val name = peerName ?: return@collect
                             when (action) {
-                                is RemoteAction.Zoom -> _notices.tryEmit(SessionNotice.RemoteZoom(name, action.ratio))
+                                is RemoteAction.Zoom -> {
+                                    // The ratio's line takes the place of the pinch's, unless the next pinch began.
+                                    if (remoteControl.zoomHold.holder.value != Role.SUBJECT) noOneZooming()
+                                    _notices.tryEmit(SessionNotice.RemoteZoom(name, action.ratio))
+                                }
 
                                 is RemoteAction.GuideMove -> _notices.tryEmit(SessionNotice.RemoteGuideMove(name))
+
+                                is RemoteAction.GuideVisible ->
+                                    _notices.tryEmit(SessionNotice.RemoteGuideVisible(name, action.visible))
+
+                                is RemoteAction.GuideOpacity ->
+                                    _notices.tryEmit(SessionNotice.RemoteGuideOpacity(name, action.opacity))
+
+                                is RemoteAction.GuideRemove ->
+                                    _guideRemovals.trySend(SubjectRemovedGuide(name, action.guide, action.state))
+
+                                is RemoteAction.GuideRestore -> _notices.tryEmit(SessionNotice.RemoteGuideRestore(name))
 
                                 is RemoteAction.Brightness ->
                                     _notices.tryEmit(SessionNotice.RemoteBrightness(name, action.index))
 
                                 is RemoteAction.Flash -> _notices.tryEmit(SessionNotice.RemoteFlash(name, action.mode))
+
+                                is RemoteAction.Timer ->
+                                    _notices.tryEmit(SessionNotice.RemoteTimer(name, action.timer))
+
+                                is RemoteAction.Shutter -> _notices.tryEmit(SessionNotice.RemoteShutter(name))
+
+                                is RemoteAction.TimerStart ->
+                                    _notices.tryEmit(SessionNotice.RemoteShutterPress(name))
+
+                                is RemoteAction.TimerStop -> _notices.tryEmit(SessionNotice.RemoteTimerCancel(name))
+
+                                is RemoteAction.PoseStart -> _notices.tryEmit(SessionNotice.RemotePoseStart(name))
+
+                                is RemoteAction.Focus -> {
+                                    _remoteFocus.tryEmit(RemoteFocus(action.x, action.y))
+                                    val now = clock()
+                                    val last = focusNoticeAt
+                                    if (last == null || now - last >= FOCUS_NOTICE_MS + FOCUS_NOTICE_QUIET_MS) {
+                                        focusNoticeAt = now
+                                        _notices.tryEmit(SessionNotice.RemoteFocus(name))
+                                    }
+                                }
                             }
                         }
                     }
@@ -453,7 +619,22 @@ class SessionViewModel(
                             _notices.tryEmit(SessionNotice.RemoteGuide(name))
                         }
                     }
-                    guideSyncer.startAsSender(this)
+                    launch {
+                        // The subject's pinch holds the zoom from its first step to its end (FR-7.6), and Camera names
+                        // them meanwhile (#292). Its end waits for the applied ratio's notice before the name goes.
+                        remoteControl.zoomHold.holder.collect { holder ->
+                            if (holder == Role.SUBJECT) {
+                                zoomingLinger?.cancel()
+                                _subjectZooming.value = peerName
+                            } else if (_subjectZooming.value != null && zoomingLinger?.isActive != true) {
+                                zoomingLinger = launch {
+                                    delay(ZOOMING_LINGER_MS)
+                                    _subjectZooming.value = null
+                                }
+                            }
+                        }
+                    }
+                    guideSyncer.startAsSender(this, resumed)
                     poseSyncer?.startAsSender(this)
                     confirmSyncer?.startAsSender(this)
                     descriptionSyncer?.startAsSender(this)
@@ -465,7 +646,15 @@ class SessionViewModel(
             connectedJob?.cancel()
             connectedJob = null
             remoteControl.stop()
+            noOneZooming()
         }
+    }
+
+    /** The subject's pinch is no longer named on Camera (#292). */
+    private fun noOneZooming() {
+        zoomingLinger?.cancel()
+        zoomingLinger = null
+        _subjectZooming.value = null
     }
 
     /**
@@ -538,16 +727,148 @@ class SessionViewModel(
         viewModelScope.launch { mobileDataNotice.markShown() }
     }
 
+    /**
+     * The Camera screen, while it is in front, takes up the presses of the subject's shutter and says what it did
+     * with each (FR-7.8, #314); null once it is not, and a press is then answered as not taken.
+     */
+    fun setRemoteShutter(taker: ((cancel: Boolean) -> ShutterOutcome)?) {
+        remoteControl.shutter = taker
+    }
+
+    /**
+     * The Camera screen, while it is in front, begins the scene photo for the situation the subject picked (FR-6.15,
+     * #276), and says whether it began; null once it is not, and a request is then answered as not begun.
+     */
+    fun setRemotePoseStarter(starter: ((Situation, (PoseStartStep) -> Unit) -> Unit)?) {
+        remoteControl.poseStarter = starter
+    }
+
+    /** [starter]'s screen is no longer in front; a screen that came after it keeps its own. */
+    fun dropRemotePoseStarter(starter: (Situation, (PoseStartStep) -> Unit) -> Unit) {
+        if (remoteControl.poseStarter === starter) remoteControl.poseStarter = null
+    }
+
+    /**
+     * Subject: asks the photographer's phone to begin AI poses for [situation] (FR-6.15, #276). The photographer takes
+     * the scene photo, and the steps after it show on both phones as when the photographer starts them.
+     */
+    fun askForPoses(situation: Situation) {
+        val connected = state.value as? SessionState.Connected
+        if (connected?.role != Role.SUBJECT) {
+            // Nothing can be asked: the link dropped while the sheet was open.
+            _poseStartAnswers.trySend(PoseStartStep.REFUSED)
+            return
+        }
+        if (poseRequestWaiting != null) {
+            // One request at a time: a second one would wait behind the first on the photographer's phone, which
+            // begins the first and refuses the second, and this phone would say the refusal. The first's answer comes.
+            if (poseRequestAsked) _poseStartAnswers.trySend(PoseStartStep.ASKING)
+            return
+        }
+        // Numbered, so only its own answers count: an earlier request's, come late, is not this one's.
+        val request = ++poseRequests
+        poseRequestWaiting = request
+        session.send(SessionMessage.PoseStart(situation.apiName, request))
+        poseStartWait?.cancel()
+        poseStartWait = viewModelScope.launch {
+            delay(POSE_START_WAIT_MS)
+            // No word of it in time, not even that the photographer is asked: as far as this phone knows, nothing began.
+            if (poseRequestWaiting == request) {
+                poseRequestWaiting = null
+                poseRequestGivenUp = request
+                _poseStartAnswers.trySend(PoseStartStep.REFUSED)
+            }
+        }
+    }
+
+    /**
+     * What the photographer's phone says of the request that waits. An answer to the request the limit gave up is
+     * heard too, since the photographer's phone acted on it: that its user is asked brings the request back, with
+     * "Waiting for … to agree" after the refusal this phone said too soon, and that the poses began is said. Its
+     * refusal was said at the limit. Any other request's answer is dropped.
+     */
+    private fun onPoseStartAnswer(answer: SessionMessage.PoseStartAnswer) {
+        if (answer.request != poseRequestWaiting) {
+            if (answer.request != poseRequestGivenUp) return
+            if (answer.asking) {
+                // Only while no later request waits: that one's own answer comes.
+                if (poseRequestWaiting != null) return
+                poseRequestGivenUp = null
+                poseRequestWaiting = answer.request
+                poseRequestAsked = true
+                _poseStartAnswers.trySend(PoseStartStep.ASKING)
+            } else if (answer.started) {
+                poseRequestGivenUp = null
+                _poseStartAnswers.trySend(PoseStartStep.STARTED)
+            }
+            return
+        }
+        poseStartWait?.cancel()
+        poseStartWait = null
+        if (answer.asking) {
+            // The photographer reads the AI notice: the request waits for their answer, however long that takes.
+            poseRequestAsked = true
+            _poseStartAnswers.trySend(PoseStartStep.ASKING)
+            return
+        }
+        poseRequestWaiting = null
+        poseRequestAsked = false
+        _poseStartAnswers.trySend(if (answer.started) PoseStartStep.STARTED else PoseStartStep.REFUSED)
+    }
+
+    /**
+     * The session is over: its request no longer waits, and an answer no screen read is not said in the next session,
+     * whose photographer is another.
+     */
+    private fun forgetPoseStarts() {
+        poseStartWait?.cancel()
+        poseStartWait = null
+        poseRequestWaiting = null
+        poseRequestAsked = false
+        poseRequestGivenUp = null
+        while (_poseStartAnswers.tryReceive().isSuccess) Unit
+    }
+
+    /** [taker]'s screen is no longer in front; a screen that came after it keeps its own. */
+    fun dropRemoteShutter(taker: (cancel: Boolean) -> ShutterOutcome) {
+        if (remoteControl.shutter === taker) remoteControl.shutter = null
+    }
+
     private fun onMessage(message: SessionMessage) {
+        if (message is SessionMessage.PoseStartAnswer) {
+            onPoseStartAnswer(message)
+            return
+        }
         if (message !is SessionMessage.Leave) return
         val name = peerName ?: return
         _notices.tryEmit(SessionNotice.PeerGone(name, message.reason))
     }
 
-    private companion object {
-        const val BACKGROUND_LIMIT_MS = 60_000L
+    companion object {
+        /**
+         * How long "Joonhyung set the focus" shows. Shorter than the other notices: the focus box beside it already
+         * says what happened, and it goes after about a second too.
+         */
+        const val FOCUS_NOTICE_MS = 1_500L
+
+        /** How long after that notice another tap to focus makes none. */
+        const val FOCUS_NOTICE_QUIET_MS = 2_000L
+
+        /**
+         * How long a pinch that ended stays named without its last value applied (#292): above the photographer's
+         * wait for the camera (`RemoteControlHandler.ECHO_TIMEOUT_MS`), so the line holds until the ratio's notice.
+         */
+        const val ZOOMING_LINGER_MS = 1_000L
+
+        /**
+         * How long the subject's start of AI poses waits for the photographer's phone to say anything (#276). That
+         * phone answers at once, also that its user is being asked, so this is the link's time alone.
+         */
+        const val POSE_START_WAIT_MS = 2_000L
+
+        private const val BACKGROUND_LIMIT_MS = 60_000L
 
         /** WebRTC's `networkType` of a candidate on a cellular interface. */
-        const val CELLULAR = "cellular"
+        private const val CELLULAR = "cellular"
     }
 }

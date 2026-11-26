@@ -1,18 +1,26 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraController
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.ShutterTimer
+import com.lastpenguin.pix.camera.ShutterTimerChoice
+import com.lastpenguin.pix.camera.baseExposureIndex
 import com.lastpenguin.pix.core.Timings
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideRepository
+import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.guide.ReferenceGuide
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -21,6 +29,29 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
+/**
+ * What became of the situation the subject picked for AI poses, on the photographer's phone (FR-6.15, #276): its user
+ * is [ASKING]ed to agree to the AI notice first, the scene photo's step [STARTED], or the start was [REFUSED].
+ */
+enum class PoseStartStep { ASKING, STARTED, REFUSED }
+
+/**
+ * What the Camera screen did with a press of the subject's shutter (FR-7.8): took the photo; started the
+ * photographer's timer, whose end takes it (FR-1.17); stopped the timer's countdown; left the timer as it was, for a
+ * press for a photo that met a countdown or a cancel that found none; or refused the press.
+ */
+enum class ShutterOutcome {
+    TAKEN,
+    TIMER_STARTED,
+    TIMER_STOPPED,
+    TIMER_KEPT,
+    REFUSED,
+    ;
+
+    /** True when the press was the timer's, so no photo was taken at once and none was refused. */
+    val timers: Boolean get() = this == TIMER_STARTED || this == TIMER_STOPPED || this == TIMER_KEPT
+}
+
 /** A remote action the photographer's phone applied, for the notice "Joonhyung set zoom to 2×" (FR-7.4). */
 sealed interface RemoteAction {
     data class Zoom(val ratio: Float) : RemoteAction
@@ -28,10 +59,40 @@ sealed interface RemoteAction {
     /** The subject moved or resized the guide; one per gesture (FR-7.2). */
     data object GuideMove : RemoteAction
 
+    /** The subject hid the guide, or showed it again ([visible]) (FR-7.2). */
+    data class GuideVisible(val visible: Boolean) : RemoteAction
+
+    /** The subject's drag on the opacity slider ended at [opacity], as applied (FR-7.2). */
+    data class GuideOpacity(val opacity: Float) : RemoteAction
+
+    /** The subject removed [guide], which was at [state]: *Undo* on this phone puts it back there (FR-7.2). */
+    data class GuideRemove(val guide: ReferenceGuide, val state: GuideState) : RemoteAction
+
+    /** The subject's *Undo* put the removed guide back where it was (FR-7.2). */
+    data object GuideRestore : RemoteAction
+
     /** The subject set the brightness to the exposure index [index] (FR-7.3). */
     data class Brightness(val index: Int) : RemoteAction
 
     data class Flash(val mode: FlashMode) : RemoteAction
+
+    /** The subject's tap set the focus at [x], [y] of the photographer's frame, 0..1 (FR-7.7). */
+    data class Focus(val x: Float, val y: Float) : RemoteAction
+
+    /** The subject set the photographer's timer (#318). */
+    data class Timer(val timer: ShutterTimer) : RemoteAction
+
+    /** The subject's shutter took a photo (FR-7.8, #314). */
+    data object Shutter : RemoteAction
+
+    /** The subject's shutter started the photographer's timer, whose end takes the photo (FR-7.8, FR-1.17). */
+    data object TimerStart : RemoteAction
+
+    /** The subject's shutter stopped the timer's countdown (FR-7.8, FR-1.17). */
+    data object TimerStop : RemoteAction
+
+    /** The subject started AI poses, and the scene photo's step began here (FR-6.15, #276). */
+    data object PoseStart : RemoteAction
 }
 
 /**
@@ -62,12 +123,41 @@ sealed interface RemoteAction {
  * a change of exposure, flash, aspect ratio, or the camera in use (#201), from either phone, is sent as soon as the
  * camera reports it, attributed to the subject when it matches the subject's pending request.
  *
+ * **Timer (It 5, FR-1.17, #318).** `camera.timer.set` sets the photographer's timer ([timerChoice]), which every
+ * `camera.state` carries, so both menus show one value, whoever chose it and on whatever screen the photographer is.
+ *
+ * **Focus (It 5, FR-7.7).** `camera.focus.set` is the subject's tap, in fractions of the photographer's frame as the
+ * photographer's preview shows it. It does what a tap on Camera does (FR-1.4): the camera focuses and meters there
+ * when it can focus on a point, and the brightness goes back to the base, 0 EV (FR-1.11).
+ * The point has no echo, since focus has no lasting state. The tap is answered with the `camera.state` that carries
+ * the base, as the subject's and marked `focused`, so the subject's bar knows where a drag starts from and takes no
+ * other echo for it: at once when the camera has the base already, and otherwise when the camera reports it, or
+ * with where the camera is when it has not after [ECHO_TIMEOUT_MS]. It makes no brightness notice. A point outside the frame is
+ * dropped, and so is a tap while the camera is not ready, as on Camera. The photographer's own tap goes the other
+ * way as `camera.focus` ([focusedHere]), so the subject's phone shows the focus box too.
+ *
  * **Guide moves (It 2, FR-7.2).** `guide.move` carries the center and height the subject asks for, in frame
  * coordinates; [guides] clamps it with the limits of the photographer's frame and publishes the change, which
  * `GuideSyncer` echoes as `guide.state`; [attributeGuideChanges] tells the syncer that those changes are the
  * subject's. Requests are applied in arrival order, so the later change wins when both people move the guide
  * (FR-7.6). A move without a visible guide, or for a guide that has since been replaced, is dropped: a hidden
  * guide cannot be edited on either phone, and a gesture never crosses guide identities.
+ *
+ * **The guide's toolbar (It 5, FR-7.2).** `guide.visible.set` hides or shows the guide, `guide.opacity.set` sets its
+ * opacity with the same step-then-final pattern as a move, and `guide.remove` takes it off the camera, as the
+ * toolbar's own controls do; each is the subject's in the echoed `guide.state`, or `guide.clear` for a removal. Like a
+ * move, a request for a guide since replaced is dropped, and so is an opacity for a hidden guide. A removal is
+ * reported with the guide and where it was, so that *Undo* here can put it back. The last guide removed, by either
+ * phone ([removedHere] for this one's ✕), is kept for `guide.restore`, the subject's *Undo*, which puts it back unless
+ * another guide went on since.
+ *
+ * **Shutter (It 5, FR-7.8, #314).** `camera.shutter` is the subject's press. The photo is the Camera screen's to take
+ * ([shutter]), as at its own shutter, with its timer when that is on, and every press is answered with
+ * `camera.shutter.answer`.
+ *
+ * **AI poses (It 5, FR-6.15, #276).** `pose.start` is the situation the subject picked. The Camera screen begins the
+ * scene photo for it ([poseStarter]), as if its own user had picked it, and the request is answered with
+ * `pose.start.answer`.
  * Owner: Real-time (#10, #57).
  */
 class RemoteControlHandler(
@@ -78,7 +168,23 @@ class RemoteControlHandler(
     private val clock: () -> Long = System::currentTimeMillis,
     /** Who holds the zoom; `CameraViewModel` takes it for the photographer's own pinch. */
     val zoomHold: ZoomHold = ZoomHold(),
+    /** The timer as chosen; `CameraViewModel` sets it for the menu on Camera, and counts down with it. */
+    val timerChoice: ShutterTimerChoice = ShutterTimerChoice(),
 ) {
+    /**
+     * Takes up a press of the subject's shutter (FR-7.8, #314), a press for a photo or one to cancel the timer's
+     * countdown, and says what it did. The Camera screen sets it while it is in front, since only there is the camera
+     * bound and the shutter the camera's own; null otherwise.
+     */
+    var shutter: ((cancel: Boolean) -> ShutterOutcome)? = null
+
+    /**
+     * Begins a pose's scene photo for the situation the subject picked (FR-6.15, #276), and tells its second argument
+     * whether it began: at once, or once the photographer answered the AI notice. The Camera screen sets it while it
+     * is in front, as it does [shutter]; null otherwise.
+     */
+    var poseStarter: ((Situation, (PoseStartStep) -> Unit) -> Unit)? = null
+
     private val _actions = MutableSharedFlow<RemoteAction>(extraBufferCapacity = 16)
 
     /** Applied remote actions, for the notice on the photographer's screen. */
@@ -94,12 +200,31 @@ class RemoteControlHandler(
     private var timeoutJob: Job? = null
     private var exposureTimeoutJob: Job? = null
     private var flashTimeoutJob: Job? = null
+    private var baseTimeoutJob: Job? = null
     private var pending: PendingValue<Float>? = null
 
     // False while the subject's pinch has sent steps but not its last value, so the camera still holds its lens.
     private var zoomSettled = true
     private var pendingExposure: PendingValue<Int>? = null
     private var pendingFlash: PendingValue<FlashMode>? = null
+
+    // The timer the subject asked for, until its change is echoed: that echo is the subject's.
+    private var pendingTimer: ShutterTimer? = null
+
+    // True while the photographer's timer counts down (countdownHere): the subject's flash waits, as theirs does.
+    private var photographerCounting = false
+
+    // The base brightness a tap to focus asked for, until the camera reports it: its echo is the subject's, without
+    // the notice of a brightness the subject chose.
+    private var pendingBase: PendingValue<Int>? = null
+
+    // The last guide removed, by either phone, and where it was: what the subject's Undo puts back (FR-7.2).
+    private var removed: Pair<ReferenceGuide, GuideState>? = null
+
+    /** This phone's ✕ took [guide] off the camera, at [state]: the subject's *Undo* can put it back too (FR-7.2). */
+    fun removedHere(guide: ReferenceGuide, state: GuideState) {
+        removed = guide to state
+    }
 
     /** Echoes every applied zoom while [scope] is active, starting with the current one. */
     fun start(scope: CoroutineScope) {
@@ -108,10 +233,11 @@ class RemoteControlHandler(
         zoomJob = scope.launch { camera.zoom.collect { zoom -> onApplied(zoom) } }
         // The first zoom echo above already carries the current values.
         settingsJob = scope.launch {
-            combine(camera.state.map { Triple(it.exposure, it.flash, it.aspect) }, camera.facing, ::Pair)
+            val applied = camera.state.map { Triple(it.exposure, it.flash, it.aspect) }
+            combine(applied, camera.facing, timerChoice.timer, ::Triple)
                 .distinctUntilChanged()
                 .drop(1)
-                .collect { (settings, _) -> onSettingsApplied(settings.first, settings.second) }
+                .collect { (settings, _, _) -> onSettingsApplied(settings.first, settings.second) }
         }
         // The current holder first, so a subject that connects or reconnects mid-pinch knows it.
         holderJob = scope.launch { zoomHold.holder.collect { session.send(SessionMessage.ZoomHoldUpdate(it)) } }
@@ -137,6 +263,8 @@ class RemoteControlHandler(
         timeoutJob?.cancel()
         exposureTimeoutJob?.cancel()
         flashTimeoutJob?.cancel()
+        baseTimeoutJob?.cancel()
+        baseTimeoutJob = null
         zoomJob = null
         finalJob = null
         timeoutJob = null
@@ -145,7 +273,40 @@ class RemoteControlHandler(
         pending = null
         pendingExposure = null
         pendingFlash = null
+        pendingTimer = null
+        pendingBase = null
         scope = null
+    }
+
+    /**
+     * The photographer's own tap focused at [x], [y] of the frame (FR-7.7): the subject's phone shows the focus box
+     * there too. Only while a session runs; the brightness that the tap put back goes as `camera.state`.
+     */
+    fun focusedHere(x: Float, y: Float) {
+        if (scope == null) return
+        session.send(SessionMessage.Focused(x, y))
+        Timings.mark("focus.told", "$x $y")
+    }
+
+    /**
+     * The photographer did [action] on their own camera (FR-7.4, #292): the subject's phone says it in a line. Only
+     * while a session runs.
+     */
+    fun didHere(action: PhotographerAction) {
+        if (scope == null) return
+        session.send(action.toMessage())
+        Timings.mark("did.told", action.toMessage().action)
+    }
+
+    /**
+     * The photographer's timer has [left] seconds before its photo, or 0 as it ends (FR-1.17): the subject's phone
+     * shows the countdown too. Only while a session runs.
+     */
+    fun countdownHere(left: Int) {
+        photographerCounting = left > 0
+        if (scope == null) return
+        session.send(SessionMessage.Countdown(left))
+        Timings.mark("timer.told", "$left")
     }
 
     /** Handles the subject's requests; other messages are ignored. */
@@ -154,8 +315,72 @@ class RemoteControlHandler(
             is SessionMessage.ZoomSet -> if (message.cancel) handleZoomCancel() else handleZoom(message)
             is SessionMessage.ExposureSet -> handleExposure(message)
             is SessionMessage.FlashSet -> handleFlash(message)
+            is SessionMessage.TimerSet -> handleTimer(message)
+            is SessionMessage.FocusSet -> handleFocus(message)
             is SessionMessage.GuideMove -> handleGuideMove(message)
+            is SessionMessage.GuideVisibleSet -> handleGuideVisible(message)
+            is SessionMessage.GuideOpacitySet -> handleGuideOpacity(message)
+            is SessionMessage.GuideRemove -> handleGuideRemove(message)
+            is SessionMessage.GuideRestore -> handleGuideRestore(message)
+            is SessionMessage.ShutterPress -> handleShutter(message)
+            is SessionMessage.PoseStart -> handlePoseStart(message)
             else -> Unit
+        }
+    }
+
+    /**
+     * `pose.start`: the Camera screen begins the scene photo for the subject's situation, if it is in front and can
+     * (FR-6.15, #276). Every request is answered, by its number: a refusal at once, and a start when it began. That
+     * waits for the photographer when the AI notice is up, which the subject's phone is told at once, so that it does
+     * not give the request up. An answer that comes once this session is over tells no one; one that comes after a
+     * drop of the same session is told, or the subject's phone would wait for it without end.
+     */
+    private fun handlePoseStart(request: SessionMessage.PoseStart) {
+        val situation = Situation.named(request.situation)
+        val starter = poseStarter
+        // The session this request came in, which may be over when the photographer answers the notice. By its id,
+        // not by this handler's run: a drop stops the handler and the link's return starts it anew, in one session.
+        val asked = sessionId()
+        var decided = false
+        val answer = { step: PoseStartStep ->
+            // One last answer, and none once this session is over. While the link reconnects, the session keeps it.
+            if (!decided && asked != null && sessionId() == asked) {
+                decided = step != PoseStartStep.ASKING
+                val started = step == PoseStartStep.STARTED
+                Timings.mark("poses.remote", step.name.lowercase())
+                session.send(
+                    SessionMessage.PoseStartAnswer(started, request.request, asking = step == PoseStartStep.ASKING),
+                )
+                if (started) _actions.tryEmit(RemoteAction.PoseStart)
+            }
+        }
+        if (situation == null || starter == null) answer(PoseStartStep.REFUSED) else starter(situation, answer)
+    }
+
+    /** The id of the session that runs or reconnects; null outside one. */
+    private fun sessionId(): String? = when (val state = session.state.value) {
+        is SessionState.Connected -> state.sessionId
+        is SessionState.Reconnecting -> state.sessionId
+        else -> null
+    }
+
+    /**
+     * `camera.shutter`: the Camera screen takes the photo, if it is in front and can, or its timer takes the press
+     * up (FR-1.17), and the press is answered either way, so the subject's shutter is free again. Nothing is kept for
+     * later: a press is one moment, which is why it comes on the realtime channel, at once or not at all.
+     */
+    private fun handleShutter(request: SessionMessage.ShutterPress) {
+        val outcome = shutter?.invoke(request.cancel) ?: ShutterOutcome.REFUSED
+        Timings.mark("shutter.remote", outcome.name.lowercase())
+        // Named by its press, so an answer that comes late is not taken for the next press's.
+        session.send(
+            SessionMessage.ShutterAnswer(outcome == ShutterOutcome.TAKEN, request.press, timer = outcome.timers),
+        )
+        when (outcome) {
+            ShutterOutcome.TAKEN -> _actions.tryEmit(RemoteAction.Shutter)
+            ShutterOutcome.TIMER_STARTED -> _actions.tryEmit(RemoteAction.TimerStart)
+            ShutterOutcome.TIMER_STOPPED -> _actions.tryEmit(RemoteAction.TimerStop)
+            ShutterOutcome.TIMER_KEPT, ShutterOutcome.REFUSED -> Unit
         }
     }
 
@@ -189,8 +414,10 @@ class RemoteControlHandler(
         // A final echo still due for the previous step would send a stale zoom after the subject's pinch ended.
         // The newer request brings its own echoes: when applied, or from the timeout answer.
         finalJob?.cancel()
-        // The subject's pinch holds the lens like a local one until its last value (Design 2.6.5).
-        camera.setZoom(ratio, request.final)
+        // The subject's pinch holds the lens like a local one until its last value (Design 2.6.5). That value, and a
+        // quick step's one value, glide where the camera can show it, as the photographer's own do (#310); the camera's
+        // states on the way are the photographer's echoes, and the one that arrives is the subject's.
+        if (request.final) camera.glideZoom(ratio) else camera.setZoom(ratio, final = false)
         if (!request.final) return
         timeoutJob = scope?.launch {
             answerIfStalled(
@@ -299,10 +526,13 @@ class RemoteControlHandler(
         }
     }
 
-    /** `camera.flash.set`: applied when the camera has a flash; otherwise ignored with an unchanged echo. */
+    /**
+     * `camera.flash.set`: applied when the camera has a flash; otherwise ignored with an unchanged echo, and so while
+     * the photographer's timer counts down, as their own Flash waits then (FR-1.17).
+     */
     private fun handleFlash(request: SessionMessage.FlashSet) {
         Timings.mark("flash.received", "${request.mode}")
-        if (camera.capabilities.value?.hasFlash != true) {
+        if (camera.capabilities.value?.hasFlash != true || photographerCounting) {
             send(camera.zoom.value, Role.PHOTOGRAPHER, final = true)
             return
         }
@@ -330,6 +560,67 @@ class RemoteControlHandler(
         }
     }
 
+    /**
+     * `camera.timer.set`: the timer as the subject's menu chose it (#318), for both shutters. It is this phone's one
+     * timer ([timerChoice]), so the change shows on Camera, or waits there for the photographer to come back from
+     * another screen. Seconds this Pix does not offer, and a request while the timer counts down, when Camera's own
+     * Timer waits too (FR-1.17), are answered with the unchanged state, which puts the subject's item back.
+     */
+    private fun handleTimer(request: SessionMessage.TimerSet) {
+        val timer = ShutterTimer.ofSeconds(request.seconds)
+        Timings.mark("timer.received", "${request.seconds}")
+        if (timer == null || photographerCounting) {
+            send(camera.zoom.value, Role.PHOTOGRAPHER, final = true)
+            return
+        }
+        if (timerChoice.timer.value == timer) {
+            // Both people chose it at once: no change follows, so the answer goes here.
+            confirm(RemoteAction.Timer(timer), "timer.applied", "${timer.seconds}")
+            send(camera.zoom.value, Role.SUBJECT, final = true)
+            return
+        }
+        pendingTimer = timer
+        timerChoice.set(timer)
+    }
+
+    /**
+     * `camera.focus.set`: camera.setFocusPoint where the camera takes a point, and the base brightness again. Only a
+     * point the camera took is an action: without point focus the tap is only where the brightness bar comes up.
+     */
+    private fun handleFocus(request: SessionMessage.FocusSet) {
+        val (x, y) = request
+        Timings.mark("focus.received", "$x $y")
+        if (!x.isFinite() || !y.isFinite() || x !in 0f..1f || y !in 0f..1f) return
+        if (camera.status.value != CameraStatus.READY) return
+        val caps = camera.capabilities.value ?: return
+        // The subject's phone asks only of a camera that focuses on a point or has a brightness range.
+        if (!caps.supportsFocusPoint && caps.baseExposureIndex() == null) return
+        if (caps.supportsFocusPoint) camera.setFocusPoint(x, y)
+        val base = caps.baseExposureIndex()
+        if (base == null || (pendingExposure == null && camera.state.value.exposure == base)) {
+            // No brightness to set, or already there with nothing outstanding, so the camera will not emit again:
+            // answered now.
+            send(camera.zoom.value, Role.SUBJECT, final = true, focused = true)
+        } else {
+            // A drag's request still outstanding is left alone: its answer or its late application still tells the
+            // subject where the camera is.
+            val queued = PendingValue(base, clock(), final = true)
+            pendingBase = queued
+            camera.setExposure(base)
+            baseTimeoutJob?.cancel()
+            baseTimeoutJob = scope?.launch {
+                // A camera that does not take the base reports nothing: the tap is then answered with where the camera
+                // is, and the base is no longer waited for, so a later change to that value is not taken for it.
+                delay(ECHO_TIMEOUT_MS)
+                camera.status.first { it != CameraStatus.STARTING }
+                if (pendingBase !== queued) return@launch
+                pendingBase = null
+                send(camera.zoom.value, Role.SUBJECT, final = true, focused = true)
+            }
+        }
+        if (caps.supportsFocusPoint) confirm(RemoteAction.Focus(x, y), "focus.applied", "$x $y")
+    }
+
     /** `guide.move`: the photographer's repository clamps and applies it; GuideSyncer echoes the result. */
     private fun handleGuideMove(request: SessionMessage.GuideMove) {
         Timings.mark(
@@ -348,6 +639,55 @@ class RemoteControlHandler(
         if (request.final) {
             confirm(RemoteAction.GuideMove, "move.applied", "${request.cx} ${request.cy} ${request.height}")
         }
+    }
+
+    /** `guide.visible.set`: the subject's *Hide* or *Show* (FR-7.2); nothing for another guide or no change. */
+    private fun handleGuideVisible(request: SessionMessage.GuideVisibleSet) {
+        val guide = guides.guide.value ?: return
+        if (guide.id != request.guideId || guides.state.value.visible == request.visible) return
+        attributeGuideChanges(Role.SUBJECT)
+        guides.update(final = true) { it.copy(visible = request.visible) }
+        confirm(RemoteAction.GuideVisible(request.visible), "guide.visible.applied", "${request.visible}")
+    }
+
+    /**
+     * `guide.opacity.set`: a step of the subject's slider, or its last value (FR-7.2); [guides] keeps it within
+     * 10–90 %. A hidden guide keeps its opacity, as its slider is off on both phones.
+     */
+    private fun handleGuideOpacity(request: SessionMessage.GuideOpacitySet) {
+        if (!request.opacity.isFinite()) return
+        val guide = guides.guide.value ?: return
+        if (!guides.state.value.visible || guide.id != request.guideId) return
+        attributeGuideChanges(Role.SUBJECT)
+        guides.update(request.final) { it.copy(opacity = request.opacity) }
+        if (request.final) {
+            val applied = guides.state.value.opacity
+            confirm(RemoteAction.GuideOpacity(applied), "guide.opacity.applied", "$applied")
+        }
+    }
+
+    /** `guide.remove`: the subject's ✕ takes the guide off the camera, kept in the report for *Undo* (FR-7.2). */
+    private fun handleGuideRemove(request: SessionMessage.GuideRemove) {
+        val guide = guides.guide.value ?: return
+        if (guide.id != request.guideId) return
+        val state = guides.state.value
+        removed = guide to state
+        guides.setGuide(null)
+        confirm(RemoteAction.GuideRemove(guide, state), "guide.remove.applied", guide.id)
+    }
+
+    /**
+     * `guide.restore`: the subject's *Undo* puts back the guide removed last, by either phone, where it was, as this
+     * phone's own *Undo* does; nothing when it names another guide or another went on since (FR-7.2).
+     */
+    private fun handleGuideRestore(request: SessionMessage.GuideRestore) {
+        val (guide, state) = removed ?: return
+        if (guide.id != request.guideId || guides.guide.value != null) return
+        removed = null
+        attributeGuideChanges(Role.SUBJECT)
+        guides.setGuide(guide)
+        guides.update(final = true) { state }
+        confirm(RemoteAction.GuideRestore, "guide.restore.applied", guide.id)
     }
 
     /**
@@ -394,8 +734,8 @@ class RemoteControlHandler(
 
     /**
      * Exposure, flash, ratio, or the camera in use changed. A change that matches the subject's pending request is the
-     * subject's and gets its notice (brightness only for the slider's final value); a step of the subject's slider
-     * is echoed as a step, everything else as a final state.
+     * subject's and gets its notice (brightness only for the bar's final value, and none for the base that a tap to
+     * focus set); a step of the subject's bar is echoed as a step, everything else as a final state.
      */
     private fun onSettingsApplied(exposure: Int, flash: FlashMode) {
         val now = clock()
@@ -411,8 +751,22 @@ class RemoteControlHandler(
             flashTimeoutJob?.cancel()
             confirm(RemoteAction.Flash(flash), "flash.applied", "$flash")
         }
-        val bySubject = exposureRequest != null || flashRequest != null
-        send(camera.zoom.value, if (bySubject) Role.SUBJECT else Role.PHOTOGRAPHER, exposureRequest?.final ?: true)
+        val baseRequest = pendingBase?.takeIf { it.value == exposure && now - it.at <= PENDING_MS }
+        if (baseRequest != null) {
+            pendingBase = null
+            baseTimeoutJob?.cancel()
+        }
+        val timer = timerChoice.timer.value
+        val timerRequest = pendingTimer?.takeIf { it == timer }
+        pendingTimer = null
+        if (timerRequest != null) confirm(RemoteAction.Timer(timer), "timer.applied", "${timer.seconds}")
+        val bySubject = exposureRequest != null || flashRequest != null || baseRequest != null || timerRequest != null
+        send(
+            camera.zoom.value,
+            if (bySubject) Role.SUBJECT else Role.PHOTOGRAPHER,
+            exposureRequest?.final ?: true,
+            focused = baseRequest != null,
+        )
     }
 
     private fun confirm(action: RemoteAction, mark: String, detail: String) {
@@ -420,7 +774,8 @@ class RemoteControlHandler(
         Timings.mark(mark, detail)
     }
 
-    private fun send(zoom: Float, by: Role, final: Boolean) {
+    /** [focused]: this state answers the subject's tap to focus (`camera.focus.set`). */
+    private fun send(zoom: Float, by: Role, final: Boolean, focused: Boolean = false) {
         val applied = camera.state.value
         session.send(
             SessionMessage.CameraStateUpdate(
@@ -431,6 +786,8 @@ class RemoteControlHandler(
                 flash = applied.flash,
                 aspect = applied.aspect,
                 facing = camera.facing.value,
+                focused = focused,
+                timer = timerChoice.timer.value.seconds,
             ),
         )
     }
@@ -441,22 +798,28 @@ class RemoteControlHandler(
         var answered = false
     }
 
-    private companion object {
-        const val ZOOM_MATCH = 0.01f
+    companion object {
+        /**
+         * How long a final request, or the base of a tap to focus, waits for the camera to report it before it is
+         * answered with the current state. The subject's phone waits longer than this for a tap's answer
+         * (`SubjectViewModel`), so keep the two together.
+         */
+        const val ECHO_TIMEOUT_MS = 500L
+
+        private const val ZOOM_MATCH = 0.01f
 
         // How close the shown zoom must be for a pinch's last value to count as already applied: well inside the lens
         // hold band (CameraZoomPlan.HOLD_BAND), where a held lens shows its edge rather than the pinch's value.
-        const val SHOWN_MATCH = 0.001f
+        private const val SHOWN_MATCH = 0.001f
 
         /** How long a request stays the subject's: long enough for a lens switch or a photo save to finish. */
-        const val PENDING_MS = 5_000L
-        const val ECHO_TIMEOUT_MS = 500L
-        const val FINAL_DELAY_MS = 100L
+        private const val PENDING_MS = 5_000L
+        private const val FINAL_DELAY_MS = 100L
 
         /**
          * How long the subject's pinch keeps the zoom after its last request. A still finger sends nothing, so it is
          * well above the 50 ms between steps; a pinch ended normally frees it at its final value.
          */
-        const val HOLD_TIMEOUT_MS = 2_000L
+        private const val HOLD_TIMEOUT_MS = 2_000L
     }
 }

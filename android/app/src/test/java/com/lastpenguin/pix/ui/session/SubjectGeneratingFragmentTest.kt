@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.drawable.BitmapDrawable
@@ -14,6 +14,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentGeneratingBinding
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.FakePoseCandidateCodec
 import com.lastpenguin.pix.session.PeerInfo
@@ -25,6 +26,7 @@ import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.idleUntil
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import kotlinx.coroutines.CoroutineScope
@@ -39,12 +41,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
-import org.robolectric.shadows.ShadowToast
 
 /*
  * The subject's Generating poses (R&S 6.6, FR-6.15, Iter3-A13) on the real Fragment, with the photographer's set
- * delivered to the container's PoseSyncer and its description to the DescriptionSyncer. Partitions: the slots in the
- * photographer's order, filled as copies arrive, a failed one saying so, with the count; before the slots are known,
+ * delivered to the container's PoseSyncer and its description to the DescriptionSyncer. Partitions: the situation the
+ * photographer's photo was taken for, named on the photo's card, and none for Auto or from an older photographer that
+ * says none; the slots in the photographer's order, filled as copies arrive, a failed one saying so, with the count; before the slots are known,
  * "Choosing poses…" for suggested poses and "Creating…" for a description; a photographer of before Iter3-A13, whose
  * copies fill in as they arrive; the set's Pick a pose with copies here (on to the subject's Pick a pose, in this
  * screen's place) and without any (back to Subject view); the set's end (back, with a notice that the photographer
@@ -64,8 +66,11 @@ class SubjectGeneratingFragmentTest {
         receiving.cancel()
     }
 
-    /** A subject's phone whose syncers have the photographer's description d1 started into set1, GENERATING. */
-    private fun generating(suggested: Boolean = false): TestAppContainer {
+    /**
+     * A subject's phone whose syncers have the photographer's description d1 started into set1, GENERATING, for
+     * [situation], as the photographer names it; null names none, as an older photographer.
+     */
+    private fun generating(suggested: Boolean = false, situation: Situation? = null): TestAppContainer {
         // Copies with pixels, as the grid shows them.
         val modules = TestAppContainer(candidateImage = { bitmap() }).install()
         modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
@@ -75,7 +80,8 @@ class SubjectGeneratingFragmentTest {
         modules.session.deliver(SessionMessage.PoseDescription("d1", DescriptionStep.OPEN, "jump"))
         val text = if (suggested) "" else "jump"
         modules.session.deliver(SessionMessage.PoseDescription("d1", DescriptionStep.STARTED, text))
-        step(modules, PoseSetStep.GENERATING)
+        modules.session.deliver(SessionMessage.PoseStep("set1", PoseSetStep.GENERATING, situation = situation?.apiName))
+        idle()
         return modules
     }
 
@@ -129,6 +135,19 @@ class SubjectGeneratingFragmentTest {
     private fun waitForSlots(expected: List<String>) {
         idleUntil { shownSlots() == expected }
         assertEquals(expected, shownSlots())
+    }
+
+    @Test
+    fun namesTheSituationThePhotographersPhotoWasTakenFor_andNoneForAuto_orFromAnOlderPhotographer() {
+        for ((situation, named) in listOf(Situation.FULL_BODY to true, Situation.DEFAULT to false, null to false)) {
+            generating(situation = situation)
+            launch()
+            onScreen { binding ->
+                assertEquals("$situation", named, binding.situationTag.visibility == View.VISIBLE)
+                if (named) assertEquals(string(R.string.situation_full_body), binding.situationTag.text.toString())
+            }
+            scenario?.close()
+        }
     }
 
     @Test
@@ -205,7 +224,7 @@ class SubjectGeneratingFragmentTest {
         step(modules, PoseSetStep.CLOSED)
 
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
-        assertEquals(string(R.string.peer_stopped_poses, "Dongje"), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.peer_stopped_poses, "Dongje"), shownNotice())
     }
 
     @Test
@@ -219,7 +238,7 @@ class SubjectGeneratingFragmentTest {
         step(modules, PoseSetStep.CLOSED)
 
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
-        assertEquals(string(R.string.peer_poses_failed, "Dongje"), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.peer_poses_failed, "Dongje"), shownNotice())
     }
 
     @Test
@@ -234,7 +253,7 @@ class SubjectGeneratingFragmentTest {
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
         assertEquals(
             string(R.string.peer_poses_failed, "Dongje") + "\n" + string(R.string.generation_daily_limit_message),
-            ShadowToast.getTextOfLatestToast(),
+            shownNotice(),
         )
     }
 
@@ -261,6 +280,6 @@ class SubjectGeneratingFragmentTest {
         idle()
 
         assertEquals(R.id.subjectFragment, nav.currentDestination?.id)
-        assertNull(ShadowToast.getTextOfLatestToast())
+        assertNull(shownNotice())
     }
 }

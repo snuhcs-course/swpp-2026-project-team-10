@@ -1,12 +1,16 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Joonhyung Han and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.content.Context
 import android.view.ContextThemeWrapper
+import android.view.MotionEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -17,6 +21,12 @@ import org.robolectric.annotation.Config
  * Partitions (equivalence): a camera of 0.1 EV steps (Samsung's ±2 EV in 41) and one of 1/6 EV (Pixel's ±2 EV in 25);
  * a drag up and one down; a bar laid out short, tall, and not at all. Boundary: half a step's way, which rounds to the
  * step, and just under it; a drag past the range's end, which stops there; a camera without a step, which a drag leaves.
+ * A value not known yet (Subject view after a tap to focus, #273), state-based: a touch and TalkBack's change while it
+ * is awaited (nothing changes), and the same touch once it is known (a drag from the value shown then, by the finger's
+ * way from there); a waiting touch on a bar that is disabled before the finger lifts, which holds it no longer.
+ * The end of a drag (FR-7.6), state-based: a finger lifted without moving the sun, also after the other phone changed
+ * the brightness under it (no value goes out, and the bar shows the new one); a drag back to where it began, which
+ * still ends with its value.
  */
 @RunWith(AndroidJUnit4::class)
 @Config(qualifiers = "xxhdpi")
@@ -37,6 +47,106 @@ class ExposureBarViewTest {
         dragTo(dp * density)
         finishDrag()
         return index to reported
+    }
+
+    private fun ExposureBarView.touch(action: Int, y: Float) {
+        val event = MotionEvent.obtain(0L, 0L, action, 10f, y, 0)
+        onTouchEvent(event)
+        event.recycle()
+    }
+
+    @Test
+    fun aTouchWhileTheValueIsAwaited_changesNothing_andItsDragThenStartsFromTheValueThatCame() {
+        val reported = mutableListOf<Pair<Int, Boolean>>()
+        // 0.5 EV steps: 150 dp of the finger's way is two steps.
+        val bar = bar(-4..4, 0.5f, value = 3).apply { onChange = { index, final -> reported += index to final } }
+        bar.awaitingValue = true
+
+        bar.touch(MotionEvent.ACTION_DOWN, 600f)
+        bar.touch(MotionEvent.ACTION_MOVE, 600f - 150f * density)
+        assertEquals(3, bar.index)
+        assertTrue(reported.isEmpty())
+        // The finger holds the bar up, as a drag does.
+        assertTrue(bar.isHeld)
+
+        // The value came: the camera went back to 0. The finger's way so far does not count.
+        bar.render(-4..4, 0.5f, 0, enabled = true)
+        bar.awaitingValue = false
+        bar.touch(MotionEvent.ACTION_MOVE, 600f - 160f * density)
+        assertEquals(0, bar.index)
+        bar.touch(MotionEvent.ACTION_MOVE, 600f - 310f * density)
+        bar.touch(MotionEvent.ACTION_UP, 600f - 310f * density)
+
+        assertEquals(2, bar.index)
+        assertEquals(listOf(2 to false, 2 to true), reported)
+        assertFalse(bar.isHeld)
+    }
+
+    @Test
+    fun aFingerLiftedWithoutMovingTheSun_sendsNothing_andTheBarShowsTheBrightnessAsItIsNow() {
+        val reported = mutableListOf<Pair<Int, Boolean>>()
+        val touching = mutableListOf<Boolean>()
+        val bar = bar(-4..4, 0.5f, value = 3).apply {
+            onChange = { index, final -> reported += index to final }
+            onTouching = { touching += it }
+        }
+
+        bar.touch(MotionEvent.ACTION_DOWN, 600f)
+        // The other phone changed the brightness under the finger: the held bar keeps its own value meanwhile.
+        bar.render(-4..4, 0.5f, 1, enabled = true)
+        assertEquals(3, bar.index)
+        bar.touch(MotionEvent.ACTION_UP, 600f)
+
+        // The old value would have gone out over the other phone's newer one.
+        assertTrue(reported.isEmpty())
+        assertEquals(1, bar.index)
+        assertEquals(listOf(true, false), touching)
+        assertFalse(bar.isHeld)
+    }
+
+    @Test
+    fun aDragBackToWhereItBegan_stillEndsWithItsValue() {
+        val reported = mutableListOf<Pair<Int, Boolean>>()
+        val bar = bar(-4..4, 0.5f, value = 3).apply { onChange = { index, final -> reported += index to final } }
+
+        bar.startDrag()
+        bar.dragTo(75f * density)
+        bar.dragTo(0f)
+        bar.finishDrag()
+
+        // Its steps went out, so the other phone waits for the value they end on.
+        assertEquals(listOf(4 to false, 3 to false, 3 to true), reported)
+    }
+
+    @Test
+    fun aWaitingTouch_onABarDisabledMeanwhile_holdsItNoLonger() {
+        val touching = mutableListOf<Boolean>()
+        val bar = bar(-4..4, 0.5f, value = 3).apply { onTouching = { touching += it } }
+        bar.awaitingValue = true
+        bar.touch(MotionEvent.ACTION_DOWN, 600f)
+        assertTrue(bar.isHeld)
+
+        // The link dropped under the finger: the screen disables the bar before the finger lifts.
+        bar.render(-4..4, 0.5f, 3, enabled = false)
+        assertFalse(bar.isHeld)
+        bar.touch(MotionEvent.ACTION_UP, 600f)
+        assertFalse(bar.isHeld)
+        assertEquals(listOf(true, false), touching)
+    }
+
+    @Test
+    fun talkBacksChangeWhileTheValueIsAwaited_isNotTaken() {
+        val reported = mutableListOf<Pair<Int, Boolean>>()
+        val bar = bar(-4..4, 0.5f, value = 3).apply { onChange = { index, final -> reported += index to final } }
+        bar.awaitingValue = true
+
+        assertFalse(bar.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD, null))
+        assertEquals(3, bar.index)
+        assertTrue(reported.isEmpty())
+
+        bar.awaitingValue = false
+        assertTrue(bar.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD, null))
+        assertEquals(2, bar.index)
     }
 
     @Test

@@ -1,6 +1,9 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui
 
+import android.app.PendingIntent
+import android.content.Intent
+import android.content.IntentSender
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
@@ -10,14 +13,19 @@ import com.lastpenguin.pix.account.FakeFriendsRepository
 import com.lastpenguin.pix.account.FakeGoogleIdTokens
 import com.lastpenguin.pix.account.FakeInvitationManager
 import com.lastpenguin.pix.camera.CameraSettings
+import com.lastpenguin.pix.camera.PhoneAlbum
+import com.lastpenguin.pix.camera.PhonePhotoSource
 import com.lastpenguin.pix.camera.PhoneTurns
+import com.lastpenguin.pix.camera.PhotoAccess
 import com.lastpenguin.pix.camera.PhotoDeleter
+import com.lastpenguin.pix.camera.PhotoDeletion
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.core.AppContainer
 import com.lastpenguin.pix.generation.GenerationConsent
 import com.lastpenguin.pix.generation.GenerationEvent
 import com.lastpenguin.pix.generation.PlannedPose
 import com.lastpenguin.pix.generation.PoseGenerator
+import com.lastpenguin.pix.generation.PoseLibrary
 import com.lastpenguin.pix.generation.PoseRequest
 import com.lastpenguin.pix.generation.PoseTip
 import com.lastpenguin.pix.generation.PoseTipper
@@ -64,6 +72,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flow
 import org.robolectric.RuntimeEnvironment
 
@@ -161,39 +170,105 @@ class TestAppContainer(
     /** Whether the subject's album refuses the photographer's photos, as a full disk does (FR-6.14). */
     var albumFails = false
 
-    /** The photos in Pix's album (FR-1.6), oldest first, which a test sets: no MediaStore here tells of a saved photo. */
+    /**
+     * The phone's photos that Pix may read (FR-1.6), oldest first, which a test sets: no MediaStore here tells of a
+     * saved photo.
+     */
     val album = MutableStateFlow<List<Uri>>(emptyList())
+
+    /** How much of the phone's photos [album] has; all of them unless a test says otherwise. */
+    val photoAccess = MutableStateFlow(PhotoAccess.ALL)
+
+    /** The albums of [album], which a test sets with it. */
+    val albums = MutableStateFlow<List<PhoneAlbum>>(emptyList())
+
+    /** What reading the photos again brings, as after the permission was asked; [rereads] counts them. */
+    var onReread: () -> Unit = {}
+    var rereads = 0
+        private set
+
+    /** How many times a photo of [album] was changed in place, as an app's edit saved over it; a test moves it. */
+    val photoEdits = MutableStateFlow(0)
+
+    private val phonePhotos = object : PhonePhotoSource {
+        override val photos: StateFlow<List<Uri>> = album
+        override val access: StateFlow<PhotoAccess> = photoAccess
+        override val albums: StateFlow<List<PhoneAlbum>> = this@TestAppContainer.albums
+        override val edits: StateFlow<Int> = photoEdits
+
+        override suspend fun refresh() {
+            rereads++
+            onReread()
+        }
+    }
 
     /** The photos the viewer deleted, in order; each leaves [album] and the session's photos unless [deleteFails]. */
     val deleted = mutableListOf<Uri>()
 
-    /** Whether a delete fails, as for a photo another app owns. */
+    /** Whether a delete fails, as when MediaStore refuses. */
     var deleteFails = false
 
-    /** Pix's album's own delete, as `PixAlbumPhotos.delete`. */
+    /** Other apps' photos, which only Android's question deletes, [deleteQuestion]; its yes deletes them. */
+    var othersPhotos: Set<Uri> = emptySet()
+
+    /**
+     * As from Android 12, where Pix asks before deleting another app's photo too; false as on Android 11, where only
+     * Android's question does.
+     */
+    var asksForOthers = false
+
+    /** Whether Pix may not manage the phone's media yet, so Android would ask about another app's photo each time. */
+    var needsMediaAccess = false
+
+    /** Stands in for Android's question before another app's photo is deleted. */
+    val deleteQuestion: IntentSender = PendingIntent.getActivity(
+        ApplicationProvider.getApplicationContext(),
+        0,
+        Intent("com.lastpenguin.pix.test.DELETE_QUESTION"),
+        PendingIntent.FLAG_IMMUTABLE,
+    ).intentSender
+
+    /** The phone's own delete, as `PhonePhotos.delete`. */
     private val albumDeleter = PhotoDeleter { uri ->
-        if (deleteFails) return@PhotoDeleter false
-        deleted += uri
-        album.value -= uri
-        true
+        when {
+            uri in othersPhotos -> PhotoDeletion.NeedsConsent(deleteQuestion, deletesItself = true)
+
+            deleteFails -> PhotoDeletion.Failed
+
+            else -> {
+                deleted += uri
+                album.value -= uri
+                PhotoDeletion.Deleted
+            }
+        }
     }
 
     /**
      * The viewer's delete, through the real `PhotoSyncer` as in the app. A screen test starts no sender, so a photo
      * taken in a session waits to go and is deleted only after its session.
      */
-    private val deleter = PhotoDeleter { uri -> photos.delete(uri, albumDeleter, CoroutineScope(Dispatchers.Main)) }
+    private val deleter = object : PhotoDeleter {
+        override suspend fun delete(uri: Uri) = photos.delete(uri, albumDeleter, CoroutineScope(Dispatchers.Main))
+
+        override fun asksFirst(uri: Uri) = uri !in othersPhotos || asksForOthers
+
+        override fun needsAccess(uri: Uri) = uri in othersPhotos && needsMediaAccess
+    }
+
+    /** The candidates kept as history through [maker], so a test finishes each cut it waits for. */
+    val poseLibrary = PoseLibrary(maker, saved, CoroutineScope(Dispatchers.Main))
 
     val container = AppContainer(
         cameraController = camera,
         cameraSettings = settings,
-        albumPhotos = album,
+        phonePhotos = phonePhotos,
         photoDeleter = deleter,
         guideRepository = guides,
         mirrorGuideRepository = mirror,
         mirrorReference = reference,
         referenceGuideMaker = maker,
         savedGuideStore = saved,
+        poseLibrary = poseLibrary,
         poseGenerator = generator,
         personDetector = persons,
         poseTipper = tipper,
@@ -212,7 +287,12 @@ class TestAppContainer(
         descriptionSyncer = descriptions,
         photoSyncer = photos,
         tipSyncer = tipSync,
-        remoteControlHandler = RemoteControlHandler(session, camera, guides, attributeGuideChanges = syncer::attribute),
+        remoteControlHandler = RemoteControlHandler(
+            session,
+            camera,
+            guides,
+            attributeGuideChanges = syncer::attribute,
+        ),
         mobileDataNotice = mobileData,
         appSettings = appSettings,
         appLanguage = language,
@@ -232,6 +312,8 @@ class TestAppContainer(
      */
     fun install(): TestAppContainer {
         RuntimeEnvironment.setQualifiers("+night")
+        // Camera's hand-off to Generate poses lives with the process; one an earlier test left is not this test's.
+        com.lastpenguin.pix.ui.generation.SceneHandOff.pending = null
         ApplicationProvider.getApplicationContext<PixApplication>().installContainer(container)
         return this
     }
@@ -240,9 +322,9 @@ class TestAppContainer(
      * The photographer's photo [photoId] reaching this phone whole, as `photo.begin`, one chunk, and `photo.end`; the
      * subject's [photos] must be receiving. A few bytes that start as a JPEG are enough, since nothing decodes them.
      */
-    fun deliverPhoto(photoId: String) {
+    fun deliverPhoto(photoId: String, shot: String? = null) {
         val bytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 1, 2, 3)
-        session.deliver(SessionMessage.PhotoBegin(photoId, "jpeg", bytes.size.toLong(), 1, takenAt = 1))
+        session.deliver(SessionMessage.PhotoBegin(photoId, "jpeg", bytes.size.toLong(), 1, takenAt = 1, shot = shot))
         session.deliver(SessionMessage.PhotoChunk(photoId, 0, Base64.getEncoder().encodeToString(bytes)))
         session.deliver(SessionMessage.PhotoEnd(photoId, CRC32().apply { update(bytes) }.value))
     }

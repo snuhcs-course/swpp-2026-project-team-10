@@ -1,7 +1,8 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
+import android.graphics.Path
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -31,7 +32,9 @@ data class GuideLook(val color: GuideColor = GuideColor.WHITE, val thickness: Gu
 /**
  * A guide's outline at a thickness from the settings. [ReferenceGuide.outline] is the default line; another thickness
  * is traced again from the mask, off the main thread, as the other phone traces a received mask (Design 2.6.1). The last
- * few results are kept, so a screen that shows the same guide again does not trace it again.
+ * few results are kept, so a screen that shows the same guide again does not trace it again. The inside that
+ * guide-edit mode tints is made here too, the same way ([inside]), and so are the lines Reference confirm draws along
+ * the person ([lines]), which are needed once and not kept.
  */
 class GuideOutlines(
     private val extractor: OutlineExtractor = OutlineExtractor(),
@@ -54,6 +57,31 @@ class GuideOutlines(
         }
         return outline
     }
+
+    private val insides = ArrayDeque<Pair<ReferenceGuide, Bitmap>>()
+
+    /**
+     * The inside of [guide]'s mask, which guide-edit mode tints (#271): a pass over the whole mask, so it is made off the
+     * main thread, never while the guide is drawn, and kept like the outlines. Null when the mask is gone.
+     */
+    suspend fun inside(guide: ReferenceGuide): Bitmap? {
+        synchronized(insides) { insides.firstOrNull { it.first === guide } }?.let { return it.second }
+        val inside = withContext(dispatcher) {
+            guide.mask.takeUnless { it.isRecycled }?.let { guideInside(it.maskPixels()).toMaskBitmap() }
+        } ?: return null
+        synchronized(insides) {
+            insides.addFirst(guide to inside)
+            while (insides.size > KEPT) insides.removeLast()
+        }
+        return inside
+    }
+
+    /**
+     * [guide]'s outline as lines in its mask's pixels, for Reference confirm to draw along the person as the photo turns
+     * into the guide (#295): traced off the main thread like another thickness. None when the mask is gone.
+     */
+    suspend fun lines(guide: ReferenceGuide): List<Path> =
+        withContext(dispatcher) { guide.mask.takeUnless { it.isRecycled }?.let(extractor::lines).orEmpty() }
 
     companion object {
         private const val KEPT = 4

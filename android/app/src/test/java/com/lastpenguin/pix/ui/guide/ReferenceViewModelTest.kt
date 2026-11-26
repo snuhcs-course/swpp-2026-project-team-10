@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-04, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Joonhyung Han, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
@@ -8,6 +8,7 @@ import com.lastpenguin.pix.generation.GuideTip
 import com.lastpenguin.pix.generation.PoseTip
 import com.lastpenguin.pix.generation.PoseTipper
 import com.lastpenguin.pix.generation.PoseTips
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.TipSource
 import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.GuideChange
@@ -70,6 +71,37 @@ class ReferenceViewModelTest {
     }
 
     @Test
+    fun aChosenPosesGuideUsed_isNotToldAsAGuideSet_sinceItsConfirmSaysSoItself() = runTest {
+        var told = 0
+        val telling = ReferenceViewModel(maker, guides, onGuideSet = { told++ })
+        store.put("telling", telling)
+        telling.onCandidatePicked(bitmap())
+        runCurrent()
+        maker.finish(Result.success(guide()))
+        runCurrent()
+
+        telling.onUseGuide()
+
+        assertEquals(0, told)
+    }
+
+    @Test
+    fun aGuideForThePhotographerFromTheSubjectsPhone_isNotToldHere() = runTest {
+        var told = 0
+        val saved = SavedGuideStore.InMemory()
+        val subjectModel = ReferenceViewModel(maker, guides, saved, subject = FakeTarget(), onGuideSet = { told++ })
+        store.put("subject-telling", subjectModel)
+        subjectModel.openFor(fromSubject = true)
+        saved.save(guide(), GuideState())
+        runCurrent()
+
+        subjectModel.onUseSaved(saved.saved.value.single().id)
+        runCurrent()
+
+        assertEquals(0, told)
+    }
+
+    @Test
     fun onCandidatePicked_personFound_isReadyToConfirm() = runTest {
         val guide = guide()
 
@@ -84,10 +116,21 @@ class ReferenceViewModelTest {
     }
 
     @Test
+    fun onCandidatePicked_ofASituationsSet_keepsTheSituationForTheLibrary() = runTest {
+        model.onCandidatePicked(bitmap(), situation = Situation.BACKGROUND)
+        runCurrent()
+        maker.finish(Result.success(guide()))
+        runCurrent()
+
+        val ready = model.uiState.value as ReferenceUiState.Ready
+        assertEquals(Situation.BACKGROUND, ready.guide.situation)
+    }
+
+    @Test
     fun onCandidatePicked_withTheGuideItsHeartSaved_goesOnWithIt_withoutCuttingAgain() = runTest {
         val saved = guide()
 
-        model.onCandidatePicked(bitmap(), saved = saved)
+        model.onCandidatePicked(bitmap(), kept = { Result.success(saved) })
         runCurrent()
 
         assertEquals(emptyList<GuideSource>(), maker.sources)

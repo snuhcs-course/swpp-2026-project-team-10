@@ -60,6 +60,9 @@
         <item name="bottomSheetDialogTheme">@style/ThemeOverlay.Pix.BottomSheetDialog</item>
         <item name="bottomSheetDragHandleStyle">@style/Widget.Pix.BottomSheet.DragHandle</item>
         <item name="materialAlertDialogTheme">@style/ThemeOverlay.Pix.MaterialAlertDialog</item>
+        <item name="snackbarStyle">@style/Widget.Pix.Snackbar</item>
+        <item name="snackbarTextViewStyle">@style/Widget.Pix.Snackbar.TextView</item>
+        <item name="snackbarButtonStyle">@style/Widget.Pix.Snackbar.Action</item>
     </style>
 
     <!-- The first-use tutorial (FR-10.4): a see-through dialog over the whole screen, its own dimming drawn by
@@ -76,6 +79,10 @@
         <item name="android:enforceStatusBarContrast">false</item>
         <item name="android:windowAnimationStyle">@null</item>
     </style>
+
+    <!-- The scene photo of Generate poses, large (FR-4.15, ScenePhotoFragment): a window over the whole screen like the
+         tutorial's, whose view fades itself and draws its own background. -->
+    <style name="Theme.Pix.ScenePhoto" parent="Theme.Pix.Tutorial" />
 
     <style name="ThemeOverlay.Pix.BottomSheetDialog" parent="ThemeOverlay.Material3.BottomSheetDialog">
         <item name="bottomSheetStyle">@style/Widget.Pix.BottomSheet</item>

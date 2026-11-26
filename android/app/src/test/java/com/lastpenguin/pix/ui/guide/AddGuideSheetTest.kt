@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.animation.ValueAnimator
@@ -25,6 +25,11 @@ import com.lastpenguin.pix.databinding.ItemSituationTileBinding
 import com.lastpenguin.pix.databinding.SheetAddGuideBinding
 import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideState
+import com.lastpenguin.pix.session.FakeCameraController
+import com.lastpenguin.pix.session.PeerInfo
+import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
@@ -62,11 +67,16 @@ import org.robolectric.shadows.ShadowDialog
  * the tile still pressed, and under the consent notice it is itself again; once a tap goes on, every other tap on the
  * sheet is ignored. My library (FR-3.8, FR-3.11): nothing saved (no count); the row, which opens the library and closes
  * the sheet, once however often it is tapped. The gallery's picker (FR-2.7, #243): closed without a photo (the sheet
- * stays open and takes taps again, the guide on the camera unchanged) or with one (Reference confirm). The order at the
+ * stays open and takes taps again, the guide on the camera unchanged) or with one (Reference confirm). Opened for its
+ * gallery, as Back on No person found opens it (#294): the picker at once and only one, closed without a photo (the
+ * sheet stays and takes taps) or with one (Reference confirm), none again for a sheet made anew, and none when the
+ * sheet is opened from its button. The order at the
  * Galaxy S22's 360 × 705 dp, at font scale 1.0 and 1.3 (boundary, #243): the title, then What are you taking? with the
  * tiles, Auto's badge whole on its tile, then the guide from a photo with its two rows, each whole and clear of the
- * next. From Subject view (FR-6.15): no situations, Add a pose guide as the title, and Replace only for a guide on the
- * video, not one on this phone's camera.
+ * next. From Subject view (FR-6.15): the situations too (#276), Add a pose guide as the title, and Replace only for a
+ * guide on the video, not one on this phone's camera; a tile asks the photographer's phone and starts no scene photo
+ * here; the selfie's tile on whatever this phone's cameras; without consent, asked first in the subject's words, "Not
+ * now" sending nothing and "Agree" asking.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -99,10 +109,17 @@ class AddGuideSheetTest {
         event.recycle()
     }
 
-    private fun launch(modules: TestAppContainer = TestAppContainer(), fromSubject: Boolean = false): TestAppContainer {
+    private fun launch(
+        modules: TestAppContainer = TestAppContainer(),
+        fromSubject: Boolean = false,
+        openGallery: Boolean = false,
+    ): TestAppContainer {
         modules.install()
         scenario = launchFragment<AddGuideSheet>(
-            fragmentArgs = bundleOf(AddGuideSheet.ARG_FROM_SUBJECT to fromSubject),
+            fragmentArgs = bundleOf(
+                AddGuideSheet.ARG_FROM_SUBJECT to fromSubject,
+                AddGuideSheet.ARG_OPEN_GALLERY to openGallery,
+            ),
             themeResId = R.style.Theme_Pix,
         )
         scenario!!.onFragment {
@@ -240,6 +257,65 @@ class AddGuideSheetTest {
     }
 
     @Test
+    fun openedForItsGallery_opensThePickerAtOnce_andClosingItLeavesTheSheetTakingTaps() {
+        launch(openGallery = true)
+        val nav = scenario!!.attachNav(R.id.addGuideSheet)
+
+        scenario!!.onFragment { fragment ->
+            val activity = shadowOf(fragment.requireActivity())
+            val picker = checkNotNull(activity.nextStartedActivityForResult) { "no picker opened" }
+            // Once: the sheet opened one picker, not one per start.
+            assertNull(activity.nextStartedActivityForResult)
+            activity.receiveResult(picker.intent, Activity.RESULT_CANCELED, null)
+        }
+        idle()
+
+        assertTrue(sheet.requireDialog().isShowing)
+        assertEquals(R.id.addGuideSheet, nav.currentDestination?.id)
+        tile(Situation.DEFAULT).root.performClick()
+        idle()
+        assertEquals(GenerationUiState.Phase.FRAMING, generation.uiState.value.phase)
+    }
+
+    @Test
+    fun openedForItsGallery_aPhotoPicked_opensReferenceConfirm() {
+        launch(openGallery = true)
+        val nav = scenario!!.attachNav(R.id.addGuideSheet)
+
+        scenario!!.onFragment { fragment ->
+            val activity = shadowOf(fragment.requireActivity())
+            val picker = checkNotNull(activity.nextStartedActivityForResult) { "no picker opened" }
+            activity.receiveResult(
+                picker.intent,
+                Activity.RESULT_OK,
+                Intent().setData(Uri.parse("content://photos/1")),
+            )
+        }
+        idle()
+
+        assertEquals(R.id.referenceConfirmFragment, nav.currentDestination?.id)
+    }
+
+    @Test
+    fun openedForItsGallery_aSheetMadeAnew_opensNoSecondPicker() {
+        launch(openGallery = true)
+        scenario!!.onFragment { checkNotNull(shadowOf(it.requireActivity()).nextStartedActivityForResult) }
+
+        // The language or the font size changes while the picker is up: the sheet comes back without another one.
+        scenario!!.recreate()
+        idle()
+
+        scenario!!.onFragment { assertNull(shadowOf(it.requireActivity()).nextStartedActivityForResult) }
+    }
+
+    @Test
+    fun openedFromItsButton_opensNoPickerByItself() {
+        launch()
+
+        scenario!!.onFragment { assertNull(shadowOf(it.requireActivity()).nextStartedActivityForResult) }
+    }
+
+    @Test
     fun aPhotoPicked_opensReferenceConfirm() {
         launch()
         val nav = scenario!!.attachNav(R.id.addGuideSheet)
@@ -250,12 +326,13 @@ class AddGuideSheetTest {
     }
 
     @Test
-    fun fromSubjectView_offersNoPosesAndAsksToReplaceTheGuideOnTheVideo() {
+    fun fromSubjectView_offersThePosesToo_andAsksToReplaceTheGuideOnTheVideo() {
         val modules = TestAppContainer()
         modules.guides.setGuide(guide())
         launch(modules, fromSubject = true)
         onSheet { binding ->
-            assertEquals(View.GONE, binding.newPosesSection.visibility)
+            // The situations too, all of them (#276): the photographer's phone takes it from there.
+            assertEquals(View.VISIBLE, binding.newPosesSection.visibility)
             assertEquals(string(R.string.add_guide_title), binding.titleText.text.toString())
         }
         scenario?.close()
@@ -411,6 +488,72 @@ class AddGuideSheetTest {
 
         assertEquals(GenerationUiState.Phase.FRAMING, generation.uiState.value.phase)
         assertEquals(Situation.LANDMARK, generation.uiState.value.situation)
+        assertFalse(sheet.isAdded)
+    }
+
+    // ---- From Subject view: the situation goes to the photographer's phone (FR-6.15, #276) ------------------------
+
+    private fun starts(modules: TestAppContainer): List<SessionMessage.PoseStart> =
+        modules.session.sent.filterIsInstance<SessionMessage.PoseStart>()
+
+    private fun asSubject(modules: TestAppContainer = TestAppContainer()): TestAppContainer {
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))
+        return launch(modules, fromSubject = true)
+    }
+
+    @Test
+    fun fromSubjectView_aTileAsksThePhotographersPhone_andStartsNothingHere() {
+        val modules = asSubject()
+
+        tile(Situation.LANDMARK).root.performClick()
+        idle()
+
+        assertEquals(listOf("landmark"), starts(modules).map { it.situation })
+        // The scene photo is the photographer's to take: this phone's camera is not asked for one.
+        assertEquals(GenerationUiState.Phase.IDLE, generation.uiState.value.phase)
+        assertFalse(sheet.isAdded)
+    }
+
+    @Test
+    fun fromSubjectView_theSelfieTileIsOn_whateverThisPhonesCameras() {
+        // The selfie is taken with the photographer's front camera, which this phone knows nothing of.
+        val camera = FakeCameraController().apply { hasFrontCamera.value = false }
+        val modules = asSubject(TestAppContainer(camera = camera))
+
+        assertTrue(tile(Situation.SELFIE).root.isEnabled)
+        tile(Situation.SELFIE).root.performClick()
+        idle()
+
+        assertEquals(listOf("selfie"), starts(modules).map { it.situation })
+    }
+
+    @Test
+    fun fromSubjectView_withoutConsent_asksFirstInTheSubjectsWords_notNowSendsNothing_agreeAsks() {
+        val modules = asSubject(TestAppContainer().apply { consent.given = false })
+
+        tile(Situation.FULL_BODY).root.performClick()
+        idle()
+        val notice = ShadowDialog.getLatestDialog() as AlertDialog
+        assertTrue(notice.isShowing)
+        assertEquals(
+            string(R.string.consent_message_subject),
+            notice.findViewById<TextView>(android.R.id.message)!!.text.toString(),
+        )
+        assertTrue(starts(modules).isEmpty())
+
+        notice.getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
+        idle()
+        assertTrue(starts(modules).isEmpty())
+        assertFalse(modules.consent.given)
+        assertTrue(sheet.isAdded)
+
+        tile(Situation.FULL_BODY).root.performClick()
+        idle()
+        (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idle()
+
+        assertTrue(modules.consent.given)
+        assertEquals(listOf("full_body"), starts(modules).map { it.situation })
         assertFalse(sheet.isAdded)
     }
 

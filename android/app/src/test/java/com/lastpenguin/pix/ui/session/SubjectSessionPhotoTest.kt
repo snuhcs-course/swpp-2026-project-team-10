@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.content.Context
@@ -29,7 +29,10 @@ import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNoticeView
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
+import com.lastpenguin.pix.ui.ScreenTestSupport.windowBox
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.camera.ZoomablePhotoView
 import com.lastpenguin.pix.ui.camera.doubleTapPhoto
@@ -64,16 +67,18 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
-import org.robolectric.shadows.ShadowToast
 
 /*
  * The session's photos on Subject view (FR-6.14, R&S 6.6; Iter4-A2), on the real Fragment with a container of fakes
  * and the real PhotoSyncer, whose album saves each photo the photographer sends.
  * The thumbnail (state-based): empty and taking no tap before the first photo, with no viewer built yet, and for one
  * the album could not save; the first photo's, then a newer one's in its place.
+ * The photo on its way (state-based, #271): from the photographer's shutter, the slot where Camera's shutter is says
+ * it is coming, with a spinner, until it is saved, or the album could not save it; two shutters wait for both photos.
  * The viewer (state-based): the session's photos over the video, opened at the newest under Back, Share, and Delete,
- * with no title and no counter, with the session going on and the screen staying; a swipe shows the earlier ones, with
- * the strip of thumbnails under the photo, the one on screen selected, a tap on one showing it, TalkBack reading which
+ * with no title and no counter, with the session going on and the screen staying; the pages and the strip run newest
+ * first, so a swipe to the left shows the earlier ones, with the strip of thumbnails under the photo, the one on screen
+ * selected, a tap on one showing it, TalkBack reading which
  * photo of how many, and each opening starts at the newest again; one photo has no strip; a newer photo while it is
  * open is one more page, the page on screen staying, and the thumbnail's; its Back and the system's close it without
  * asking to leave; a photo that cannot be read says so; the photographer's step that starts while it is open waits
@@ -82,7 +87,7 @@ import org.robolectric.shadows.ShadowToast
  * and each opening shows them; a drag down past the line, or a flick, closes it, and a short slow one goes back; a
  * double tap zooms in and another out, and a page swiped away is whole again. Share sends the photo on screen through
  * the share sheet with leave to read it. Delete asks first: Cancel keeps it; Delete takes it from the pages, the strip,
- * and the thumbnail, the last one closing the viewer; a delete that fails keeps it and says so.
+ * and the thumbnail, the last one closing the viewer; a delete that fails keeps it and says so, above the strip.
  * Turned with this phone (equivalence, #207): held sideways, the viewer is a landscape screen, the photo on screen
  * stays, and nothing is sent to the photographer.
  */
@@ -141,8 +146,8 @@ class SubjectSessionPhotoTest {
     }
 
     /** The photographer's photo [photoId] arrives and is saved here; its pictures are read off the main thread. */
-    private fun TestAppContainer.photo(photoId: String) {
-        deliverPhoto(photoId)
+    private fun TestAppContainer.photo(photoId: String, shot: String? = null) {
+        deliverPhoto(photoId, shot)
         settle()
     }
 
@@ -176,6 +181,31 @@ class SubjectSessionPhotoTest {
         root is TextView -> root.text?.toString() == text
         root is ViewGroup -> (0 until root.childCount).any { textShown(root.getChildAt(it), text) }
         else -> false
+    }
+
+    // ---- A result under the photos (#314): a refused press answered while they are open, said once they close --
+
+    @Test
+    fun aRefusedPressThatIsAnsweredUnderThePhotos_isSaidOnceTheyAreClosed() {
+        val modules = launch()
+        modules.photo("p1")
+        onScreen { binding, _ -> binding.shutterButton.performClick() }
+        idle()
+        openThumbnail()
+        onScreen { binding, _ -> assertTrue(binding.viewer().root.isShown) }
+
+        val press = modules.session.sent.filterIsInstance<SessionMessage.ShutterPress>().last().press
+        modules.session.deliver(SessionMessage.ShutterAnswer(taken = false, press = press))
+        idle()
+        // The photos cover the line's place: it waits for them to close.
+        onScreen { binding, _ -> assertFalse(binding.toggleLabel.isShown) }
+
+        onScreen { _, fragment -> fragment.requireActivity().onBackPressedDispatcher.onBackPressed() }
+        settle()
+        onScreen { binding, _ ->
+            assertTrue(binding.toggleLabel.isShown)
+            assertEquals(string(R.string.subject_shutter_refused), binding.toggleLabel.text.toString())
+        }
     }
 
     // ---- The thumbnail ----------------------------------------------------------------------
@@ -223,6 +253,58 @@ class SubjectSessionPhotoTest {
         }
     }
 
+    // ---- The photo on its way ---------------------------------------------------------------
+
+    private fun FragmentSubjectBinding.receivingShown(): Boolean {
+        val receiving = cameraCaptionStatus.text.toString() == string(R.string.subject_receiving_photo)
+        assertEquals(receiving, cameraCaptionSpinner.isShown)
+        assertEquals(!receiving, cameraCaptionDot.isShown)
+        return receiving && cameraCaption.isShown
+    }
+
+    @Test
+    fun thePhotographersShutter_saysAPhotoIsComing_untilItIsSaved() {
+        val modules = launch()
+        onScreen { binding, _ -> assertFalse(binding.receivingShown()) }
+
+        modules.session.deliver(SessionMessage.PhotoShutter("a"))
+        idle()
+        onScreen { binding, _ -> assertTrue(binding.receivingShown()) }
+
+        modules.photo("p1", shot = "a")
+        onScreen { binding, _ ->
+            assertFalse(binding.receivingShown())
+            assertEquals(string(R.string.subject_live), binding.cameraCaptionStatus.text.toString())
+            assertSame(thumbnails[saved("p1")], binding.thumbnailShows())
+        }
+    }
+
+    @Test
+    fun twoShutters_waitForBothPhotos() {
+        val modules = launch()
+
+        modules.session.deliver(SessionMessage.PhotoShutter("a"))
+        modules.session.deliver(SessionMessage.PhotoShutter("b"))
+        modules.photo("p1", shot = "a")
+        onScreen { binding, _ -> assertTrue(binding.receivingShown()) }
+
+        modules.photo("p2", shot = "b")
+        onScreen { binding, _ -> assertFalse(binding.receivingShown()) }
+    }
+
+    @Test
+    fun aPhotoTheAlbumCouldNotSave_endsTheSign() {
+        val modules = launch()
+        modules.albumFails = true
+
+        modules.session.deliver(SessionMessage.PhotoShutter("a"))
+        idle()
+        onScreen { binding, _ -> assertTrue(binding.receivingShown()) }
+
+        modules.photo("p1", shot = "a")
+        onScreen { binding, _ -> assertFalse(binding.receivingShown()) }
+    }
+
     // ---- The viewer -------------------------------------------------------------------------
 
     @Test
@@ -238,9 +320,9 @@ class SubjectSessionPhotoTest {
             assertTrue(binding.viewer().root.isShown)
             assertSame(pictures[saved("p2")], binding.viewerShows())
             assertEquals(of(2, 2), binding.viewer().pageReads())
-            // The strip under the photo, the newest selected.
+            // The strip under the photo, newest first, the newest selected at its left.
             assertEquals(2, binding.viewer().stripCount())
-            assertEquals(1, binding.viewer().stripSelected())
+            assertEquals(0, binding.viewer().stripSelected())
             // No title and no counter: Back, Share, Delete, the photo, and the strip.
             assertEquals(emptyList<String>(), binding.viewer().textsShown())
             assertTrue(binding.viewer().headerShown())
@@ -257,12 +339,13 @@ class SubjectSessionPhotoTest {
         modules.photo("p2")
         openThumbnail()
 
-        onScreen { binding, _ -> binding.viewer().photoViewerPages.setCurrentItem(0, false) }
+        // A swipe to the left: the page to the right, the earlier photo.
+        onScreen { binding, _ -> binding.viewer().photoViewerPages.setCurrentItem(1, false) }
         settle()
         onScreen { binding, _ ->
             assertSame(pictures[saved("p1")], binding.viewerShows())
             assertEquals(of(1, 2), binding.viewer().pageReads())
-            assertEquals(0, binding.viewer().stripSelected())
+            assertEquals(1, binding.viewer().stripSelected())
         }
 
         onScreen { binding, _ -> binding.viewer().photoViewerBack.performClick() }
@@ -292,8 +375,9 @@ class SubjectSessionPhotoTest {
             assertNotNull(binding.viewerShows())
             assertSame(pictures[saved("p1")], binding.viewerShows())
             assertEquals(of(1, 2), binding.viewer().pageReads())
+            // The newer one comes in at the left, before the page on screen.
             assertEquals(2, binding.viewer().stripCount())
-            assertEquals(0, binding.viewer().stripSelected())
+            assertEquals(1, binding.viewer().stripSelected())
             assertSame(thumbnails[saved("p2")], binding.thumbnailShows())
         }
     }
@@ -306,13 +390,14 @@ class SubjectSessionPhotoTest {
         modules.photo("p3")
         openThumbnail()
 
-        onScreen { binding, _ -> binding.viewer().tapStrip(0) }
+        // The strip runs newest first: the oldest is its last thumbnail.
+        onScreen { binding, _ -> binding.viewer().tapStrip(2) }
         settle()
 
         onScreen { binding, _ ->
             assertSame(pictures[saved("p1")], binding.viewerShows())
             assertEquals(of(1, 3), binding.viewer().pageReads())
-            assertEquals(0, binding.viewer().stripSelected())
+            assertEquals(2, binding.viewer().stripSelected())
         }
     }
 
@@ -394,9 +479,9 @@ class SubjectSessionPhotoTest {
             assertTrue(binding.viewer().headerShown())
         }
 
-        onScreen { binding, _ -> binding.viewer().photoViewerPages.setCurrentItem(0, false) }
-        settle()
         onScreen { binding, _ -> binding.viewer().photoViewerPages.setCurrentItem(1, false) }
+        settle()
+        onScreen { binding, _ -> binding.viewer().photoViewerPages.setCurrentItem(0, false) }
         settle()
         onScreen { binding, _ -> assertEquals(1f, binding.viewer().pagePhoto().zoom) }
         onScreen { binding, _ -> binding.viewer().doubleTapPhoto() }
@@ -413,7 +498,7 @@ class SubjectSessionPhotoTest {
         modules.photo("p1")
         modules.photo("p2")
         openThumbnail()
-        onScreen { binding, _ -> binding.viewer().photoViewerPages.setCurrentItem(0, false) }
+        onScreen { binding, _ -> binding.viewer().photoViewerPages.setCurrentItem(1, false) }
         settle()
 
         onScreen { binding, _ -> binding.viewer().photoViewerShare.performClick() }
@@ -422,7 +507,8 @@ class SubjectSessionPhotoTest {
         assertEquals(Intent.ACTION_CHOOSER, chooser.action)
         val send = checkNotNull(IntentCompat.getParcelableExtra(chooser, Intent.EXTRA_INTENT, Intent::class.java))
         assertEquals(Intent.ACTION_SEND, send.action)
-        assertEquals("image/jpeg", send.type)
+        // The type MediaStore says, which has no row for it here.
+        assertEquals("image/*", send.type)
         assertEquals(saved("p1"), IntentCompat.getParcelableExtra(send, Intent.EXTRA_STREAM, Uri::class.java))
         assertTrue(send.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
         // The session and the viewer stay under the share sheet.
@@ -457,7 +543,7 @@ class SubjectSessionPhotoTest {
         onScreen { binding, _ ->
             assertTrue(binding.viewer().root.isShown)
             assertEquals(2, binding.viewer().stripCount())
-            assertEquals(1, binding.viewer().stripSelected())
+            assertEquals(0, binding.viewer().stripSelected())
             assertSame(pictures[saved("p2")], binding.viewerShows())
             assertEquals(of(2, 2), binding.viewer().pageReads())
             assertSame(thumbnails[saved("p2")], binding.thumbnailShows())
@@ -496,10 +582,14 @@ class SubjectSessionPhotoTest {
         (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_POSITIVE).performClick()
         settle()
 
-        assertEquals(string(R.string.photo_not_deleted), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.photo_not_deleted), shownNotice())
         onScreen { binding, _ ->
             assertEquals(2, binding.viewer().stripCount())
             assertSame(pictures[saved("p2")], binding.viewerShows())
+            // Above the viewer's strip, not over the photo where the zoom row lies under it.
+            val dp = binding.root.resources.displayMetrics.density
+            val strip = windowBox(binding.viewer().photoViewerStrip)
+            assertEquals(strip.top - 12 * dp, windowBox(checkNotNull(shownNoticeView())).bottom.toFloat(), 1f)
         }
     }
 

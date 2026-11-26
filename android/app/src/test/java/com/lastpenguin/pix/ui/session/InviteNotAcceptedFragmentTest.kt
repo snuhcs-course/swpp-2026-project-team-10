@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-30, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.appcompat.app.AppCompatActivity
@@ -12,6 +12,7 @@ import com.lastpenguin.pix.databinding.FragmentFailureBinding
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.inviteFromFriends
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import kotlinx.coroutines.CompletableDeferred
@@ -23,7 +24,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.annotation.GraphicsMode
-import org.robolectric.shadows.ShadowToast
 
 /*
  * Invite not accepted (R&S 6.5, FR-6.3; Testing Documentation 2.1.6), on the real Fragment. Partitions: the screen as
@@ -94,13 +94,13 @@ class InviteNotAcceptedFragmentTest {
 
         onScreen { binding -> binding.primaryButton.performClick() }
         idle()
-        assertEquals("Test Account 2 is in another session", ShadowToast.getTextOfLatestToast())
+        assertEquals("Test Account 2 is in another session", shownNotice())
         assertTrue(onScreen { it.primaryButton.isEnabled })
 
         modules.invitations.failure = AccountError.OFFLINE
         onScreen { binding -> binding.primaryButton.performClick() }
         idle()
-        assertEquals(string(R.string.offline_error), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.offline_error), shownNotice())
         assertEquals(R.id.inviteNotAcceptedFragment, nav.currentDestination?.id)
     }
 

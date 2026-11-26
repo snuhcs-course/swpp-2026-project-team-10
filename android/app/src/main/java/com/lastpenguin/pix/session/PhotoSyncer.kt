@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.content.ContentResolver
@@ -7,6 +7,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import com.lastpenguin.pix.camera.PhotoAlbum
 import com.lastpenguin.pix.camera.PhotoDeleter
+import com.lastpenguin.pix.camera.PhotoDeletion
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.session.protocol.PhotoRefusal
 import com.lastpenguin.pix.session.protocol.SessionMessage
@@ -16,6 +17,7 @@ import java.io.IOException
 import java.io.InputStream
 import java.util.Base64
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.CRC32
 import kotlinx.coroutines.CoroutineDispatcher
@@ -23,39 +25,45 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 /** What the Camera screen tells the subject's phone about its photos (FR-6.14), the photographer's side of [PhotoSyncer]. */
 interface PhotoShare {
     /**
-     * The shutter was pressed: the id of the session the photo belongs to, or null outside a session. A connected
-     * subject hears of it at once (`photo.shutter`).
+     * The shutter was pressed: the photo's shot, an id it keeps until it is sent or given up, or null outside a session.
+     * The photo belongs to the session running now. A connected subject hears of it at once (`photo.shutter`), and
+     * waits for that photo by its shot (#271).
      */
     fun shutter(): String?
 
-    /** The photo of [sessionId], from [shutter], taken at [takenAt], is saved here as [uri]. */
-    fun taken(sessionId: String, uri: Uri, takenAt: Long)
+    /** The photo of [shot], from [shutter], taken at [takenAt], is saved here as [uri]. */
+    fun taken(shot: String, uri: Uri, takenAt: Long)
 
-    /** The photo of [sessionId] could not be saved, so there is nothing to send. */
-    fun notTaken(sessionId: String)
+    /** The photo of [shot] could not be saved, so there is nothing to send. */
+    fun notTaken(shot: String)
 
     /** For a phone with nothing to share, such as the ViewModel's tests. */
     object None : PhotoShare {
         override fun shutter(): String? = null
 
-        override fun taken(sessionId: String, uri: Uri, takenAt: Long) = Unit
+        override fun taken(shot: String, uri: Uri, takenAt: Long) = Unit
 
-        override fun notTaken(sessionId: String) = Unit
+        override fun notTaken(shot: String) = Unit
     }
 }
 
@@ -90,8 +98,8 @@ class ContentPhotoReader(private val resolver: ContentResolver) : PhotoReader {
  * reach the album says so in [sendFailed], and the next one goes on. [drop] ends it all with the session.
  *
  * Subject ([startAsReceiver]): writes the chunks to one file in [partDir], not to memory, saves it to [album] at
- * `photo.end`, and answers `photo.saved`. [received] says how each ended, for the subject's toast, and [shutters]
- * when each was taken, for Subject view's blink (Iter3-A12).
+ * `photo.end`, and answers `photo.saved`. [received] says how each ended, for the subject's notice, [shutters] when each
+ * was taken, for Subject view's blink (Iter3-A12), and [receiving] whether one is on its way, for its sign (#271).
  *
  * Both: [sessionPhotos] are the session's photos on this phone, taken or received, for the thumbnail and the viewer
  * of Camera and Subject view (Iter4-A2).
@@ -136,25 +144,29 @@ class PhotoSyncer(
     }
 
     /**
-     * Deletes [uri], one of this phone's photos, through [album] (FR-1.16), and drops it from the session's photos.
-     * True once it is gone, false when [album] could not delete it. On the photographer's phone a photo still waiting
-     * to go, or going, is read again at its turn, so it leaves the session's photos at once but stays on the phone
-     * until it has reached the subject, failed, or its session ended; [later] deletes it then, and true says so.
+     * Deletes [uri], one of this phone's photos, through [album] (FR-1.16), and drops it from the session's photos once
+     * it is gone; what [album] answers is the answer. On the photographer's phone a photo still waiting to go, or
+     * going, is read again at its turn, so it leaves the session's photos at once but stays on the phone until it has
+     * reached the subject, failed, or its session ended; [later] deletes it then, and the answer is that it is gone.
      * Deleted at once, it would never reach the subject, and no copy would be left (#247).
      */
-    suspend fun delete(uri: Uri, album: PhotoDeleter, later: CoroutineScope): Boolean {
-        if (uri !in outgoing.value) return album.delete(uri).also { gone -> if (gone) forget(uri) }
+    suspend fun delete(uri: Uri, album: PhotoDeleter, later: CoroutineScope): PhotoDeletion {
+        if (uri !in outgoing.value) {
+            return album.delete(uri).also { result -> if (result == PhotoDeletion.Deleted) forget(uri) }
+        }
         forget(uri)
         later.launch {
             outgoing.first { uri !in it }
-            if (!album.delete(uri)) Log.w(TAG, "A photo deleted while it went to the subject stays on this phone")
+            if (album.delete(uri) != PhotoDeletion.Deleted) {
+                Log.w(TAG, "A photo deleted while it went to the subject stays on this phone")
+            }
         }
-        return true
+        return PhotoDeletion.Deleted
     }
 
     // ---- Photographer -----------------------------------------------------------------------------------------
 
-    private data class Outgoing(val photoId: String, val uri: Uri, val takenAt: Long)
+    private data class Outgoing(val photoId: String, val uri: Uri, val takenAt: Long, val shot: String)
 
     /** How far the subject has the photo that is going; [saved] is its `photo.saved`. */
     private data class Progress(val photoId: String, val next: Int = 0, val saved: Boolean? = null)
@@ -173,24 +185,43 @@ class PhotoSyncer(
     /** One for each photo of this session that will not reach the subject's album; none is lost unread. */
     val sendFailed: Flow<Unit> = _sendFailed.receiveAsFlow()
 
-    override fun shutter(): String? = currentSession()?.also {
+    /** The session of each shot not yet taken or given up. */
+    private val shots = ConcurrentHashMap<String, String>()
+
+    override fun shutter(): String? {
+        val sessionId = currentSession() ?: return null
+        val shot = UUID.randomUUID().toString()
+        shots[shot] = sessionId
         unconfirmed.incrementAndGet()
-        if (session.state.value is SessionState.Connected) session.send(SessionMessage.PhotoShutter)
+        if (session.state.value is SessionState.Connected) session.send(SessionMessage.PhotoShutter(shot))
+        return shot
     }
 
     /**
      * Saving takes seconds, so another session may run by now: a photo goes only to the session of its shutter. One
      * whose session ended meanwhile was counted when it ended, by [drop].
      */
-    override fun taken(sessionId: String, uri: Uri, takenAt: Long) {
+    override fun taken(shot: String, uri: Uri, takenAt: Long) {
+        val sessionId = shots.remove(shot) ?: return
         if (currentSession() != sessionId) return
         keep(sessionId, uri)
         outgoing.update { it + uri }
-        queue.trySend(Outgoing(UUID.randomUUID().toString(), uri, takenAt))
+        queue.trySend(Outgoing(UUID.randomUUID().toString(), uri, takenAt, shot))
     }
 
-    override fun notTaken(sessionId: String) {
-        if (currentSession() == sessionId) unconfirmed.updateAndGet { maxOf(it - 1, 0) }
+    override fun notTaken(shot: String) {
+        val sessionId = shots.remove(shot) ?: return
+        if (currentSession() != sessionId) return
+        unconfirmed.updateAndGet { maxOf(it - 1, 0) }
+        dropped(shot)
+    }
+
+    /**
+     * The subject waits for each photo from its `photo.shutter` on (#271): one that will not come after all, before its
+     * `photo.begin`, is said by its [shot], or Subject view would say a photo is on its way until its wait ends ([STALL_MS]).
+     */
+    private fun dropped(shot: String) {
+        if (currentSession() != null) session.send(SessionMessage.PhotoDropped(shot))
     }
 
     private fun currentSession(): String? = session.state.value.liveSessionId()
@@ -238,6 +269,7 @@ class PhotoSyncer(
     /** The session ended: what is not confirmed stays here. Returns how many photos that is, failures unread included. */
     fun drop(): Int {
         while (queue.tryReceive().isSuccess) Unit
+        shots.clear()
         progress.value = null
         // None goes any more, so a photo deleted on its way is deleted now.
         outgoing.value = emptySet()
@@ -247,12 +279,19 @@ class PhotoSyncer(
     }
 
     private suspend fun send(photo: Outgoing): Boolean {
-        val content = reader.open(photo.uri) ?: return false
+        val content = reader.open(photo.uri) ?: return false.also { dropped(photo.shot) }
         return content.stream.use { stream ->
-            if (content.bytes !in 1..MAX_PHOTO_BYTES) return@use false
+            if (content.bytes !in 1..MAX_PHOTO_BYTES) return@use false.also { dropped(photo.shot) }
             progress.value = Progress(photo.photoId)
             val chunks = ((content.bytes + CHUNK_BYTES - 1) / CHUNK_BYTES).toInt()
-            val begin = SessionMessage.PhotoBegin(photo.photoId, FORMAT, content.bytes, chunks, photo.takenAt)
+            val begin = SessionMessage.PhotoBegin(
+                photo.photoId,
+                FORMAT,
+                content.bytes,
+                chunks,
+                photo.takenAt,
+                photo.shot,
+            )
             Timings.mark("photo.sent", "begin ${photo.photoId} ${content.bytes}")
             if (!session.sendBulk(begin)) return@use false
             val saved = sendChunks(photo.photoId, stream, chunks)
@@ -267,9 +306,8 @@ class PhotoSyncer(
         val encoder = Base64.getEncoder()
         val buffer = ByteArray(CHUNK_BYTES)
         for (index in 0 until chunks) {
-            val room = withTimeoutOrNull(STALL_MS) {
-                progress.first { it == null || it.saved != null || index - it.next < WINDOW_CHUNKS }
-            } ?: return false
+            val room = awaitProgress { it == null || it.saved != null || index - it.next < WINDOW_CHUNKS }
+                ?: return false
             room.saved?.let { return it }
             val read = stream.readChunk(buffer)
             if (read <= 0) return false
@@ -278,8 +316,41 @@ class PhotoSyncer(
             if (!session.sendBulk(SessionMessage.PhotoChunk(photoId, index, data))) return false
         }
         if (!session.sendBulk(SessionMessage.PhotoEnd(photoId, crc.value))) return false
-        val answer = withTimeoutOrNull(STALL_MS) { progress.first { it == null || it.saved != null } }
+        val answer = awaitProgress { it == null || it.saved != null }
         return answer?.saved == true
+    }
+
+    /** The photo's progress once it is [reached]; null when it ended, or the subject said nothing for a stall's time. */
+    private suspend fun awaitProgress(reached: (Progress?) -> Boolean): Progress? {
+        // Most chunks find room at once: no wait, and nothing set up for one.
+        val now = progress.value
+        if (reached(now)) return now
+        return merge(progress.filter(reached), stalls().map { null }).first()
+    }
+
+    /**
+     * What a stall's time follows of the link: whether it is [down] and tried again, which the session does for its
+     * own time (Design 2.6.7), and how often it came [back]. The count tells of a drop even when no reader saw its
+     * `Reconnecting`: a state flow shows only its latest value, and the states around such a drop differ in it alone.
+     */
+    private data class Link(val down: Boolean, val back: Int)
+
+    private val link: Flow<Link>
+        get() = session.state
+            .map { Link(it is SessionState.Reconnecting, (it as? SessionState.Connected)?.drops ?: 0) }
+            .distinctUntilChanged()
+
+    /**
+     * Emits once the link has been up for [STALL_MS] in a row. The time a drop takes does not count, and the time
+     * starts over once the link is back: the session decides how long a drop may last, and a photo that waited
+     * through one is not given up for it (#293).
+     */
+    private fun stalls(): Flow<Unit> = channelFlow {
+        link.collectLatest { link ->
+            if (link.down) return@collectLatest
+            delay(STALL_MS)
+            send(Unit)
+        }
     }
 
     /** Fills [buffer] unless the stream ends first; a read may return less than asked. Returns how much came. */
@@ -319,7 +390,7 @@ class PhotoSyncer(
 
     private val _received = Channel<Boolean>(Channel.UNLIMITED)
 
-    /** True when a photo reached this phone's album, false when it could not be saved. */
+    /** True when a photo reached this phone's album; false when it could not be saved, or will not come at all. */
     val received: Flow<Boolean> = _received.receiveAsFlow()
 
     private val _shutters =
@@ -328,10 +399,62 @@ class PhotoSyncer(
     /** Each `photo.shutter` while a screen listens; one that no screen saw is a moment gone, not kept for later. */
     val shutters: Flow<Unit> = _shutters.asSharedFlow()
 
+    /**
+     * The photographer's photos from their shutter on that are not yet saved, refused, or given up here: by shot, and
+     * as a count for a phone before #271, whose messages name none.
+     */
+    private data class Waits(
+        val shots: Set<String> = emptySet(),
+        val unnamed: Int = 0,
+        /** The last shots whose wait ended, newest last, so a `photo.shutter` that comes after its end starts none. */
+        val ended: List<String> = emptyList(),
+    ) {
+        val any: Boolean get() = shots.isNotEmpty() || unnamed > 0
+
+        /**
+         * A `photo.shutter`. It comes on the realtime channel, so it can come after its photo's `photo.dropped` or
+         * `photo.saved`, on the reliable one: a shot whose wait already ended stays ended.
+         */
+        fun add(shot: String?): Waits = when {
+            shot == null -> copy(unnamed = unnamed + 1)
+            shot in ended -> this
+            else -> copy(shots = shots + shot)
+        }
+
+        /** The photo of [shot] begins, its shutter heard or not; an unnamed begin is the one unnamed photo at least. */
+        fun began(shot: String?): Waits =
+            if (shot != null) copy(shots = shots + shot) else copy(unnamed = maxOf(unnamed, 1))
+
+        /** The photo of [shot] came or will not: that wait, and only that one, ends. */
+        fun end(shot: String?): Waits = if (shot != null) {
+            copy(shots = shots - shot, ended = (ended - shot + shot).takeLast(ENDED_KEPT))
+        } else {
+            copy(unnamed = maxOf(unnamed - 1, 0))
+        }
+
+        /** No wait left, the ended shots kept. */
+        fun cleared(): Waits = Waits(ended = ended)
+    }
+
+    private val awaited = MutableStateFlow(Waits())
+
+    /** Counts the photo messages, each of which shows that a photo is still on its way. */
+    private val photoMessagesSeen = MutableStateFlow(0L)
+
+    /**
+     * Whether a photo of the photographer's is on its way to this phone's album (#271): from its `photo.shutter`, or its
+     * `photo.begin` when the shutter was lost or came during a drop, until it is saved, refused, or given up, by
+     * `photo.dropped` before its begin. Each is waited for by its shot, so a lost shutter or a dropped photo never ends
+     * another's wait, and a shutter that comes after its photo's end starts none. A photographer's phone before #271 never says a photo is dropped, and [STALL_MS] without a photo
+     * message ends the wait then, as does the session's end.
+     */
+    val receiving: Flow<Boolean> = awaited.map { it.any }.distinctUntilChanged()
+
     fun startAsReceiver(scope: CoroutineScope) {
         scope.launch(dispatcher) {
             clearParts()
             saved.clear()
+            awaited.value = Waits()
             // What an earlier session left unread is not about this one's photographer.
             while (_received.tryReceive().isSuccess) Unit
             // Files and the album take their time, and a reader of incoming that waits costs every reader its messages
@@ -342,9 +465,34 @@ class PhotoSyncer(
                     if (message is SessionMessage.PhotoBegin || message is SessionMessage.PhotoChunk ||
                         message is SessionMessage.PhotoEnd
                     ) {
+                        photoMessagesSeen.update { it + 1 }
                         photoMessages.trySend(message)
                     }
-                    if (message is SessionMessage.PhotoShutter) _shutters.tryEmit(Unit)
+                    if (message is SessionMessage.PhotoShutter) {
+                        awaited.update { it.add(message.shot) }
+                        photoMessagesSeen.update { it + 1 }
+                        _shutters.tryEmit(Unit)
+                    }
+                    // That photo will not come; one whose shutter never arrived ends no other's wait. It is said,
+                    // once, as a photo that could not be saved here: the photographer's camera may have failed after
+                    // its shutter, which the subject's own press was told was taken (#314).
+                    if (message is SessionMessage.PhotoDropped) {
+                        val told = message.shot in awaited.value.ended
+                        awaited.update { it.end(message.shot) }
+                        if (!told) _received.trySend(false)
+                    }
+                }
+            }
+            launch {
+                // A wait with no photo message for this long is over: that photo is not coming. The time a drop
+                // takes does not count, as for the sender ([stalls]): each change of the link starts the time again,
+                // as each photo message does.
+                combine(awaited, photoMessagesSeen, link) { waits, _, link ->
+                    waits.any && !link.down
+                }.collectLatest { waiting ->
+                    if (!waiting) return@collectLatest
+                    delay(STALL_MS)
+                    awaited.update { it.cleared() }
                 }
             }
             try {
@@ -359,29 +507,35 @@ class PhotoSyncer(
             } finally {
                 abandon()
                 clearParts()
+                awaited.value = Waits()
             }
         }
     }
 
     private fun onBegin(begin: SessionMessage.PhotoBegin) {
+        // The photographer gave up the photo that was arriving, if this is another, so it is no longer awaited.
+        val gone = arriving?.begin?.takeIf { it.photoId != begin.photoId }
+        if (gone != null) awaited.update { it.end(gone.shot) }
         abandon()
         if (begin.photoId in saved) {
             session.send(SessionMessage.PhotoSaved(begin.photoId, ok = true))
             return
         }
+        // Its shutter may have been lost, or come during a drop and never been sent.
+        awaited.update { it.began(begin.shot) }
         val refusal = when {
             begin.bytes !in 1..MAX_PHOTO_BYTES -> PhotoRefusal.TOO_LARGE
             begin.format != FORMAT -> PhotoRefusal.BROKEN
             begin.chunks.toLong() != (begin.bytes + CHUNK_BYTES - 1) / CHUNK_BYTES -> PhotoRefusal.BROKEN
             else -> null
         }
-        if (refusal != null) return answer(begin.photoId, refusal)
+        if (refusal != null) return answer(begin, refusal)
         arriving = try {
             partDir.mkdirs()
             Arriving(begin, File(partDir, "${UUID.randomUUID()}$PART_SUFFIX"))
         } catch (error: IOException) {
             Log.w(TAG, "No file for photo ${begin.photoId}", error)
-            answer(begin.photoId, PhotoRefusal.STORAGE)
+            answer(begin, PhotoRefusal.STORAGE)
             null
         }
     }
@@ -422,25 +576,26 @@ class PhotoSyncer(
             onSuccess = { uri ->
                 saved += end.photoId
                 sessionId?.let { keep(it, uri) }
-                answer(end.photoId, null)
+                answer(photo.begin, null)
                 Timings.mark("photo.applied", "saved ${end.photoId}")
             },
             onFailure = { error ->
                 Log.w(TAG, "Photo ${end.photoId} could not be saved", error)
-                answer(end.photoId, PhotoRefusal.STORAGE)
+                answer(photo.begin, PhotoRefusal.STORAGE)
             },
         )
         abandon()
     }
 
     private fun fail(photo: Arriving, refusal: PhotoRefusal) {
-        answer(photo.begin.photoId, refusal)
+        answer(photo.begin, refusal)
         abandon()
     }
 
-    /** Tells the photographer, and this phone's person, how the photo ended: saved, or [refusal]. */
-    private fun answer(photoId: String, refusal: PhotoRefusal?) {
-        session.send(SessionMessage.PhotoSaved(photoId, ok = refusal == null, reason = refusal))
+    /** Tells the photographer, and this phone's person, how the photo of [begin] ended: saved, or [refusal]. */
+    private fun answer(begin: SessionMessage.PhotoBegin, refusal: PhotoRefusal?) {
+        awaited.update { it.end(begin.shot) }
+        session.send(SessionMessage.PhotoSaved(begin.photoId, ok = refusal == null, reason = refusal))
         _received.trySend(refusal == null)
     }
 
@@ -466,8 +621,14 @@ class PhotoSyncer(
         const val WINDOW_CHUNKS = 32
         const val ACK_EVERY = 16
 
-        /** No word from the subject for this long gives the photo up. Longer than a reconnect's 10 s. */
+        /**
+         * No word from the other phone for this long, with the link up, gives the photo up. A drop's time is the
+         * session's to limit and is not counted here ([stalls]).
+         */
         const val STALL_MS = 30_000L
+
+        /** How many ended shots the subject keeps against a late `photo.shutter`, more than a burst of photos. */
+        private const val ENDED_KEPT = 16
 
         private const val FORMAT = "jpeg"
         private const val PART_SUFFIX = ".part"

@@ -1,24 +1,30 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.animation.Animator
 import android.animation.ValueAnimator
+import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
+import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.annotation.ColorRes
 import androidx.annotation.DrawableRes
 import androidx.annotation.VisibleForTesting
+import androidx.appcompat.app.AlertDialog
 import androidx.core.animation.doOnEnd
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -28,19 +34,29 @@ import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.databinding.FragmentSubjectBinding
-import com.lastpenguin.pix.guide.SavedGuideStore
+import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.session.EndReason
+import com.lastpenguin.pix.session.PhotographerAction
+import com.lastpenguin.pix.session.PoseStartStep
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.settings.TutorialScreen
+import com.lastpenguin.pix.ui.FlowProgressView
 import com.lastpenguin.pix.ui.Motion
+import com.lastpenguin.pix.ui.NoticeAction
+import com.lastpenguin.pix.ui.NoticeAnchor
+import com.lastpenguin.pix.ui.NoticeLength
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.camera.CountdownRing
 import com.lastpenguin.pix.ui.camera.ExposureScale
+import com.lastpenguin.pix.ui.camera.FocusBrightness
 import com.lastpenguin.pix.ui.camera.FramePlace
 import com.lastpenguin.pix.ui.camera.GuideSaveNotice
 import com.lastpenguin.pix.ui.camera.PhotoViewer
@@ -57,12 +73,14 @@ import com.lastpenguin.pix.ui.camera.TOP_BAR_OVERHANG_DP
 import com.lastpenguin.pix.ui.camera.ToggleLabel
 import com.lastpenguin.pix.ui.camera.TrackedSliderController
 import com.lastpenguin.pix.ui.camera.TurningIcons
+import com.lastpenguin.pix.ui.camera.ViewfinderFrame
 import com.lastpenguin.pix.ui.camera.ZOOM_ROW_MARGIN_DP
 import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
 import com.lastpenguin.pix.ui.camera.framePlace
 import com.lastpenguin.pix.ui.camera.guideSaveIcon
 import com.lastpenguin.pix.ui.camera.guideSaveTint
 import com.lastpenguin.pix.ui.camera.isUnder
+import com.lastpenguin.pix.ui.camera.keepTouches
 import com.lastpenguin.pix.ui.camera.lerp
 import com.lastpenguin.pix.ui.camera.photoThumbnail
 import com.lastpenguin.pix.ui.camera.photoToView
@@ -70,27 +88,37 @@ import com.lastpenguin.pix.ui.camera.placeReference
 import com.lastpenguin.pix.ui.camera.placeZoomRow
 import com.lastpenguin.pix.ui.camera.previewArea
 import com.lastpenguin.pix.ui.camera.previewAspect
+import com.lastpenguin.pix.ui.camera.saveGuideTint
 import com.lastpenguin.pix.ui.camera.setLabelIcon
 import com.lastpenguin.pix.ui.camera.setReferenceActions
-import com.lastpenguin.pix.ui.camera.showGuideEditing
 import com.lastpenguin.pix.ui.camera.showPhotoThumbnails
 import com.lastpenguin.pix.ui.camera.showPinchModeLabel
 import com.lastpenguin.pix.ui.camera.showReference
 import com.lastpenguin.pix.ui.camera.showReferenceHandle
 import com.lastpenguin.pix.ui.fadeTo
+import com.lastpenguin.pix.ui.reveal
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.TutorialFragment
 import com.lastpenguin.pix.ui.settings.followLook
 import com.lastpenguin.pix.ui.settings.renderLatency
 import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
 import com.lastpenguin.pix.ui.settings.tutorialFor
+import com.lastpenguin.pix.ui.showNotice
+import com.lastpenguin.pix.ui.showNoticeOnScreen
 import java.text.DecimalFormat
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.webrtc.RendererCommon
@@ -102,14 +130,16 @@ import org.webrtc.VideoSink
  * Subject view (R&S 6.6): the photographer's live video, fitted to their frame, with their name and *Leave*.
  * A pinch on the video zooms the photographer's camera while guide-edit mode is off, with the Camera screen's
  * readout (FR-7.1, AD-17); with the mode on, drags and pinches move the photographer's guide (FR-7.2). The
- * brightness slider and the flash button are the photographer's controls on this phone (FR-7.3), and the guide's
+ * brightness bar and the camera menu's flash are the photographer's controls on this phone (FR-7.3), and the guide's
  * reference photo sits in a corner as on their Camera screen (FR-3.9). *Guide* opens Add a pose guide, whose guide
  * goes to the photographer (FR-6.15, Design 2.6.5), and *Save guide* keeps the guide on this phone (FR-6.16). While
  * the photographer describes or creates poses, picks one, or checks its guide, the video says so, and their *Generate
  * poses*, candidates, and the chosen pose's outline open on this phone's screens of the same steps (Design 2.6.5).
  * The bottom row is Camera's: *Guide* at the left, and the session's newest photo as a thumbnail at the right, empty
  * until the first, which opens the session's photos in a viewer over the screen, inside Pix, so the session goes on
- * (FR-6.14).
+ * (FR-6.14). In the middle, Camera's shutter asks the photographer's phone for a photo (FR-7.8, #314), and the line
+ * right above it says whose camera this is and that it is live, or that a photo is coming (#271), for the whole
+ * session, so no notice says it again.
  * System back closes the viewer, or else asks first (R&S 6.9). The first time the video shows, the tutorial's tips of
  * this screen come over it (FR-10.4). The video fades in, dims under a text, moves to the photographer's new ratio as
  * their frame does, and blinks at their shutter (Design 2.6.4). Leaving for another screen, the video goes at once and
@@ -117,20 +147,38 @@ import org.webrtc.VideoSink
  * Owner: Real-time (#8, #10, #57), with the guide from #9 and Iter3-P9; *Save guide*, the candidates, and the outline
  * Iter3-P16.
  */
-class SubjectFragment : Fragment(R.layout.fragment_subject) {
+class SubjectFragment :
+    Fragment(R.layout.fragment_subject),
+    NoticeAnchor {
 
     private val viewModel: SubjectViewModel by viewModels { PixViewModels.Factory }
     private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
     private val settingsViewModel: SettingsViewModel by activityViewModels { PixViewModels.Factory }
     private val zoomFormat = DecimalFormat("0.0")
     private var pinchZoom: PinchZoomController? = null
-    private var brightnessSlider: TrackedSliderController? = null
+    private var opacitySlider: TrackedSliderController? = null
+
+    // The focus box at this phone's tap and the brightness bar beside it, as on Camera (FR-7.3, FR-7.7).
+    private var focusBrightness: FocusBrightness? = null
     private var renderer: SurfaceViewRenderer? = null
     private var watchdog: FrameWatchdog? = null
     private var referenceDrag: ReferenceDragController? = null
+    private var leaveDialog: AlertDialog? = null
+
+    // "Guide removed" with Undo, by either phone's ✕ (FR-7.2), until a guide is on the video again.
+    private var undoNotice: Snackbar? = null
+
+    // Whether the last render had a guide on the video: one that comes back takes the Undo down.
+    private var guideShown = false
+
+    // True while "Leave the session?" is up: it covers this screen without being another destination ([uncovered]).
+    private val leaveAsked = MutableStateFlow(false)
     private var turningIcons: TurningIcons? = null
     private var photoViewer: PhotoViewer? = null
     private var toggleLabelJob: Job? = null
+
+    /** The text of a label shown without a time of its own ([holdZoomingLabel]), until it is let go. */
+    private var heldLabel: String? = null
     private var pinchModeJob: Job? = null
 
     // Set while a step waits for this screen to be the current destination again (inFront).
@@ -163,6 +211,12 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     @VisibleForTesting
     internal var photoOf: (Uri) -> Bitmap? = { uri -> requireContext().photoToView(uri) }
 
+    // The shutter's ring while the photographer's timer counts down (FR-1.17), made with the first countdown shown.
+    private var countdownRing: CountdownRing? = null
+
+    @VisibleForTesting
+    internal val shutterRing: CountdownRing? get() = countdownRing
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentSubjectBinding.bind(view)
         binding.guideOverlay.editable = false
@@ -187,47 +241,71 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                 }
             }
         }
-        // The zoom row stays above the brightness slider as it opens and closes.
+        // The zoom row stays above the tip as it opens and closes.
         binding.bottomOverlays.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeZoomRow(binding) }
+        // The camera's name is fitted to the width above the shutter, known only after layout.
+        binding.bottomOverlays.addOnLayoutChangeListener { overlays, left, _, right, _, oldLeft, _, oldRight, _ ->
+            if (right - left != oldRight - oldLeft) {
+                overlays.post { if (view != null) renderCaption(binding, viewModel.uiState.value) }
+            }
+        }
         binding.root.addOnLayoutChangeListener(placeVideo)
         binding.topBar.addOnLayoutChangeListener(placeVideo)
         binding.bottomPanel.addOnLayoutChangeListener(placeVideo)
-        // The whole area takes the pinch, the margins beside a video of another shape too.
+        // The whole area takes the pinch, the margins beside a video of another shape too. A tap inside the image asks
+        // the photographer's camera to focus there (FR-7.7), and a drag up or down sets its brightness (FR-7.3), as on
+        // Camera; the pinch controller owns the video's touches, so it reports both, and neither in guide-edit mode.
         pinchZoom = PinchZoomController(
             binding.videoContainer,
             range = { viewModel.uiState.value.let { if (it.canZoom) it.minZoom..it.maxZoom else null } },
             current = { viewModel.uiState.value.zoom },
+            onTap = { x, y -> onVideoTap(x, y) },
+            onDrag = videoBrightnessDrag,
             onZoom = viewModel::onZoomGesture,
         )
         setupZoomAccessibility(binding.zoomReadout)
-        // The icons turn with this phone, held as the subject holds it, and so do the zoom readout and Guide and Pick a
-        // pose with their labels (FR-1.15); the other texts and the layout stay.
+        setupFocusAccessibility(binding)
+        // The icons turn with this phone, held as the subject holds it, and so do the zoom readout, the countdown, Guide
+        // and Pick a pose with their labels, and the menu's items with theirs (FR-1.15); the other texts and the layout
+        // stay.
         viewModel.watchPhoneTurn(viewLifecycleOwner)
         turningIcons = TurningIcons(
             controls = listOf(
-                binding.flashButton,
-                binding.settingsButton,
-                binding.brightnessButton,
+                binding.cameraMenuButton,
                 binding.tipButton,
+                binding.hideGuideButton,
                 binding.saveGuideButton,
+                binding.removeGuideButton,
                 binding.editGuideButton,
                 binding.zoomReadout,
+                binding.countdownNumber,
             ),
-            views = listOf(binding.guideButton, binding.pickPoseButton, binding.galleryThumbnail),
+            views = listOf(
+                binding.flashIndicator,
+                binding.timerIndicator,
+                binding.menuFlash,
+                binding.menuTimer,
+                binding.menuGrid,
+                binding.menuSettings,
+                binding.guideButton,
+                binding.pickPoseButton,
+                binding.galleryThumbnail,
+            ),
         )
         binding.editGuideButton.setOnClickListener {
             viewModel.setGuideEditing(!viewModel.uiState.value.guideEditing)
             showPinchMode(binding, viewModel.uiState.value.guideEditing)
         }
-        // The photographer's brightness and flash from this phone (FR-7.3), on the Camera screen's scale.
-        brightnessSlider = TrackedSliderController(
-            binding.brightnessSlider,
-            { ExposureScale.formatEv(sliderIndex(it), viewModel.uiState.value.exposureStep) },
-        ) { value, final -> viewModel.onExposureGesture(sliderIndex(value), final) }
-        binding.brightnessButton.setOnClickListener {
-            viewModel.setBrightnessOpen(!viewModel.uiState.value.brightnessOpen)
+        // The photographer's brightness from this phone (FR-7.3), on the Camera screen's bar: each step of a drag is
+        // sent as it comes and the last once more as final.
+        binding.exposureBar.describe = { ExposureScale.formatEv(it, viewModel.uiState.value.exposureStep) }
+        binding.exposureBar.onChange = viewModel::onExposureGesture
+        focusBrightness = FocusBrightness(binding.focusRing, binding.exposureBar, viewLifecycleOwner.lifecycleScope) {
+            viewModel.setBrightnessOpen(false)
         }
-        binding.flashButton.setOnClickListener { viewModel.onFlashTap() }
+        setupMenu(binding)
+        // The pose flow's bar starts empty on the subject's first step (#210), whatever this phone showed before.
+        FlowProgressView.shownStep = 0
         // The session's photos open over the video, inside Pix, so the session goes on (FR-6.14).
         binding.galleryButton.setOnClickListener { viewModel.openPhotos() }
         val photoViewer =
@@ -238,11 +316,24 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                 thumbnail = { thumbnailOf(it) },
                 onBack = viewModel::closePhotos,
                 onDelete = viewModel::deletePhoto,
+                opensFrom = binding.galleryButton,
             )
         this.photoViewer = photoViewer
         binding.guideButton.setOnClickListener { findNavController().navigate(R.id.action_subject_to_addGuide) }
+        // The guide's panel, as on Camera (FR-7.2): Hide, the opacity, and ✕ ask the photographer's phone; ♥ is this
+        // phone's own (FR-6.16).
+        binding.hideGuideButton.setOnClickListener { viewModel.onHideToggle() }
+        binding.removeGuideButton.setOnClickListener { viewModel.onRemoveGuide() }
         binding.saveGuideButton.setOnClickListener { viewModel.onSaveGuide() }
+        opacitySlider = TrackedSliderController(
+            binding.opacitySlider,
+            { getString(R.string.guide_opacity_percent, (it * 100f).roundToInt()) },
+            viewModel::onOpacityChange,
+        )
         setupTip(binding)
+        // This phone's shutter (FR-7.8, #314): the photographer's phone takes the photo and tells of it as of any
+        // other, so the blink, "Receiving photo…", and the saved photo follow as they do for the photographer's own.
+        binding.shutterButton.setOnClickListener { viewModel.onShutter() }
         binding.pickPoseButton.setOnClickListener {
             val ui = viewModel.uiState.value
             when {
@@ -258,14 +349,15 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         // A session that ended while Add a pose guide was open has no transition left for this screen to see.
         (sessionViewModel.state.value as? SessionState.Ended)?.let { view.post { onTransition(it) } }
 
-        binding.leaveButton.setOnClickListener { leaveNow() }
-        // Settings in a session (#204): it covers this screen and comes back to it when the session ends.
-        binding.settingsButton.setOnClickListener {
-            val nav = findNavController()
-            if (nav.currentDestination?.id == R.id.subjectFragment) nav.navigate(R.id.action_subject_to_settings)
-        }
+        // Leave asks first, as Back does (#298); Settings is in the camera menu (setupMenu).
+        binding.leaveButton.setOnClickListener { confirmLeave() }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) {
-            if (viewModel.uiState.value.photosOpen) viewModel.closePhotos() else confirmLeave()
+            val ui = viewModel.uiState.value
+            when {
+                ui.photosOpen -> viewModel.closePhotos()
+                ui.menuOpen -> viewModel.setMenuOpen(false)
+                else -> confirmLeave()
+            }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -276,13 +368,38 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         photoViewer.turnTo(turn)
                     }
                 }
+                // The grid as this phone's Settings says (FR-1.9), and the menu's item for it (FR-1.17); Subject view
+                // has no horizon bar.
+                launch {
+                    settingsViewModel.showGrid.collect {
+                        binding.compositionOverlay.showGrid = it
+                        renderMenu(binding, viewModel.uiState.value)
+                    }
+                }
                 // The photographer's guide in this phone's own color and thickness (FR-3.10).
                 launch {
                     binding.guideOverlay.followLook(settingsViewModel.guideLook, viewModel.uiState.map { it.guide })
                 }
                 launch {
+                    // Either phone's ✕ (FR-7.2), as the photographer's phone says it too, with the same Undo; none once a
+                    // guide is on the video again, as after a screen that was stopped meanwhile.
+                    viewModel.guideRemoved.collect { removal ->
+                        val ui = viewModel.uiState.value
+                        if (ui.guide != null) return@collect
+                        offerUndo(
+                            when (removal) {
+                                GuideRemoval.THIS_PHONE -> getString(R.string.guide_removed_from_camera)
+
+                                GuideRemoval.PHOTOGRAPHER ->
+                                    ui.photographerName?.let { getString(R.string.remote_guide_remove_notice, it) }
+                                        ?: getString(R.string.guide_removed_from_camera)
+                            },
+                        )
+                    }
+                }
+                launch {
                     viewModel.photoNotDeleted.collect {
-                        Toast.makeText(requireContext(), R.string.photo_not_deleted, Toast.LENGTH_SHORT).show()
+                        showNotice(R.string.photo_not_deleted)
                     }
                 }
                 launch {
@@ -298,20 +415,23 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         renderMirror(binding, ui.mirrored)
                         renderReference(binding, ui)
                         // The video fits itself to the stream; the grid and the guide fit to the same frame (AD-10).
+                        // 1:1 comes in the 4:3 around it, which is dimmed outside the frame, as on Camera (R&S 6.2).
                         binding.compositionOverlay.frameAspect = ui.aspect.frameAspect
+                        binding.compositionOverlay.dimOutside = ui.aspect.previewAspect != ui.aspect.frameAspect
                         binding.guideOverlay.frameAspect = ui.aspect.frameAspect
                         binding.guideOverlay.render(ui.guide, ui.guideState)
                         renderOverlays(binding, ui)
                         // Guide-edit mode (AD-17): the overlay owns the video's touches while on; the pinch zooms while off.
                         binding.guideOverlay.editable = ui.guideEditing
+                        binding.guideOverlay.filled = ui.guideEditing
                         pinchZoom?.enabled = !ui.guideEditing
                         // The toggle sits beside the readout while a guide is on the video; a hidden guide cannot be edited.
                         binding.editGuideButton.isVisible = ui.guide != null
                         // Checked before enabled: MaterialButton ignores setChecked while it is disabled, so a
                         // hidden guide would leave the toggle drawn as on (found by SubjectFragmentRenderTest).
                         binding.editGuideButton.isChecked = ui.guideEditing
-                        binding.editGuideButton.showGuideEditing(ui.guideEditing)
-                        binding.editGuideButton.isEnabled = ui.connected && ui.guideState.visible
+                        // Nor while a guide this phone offered waits for the photographer's phone (FR-7.2).
+                        binding.editGuideButton.isEnabled = ui.connected && ui.guideState.visible && !ui.guideWaiting
                         if (ui.guide == null) binding.pinchModeLabel.isVisible = false
                         // Guide-colored once a guide is on the video; it then replaces the guide on both phones.
                         binding.guideButton.isActivated = ui.guide != null
@@ -319,11 +439,17 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                         binding.guideButton.contentDescription = getString(
                             if (ui.guide == null) R.string.guide_add_description else R.string.guide_change_description,
                         )
-                        renderSaveGuide(binding, ui)
+                        // A guide on the video again, put back or another: nothing is left to undo.
+                        if (ui.guide != null && !guideShown) dismissUndo()
+                        guideShown = ui.guide != null
+                        // The tip first: whether the guide's panel fits depends on it.
                         renderTip(binding, ui)
+                        renderGuideControls(binding, ui)
                         binding.galleryButton.isEnabled = ui.lastPhoto != null
                         photoViewer.render(ui.photos, ui.photosOpen)
                         renderPoses(binding, ui)
+                        renderCaption(binding, ui)
+                        renderShutter(binding, ui)
                         renderCameraControls(binding, ui)
                         val ratio = zoomFormat.format(ui.zoom)
                         binding.zoomReadout.text = getString(R.string.zoom_ratio, ratio)
@@ -358,22 +484,49 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                 }
                 launch {
                     sessionViewModel.guideOfferFailed.collect {
-                        Toast.makeText(requireContext(), R.string.guide_offer_failed, Toast.LENGTH_SHORT).show()
+                        showNotice(R.string.guide_offer_failed)
                     }
                 }
                 launch {
                     viewModel.guideSaveNotices.collect { notice ->
                         val text = when (notice) {
                             GuideSaveNotice.SAVED -> getString(R.string.guide_saved_notice)
-
-                            GuideSaveNotice.SAVED_OLDEST_REMOVED ->
-                                getString(R.string.guide_saved_oldest_removed_notice, SavedGuideStore.MAX_SAVED)
-
                             GuideSaveNotice.REMOVED -> getString(R.string.guide_removed_notice)
-
                             GuideSaveNotice.FAILED -> getString(R.string.guide_save_failed_notice)
                         }
                         showToggleLabel(binding, text, guideSaveIcon(notice), guideSaveTint(notice))
+                    }
+                }
+                launch { viewModel.photographerFocus.collect { showPhotographerFocus(binding, it) } }
+                // What the photographer did on their own camera, said where this screen's labels show (FR-7.4, #292).
+                launch { viewModel.photographerLines.collect { showPhotographerLine(binding, it) } }
+                // What became of this phone's own asks, each in a line of a label's time: said only while this screen
+                // is what its user looks at. Under Add a pose guide, another screen, or the photos, the line would
+                // come and go unseen, so it is left where it waits until the screen is uncovered.
+                launch {
+                    uncovered().collectLatest { shown ->
+                        if (!shown) return@collectLatest
+                        coroutineScope {
+                            // The situation this phone picked for AI poses (FR-6.15, #276).
+                            launch { sessionViewModel.poseStartAnswers.collect { showPoseStart(binding, it) } }
+                            // A press that took no photo (FR-7.8, #314).
+                            launch {
+                                viewModel.shutterRefusals.collect {
+                                    showToggleLabel(
+                                        binding,
+                                        getString(R.string.subject_shutter_refused),
+                                        R.drawable.ic_alert_small,
+                                        R.color.pix_text,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                launch {
+                    // The photographer's pinch is named from its first step to its end; the ratio's line replaces it.
+                    viewModel.photographerZooming.collect { zooming ->
+                        if (zooming) holdZoomingLabel(binding) else letHeldLabelGo(binding)
                     }
                 }
                 launch {
@@ -386,15 +539,20 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                                 R.color.pix_accent,
                             )
 
-                            // The photographer's pinch holds the zoom (FR-7.6, #236).
+                            // The photographer's pinch holds the zoom (FR-7.6, #236). While it runs the line is up
+                            // already and stays; after it, a held-back pinch of this phone still says so for a while.
                             ToggleLabel.ZoomHeld -> {
                                 val name = viewModel.uiState.value.photographerName ?: return@collect
-                                showToggleLabel(
-                                    binding,
-                                    getString(R.string.zoom_held_label, name),
-                                    R.drawable.ic_zoom_small,
-                                    R.color.pix_text,
-                                )
+                                if (viewModel.photographerZooming.value) {
+                                    holdZoomingLabel(binding)
+                                } else {
+                                    showToggleLabel(
+                                        binding,
+                                        getString(R.string.zoom_held_label, name),
+                                        R.drawable.ic_zoom_small,
+                                        R.color.pix_text,
+                                    )
+                                }
                             }
 
                             else -> Unit
@@ -405,7 +563,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                     // A set that ended while this screen is in front; its Pick a pose says so itself while open.
                     viewModel.poseSetEnds.collect { end ->
                         poseSetEndNotice(requireContext(), end, viewModel.uiState.value.photographerName)?.let {
-                            Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show()
+                            showNotice(it)
                         }
                     }
                 }
@@ -413,7 +571,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                     // Generate poses that the photographer closed while this screen is in front.
                     viewModel.describeEnds.collect { end ->
                         describeEndNotice(requireContext(), end, viewModel.uiState.value.photographerName)?.let {
-                            Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show()
+                            showNotice(it)
                         }
                     }
                 }
@@ -421,14 +579,14 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
                     // A confirm that ended while this screen is in front; its Your reference says so itself while open.
                     viewModel.confirmEnds.collect { end ->
                         confirmEndNotice(requireContext(), end, viewModel.uiState.value.photographerName)?.let {
-                            Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show()
+                            showNotice(it)
                         }
                     }
                 }
                 launch {
                     sessionViewModel.mobileDataPending.collect { pending ->
                         if (!pending) return@collect
-                        Toast.makeText(requireContext(), R.string.mobile_data_notice, Toast.LENGTH_LONG).show()
+                        showNotice(R.string.mobile_data_notice, NoticeLength.LONG)
                         sessionViewModel.mobileDataNoticeShown()
                     }
                 }
@@ -438,7 +596,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
     override fun onPause() {
         pinchZoom?.finishInteraction()
-        brightnessSlider?.finishInteraction()
+        opacitySlider?.finishInteraction()
+        focusBrightness?.finishDrag()
         super.onPause()
     }
 
@@ -502,7 +661,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
             showPlace(binding, to)
         }
         // A frame of the new shape that came first.
-        if (abs((watchdog?.shape ?: 0f) - aspect.frameAspect) < SHAPE_TOLERANCE) endReshape(binding)
+        if (abs((watchdog?.shape ?: 0f) - aspect.previewAspect) < SHAPE_TOLERANCE) endReshape(binding)
     }
 
     /** The photographer's new shape came, or its time is up: the video clears, and the grid and the guide return. */
@@ -544,7 +703,8 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     /** The first frame, or one of a new shape: the video shows at once, and a new ratio's wait ends with its shape. */
     private fun onFrameShape(binding: FragmentSubjectBinding) {
         val shape = watchdog?.shape ?: return
-        if (abs(shape - viewModel.uiState.value.aspect.frameAspect) < SHAPE_TOLERANCE) endReshape(binding)
+        // The stream has its area's shape: 1:1 comes in the 4:3 around it (CameraFrameSource.streamCrop).
+        if (abs(shape - viewModel.uiState.value.aspect.previewAspect) < SHAPE_TOLERANCE) endReshape(binding)
         renderVideo(binding)
     }
 
@@ -576,7 +736,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         if (area.bottom <= area.top) return
         val imageBottom = minOf(place.frame.bottom, area.bottom - area.underControls)
         val margin = ZOOM_ROW_MARGIN_DP * resources.displayMetrics.density
-        placeZoomRow(binding.zoomRow, binding.bottomOverlays, imageBottom, margin)
+        placeZoomRow(binding.zoomRow, binding.bottomOverlays, imageBottom, margin, binding.noticeLine)
         binding.pinchModeLabel.translationY = binding.zoomRow.translationY
     }
 
@@ -601,6 +761,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         binding.liveDot.isVisible = streaming && !stalled
         // Not while a pose step's text or the session photo covers the video, which then is not what the tips show.
         videoShowing.value = streaming && !stalled && poses == null && !viewModel.uiState.value.photosOpen
+        renderShutter(binding, viewModel.uiState.value)
         binding.connectingText.text = when {
             reconnecting -> getString(R.string.reconnecting)
             !connected || (!frames.hasFrame() && poses == null) -> getString(R.string.connecting)
@@ -730,6 +891,13 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     }
 
     override fun onDestroyView() {
+        // A dialog belongs to the activity: one left open would leave a screen that is gone.
+        leaveDialog?.dismiss()
+        leaveDialog = null
+        dismissUndo()
+        guideShown = false
+        countdownRing?.stop()
+        countdownRing = null
         turningIcons?.stop()
         turningIcons = null
         photoViewer?.stop()
@@ -745,8 +913,12 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         referenceDrag = null
         pinchZoom?.finishInteraction()
         pinchZoom = null
-        brightnessSlider?.finishInteraction()
-        brightnessSlider = null
+        opacitySlider?.finishInteraction()
+        opacitySlider = null
+        focusBrightness?.clear()
+        focusBrightness = null
+        // The bar stood beside a box of this view, on its own time: a view made again shows neither.
+        viewModel.setBrightnessOpen(false)
         watchdog?.let(viewModel.video::detach)
         watchdog = null
         renderer?.release()
@@ -764,46 +936,96 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     }
 
     /**
-     * The photographer's tip (FR-4.10, #213): the tip button opens and closes it, a touch anywhere closes it and still
-     * does what it does where it lands, and the banner is clickable as well, so TalkBack can close it.
+     * The photographer's tip (FR-4.10, #213): only the tip button opens and closes it, and a touch anywhere else, on the
+     * banner too, leaves it as it is. A touch anywhere closes the camera menu.
      */
     private fun setupTip(binding: FragmentSubjectBinding) {
         binding.root.onTouchEnd = { event ->
-            // The tip button opens and closes the tip itself; closed here first, its tap would only open it again.
-            if (!binding.tipButtonFrame.isUnder(event, binding.root)) viewModel.onAnyTouch()
+            // The camera menu closes at a touch anywhere but on it or its button, which opens and closes it (FR-1.17).
+            if (!binding.cameraMenuButton.isUnder(event, binding.root) &&
+                !binding.cameraMenu.isUnder(event, binding.root)
+            ) {
+                viewModel.setMenuOpen(false)
+            }
         }
         binding.tipButton.setOnClickListener { viewModel.onTipButton() }
-        binding.tipBanner.setOnClickListener { viewModel.onAnyTouch() }
-        ViewCompat.replaceAccessibilityAction(
-            binding.tipBanner,
-            AccessibilityActionCompat.ACTION_CLICK,
-            getString(R.string.close_tip),
-        ) { _, _ ->
-            viewModel.onAnyTouch()
-            true
-        }
+        // A tap on the open tip neither closes it nor focuses the photographer's camera through it (FR-7.7).
+        binding.tipBanner.keepTouches()
     }
 
     /**
      * The photographer's tip of the guide on the video (FR-4.10, #213): its button while that guide has one and shows,
-     * with a dot until the tip was opened, and the banner only once the button opened it.
+     * with a dot until the tip was opened, lit while the tip is open and named for what its tap does, and the banner
+     * only once the button opened it.
      */
     private fun renderTip(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         val tip = ui.tip?.takeIf { ui.guide != null && ui.guideState.visible }
+        val open = tip?.open == true
         binding.tipButtonFrame.isVisible = tip != null
         binding.tipDot.isVisible = tip?.unseen == true
-        binding.tipBanner.isVisible = tip?.open == true
+        binding.tipButton.isActivated = open
+        binding.tipButton.contentDescription = getString(if (open) R.string.close_tip else R.string.show_tip)
+        binding.tipBanner.isVisible = open
         binding.tipText.text = tip?.tip?.text
     }
 
-    /** *Save guide* (FR-6.16): beside the guide-edit toggle while a guide is on the video, filled once saved here. */
+    /**
+     * The guide's panel above the shutter while a guide is on the video, as Camera's (FR-7.2): Hide, the opacity, and ✕
+     * show the photographer's guide as both phones have it, and go to the photographer's phone; the opacity is off while
+     * the guide is hidden, and the three while not connected or while a guide this phone offered waits for the
+     * photographer's phone to adopt it. ♥ is this phone's own *Save guide*.
+     */
+    private fun renderGuideControls(binding: FragmentSubjectBinding, ui: SubjectUiState) {
+        // The open tip comes first, as the line that names the camera gives way to it: at a large font the panel steps
+        // aside while the two do not fit together, and is back once the tip closes.
+        binding.guideControls.isVisible =
+            ui.guide != null && (!binding.tipBanner.isVisible || panelFitsBesideTheTip(binding))
+        val hidden = !ui.guideState.visible
+        val shared = ui.connected && !ui.guideWaiting
+        val opacityEnabled = shared && ui.guide != null && !hidden
+        opacitySlider?.render(GuideState.MIN_OPACITY, GuideState.MAX_OPACITY, ui.guideState.opacity, opacityEnabled)
+        binding.opacityValue.isEnabled = opacityEnabled
+        binding.opacityValue.text =
+            getString(R.string.guide_opacity_percent, (ui.guideState.opacity * 100f).roundToInt())
+        val hideIcon = if (hidden) R.drawable.ic_visibility else R.drawable.ic_visibility_off
+        // Setting the same icon again would redraw the button on every state change.
+        if (binding.hideGuideButton.tag != hideIcon) {
+            binding.hideGuideButton.setIconResource(hideIcon)
+            binding.hideGuideButton.tag = hideIcon
+        }
+        binding.hideGuideButton.contentDescription = getString(if (hidden) R.string.show_guide else R.string.hide_guide)
+        binding.hideGuideButton.isEnabled = shared
+        binding.removeGuideButton.isEnabled = shared
+        renderSaveGuide(binding, ui)
+    }
+
+    /**
+     * Whether the open tip, the guide's panel, and the zoom row above them fit between the top bar and the shutter's
+     * row. The longest tip at the largest font does not (CameraLayoutTest). True before the first layout.
+     */
+    private fun panelFitsBesideTheTip(binding: FragmentSubjectBinding): Boolean {
+        val overlays = binding.bottomOverlays
+        val width = overlays.width - overlays.paddingLeft - overlays.paddingRight
+        if (width <= 0) return true
+        val across = View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY)
+        val down = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        val margin = ZOOM_ROW_MARGIN_DP * resources.displayMetrics.density
+        var needed = overlays.paddingBottom + binding.zoomRow.height + margin
+        for (panel in listOf(binding.tipBanner, binding.guideControls)) {
+            panel.measure(across, down)
+            needed += panel.measuredHeight + (panel.layoutParams as ViewGroup.MarginLayoutParams).topMargin
+        }
+        return needed <= binding.bottomPanel.top - binding.topBar.bottom
+    }
+
+    /** *Save guide* (FR-6.16): on the guide's panel, a ♥ filled red once a favorite here (#297). */
     private fun renderSaveGuide(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         val button = binding.saveGuideButton
-        button.isVisible = ui.guide != null
-        val icon = if (ui.guideSaved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark
+        val icon = if (ui.guideSaved) R.drawable.ic_heart_filled else R.drawable.ic_heart
         // Setting the same icon again would redraw the button on every state change.
         if (button.tag != icon) {
             button.setIconResource(icon)
+            button.iconTint = requireContext().getColorStateList(saveGuideTint(ui.guideSaved))
             button.tag = icon
         }
         button.contentDescription = getString(if (ui.guideSaved) R.string.guide_saved else R.string.save_guide)
@@ -823,7 +1045,19 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         val generating = generating(ui)
         val confirming = confirming(ui)
         val describing = describing(ui)
-        binding.pickPoseButton.isVisible = picking || generating || confirming || describing
+        val step = picking || generating || confirming || describing
+        binding.pickPoseButton.isVisible = step
+        // The right third is the thumbnail's alone, in its middle as Camera's gallery button, or the step's button's
+        // and the thumbnail's, each as far from that middle (#314).
+        val density = resources.displayMetrics.density
+        binding.galleryButton.translationX = if (step) STEP_BESIDE_THUMBNAIL_DP * density else 0f
+        // The step's name is centered under its icon and may be wider than it, never as far as the shutter: on a
+        // narrow phone it takes two lines sooner.
+        val row = binding.guideRow.width
+        if (row > 0) {
+            val toShutter = row / 3f - (STEP_BESIDE_THUMBNAIL_DP + SHUTTER_HALF_DP + STEP_CLEAR_OF_SHUTTER_DP) * density
+            binding.pickPoseLabel.maxWidth = (2 * toShutter).toInt().coerceAtLeast((MIN_TOUCH_DP * density).toInt())
+        }
         val label = when {
             confirming -> R.string.pose_guide_title
             describing -> R.string.describe_title
@@ -848,6 +1082,173 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         } else if (describing && describeId != null) {
             if (inFront(binding) && viewModel.claimDescribeOpening(describeId)) openDescribe()
         }
+    }
+
+    /**
+     * Whether this screen itself is what its user looks at: the current destination, so not under a sheet such as Add
+     * a pose guide, which leaves it started, and not under its own photos or a dialog of its own, "Leave the session?"
+     * or the tutorial's tips. A new dialog of this screen belongs here too.
+     */
+    private fun uncovered(): Flow<Boolean> {
+        // Without a navigation controller, as in a screen test, nothing can cover it but its photos.
+        val nav = runCatching { findNavController() }.getOrNull()
+        val onTop = if (nav == null) {
+            flowOf(true)
+        } else {
+            callbackFlow {
+                val listener = NavController.OnDestinationChangedListener { _, destination, _ ->
+                    trySend(destination.id == R.id.subjectFragment)
+                }
+                nav.addOnDestinationChangedListener(listener)
+                awaitClose { nav.removeOnDestinationChangedListener(listener) }
+            }
+        }
+        val photos = viewModel.uiState.map { it.photosOpen }
+        return combine(onTop, photos, leaveAsked, tutorialOver()) { top, open, leaving, tips ->
+            top && !open && !leaving && !tips
+        }.distinctUntilChanged()
+    }
+
+    /** Whether the tutorial's tips are over this screen: a child dialog, so the destination stays this one. */
+    private fun tutorialOver(): Flow<Boolean> = callbackFlow {
+        val fragments = childFragmentManager
+        val watcher = object : FragmentManager.FragmentLifecycleCallbacks() {
+            override fun onFragmentAttached(manager: FragmentManager, fragment: Fragment, context: Context) {
+                if (fragment is TutorialFragment) trySend(true)
+            }
+
+            override fun onFragmentDetached(manager: FragmentManager, fragment: Fragment) {
+                if (fragment is TutorialFragment) trySend(false)
+            }
+        }
+        trySend(TutorialFragment.over(this@SubjectFragment) != null)
+        fragments.registerFragmentLifecycleCallbacks(watcher, false)
+        awaitClose { fragments.unregisterFragmentLifecycleCallbacks(watcher) }
+    }
+
+    /**
+     * What became of the situation this phone picked for AI poses (FR-6.15, #276): the photographer takes the scene
+     * photo next, is asked to agree first, or their phone could not begin.
+     */
+    private fun showPoseStart(binding: FragmentSubjectBinding, step: PoseStartStep) {
+        val name = viewModel.uiState.value.photographerName
+        when (step) {
+            // Their phone shows the AI notice first: this one waits, and says so.
+            PoseStartStep.ASKING -> if (name != null) {
+                showToggleLabel(
+                    binding,
+                    getString(R.string.subject_poses_asking, name),
+                    R.drawable.ic_sparkle,
+                    R.color.pix_text,
+                )
+            }
+
+            PoseStartStep.STARTED -> if (name != null) {
+                showToggleLabel(
+                    binding,
+                    getString(R.string.subject_poses_started, name),
+                    R.drawable.ic_sparkle,
+                    R.color.pix_text,
+                )
+            }
+
+            PoseStartStep.REFUSED -> showToggleLabel(
+                binding,
+                getString(R.string.subject_poses_refused),
+                R.drawable.ic_alert_small,
+                R.color.pix_text,
+            )
+        }
+    }
+
+    /**
+     * The line right above the shutter, once connected (#314; in the shutter's place before it, #271): whose camera
+     * this is and that it is live, or, from the photographer's shutter until the photo is saved here, that it is coming
+     * (FR-6.14). While a step's button shows, the video's own text says what the photographer does, so the line is
+     * the name alone, without the red dot. The open tip takes the line's place until its button closes it: at the
+     * largest font the two do not fit above the shutter together.
+     */
+    private fun renderCaption(binding: FragmentSubjectBinding, ui: SubjectUiState) {
+        binding.cameraCaption.isVisible = ui.connected && ui.tip?.open != true
+        val receiving = ui.receivingPhoto
+        val live = !receiving && !binding.pickPoseButton.isVisible
+        binding.cameraCaptionName.isVisible = !receiving
+        // The red dot says "live", as the light over the video does: not beside the name of a camera that is off.
+        binding.cameraCaptionDot.isVisible = live
+        binding.cameraCaptionSpinner.isVisible = receiving
+        binding.cameraCaptionStatus.isVisible = receiving || live
+        binding.cameraCaptionStatus.setText(
+            if (receiving) R.string.subject_receiving_photo else R.string.subject_live,
+        )
+        fitCaption(binding, ui.photographerName, live)
+    }
+
+    /**
+     * One line while the name and "Live" fit the width above the shutter; at a font too large for that, the name
+     * stands over "Live" (SessionCaption). The name is the photographer's account, or their phone's while signed out.
+     */
+    private fun fitCaption(binding: FragmentSubjectBinding, name: String?, live: Boolean) {
+        val overlays = binding.bottomOverlays
+        SessionCaption(
+            binding.cameraCaption,
+            binding.cameraCaptionDot,
+            binding.cameraCaptionTitle,
+            binding.cameraCaptionSeparator,
+            binding.cameraCaptionStatus,
+        ) { if (it == null) getString(R.string.subject_title_placeholder) else getString(R.string.subject_title, it) }
+            .fit(
+                overlays.width - overlays.paddingLeft - overlays.paddingRight,
+                name,
+                getString(R.string.subject_live),
+                live,
+            )
+    }
+
+    /**
+     * This phone's shutter (FR-7.8, #314): dimmed while the photographer's video does not show, as while the link
+     * reconnects or their camera is off for a pose's step, and while a press waits for its answer. While the
+     * photographer's timer counts down it stops the countdown, as Camera's own does (FR-1.17): it shows Camera's stop
+     * square in the timer's ring, filling through the photographer's seconds, and is named so; the tutorial's tip on it
+     * says so too, and no line on the screen.
+     */
+    private fun renderShutter(binding: FragmentSubjectBinding, ui: SubjectUiState) {
+        binding.shutterButton.isEnabled = ui.connected && videoShowing.value && !ui.shutterWaiting
+        renderCountdownRing(binding.shutterButton, ui)
+        val name = ui.photographerName
+        val timer = ui.timer
+        binding.shutterButton.contentDescription = when {
+            ui.countdown != null -> getString(R.string.shutter_cancel_timer)
+
+            // With the photographer's timer on, a press starts its countdown (FR-7.8, #318), and the shutter says so.
+            name == null && timer != ShutterTimer.OFF -> getString(R.string.shutter_timer, timer.seconds)
+
+            name == null -> getString(R.string.shutter)
+
+            timer != ShutterTimer.OFF -> getString(R.string.subject_shutter_timer, name, timer.seconds)
+
+            else -> getString(R.string.subject_shutter, name)
+        }
+    }
+
+    /**
+     * The timer's ring on the shutter while the photographer's countdown shows (FR-1.17), over the timer's whole length
+     * as chosen; the white shutter again as it ends.
+     */
+    private fun renderCountdownRing(shutter: View, ui: SubjectUiState) {
+        val left = ui.countdown
+        val ring = countdownRing
+        if (left == null) {
+            ring?.stop()
+            if (ring != null &&
+                shutter.background === ring.drawable
+            ) {
+                shutter.setBackgroundResource(R.drawable.bg_shutter)
+            }
+            return
+        }
+        val shown = ring ?: CountdownRing(requireContext()).also { countdownRing = it }
+        if (shutter.background !== shown.drawable) shutter.background = shown.drawable
+        shown.show(left, ui.timer.seconds)
     }
 
     /**
@@ -934,39 +1335,263 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         }
     }
 
-    /** Brightness and flash, hidden when the photographer's phone has no range or no flash (FR-7.3). */
+    /**
+     * The brightness bar beside the focus box, up after a tap on the video while the photographer's camera has a
+     * range, and the camera menu (FR-7.3, FR-1.17).
+     */
     private fun renderCameraControls(binding: FragmentSubjectBinding, ui: SubjectUiState) {
-        binding.brightnessButton.isVisible = ui.hasBrightness
-        binding.brightnessButton.isChecked = ui.brightnessOpen
-        binding.brightnessButton.isEnabled = ui.connected
-        binding.brightnessPanel.isVisible = ui.brightnessOpen
-        brightnessSlider?.render(
-            1f,
-            ExposureScale.sliderMax(ui.exposureRange),
-            ExposureScale.sliderValue(ui.exposure, ui.exposureRange),
+        // Until a tap to focus is answered, the bar shows the brightness from before it: its own drag waits too.
+        binding.exposureBar.awaitingValue = ui.baseAwaited
+        binding.exposureBar.render(
+            ui.exposureRange,
+            ui.exposureStep,
+            ui.exposure,
             enabled = ui.connected && ui.hasBrightness,
         )
-        binding.brightnessValue.text = ExposureScale.formatEv(ui.exposure, ui.exposureStep)
-        binding.flashButton.isVisible = ui.hasFlash
-        binding.flashButton.isEnabled = ui.connected
-        binding.flashButton.setIconResource(
+        focusBrightness?.place(videoFrame(binding, ui))
+        focusBrightness?.show(ui.brightnessOpen)
+        renderMenu(binding, ui)
+        renderCountdown(binding, ui)
+    }
+
+    /**
+     * The camera menu (FR-1.17): its button opens and closes it. The photographer's flash goes to its next choice at each
+     * tap and this phone's grid on or off, leaving it open; Settings closes it and opens that screen, which covers this
+     * one and comes back to it when the session ends (#204).
+     */
+    private fun setupMenu(binding: FragmentSubjectBinding) {
+        val toggle = View.OnClickListener { viewModel.setMenuOpen(!viewModel.uiState.value.menuOpen) }
+        binding.cameraMenuButton.setOnClickListener(toggle)
+        // A tap on the icons beside the button opens the menu too, as on Camera, through the area over them.
+        binding.indicatorsTouch.setOnClickListener(toggle)
+        binding.menuFlash.setOnClickListener { viewModel.onFlashTap() }
+        binding.menuTimer.setOnClickListener { viewModel.onTimerTap() }
+        binding.menuGrid.setOnClickListener { settingsViewModel.toggleShowGrid() }
+        binding.menuSettings.setOnClickListener {
+            viewModel.setMenuOpen(false)
+            val nav = findNavController()
+            if (nav.currentDestination?.id == R.id.subjectFragment) nav.navigate(R.id.action_subject_to_settings)
+        }
+    }
+
+    /**
+     * The camera menu's button, the photographer's flash and timer beside it while either is on, as Camera shows its
+     * own, and the menu's items, each in the accent while what it sets is on (FR-1.17): the photographer's flash, only
+     * when their camera has one (FR-7.3), their timer (#318), and this phone's grid.
+     */
+    private fun renderMenu(binding: FragmentSubjectBinding, ui: SubjectUiState) {
+        binding.cameraMenuButton.isActivated = ui.menuOpen
+        binding.cameraMenu.reveal(ui.menuOpen)
+        val flashOn = ui.hasFlash && ui.flash != FlashMode.OFF
+        val timerOn = ui.timer != ShutterTimer.OFF
+        binding.flashIndicator.isVisible = flashOn
+        binding.timerIndicator.isVisible = timerOn
+        binding.indicatorsTouch.isVisible = flashOn || timerOn
+        setImageOnce(
+            binding.flashIndicator,
             when (ui.flash) {
                 FlashMode.OFF -> R.drawable.ic_flash_off
                 FlashMode.AUTO -> R.drawable.ic_flash_auto
                 FlashMode.ON -> R.drawable.ic_flash_on
             },
         )
-        binding.flashButton.contentDescription = getString(
+        setImageOnce(binding.timerIndicator, timerIcon(ui.timer))
+        binding.menuFlash.isVisible = ui.hasFlash
+        // The photographer's flash and timer wait while their timer counts down, as on their phone (FR-1.17).
+        binding.menuFlash.isEnabled = ui.connected && ui.countdown == null
+        binding.menuFlash.isActivated = flashOn
+        binding.menuTimer.isEnabled = ui.connected && ui.countdown == null
+        binding.menuTimer.isActivated = timerOn
+        setImageOnce(
+            binding.menuTimerIcon,
+            when (ui.timer) {
+                ShutterTimer.OFF -> R.drawable.ic_menu_timer_off
+                ShutterTimer.THREE -> R.drawable.ic_menu_timer_3
+                ShutterTimer.TEN -> R.drawable.ic_menu_timer_10
+            },
+        )
+        binding.menuTimer.contentDescription = timerText(ui.timer)
+        val icon = when (ui.flash) {
+            FlashMode.OFF -> R.drawable.ic_menu_flash_off
+            FlashMode.AUTO -> R.drawable.ic_menu_flash_auto
+            FlashMode.ON -> R.drawable.ic_menu_flash_on
+        }
+        if (binding.menuFlashIcon.tag != icon) {
+            binding.menuFlashIcon.tag = icon
+            binding.menuFlashIcon.setImageResource(icon)
+        }
+        binding.menuFlash.contentDescription = getString(
             when (ui.flash) {
                 FlashMode.OFF -> R.string.flash_off
                 FlashMode.AUTO -> R.string.flash_auto
                 FlashMode.ON -> R.string.flash_on
             },
         )
+        val grid = settingsViewModel.showGrid.value
+        binding.menuGrid.isActivated = grid
+        binding.menuGrid.contentDescription = getString(if (grid) R.string.grid_on else R.string.grid_off)
     }
 
-    /** The exposure index for a brightness slider position (ExposureScale, shared with the Camera screen). */
-    private fun sliderIndex(value: Float): Int = ExposureScale.index(value, viewModel.uiState.value.exposureRange)
+    /** The timer beside the menu's button, at the weight of the top bar's icons; never off, which shows none. */
+    @DrawableRes
+    private fun timerIcon(timer: ShutterTimer): Int =
+        if (timer == ShutterTimer.TEN) R.drawable.ic_timer_10 else R.drawable.ic_timer_3
+
+    /** "Timer off", or "Timer 3 s": the menu's item as TalkBack reads it, as on Camera. */
+    private fun timerText(timer: ShutterTimer): String = if (timer == ShutterTimer.OFF) {
+        getString(R.string.timer_off)
+    } else {
+        getString(R.string.timer_seconds, timer.seconds)
+    }
+
+    /** Sets [image]'s drawable only when it changes, which the tag remembers: a render comes with every zoom step. */
+    private fun setImageOnce(image: ImageView, @DrawableRes icon: Int) {
+        if (image.tag == icon) return
+        image.tag = icon
+        image.setImageResource(icon)
+    }
+
+    /** The photographer's timer counting down (FR-1.17): the seconds left over the video, and whose photo it is. */
+    private fun renderCountdown(binding: FragmentSubjectBinding, ui: SubjectUiState) {
+        val left = ui.countdown
+        binding.countdownPanel.isVisible = left != null
+        if (left == null) return
+        binding.countdownNumber.text = left.toString()
+        // The name comes in `hello`, before any countdown; without it the number says enough.
+        val name = ui.photographerName
+        binding.countdownLine.isVisible = name != null
+        if (name != null) binding.countdownLine.text = getString(R.string.photographer_timer_label, name)
+    }
+
+    /**
+     * A tap on the video inside the photographer's image (FR-7.7): their camera is asked to focus there, the box shows
+     * where, and the brightness bar comes up beside it (FR-7.3), as a tap on Camera does. False when nothing was asked:
+     * a tap beside the image, a camera that can do neither, or a video that is not showing.
+     */
+    private fun onVideoTap(x: Float, y: Float): Boolean {
+        val binding = view?.let(FragmentSubjectBinding::bind) ?: return false
+        // Not over a video that is not coming: the photographer's camera is paused or not yet seen, and would drop the
+        // request, so a box here would show a focus that was never set.
+        if (!videoShowing.value) return false
+        // Nor while the photographer's camera rebinds for a new ratio: it drops a tap until it is ready, which the
+        // first frame of the new shape says, and the frame on screen is not the one the tap would be placed in.
+        if (reshaping) return false
+        val ui = viewModel.uiState.value
+        val frame = videoFrame(binding, ui)
+        if (frame.width <= 0f || x !in frame.left..frame.right || y !in frame.top..frame.bottom) return false
+        if (!viewModel.onFocusTap((x - frame.left) / frame.width, (y - frame.top) / frame.height)) return false
+        val focusBrightness = focusBrightness ?: return false
+        focusBrightness.tap(x, y, focuses = ui.supportsFocusPoint, brightness = ui.hasBrightness)
+        if (ui.hasBrightness) {
+            viewModel.setBrightnessOpen(true)
+            focusBrightness.place(frame)
+            focusBrightness.hold()
+        }
+        return true
+    }
+
+    /**
+     * The photographer's own tap to focus (FR-7.7): the focus box at that place on this phone's video, alone, as the
+     * photographer's phone shows this phone's taps. A bar this phone has up goes, since the camera no longer focuses
+     * beside it and the brightness is the photographer's base again; while a finger is on it, nothing moves under it.
+     */
+    private fun showPhotographerFocus(binding: FragmentSubjectBinding, focus: RemoteFocus) {
+        if (binding.exposureBar.isHeld) return
+        val frame = videoFrame(binding, viewModel.uiState.value)
+        if (frame.width <= 0f || frame.height <= 0f) return
+        // The box first: the bar's going then leaves it alone.
+        focusBrightness?.showBoxAlone(frame.left + focus.x * frame.width, frame.top + focus.y * frame.height)
+        viewModel.setBrightnessOpen(false)
+    }
+
+    /**
+     * A drag up or down on the video (FR-7.3): with the bar up after a tap, it moves the brightness on from there, once
+     * that tap is answered.
+     * Without it, the drag taps where it started first, as on Camera, which puts the photographer's brightness back to
+     * their base: this phone learns that base from the tap's answer, so the drag's way counts from when it came
+     * (`SubjectUiState.baseAwaited`), and the bar's sun starts there.
+     */
+    private val videoBrightnessDrag = object : PinchZoomController.VerticalDrag {
+        // The tap this drag began with is not answered yet.
+        private var waiting = false
+
+        // How far up the finger was when the bar's drag began.
+        private var from = 0f
+
+        override fun onStart(x: Float, y: Float): Boolean {
+            val binding = view?.let(FragmentSubjectBinding::bind) ?: return false
+            val ui = viewModel.uiState.value
+            if (!ui.connected || !ui.hasBrightness) return false
+            waiting = false
+            from = 0f
+            if (!ui.brightnessOpen || !binding.exposureBar.isVisible) {
+                waiting = onVideoTap(x, y)
+                return waiting
+            }
+            // The bar is up, but its tap may not be answered yet: then it still shows the brightness from before.
+            if (ui.baseAwaited) {
+                waiting = true
+                return true
+            }
+            binding.exposureBar.startDrag()
+            return binding.exposureBar.isDragging
+        }
+
+        override fun onMove(up: Float) {
+            val bar = view?.let(FragmentSubjectBinding::bind)?.exposureBar ?: return
+            if (waiting) {
+                val ui = viewModel.uiState.value
+                // The bar went meanwhile, as at the photographer's own focus: this drag moves nothing any more.
+                if (!ui.brightnessOpen) {
+                    waiting = false
+                    return
+                }
+                if (ui.baseAwaited) return
+                waiting = false
+                from = up
+                bar.startDrag()
+            }
+            // Nothing while the bar is not dragged.
+            bar.dragTo(up - from)
+        }
+
+        override fun onEnd() {
+            waiting = false
+            focusBrightness?.finishDrag()
+        }
+    }
+
+    /** The photographer's image on this screen: the video's frame in their ratio, fitted in its area (AD-10). */
+    private fun videoFrame(binding: FragmentSubjectBinding, ui: SubjectUiState): ViewfinderFrame {
+        val area = binding.videoContainer
+        return fitViewfinderFrame(area.width.toFloat(), area.height.toFloat(), ui.aspect.frameAspect)
+    }
+
+    /**
+     * TalkBack has no tap at a place on the video, and the brightness button is gone (#273): its action on the video
+     * asks for the focus at the image's middle, which brings the bar, and moves its focus onto the bar, which stays up
+     * while it has it.
+     */
+    private fun setupFocusAccessibility(binding: FragmentSubjectBinding) {
+        ViewCompat.replaceAccessibilityAction(
+            binding.liveView,
+            AccessibilityActionCompat.ACTION_CLICK,
+            getString(R.string.focus_and_brightness_action),
+        ) { _, _ ->
+            val frame = videoFrame(binding, viewModel.uiState.value)
+            if (!onVideoTap(frame.centerX, frame.centerY)) return@replaceAccessibilityAction false
+            val bar = binding.exposureBar
+            // Once the bar shows. Without a screen reader the focus does not move, and the bar keeps its own time.
+            bar.post {
+                if (!bar.isShown) return@post
+                bar.performAccessibilityAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
+                if (!bar.isAccessibilityFocused) {
+                    bar.performAccessibilityAction(AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS, null)
+                }
+            }
+            true
+        }
+    }
 
     private fun setupZoomAccessibility(readout: View) {
         fun adjust(factor: Float): Boolean {
@@ -1011,35 +1636,52 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
 
             EndReason.PEER_LEFT -> {
                 val name = viewModel.uiState.value.photographerName
-                Toast.makeText(
-                    requireContext(),
+                showNotice(
                     name?.let { getString(R.string.peer_ended_session, it) }
                         ?: getString(R.string.peer_ended_session_unnamed),
-                    Toast.LENGTH_SHORT,
-                ).show()
+                )
                 backToCamera()
             }
 
             EndReason.LEFT, EndReason.CANCELLED -> backToCamera()
 
             else -> {
-                Toast.makeText(requireContext(), R.string.session_ended, Toast.LENGTH_SHORT).show()
+                showNotice(R.string.session_ended)
                 backToCamera()
             }
         }
     }
 
+    /**
+     * [text], a guide removed by either phone, with *Undo*, which asks the photographer's phone to put it back (FR-7.2).
+     * It goes once a guide is on the video again.
+     */
+    private fun offerUndo(text: String) {
+        dismissUndo()
+        undoNotice =
+            showNoticeOnScreen(text, NoticeLength.UNDO, NoticeAction(R.string.undo) { viewModel.onUndoRemove() })
+    }
+
+    private fun dismissUndo() {
+        undoNotice?.dismiss()
+        undoNotice = null
+    }
+
+    /** Asks before leaving, for Back and Leave alike (#298); one tap leaves the photographer's camera for good. */
     private fun confirmLeave() {
-        MaterialAlertDialogBuilder(requireContext())
+        if (leaveDialog?.isShowing == true) return
+        leaveDialog = MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.leave_session_title)
             .setPositiveButton(R.string.leave) { _, _ -> leaveNow() }
             .setNegativeButton(R.string.cancel, null)
+            .setOnDismissListener { leaveAsked.value = false }
             .show()
+        leaveAsked.value = true
     }
 
     private fun leaveNow() {
         pinchZoom?.finishInteraction()
-        brightnessSlider?.finishInteraction()
+        focusBrightness?.finishDrag()
         sessionViewModel.leave()
         backToCamera()
     }
@@ -1047,6 +1689,18 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
     private fun backToCamera() {
         findNavController().popBackStack(R.id.cameraFragment, false)
     }
+
+    /**
+     * Notices take the zoom row's place, as on Camera, so they cover the row but never the line that names the camera,
+     * the shutter, or the controls under the video (#298); above the controls while the row is hidden. Over the
+     * session's photos, they sit where the viewer says, not over the photo.
+     */
+    override val noticeAnchor: View?
+        get() {
+            val binding = view?.let(FragmentSubjectBinding::bind) ?: return null
+            photoViewer?.takeIf { it.isOpen }?.let { return it.noticeAnchor }
+            return if (binding.zoomRow.isShown) binding.noticeLine else binding.bottomPanel
+        }
 
     /**
      * Passes frames to the renderer and remembers when the last one came, to detect a paused camera, and its shape. It
@@ -1084,6 +1738,7 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         text: String,
         @DrawableRes icon: Int,
         @ColorRes tint: Int,
+        durationMs: Long = LABEL_MS,
     ) {
         val chip = binding.toggleLabel
         chip.text = text
@@ -1091,9 +1746,159 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         chip.isVisible = true
         toggleLabelJob?.cancel()
         toggleLabelJob = viewLifecycleOwner.lifecycleScope.launch {
-            delay(LABEL_MS)
-            chip.isVisible = false
+            delay(durationMs)
+            // A pinch of the photographer's that still goes on has its label back, which this one took the place of.
+            if (heldLabel != null) showZoomingLabel(binding) else chip.isVisible = false
         }
+    }
+
+    /**
+     * What the photographer did on their own camera (FR-7.4, #292), in the words Camera has for what the subject did,
+     * since the same thing happened the other way round. The focus's line is as short as Camera's.
+     */
+    private fun showPhotographerLine(binding: FragmentSubjectBinding, line: PhotographerLine) {
+        val ui = viewModel.uiState.value
+        val name = ui.photographerName ?: return
+        val white = R.color.pix_text
+        when (line) {
+            PhotographerLine.Focused -> showToggleLabel(
+                binding,
+                getString(R.string.remote_focus_notice, name),
+                R.drawable.ic_target_small,
+                white,
+                SessionViewModel.FOCUS_NOTICE_MS,
+            )
+
+            is PhotographerLine.Did -> when (val action = line.action) {
+                is PhotographerAction.Zoom -> showToggleLabel(
+                    binding,
+                    getString(R.string.remote_zoom_notice, name, DecimalFormat("0.#").format(action.ratio)),
+                    R.drawable.ic_zoom_small,
+                    white,
+                )
+
+                is PhotographerAction.Brightness -> showToggleLabel(
+                    binding,
+                    getString(
+                        R.string.remote_brightness_notice,
+                        name,
+                        ExposureScale.formatEv(action.index, ui.exposureStep),
+                    ),
+                    R.drawable.ic_brightness,
+                    white,
+                )
+
+                is PhotographerAction.Timer -> if (action.timer == ShutterTimer.OFF) {
+                    showToggleLabel(
+                        binding,
+                        getString(R.string.remote_timer_off_notice, name),
+                        R.drawable.ic_menu_timer_off,
+                        white,
+                    )
+                } else {
+                    showToggleLabel(
+                        binding,
+                        getString(R.string.remote_timer_notice, name, action.timer.seconds),
+                        timerIcon(action.timer),
+                        white,
+                    )
+                }
+
+                is PhotographerAction.Flash -> when (action.mode) {
+                    FlashMode.OFF -> showToggleLabel(
+                        binding,
+                        getString(R.string.remote_flash_off_notice, name),
+                        R.drawable.ic_flash_off,
+                        white,
+                    )
+
+                    FlashMode.AUTO -> showToggleLabel(
+                        binding,
+                        getString(R.string.remote_flash_auto_notice, name),
+                        R.drawable.ic_flash_auto,
+                        white,
+                    )
+
+                    FlashMode.ON -> showToggleLabel(
+                        binding,
+                        getString(R.string.remote_flash_on_notice, name),
+                        R.drawable.ic_flash_on,
+                        white,
+                    )
+                }
+
+                PhotographerAction.GuideMove -> showToggleLabel(
+                    binding,
+                    getString(R.string.remote_guide_move_notice, name),
+                    R.drawable.ic_guide,
+                    white,
+                )
+
+                PhotographerAction.Guide ->
+                    showToggleLabel(binding, getString(R.string.remote_guide_notice, name), R.drawable.ic_guide, white)
+
+                is PhotographerAction.GuideVisible -> if (action.visible) {
+                    showToggleLabel(
+                        binding,
+                        getString(R.string.remote_guide_show_notice, name),
+                        R.drawable.ic_visibility,
+                        white,
+                    )
+                } else {
+                    showToggleLabel(
+                        binding,
+                        getString(R.string.remote_guide_hide_notice, name),
+                        R.drawable.ic_visibility_off_small,
+                        white,
+                    )
+                }
+
+                is PhotographerAction.GuideOpacity -> showToggleLabel(
+                    binding,
+                    getString(R.string.remote_guide_opacity_notice, name, (action.opacity * 100f).roundToInt()),
+                    R.drawable.ic_guide,
+                    white,
+                )
+
+                // Said with its Undo through guideRemoved, which waits for this screen (FR-7.2).
+                PhotographerAction.GuideRemove -> Unit
+
+                PhotographerAction.GuideRestore -> showToggleLabel(
+                    binding,
+                    getString(R.string.remote_guide_restore_notice, name),
+                    R.drawable.ic_guide,
+                    white,
+                )
+            }
+        }
+    }
+
+    /**
+     * "… is zooming" for as long as the photographer's pinch (#292): a label without a time of its own, which goes with
+     * [letHeldLabelGo] or when another label takes its place.
+     */
+    private fun holdZoomingLabel(binding: FragmentSubjectBinding) {
+        toggleLabelJob?.cancel()
+        showZoomingLabel(binding)
+    }
+
+    /** Puts "… is zooming" in the label's place and keeps its text as the held one. */
+    private fun showZoomingLabel(binding: FragmentSubjectBinding) {
+        val name = viewModel.uiState.value.photographerName ?: return
+        val text = getString(R.string.zoom_held_label, name)
+        val chip = binding.toggleLabel
+        chip.text = text
+        setLabelIcon(chip, R.drawable.ic_zoom_small, R.color.pix_text)
+        chip.isVisible = true
+        heldLabel = text
+    }
+
+    /** The pinch is over: its label goes, unless another label has taken its place and keeps its own time. */
+    private fun letHeldLabelGo(binding: FragmentSubjectBinding) {
+        val held = heldLabel ?: return
+        heldLabel = null
+        if (toggleLabelJob?.isActive == true || binding.toggleLabel.text.toString() != held) return
+        binding.toggleLabel.isVisible = false
     }
 
     /** Over the guide-edit mode toggle for a few seconds: what a pinch moves now (Design 2.8). */
@@ -1106,7 +1911,17 @@ class SubjectFragment : Fragment(R.layout.fragment_subject) {
         }
     }
 
-    private companion object {
+    internal companion object {
+        /** How far the thumbnail and a step's button each stand from the right third's middle while a step lasts. */
+        const val STEP_BESIDE_THUMBNAIL_DP = 26f
+
+        /** Half the shutter, and what a step's name keeps clear of it. */
+        const val SHUTTER_HALF_DP = 36f
+        const val STEP_CLEAR_OF_SHUTTER_DP = 4f
+
+        /** A control's smallest width (NFR-16), which a step's name may always take. */
+        const val MIN_TOUCH_DP = 48f
+
         const val STALL_NANOS = 2_000_000_000L
         const val STALL_CHECK_MS = 500L
 

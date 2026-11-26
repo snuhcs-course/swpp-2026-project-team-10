@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -391,7 +391,7 @@ class CameraTransitionTest {
         assertEquals(1f, controls.sceneTitle.alpha, 0f)
         assertEquals(1f, controls.sceneGuide.alpha, 0f)
         assertEquals(0f, controls.sceneGuide.translationY, 0f)
-        assertEquals(0.2f, controls.sceneProgress.filled, 0.001f)
+        assertEquals(0.25f, controls.sceneProgress.filled, 0.001f)
         assertEquals(R.drawable.bg_shutter_scene, controls.shutterButton.tag)
         assertTrue(controls.shutterButton.background is StateListDrawable)
 
@@ -712,7 +712,7 @@ class CameraTransitionTest {
         assertEquals(1f, screen.controls.sceneTitle.alpha, 0f)
         assertEquals(1f, screen.controls.sceneGuide.alpha, 0f)
         assertEquals(0f, screen.controls.sceneGuide.translationY, 0f)
-        assertEquals(0.2f, screen.controls.sceneProgress.filled, 0.001f)
+        assertEquals(0.25f, screen.controls.sceneProgress.filled, 0.001f)
         assertEquals(null, screen.fragment.shutterTurn)
         assertTrue(screen.controls.shutterButton.background is StateListDrawable)
         play(16)

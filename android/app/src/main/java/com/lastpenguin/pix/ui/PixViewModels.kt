@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.lastpenguin.pix.PixApplication
 import com.lastpenguin.pix.core.AppContainer
+import com.lastpenguin.pix.session.PhotographerAction
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.partner
 import com.lastpenguin.pix.ui.account.AccountViewModel
@@ -41,12 +42,20 @@ object PixViewModels {
                 container.savedGuideStore,
                 container.poseTips.onCamera,
                 container.photoSyncer,
-                albumPhotos = container.albumPhotos,
+                phonePhotos = container.phonePhotos.photos,
+                photoAccess = container.phonePhotos.access,
+                photoAlbums = container.phonePhotos.albums,
+                rereadPhotos = container.phonePhotos::refresh,
+                photoEdits = container.phonePhotos.edits,
                 sessionPhotos = container.photoSyncer.sessionPhotos,
                 deleter = container.photoDeleter,
-                baseBrightness = container.appSettings.baseBrightness,
                 phoneTurns = container.phoneTurns,
                 zoomHold = container.remoteControlHandler.zoomHold,
+                timerChoice = container.remoteControlHandler.timerChoice,
+                onFocused = container.remoteControlHandler::focusedHere,
+                onDid = container.remoteControlHandler::didHere,
+                onRemoved = container.remoteControlHandler::removedHere,
+                onCountdown = container.remoteControlHandler::countdownHere,
             )
         }
         initializer {
@@ -57,6 +66,7 @@ object PixViewModels {
                 container.poseTips,
                 container.guideSyncer,
                 container.confirmSyncer,
+                onGuideSet = { container.remoteControlHandler.didHere(PhotographerAction.Guide) },
             )
         }
         initializer {
@@ -68,6 +78,7 @@ object PixViewModels {
                 share = container.poseSyncer,
                 descriptions = container.descriptionSyncer,
                 history = container.promptHistory,
+                library = container.poseLibrary,
                 partner = { container.sessionManager.state.value.partner },
                 phoneTurn = container.phoneTurns.turn,
             )
@@ -102,6 +113,8 @@ object PixViewModels {
                 container.tipSyncer,
                 sessionPhotos = container.photoSyncer.sessionPhotos,
                 deleter = container.photoDeleter,
+                receivingPhoto = container.photoSyncer.receiving,
+                offering = container.guideSyncer.offering,
                 phoneTurns = container.phoneTurns,
             )
         }
@@ -109,7 +122,7 @@ object PixViewModels {
         initializer {
             SubjectGeneratingViewModel(container.sessionManager, container.poseSyncer, container.descriptionSyncer)
         }
-        initializer { PoseSaveViewModel(container.referenceGuideMaker, container.savedGuideStore) }
+        initializer { PoseSaveViewModel(container.poseLibrary, container.savedGuideStore) }
         initializer { SubjectConfirmViewModel(container.sessionManager, container.confirmSyncer) }
         initializer {
             SubjectDescribeViewModel(container.sessionManager, container.descriptionSyncer, container.promptHistory)

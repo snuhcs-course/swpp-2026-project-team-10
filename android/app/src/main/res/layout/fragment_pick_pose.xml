@@ -3,9 +3,11 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:background="@color/pix_ground"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:clipToPadding="false"
     android:paddingHorizontal="20dp"
     android:paddingTop="8dp"
     android:paddingBottom="20dp">
@@ -13,8 +15,12 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginStart="-12dp"
+        android:layout_marginEnd="-12dp"
+        android:clipToPadding="false"
         android:gravity="center_vertical"
-        android:minHeight="56dp">
+        android:minHeight="56dp"
+        android:paddingHorizontal="12dp">
 
         <ImageButton
             android:id="@+id/backButton"
@@ -41,15 +47,15 @@
             android:text="@string/select_pose" />
     </LinearLayout>
 
-    <!-- Where this screen is in the pose flow (R&S 6.3, #210): Pick a pose, 5 of 5. Across the screen, past this
-         layout's padding. -->
+    <!-- Where this screen is in the pose flow (R&S 6.3, #210): Pick a pose, 4 of 4. Across the screen, past this
+         layout's padding. The layout draws past its padding, so the bar reaches the edges on screen too. -->
     <com.lastpenguin.pix.ui.FlowProgressView
         android:id="@+id/flowProgress"
         android:layout_width="match_parent"
         android:layout_height="@dimen/flow_progress_height"
         android:layout_marginStart="-20dp"
         android:layout_marginEnd="-20dp"
-        app:flowStep="5" />
+        app:flowStep="4" />
 
     <!--
         The candidates one at a time, as large as the screen allows; a swipe shows the next. The pose on screen is the

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Dongje Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Dongje Park and Joonhyung Han
 package com.lastpenguin.pix.ui.generation
 
 import android.graphics.Bitmap
@@ -53,7 +53,6 @@ class PoseTipScreenTest {
         activity.viewModel<GenerationViewModel>().apply {
             beginScene()
             takeScene()
-            useScene()
             suggestPoses()
         }
         val run = modules.generator.runs.single()
@@ -87,6 +86,8 @@ class PoseTipScreenTest {
             source = GuideSource.GENERATED,
             anchor = NormalizedRect(0.3f, 0.1f, 0.7f, 0.9f),
         )
+        // The library cuts out each candidate in turn (#297): the first, then the selected second.
+        modules.maker.finish(Result.success(guide.copy(id = "first")))
         modules.maker.finish(Result.success(guide))
         idle()
 

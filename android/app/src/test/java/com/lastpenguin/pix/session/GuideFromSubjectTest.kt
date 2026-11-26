@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.guide.GuideSource
@@ -33,10 +33,11 @@ import org.junit.Test
  * Subject, the offered guide (state-based): drawn at once at its anchor and sent with anchor and source, after its
  * reference photo when it has one; kept when a
  * state names it, while the photographer's own messages wait; dropped after the deadline, which draws the
- * photographer's guide and state again and reports it, also the guide a reconnecting subject's mirror kept; still
+ * photographer's guide and state again and reports it, also the guide a reconnecting subject held from before; still
  * adopted after a clear that came first; an answer after the deadline still finds its image; an offer while not
  * connected sends nothing and is reported; a reference of the photographer's earlier guide that arrives after the
- * answer leaves the offered guide's own thumbnail.
+ * answer leaves the offered guide's own thumbnail. While it waits, the offered guide is `offering`, for Subject view's
+ * panel (FR-7.2): from the offer until a state names it, or until the deadline.
  * Photographer, while its first guide is still being sent: a guide adopted from the subject gets no image back and
  * nothing of the first guide after its state; a guide replaced on this phone gets its image before its state, and the
  * first guide's state and reference are not sent.
@@ -50,6 +51,7 @@ class GuideFromSubjectTest {
     private val codec = FakeGuideImageCodec()
     private val references = FakeGuideReferenceCodec()
     private val mirrorReference = MirrorReference()
+    private val held = HeldGuide()
 
     private val box = NormalizedRect(0.3f, 0.2f, 0.7f, 0.9f)
 
@@ -62,6 +64,7 @@ class GuideFromSubjectTest {
             references,
             mirrorReference,
             StandardTestDispatcher(testScheduler),
+            held,
         )
 
     private fun connectedAs(role: Role, haveGuideId: String? = null) {
@@ -404,6 +407,29 @@ class GuideFromSubjectTest {
     }
 
     @Test
+    fun `the offered guide is offering until a state names it, or until the deadline`() = runTest {
+        connectedAs(Role.SUBJECT)
+        val syncer = syncer()
+        syncer.startAsReceiver(backgroundScope)
+        runCurrent()
+        assertNull(syncer.offering.value)
+
+        syncer.offer(mine("s1"))
+        runCurrent()
+        assertEquals("s1", syncer.offering.value)
+        session.deliver(SessionMessage.GuideStateUpdate(GuideState("s1"), final = true, by = Role.SUBJECT))
+        runCurrent()
+        assertNull(syncer.offering.value)
+
+        syncer.offer(mine("s2"))
+        runCurrent()
+        assertEquals("s2", syncer.offering.value)
+        advanceTimeBy(GuideSyncer.OFFER_TIMEOUT_MS + 1)
+        runCurrent()
+        assertNull(syncer.offering.value)
+    }
+
+    @Test
     fun `an offer no state names draws the photographer's guide again after the deadline`() = runTest {
         connectedAs(Role.SUBJECT)
         val syncer = syncer()
@@ -430,10 +456,10 @@ class GuideFromSubjectTest {
     }
 
     @Test
-    fun `after a reconnect an offer no state names draws the guide the mirror kept`() = runTest {
+    fun `after a reconnect an offer no state names draws the guide held from before`() = runTest {
         // From before the reconnect: hello names this guide, so only its state comes again.
-        mirror.setGuide(fakeGuide("p1"))
-        mirrorReference.set(GuideReference("p1", fakeBitmap()))
+        held.guide = fakeGuide("p1")
+        held.reference = GuideReference("p1", fakeBitmap())
         connectedAs(Role.SUBJECT, haveGuideId = "p1")
         val syncer = syncer()
         syncer.startAsReceiver(backgroundScope)

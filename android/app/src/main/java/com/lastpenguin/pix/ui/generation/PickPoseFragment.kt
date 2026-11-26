@@ -1,9 +1,8 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han, Jaewan Park, Dongje Park, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han, Jaewan Park, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
 import android.view.View
-import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -20,21 +19,21 @@ import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentPickPoseBinding
 import com.lastpenguin.pix.generation.CandidateEvent
 import com.lastpenguin.pix.guide.ReferenceGuide
-import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
+import com.lastpenguin.pix.ui.showNotice
 import kotlinx.coroutines.launch
 
 /**
  * Pick a pose (R&S 6.3): the created candidates one at a time, as large as the screen allows, and a swipe for the
  * next. The pose on screen is the selected one, which *Select* at the top right takes. In a session the subject sees
  * the same candidates, and a pick of theirs that comes first goes on here like this phone's own (Design 2.6.5). The ♥
- * on a candidate keeps it in this phone's library (FR-4.14), and *Select* goes on with the guide it saved.
- * Back goes one step back (#199): it asks first, since the set is lost, then goes to Generate poses with the photo
- * and the description kept. Back on Reference confirm comes back here with the set. *Regenerate* makes a new set of
+ * on a candidate marks it a favorite in this phone's library (FR-4.14), where every candidate is kept anyway (#297),
+ * and *Select* goes on with the guide kept there. Back goes one step back (#199), to Generate poses with the photo and
+ * the description kept, at once, since the poses stay in the library. Back on Reference confirm comes back here with the set. *Regenerate* makes a new set of
  * the same request. In a session the set goes to the subject's phone, so the choice is final, and there is no
  * *Regenerate*.
  * Owner: Server/AI/Sync (#7). The chosen pose goes to Reference confirm (#5); the set on both phones Iter3-P16; the ♥
@@ -68,12 +67,12 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
 
         binding.selectButton.setOnClickListener {
             // Read before usePose, which ends the choosing.
-            val saved = savedGuide(viewModel.uiState.value)
-            viewModel.usePose()?.let { goOn(it, chosenBy = null, saved) }
+            val state = viewModel.uiState.value
+            viewModel.usePose()?.let { goOn(it, chosenBy = null, keptGuide(state, it)) }
         }
-        binding.backButton.setOnClickListener { askToGoBack() }
+        binding.backButton.setOnClickListener { describeAgain() }
         // System back does what Back does (R&S 6.9).
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { askToGoBack() }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { describeAgain() }
         binding.regenerateButton.setOnClickListener { regenerate() }
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -128,24 +127,24 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         val state = viewModel.uiState.value
         val setId = state.setId ?: return
         val image = (slot.event as? CandidateEvent.Ready)?.image ?: return
-        saves.toggle(PoseKey(setId, slot.pose.id), image, state.sceneTurn)
+        saves.toggle(PoseKey(setId, slot.pose.id), image, state.sceneTurn, state.situation)
     }
 
-    /** The guide the ♥ saved for the selected candidate, if it did. */
-    private fun savedGuide(state: GenerationUiState): ReferenceGuide? {
+    /** The guide the library keeps for the selected candidate (#297), waited for if it is still being cut out. */
+    private fun keptGuide(state: GenerationUiState, use: PoseUse): (suspend () -> Result<ReferenceGuide>)? {
         val setId = state.setId ?: return null
-        val poseId = state.selectedPoseId ?: return null
-        return saves.savedGuide(PoseKey(setId, poseId))
+        val key = PoseKey(setId, state.selectedPoseId ?: return null)
+        return { saves.keptGuide(key, use.image, use.turn, use.situation) }
     }
 
     /**
      * The chosen pose goes to Reference confirm, the same step as an uploaded photo: the person is separated on the
-     * phone (FR-4.6), unless its ♥ [saved] it already, whose guide goes on. [chosenBy] names the subject when it was
+     * phone (FR-4.6) once, by the library, which [kept] waits for (#297). [chosenBy] names the subject when it was
      * their pick. Outside a session this screen stays under it with the set, for its Back (#199); in a session the
      * choice is final on both phones, so the set is let go.
      */
-    private fun goOn(use: PoseUse, chosenBy: String?, saved: ReferenceGuide?) {
-        referenceViewModel.onCandidatePicked(use.image, use.tipSource, chosenBy, saved, use.turn)
+    private fun goOn(use: PoseUse, chosenBy: String?, kept: (suspend () -> Result<ReferenceGuide>)?) {
+        referenceViewModel.onCandidatePicked(use.image, use.tipSource, chosenBy, kept, use.turn, use.situation)
         if (!inSession()) {
             handedOn = true
             findNavController().navigate(R.id.action_pickPose_to_referenceConfirm)
@@ -161,14 +160,10 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         viewModel.cancel()
     }
 
-    /** Back: asks first, as the set is lost, on the subject's phone too in a session. */
-    private fun askToGoBack() {
-        confirmGoingBack(generating = false, onConfirm = ::describeAgain)
-    }
-
     /**
-     * Back confirmed: Generate poses again, with the photo and the description kept, so the user can change what to
-     * ask for; the set is gone.
+     * Back: Generate poses again at once, with the photo and the description kept, so the user can change what to ask
+     * for. The set ends, on the subject's phone too in a session; its poses stay in the library, which Generate poses
+     * says (#297).
      */
     private fun describeAgain() {
         viewModel.describeAgain()
@@ -208,7 +203,8 @@ class PickPoseFragment : Fragment(R.layout.fragment_pick_pose) {
         if (state.chosenBy == Role.SUBJECT && state.phase == GenerationUiState.Phase.PICKING && image != null &&
             inFront
         ) {
-            goOn(PoseUse(image, state.tipSource, state.sceneTurn), chosenBy = subjectName(), savedGuide(state))
+            val use = PoseUse(image, state.tipSource, state.sceneTurn, state.situation)
+            goOn(use, chosenBy = subjectName(), keptGuide(state, use))
             return
         }
 
@@ -283,17 +279,11 @@ internal fun Fragment.showPoseSaveNotice(notice: PoseSaveNotice) {
     val context = requireContext()
     val text = when (notice) {
         PoseSaveNotice.SAVED -> context.getString(R.string.pose_saved_notice)
-
-        PoseSaveNotice.SAVED_OLDEST_REMOVED ->
-            context.getString(R.string.guide_saved_oldest_removed_notice, SavedGuideStore.MAX_SAVED)
-
         PoseSaveNotice.REMOVED -> context.getString(R.string.pose_removed_notice)
-
         PoseSaveNotice.NO_PERSON -> context.getString(R.string.pose_no_person_notice)
-
         PoseSaveNotice.FAILED -> context.getString(R.string.guide_save_failed_notice)
     }
-    Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+    showNotice(text)
 }
 
 private const val HANDED_ON = "handedOn"

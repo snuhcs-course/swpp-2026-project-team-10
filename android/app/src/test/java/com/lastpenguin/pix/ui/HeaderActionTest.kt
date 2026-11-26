@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-12, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.graphics.Color
@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.android.material.button.MaterialButton
 import com.lastpenguin.pix.R
+import kotlin.math.roundToInt
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -19,7 +20,7 @@ import org.robolectric.annotation.GraphicsMode
  * The step's action at a screen's top right is yellow text without a pill (R&S 6.9, #204): `Widget.Pix.Button.Header`
  * on each screen that has one. Partitions: each of the five screens (the camera's scene photo review, Reference
  * confirm, Pick a pose, Generate poses, the failure screen); the action enabled (the accent) and disabled (faint); the
- * text's alignment (at the touch area's right edge).
+ * pill under a touch, 32 dp tall around the text with 12 dp on each side, in a touch area at least 48 dp each way.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -34,7 +35,6 @@ class HeaderActionTest {
 
     private val actions
         get() = listOf(
-            action(R.layout.fragment_camera, R.id.usePhotoButton),
             action(R.layout.fragment_reference_confirm, R.id.useGuideButton),
             action(R.layout.fragment_pick_pose, R.id.selectButton),
             action(R.layout.fragment_describe_pose, R.id.generateButton),
@@ -69,11 +69,16 @@ class HeaderActionTest {
     }
 
     @Test
-    fun everyTopRightAction_endsAtItsRightEdge() {
+    fun everyTopRightAction_hasAPillAroundItsText_32dpTall_inATouchArea48dpEachWay() {
+        val density = activity.resources.displayMetrics.density
         for (button in actions) {
             val name = activity.resources.getResourceEntryName(button.id)
-            assertEquals(name, Gravity.END, button.gravity and Gravity.RELATIVE_HORIZONTAL_GRAVITY_MASK)
-            assertEquals(name, 0, button.paddingEnd)
+            assertEquals(name, Gravity.CENTER_HORIZONTAL, button.gravity and Gravity.HORIZONTAL_GRAVITY_MASK)
+            assertEquals(name, 12, (button.paddingStart / density).roundToInt())
+            assertEquals(name, 12, (button.paddingEnd / density).roundToInt())
+            assertEquals(name, 32, ((button.minHeight - button.insetTop - button.insetBottom) / density).roundToInt())
+            assertEquals(name, 48, (button.minHeight / density).roundToInt())
+            assertEquals(name, 48, (button.minWidth / density).roundToInt())
         }
     }
 }

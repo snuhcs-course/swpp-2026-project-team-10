@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix.ui.account
 
 import android.content.DialogInterface
@@ -8,7 +8,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
@@ -27,6 +26,8 @@ import com.lastpenguin.pix.account.passwordProblem
 import com.lastpenguin.pix.databinding.DialogTextInputBinding
 import com.lastpenguin.pix.databinding.SheetAccountBinding
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.showNotice
+import com.lastpenguin.pix.ui.showNoticeInDialog
 import kotlinx.coroutines.launch
 
 /**
@@ -82,7 +83,9 @@ class AccountSheet : BottomSheetDialogFragment() {
                             AccountEvent.AccountDeleted -> R.string.account_deleted
                             else -> null
                         }
-                        message?.let { Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show() }
+                        // Signing out or deleting the account closes the sheet; the other notices stay in it.
+                        val closes = event == AccountEvent.SignedOut || event == AccountEvent.AccountDeleted
+                        message?.let { if (closes) showNotice(it) else showNoticeInDialog(it) }
                     }
                 }
             }

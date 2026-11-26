@@ -1,8 +1,9 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.session.protocol.ChannelRouter
 import com.lastpenguin.pix.session.protocol.ChannelRouter.Channel
+import com.lastpenguin.pix.session.protocol.DescriptionStep
 import com.lastpenguin.pix.session.protocol.MessageCodec
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.session.signaling.IceCandidate
@@ -12,6 +13,7 @@ import com.lastpenguin.pix.session.signaling.SignalMessage
 import com.lastpenguin.pix.telemetry.TelemetryEvent.SessionConnect
 import com.lastpenguin.pix.telemetry.TelemetryEvent.SessionDrop
 import com.lastpenguin.pix.telemetry.TelemetryRecorder
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -59,6 +61,7 @@ class RtcSessionManagerTest {
         haveGuideId: () -> String? = { null },
         haveReferenceId: () -> String? = { null },
         accessToken: suspend () -> String? = { null },
+        accountName: () -> String? = { null },
     ): RtcSessionManager {
         val manager = RtcSessionManager(
             signaling = signaling,
@@ -74,6 +77,7 @@ class RtcSessionManagerTest {
             haveGuideId = haveGuideId,
             haveReferenceId = haveReferenceId,
             accessToken = accessToken,
+            accountName = accountName,
         )
         backgroundScope.launch { manager.incoming.collect { incoming += it } }
         runCurrent()
@@ -221,6 +225,25 @@ class RtcSessionManagerTest {
         runCurrent()
 
         assertEquals(PeerConfig(Role.SUBJECT, relay), peers.created.single().config)
+        manager.leave(EndReason.LEFT)
+        runCurrent()
+    }
+
+    @Test
+    fun `hello names the signed-in account in place of the phone`() = runTest {
+        val manager = manager(accountName = { "Test Account 1" })
+        manager.start(SessionEntry.NewRoom, Role.PHOTOGRAPHER)
+        runCurrent()
+        signaling.push(SignalEvent.Opened)
+        signaling.receive(SignalMessage.RoomCreated("482915", "s_1"))
+        signaling.receive(SignalMessage.PeerJoined())
+        runCurrent()
+        val peer = peers.created.single()
+
+        peer.open()
+        runCurrent()
+
+        assertEquals("Test Account 1", (peer.sentMessages().first() as SessionMessage.Hello).name)
         manager.leave(EndReason.LEFT)
         runCurrent()
     }
@@ -412,7 +435,7 @@ class RtcSessionManagerTest {
     // The `session_connect` and `session_drop` events (NFR-10, NFR-11; Design 2.8, Telemetry). Partitions: the subject's
     // try from its start and the photographer's from the subject joining, each connected once and nothing more at the
     // end; a try that failed by the connecting timeout and by an unknown code; a photographer no subject joined (none);
-    // a drop recovered within 10 s, one that was not, one that ended with the session before the 10 s, and one a new
+    // a drop recovered within the 30 s, one that was not, one that ended with the session before them, and one a new
     // subject replaced, each sent once, with the time since the link dropped on the clock for durations, never the wall
     // clock.
     @Test
@@ -520,15 +543,15 @@ class RtcSessionManagerTest {
         elapsedNow = 30_000
         peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
         runCurrent()
-        elapsedNow = 40_000
-        advanceTimeBy(10_100)
+        elapsedNow = 30_000 + RtcSessionManager.RECONNECT_BUDGET_MS
+        advanceTimeBy(RtcSessionManager.RECONNECT_BUDGET_MS + 100)
         runCurrent()
         assertEquals(SessionState.Waiting("482915"), manager.state.value)
 
         assertEquals(
             listOf(
                 SessionDrop(Role.PHOTOGRAPHER, recovered = true, ms = 4_000),
-                SessionDrop(Role.PHOTOGRAPHER, recovered = false, ms = 10_000),
+                SessionDrop(Role.PHOTOGRAPHER, recovered = false, ms = RtcSessionManager.RECONNECT_BUDGET_MS),
             ),
             telemetry.sent<SessionDrop>(),
         )
@@ -547,7 +570,7 @@ class RtcSessionManagerTest {
         now = -60_000
         manager.leave()
         runCurrent()
-        advanceTimeBy(11_000)
+        advanceTimeBy(RtcSessionManager.RECONNECT_BUDGET_MS + 1_000)
         runCurrent()
 
         assertEquals(
@@ -611,7 +634,7 @@ class RtcSessionManagerTest {
         peer.push(PeerEvent.Link(LinkState.FAILED))
         runCurrent()
         assertTrue(manager.state.value is SessionState.Reconnecting)
-        advanceTimeBy(10_001)
+        advanceTimeBy(RtcSessionManager.RECONNECT_BUDGET_MS + 1)
         runCurrent()
         assertEquals(SessionState.Waiting("482915"), manager.state.value)
         assertTrue(peer.closed)
@@ -627,19 +650,28 @@ class RtcSessionManagerTest {
     }
 
     @Test
-    fun `a link back within 10 s ends Reconnecting, and one that stays down ends the session`() = runTest {
+    fun `a link back within 30 s ends Reconnecting, and one that stays down ends the session`() = runTest {
         val (manager, peer) = connectedPhotographer()
 
+        // Back after 25 s, well past the 10 s the wait was until Iteration 5 (#293).
         peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
-        advanceTimeBy(5_000)
+        advanceTimeBy(25_000)
         runCurrent()
+        assertTrue(manager.state.value is SessionState.Reconnecting)
         peer.push(PeerEvent.Link(LinkState.CONNECTED))
         advanceTimeBy(6_000)
         runCurrent()
-        assertTrue(manager.state.value is SessionState.Connected)
+        assertEquals(1, (manager.state.value as SessionState.Connected).drops)
+
+        // Each drop it comes back from counts.
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+        peer.push(PeerEvent.Link(LinkState.CONNECTED))
+        runCurrent()
+        assertEquals(2, (manager.state.value as SessionState.Connected).drops)
 
         peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
-        advanceTimeBy(10_100)
+        advanceTimeBy(RtcSessionManager.RECONNECT_BUDGET_MS + 100)
         runCurrent()
         assertEquals(SessionState.Waiting("482915"), manager.state.value)
     }
@@ -697,6 +729,84 @@ class RtcSessionManagerTest {
 
         assertEquals(listOf(1f, 3f), incoming.filterIsInstance<SessionMessage.ZoomSet>().map { it.ratio })
         manager.leave(EndReason.LEFT)
+    }
+
+    // The readers of `incoming` (Design 2.8, Backpressure), state-based: a reader that stands still, as on a busy main
+    // thread, while a photo's chunks and a step's end arrive (it loses none, nor does another reader); boundary: a
+    // reader one queue behind, and further (its own newest are lost, no other reader's).
+    @Test
+    fun `a reader that stands still loses no message, and costs the other readers none`() = runTest {
+        val (manager, peer) = connectedSubject()
+        val gate = CompletableDeferred<Unit>()
+        val still = mutableListOf<SessionMessage>()
+        backgroundScope.launch {
+            manager.incoming.collect {
+                gate.await()
+                still += it
+            }
+        }
+        runCurrent()
+
+        repeat(200) {
+            peer.deliver(otherPhone.encode(SessionMessage.PhotoChunk("p1", it, "data")))
+            runCurrent()
+        }
+        val end = SessionMessage.PoseDescription("d1", DescriptionStep.CLOSED)
+        peer.deliver(otherPhone.encode(end))
+        runCurrent()
+
+        assertEquals(200, incoming.count { it is SessionMessage.PhotoChunk })
+        assertEquals(end, incoming.last())
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(200, still.count { it is SessionMessage.PhotoChunk })
+        assertEquals(end, still.last())
+        manager.leave(EndReason.LEFT)
+    }
+
+    @Test
+    fun `a reader further behind than its queue loses its own newest messages only`() = runTest {
+        val fanout = MessageFanout<Int>()
+        val gate = CompletableDeferred<Unit>()
+        val still = mutableListOf<Int>()
+        val running = mutableListOf<Int>()
+        backgroundScope.launch {
+            fanout.flow.collect {
+                gate.await()
+                still += it
+            }
+        }
+        backgroundScope.launch { fanout.flow.collect { running += it } }
+        runCurrent()
+
+        val sent = MessageFanout.READER_QUEUE + 10
+        repeat(sent) {
+            fanout.send(it)
+            runCurrent()
+        }
+        gate.complete(Unit)
+        runCurrent()
+
+        assertEquals((0 until sent).toList(), running)
+        // The message it stood on, and a full queue behind it.
+        assertEquals((0..MessageFanout.READER_QUEUE).toList(), still)
+    }
+
+    @Test
+    fun `a reader gets what comes after it started, and is forgotten once it stops`() = runTest {
+        val fanout = MessageFanout<Int>()
+        fanout.send(1)
+        val read = mutableListOf<Int>()
+        val reader = backgroundScope.launch { fanout.flow.collect { read += it } }
+        runCurrent()
+        fanout.send(2)
+        runCurrent()
+        reader.cancel()
+        runCurrent()
+        fanout.send(3)
+        runCurrent()
+
+        assertEquals(listOf(2), read)
     }
 
     @Test
@@ -921,12 +1031,30 @@ class RtcSessionManagerTest {
     // ---- Reconnection (Design 2.6.7) -----------------------------------------------------------------------------
 
     @Test
+    fun `a dropped link keeps the photographer's name and the subject's role in Reconnecting`() = runTest {
+        val (manager, peer) = connectedSubject(token = "subject-token")
+
+        peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
+        runCurrent()
+
+        assertEquals(
+            SessionState.Reconnecting("s_1", 0L, peer = PeerInfo("Dongje"), role = Role.SUBJECT),
+            manager.state.value,
+        )
+        manager.leave()
+    }
+
+    @Test
     fun `a dropped link puts the photographer in Reconnecting, takes its place again, and restarts ICE`() = runTest {
         val (manager, peer) = connectedPhotographer(token = "photographer-token")
 
         peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
         runCurrent()
-        assertEquals(SessionState.Reconnecting("s_1", 0L), manager.state.value)
+        // The state says whose session reconnects, as Connected did (#293).
+        assertEquals(
+            SessionState.Reconnecting("s_1", 0L, peer = PeerInfo("Joonhyung"), role = Role.PHOTOGRAPHER),
+            manager.state.value,
+        )
         // A new socket, even though the old one looked open.
         assertEquals(2, signaling.connectedUrls.size)
 
@@ -944,7 +1072,11 @@ class RtcSessionManagerTest {
         peer.push(PeerEvent.Link(LinkState.CONNECTED))
         runCurrent()
         assertEquals("v=0 restart answer", peer.remote.last().sdp)
-        assertEquals(SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER), manager.state.value)
+        // Not the state before the drop: a reader that missed Reconnecting still sees the link came back (#293).
+        assertEquals(
+            SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER, drops = 1),
+            manager.state.value,
+        )
         // The same connection: its channels and video track stayed.
         assertEquals(1, peers.created.size)
         assertFalse(peer.closed)
@@ -1018,7 +1150,7 @@ class RtcSessionManagerTest {
 
         peer.push(PeerEvent.Link(LinkState.CONNECTED))
         runCurrent()
-        assertEquals(SessionState.Connected("s_1", PeerInfo("Dongje"), Role.SUBJECT), manager.state.value)
+        assertEquals(SessionState.Connected("s_1", PeerInfo("Dongje"), Role.SUBJECT, drops = 1), manager.state.value)
         assertEquals(1, peers.created.size)
         manager.leave(EndReason.LEFT)
     }
@@ -1044,11 +1176,11 @@ class RtcSessionManagerTest {
     }
 
     @Test
-    fun `the photographer gives up after 10 s of reconnecting and keeps the room`() = runTest {
+    fun `the photographer gives up after 30 s of reconnecting and keeps the room`() = runTest {
         val (manager, peer) = connectedPhotographer(token = "photographer-token")
 
         peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
-        advanceTimeBy(9_999)
+        advanceTimeBy(29_999)
         runCurrent()
         assertTrue(manager.state.value is SessionState.Reconnecting)
         assertTrue(incoming.none { it is SessionMessage.Leave })
@@ -1062,11 +1194,11 @@ class RtcSessionManagerTest {
     }
 
     @Test
-    fun `after 10 s the subject's Reconnect takes its place again with its token and the first credentials`() =
+    fun `after 30 s the subject's Reconnect takes its place again with its token and the first credentials`() =
         runTest {
             val (manager, peer) = connectedSubject(token = "subject-token")
             peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
-            advanceTimeBy(10_001)
+            advanceTimeBy(RtcSessionManager.RECONNECT_BUDGET_MS + 1)
             runCurrent()
             assertEquals(SessionState.Ended(EndReason.CONNECTION_LOST), manager.state.value)
 
@@ -1091,7 +1223,7 @@ class RtcSessionManagerTest {
     fun `a Reconnect that fails before the server answers keeps its token for the next one`() = runTest {
         val (manager, peer) = connectedSubject(token = "subject-token")
         peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
-        advanceTimeBy(10_001)
+        advanceTimeBy(RtcSessionManager.RECONNECT_BUDGET_MS + 1)
         runCurrent()
 
         // Tapped before the network is back: the socket fails before it opens.
@@ -1126,7 +1258,7 @@ class RtcSessionManagerTest {
     fun `a subject waiting for an offer takes its place again when the photographer is back`() = runTest {
         val (manager, peer) = connectedSubject(token = "subject-token")
         peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
-        advanceTimeBy(10_001)
+        advanceTimeBy(RtcSessionManager.RECONNECT_BUDGET_MS + 1)
         runCurrent()
         manager.start(SessionEntry.Rejoin("482915"), Role.SUBJECT)
         runCurrent()
@@ -1165,7 +1297,7 @@ class RtcSessionManagerTest {
         runCurrent()
         // Without a token there is no place to take again, so no new socket.
         assertEquals(1, signaling.connectedUrls.size)
-        advanceTimeBy(10_001)
+        advanceTimeBy(RtcSessionManager.RECONNECT_BUDGET_MS + 1)
         runCurrent()
 
         manager.start(SessionEntry.Rejoin("482915"), Role.SUBJECT)
@@ -1184,6 +1316,57 @@ class RtcSessionManagerTest {
         runCurrent()
         assertEquals(SessionState.Ended(EndReason.CONNECTION_LOST), manager.state.value)
         assertTrue(peer.closed)
+    }
+
+    @Test
+    fun `the photographer's timer is kept from the last camera state, and gone with the session`() = runTest {
+        val (manager, peer) = connectedSubject(token = "subject-token")
+        assertEquals(0, manager.peerTimerSeconds.value)
+
+        // Sent as the subject connects, before Subject view exists to read it from the messages (#318).
+        val state = SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, timer = 10)
+        peer.deliver(otherPhone.encode(state))
+        runCurrent()
+        assertEquals(10, manager.peerTimerSeconds.value)
+
+        manager.leave(EndReason.LEFT)
+        runCurrent()
+        manager.start(SessionEntry.RoomCode("482915"), Role.SUBJECT)
+        runCurrent()
+        assertEquals(0, manager.peerTimerSeconds.value)
+        manager.leave(EndReason.LEFT)
+    }
+
+    // ---- With the realtime channel lost, a moment is not sent (#314, #276): the reliable channel retransmits, so
+    // even free it could deliver the press after a drop, once the subject gave it up; a pinch's step still goes.
+
+    @Test
+    fun `with the realtime channel lost, a moment is not sent on the reliable one, even while it is free`() = runTest {
+        val (manager, peer) = connectedSubject(token = "subject-token")
+        peer.push(PeerEvent.ChannelClosed(Channel.REALTIME))
+        runCurrent()
+
+        manager.send(SessionMessage.ShutterPress(1))
+        manager.send(SessionMessage.ShutterPress(2, cancel = true))
+        manager.send(SessionMessage.PoseStart("full_body", request = 1))
+        // A step of a pinch goes there as before: late, it is only an old value.
+        manager.send(SessionMessage.ZoomSet(2f, final = false))
+        runCurrent()
+
+        val sent = peer.sentMessages()
+        assertTrue(sent.none { it is SessionMessage.ShutterPress || it is SessionMessage.PoseStart })
+        assertEquals(SessionMessage.ZoomSet(2f, final = false), sent.last())
+        assertEquals(Channel.RELIABLE, peer.sent.last().first)
+
+        // Nor later, once the channel has been backed up and drained.
+        peer.buffered = backpressureFull
+        manager.send(SessionMessage.ShutterPress(3))
+        runCurrent()
+        peer.buffered = 0
+        peer.push(PeerEvent.BufferedAmount(Channel.RELIABLE, 0))
+        runCurrent()
+        assertTrue(peer.sentMessages().none { it is SessionMessage.ShutterPress })
+        manager.leave(EndReason.LEFT)
     }
 
     @Test
@@ -1315,7 +1498,8 @@ class RtcSessionManagerTest {
             runCurrent()
         }
         assertEquals(7, signaling.connectedUrls.size)
-        advanceTimeBy(5_001)
+        // The rest of the wait: the 5 s above are gone.
+        advanceTimeBy(RtcSessionManager.RECONNECT_BUDGET_MS - 5_000 + 1)
         runCurrent()
         assertEquals(SessionState.Waiting("482915"), manager.state.value)
 
@@ -1405,7 +1589,10 @@ class RtcSessionManagerTest {
         // The friend stays through a dropped link, for a set started meanwhile (FR-4.11).
         peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
         runCurrent()
-        assertEquals(SessionState.Reconnecting("s_1", 0L, friend), manager.state.value)
+        assertEquals(
+            SessionState.Reconnecting("s_1", 0L, friend, PeerInfo("Joonhyung"), Role.PHOTOGRAPHER),
+            manager.state.value,
+        )
         manager.leave()
     }
 
@@ -1519,7 +1706,7 @@ class RtcSessionManagerTest {
     }
 
     @Test
-    fun `a link lost for 10 s ends an invitation's session for the photographer`() = runTest {
+    fun `a link lost for 30 s ends an invitation's session for the photographer`() = runTest {
         val manager = invitingPhotographer()
         signaling.receive(SignalMessage.PeerJoined())
         runCurrent()
@@ -1530,7 +1717,7 @@ class RtcSessionManagerTest {
         runCurrent()
         peer.push(PeerEvent.Link(LinkState.DISCONNECTED))
         runCurrent()
-        advanceTimeBy(10_001)
+        advanceTimeBy(RtcSessionManager.RECONNECT_BUDGET_MS + 1)
         runCurrent()
         assertEquals(SessionState.Ended(EndReason.CONNECTION_LOST), manager.state.value)
     }

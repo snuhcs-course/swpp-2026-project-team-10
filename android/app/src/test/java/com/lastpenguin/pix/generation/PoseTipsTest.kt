@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-31, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Dongje Park and Sungmin Jo
 package com.lastpenguin.pix.generation
 
 import android.graphics.Bitmap
@@ -23,7 +23,8 @@ import org.junit.Test
 
 // Partitions (Testing Documentation 2.1.6). When the tip arrives: before or after its guide goes on Camera. Its
 // result: a tip, or a failure. The guide on Camera: the prepared one, another (from the gallery or saved), none, the
-// same id again after it was removed, and a saved copy with the same id in its place. Asking again: a newer guide
+// same id again after it was removed (a saved copy, no tip; the same guide put back by Undo, its tip, #298, but not
+// after another guide went on), and a saved copy with the same id in its place. Asking again: a newer guide
 // prepared while the one on Camera keeps its tip, and while an older one is still being asked for. Discarding: the
 // prepared guide before it goes on Camera, the guide already on Camera, and an older guide. The screens' language
 // changing (FR-10.2): with the tip on Camera ready, with the one prepared still being asked for (its older answer
@@ -119,9 +120,52 @@ class PoseTipsTest {
         onCamera.value = null
         runCurrent()
         assertNull(tips.onCamera.value)
-        // A saved guide keeps its id (FR-3.8), but not its tip, which was for the scene it was made in.
+        // A saved guide keeps its id (FR-3.8), but not its tip, which was for the scene it was made in. Read from the
+        // saved guides, it is another instance.
+        onCamera.value = generated.copy()
+        runCurrent()
+        assertNull(tips.onCamera.value)
+    }
+
+    @Test
+    fun aRemovedGuidePutBackByUndo_bringsItsTipBack() = runTest {
+        val tips = tips()
+        val generated = guide("g1")
+        tips.prepare(generated, candidate, TipSource(scene, POSE))
         onCamera.value = generated
         runCurrent()
+        tipper.requests.single().answer(TEXT)
+        runCurrent()
+
+        onCamera.value = null
+        runCurrent()
+        assertNull(tips.onCamera.value)
+        onCamera.value = generated
+        runCurrent()
+
+        assertEquals(GuideTip("g1", TipState.Ready(PoseTip(TEXT))), tips.onCamera.value)
+        assertEquals(1, tipper.requests.size)
+    }
+
+    @Test
+    fun aRemovedGuidesTip_isDroppedOnceAnotherGuideGoesOn() = runTest {
+        val tips = tips()
+        val generated = guide("g1")
+        tips.prepare(generated, candidate, TipSource(scene, POSE))
+        onCamera.value = generated
+        runCurrent()
+        // Still asked for when the guide is removed: the request goes on while the tip is kept aside.
+        onCamera.value = null
+        runCurrent()
+        assertFalse(tipper.requests.single().cancelled)
+
+        onCamera.value = guide("gallery", source = GuideSource.GALLERY)
+        runCurrent()
+        assertTrue(tipper.requests.single().cancelled)
+        onCamera.value = null
+        onCamera.value = generated
+        runCurrent()
+
         assertNull(tips.onCamera.value)
     }
 

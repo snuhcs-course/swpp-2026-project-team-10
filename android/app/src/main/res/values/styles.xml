@@ -25,6 +25,20 @@
         <item name="android:textColor">@color/pix_text</item>
     </style>
 
+    <!-- The shutter's countdown over the image (FR-1.17): large enough to read from where the people in the photo stand,
+         with a shadow so it shows on a bright scene. Its size is the view's, in dp (#298): a larger font would not fit
+         the number's square. -->
+    <style name="TextAppearance.Pix.Countdown" parent="TextAppearance.Material3.DisplayLarge">
+        <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
+        <item name="android:fontFamily">@font/pix_extrabold</item>
+        <item name="fontFamily">@font/pix_extrabold</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textColor">@color/pix_text</item>
+        <item name="android:shadowColor">@color/camera_dim</item>
+        <item name="android:shadowDy">4</item>
+        <item name="android:shadowRadius">24</item>
+    </style>
+
     <style name="TextAppearance.Pix.Header" parent="TextAppearance.Material3.TitleMedium">
         <item name="android:lineBreakWordStyle" tools:targetApi="33">phrase</item>
         <item name="android:fontFamily">@font/pix_bold</item>
@@ -47,6 +61,12 @@
         <item name="android:textSize">15sp</item>
         <item name="android:textColor">@color/pix_text</item>
         <item name="android:lineSpacingMultiplier">1.08</item>
+    </style>
+
+    <!-- "Auto" in Generate poses' empty field (FR-4.15): a value in the accent, as a camera shows a setting left on
+         auto. -->
+    <style name="TextAppearance.Pix.Action.Accent">
+        <item name="android:textColor">@color/pix_accent</item>
     </style>
 
     <style name="TextAppearance.Pix.Action.Small">
@@ -193,25 +213,39 @@
         <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
     </style>
 
+    <!-- A text button that starts a line of its own at the content's edge, with a small icon before its words, such as
+         Back to Auto under Generate poses' field (FR-4.15): a sentence in the accent, a touch target high. -->
+    <style name="Widget.Pix.Button.Text.Line">
+        <item name="android:minWidth">0dp</item>
+        <item name="android:paddingStart">0dp</item>
+        <item name="android:paddingEnd">8dp</item>
+        <item name="android:textColor">@color/pix_accent</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Label</item>
+        <item name="iconTint">@color/pix_accent</item>
+        <item name="iconSize">16dp</item>
+        <item name="iconPadding">6dp</item>
+        <item name="iconGravity">textStart</item>
+    </style>
+
     <!-- A pill over the preview: 44 dp of glass inside a 48 dp touch target. -->
     <style name="Widget.Pix.Button.Text.Small">
         <item name="android:minHeight">40dp</item>
         <item name="android:minWidth">0dp</item>
     </style>
 
-    <!-- The step's action at a screen's top right, such as Select on Pick a pose (#199): yellow text without a pill
-         (#204), faint while disabled, in a touch area at least 88 dp wide and 48 dp high, in the middle of the 56 dp
-         header. The text ends at the area's right edge, so it lines up with the screen's content below. Back is at
-         the top left. -->
+    <!-- The step's action at a screen's top right, such as Select on Pick a pose (#199): yellow text without a pill at
+         rest (#204), faint while disabled, in the middle of the 56 dp header. Under a touch, a 32 dp pill as wide as
+         the text and 12 dp around it, whose right edge lines up with the screen's content below; the touch area is at
+         least 48 dp each way. Back is at the top left. -->
     <style name="Widget.Pix.Button.Header">
         <item name="android:minHeight">48dp</item>
-        <item name="android:minWidth">88dp</item>
-        <item name="android:insetTop">4dp</item>
-        <item name="android:insetBottom">4dp</item>
-        <item name="android:paddingStart">16dp</item>
-        <item name="android:paddingEnd">0dp</item>
-        <item name="android:gravity">end|center_vertical</item>
-        <item name="cornerRadius">20dp</item>
+        <item name="android:minWidth">48dp</item>
+        <item name="android:insetTop">8dp</item>
+        <item name="android:insetBottom">8dp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:gravity">center</item>
+        <item name="cornerRadius">16dp</item>
         <item name="backgroundTint">@android:color/transparent</item>
         <item name="android:textColor">@color/button_header_text</item>
         <item name="rippleColor">@color/pix_ripple</item>
@@ -280,46 +314,59 @@
         <item name="rippleColor">@color/pix_ripple_strong</item>
     </style>
 
-    <!-- An icon button over a photo, such as the ♥ on Pick a pose: the round shape in glass, so it shows on any photo. -->
+    <!-- An icon button over a photo or the camera's image, such as the ♥ on Pick a pose and the tip, Save guide, and
+         guide-edit buttons beside the zoom readout: the round shape in glass, so it shows on any scene (#298). -->
     <style name="Widget.Pix.Button.Icon.OnPhoto">
         <item name="backgroundTint">@color/pix_glass</item>
         <item name="strokeColor">@color/pix_glass_stroke</item>
         <item name="strokeWidth">1dp</item>
     </style>
 
-    <!-- The top bar's flash: an icon without a shape, like the brightness button, in the middle of the bar's 44 dp,
-         with a 48 x 48 dp touch area whose last 4 dp reach over the image's top edge. -->
+    <!-- An icon in the top bar, such as the camera menu's button and the camera switch: no shape at rest, and under a
+         touch, or while its panel is open, the bar's 32 dp tall pill, as the ratio's, centered on the bar's line above
+         its last 4 dp, which reach over the image's top edge. A TurningButton's pill and touch area are 50 dp wide. The padding is 0 above and
+         below, or the insets would make the bar taller. -->
     <style name="Widget.Pix.Button.Icon.TopBar">
         <item name="android:minWidth">48dp</item>
         <item name="android:minHeight">52dp</item>
-        <item name="android:insetTop">0dp</item>
-        <item name="android:insetBottom">4dp</item>
+        <item name="android:insetTop">@dimen/top_bar_pill_inset_top</item>
+        <item name="android:insetBottom">@dimen/top_bar_pill_inset_bottom</item>
+        <item name="android:paddingTop">0dp</item>
+        <item name="android:paddingBottom">0dp</item>
+        <!-- It has no text, but a button measures a line of it: in dp, the empty line fits the pill at any font, or at
+             200 % it would make the button and the bar 2 dp taller. -->
+        <item name="android:textSize" tools:ignore="SpUsage">12dp</item>
         <item name="android:paddingStart">13dp</item>
         <item name="android:paddingEnd">13dp</item>
         <item name="iconSize">16dp</item>
     </style>
 
-    <!-- The top bar's aspect ratio: its label alone, without a shape, the size of the top bar's other text, in a 48 x 52 dp
-         touch area that adds 8 dp after the label and 4 dp below the bar, so the label stays where it was. -->
+    <!-- The top bar's aspect ratio: its label alone, the size of the top bar's other text, in a 50 x 52 dp touch area.
+         Under a touch, or while the ratios are open, the bar's pill around the label, 50 x 32 dp as the icons' are, wider
+         only for a label at a large font. -->
     <style name="Widget.Pix.Button.Text.TopBar">
-        <item name="android:minWidth">48dp</item>
+        <item name="android:minWidth">50dp</item>
         <item name="android:minHeight">52dp</item>
-        <item name="android:paddingStart">8dp</item>
-        <item name="android:paddingEnd">16dp</item>
-        <item name="android:paddingTop">6dp</item>
-        <item name="android:paddingBottom">10dp</item>
+        <item name="android:insetTop">@dimen/top_bar_pill_inset_top</item>
+        <item name="android:insetBottom">@dimen/top_bar_pill_inset_bottom</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:paddingTop">0dp</item>
+        <item name="android:paddingBottom">0dp</item>
+        <item name="backgroundTint">@color/camera_top_bar_button_background</item>
         <item name="android:textColor">@color/button_secondary_text</item>
         <item name="rippleColor">@color/pix_ripple_strong</item>
         <item name="android:textSize">12sp</item>
     </style>
 
     <!-- A ratio in the ratios under the top bar (FR-1.13): a touch area as tall as the panel, sharing its width with the
-         other ratios, around the ratio's shape. Selection is View.isSelected. -->
+         other ratios, around the ratio's shape, lit inside itself under a touch (bg_panel_option). Selection is
+         View.isSelected. -->
     <style name="Widget.Pix.AspectOption" parent="">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">48dp</item>
         <item name="android:layout_weight">1</item>
-        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+        <item name="android:background">@drawable/bg_panel_option</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
     </style>
@@ -340,10 +387,57 @@
         <item name="android:textSize">8sp</item>
     </style>
 
-    <!-- One half of a two-way switch, such as Cutout / Outline; selection is View.isSelected. -->
+    <!-- An item of the camera menu under the top bar (FR-1.17): its icon over a one-word label, in a 48 dp wide, 64 dp
+         tall touch area (NFR-16), lit inside itself under a touch (bg_panel_option); both in the accent while what it
+         sets is on (activated). -->
+    <style name="Widget.Pix.CameraMenuOption" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">64dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:minWidth">48dp</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:gravity">center</item>
+        <item name="android:background">@drawable/bg_panel_option</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <style name="Widget.Pix.CameraMenuOption.Icon" parent="">
+        <item name="android:layout_width">24dp</item>
+        <item name="android:layout_height">24dp</item>
+        <item name="android:duplicateParentState">true</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="tint">@color/camera_menu_option</item>
+    </style>
+
+    <!-- The item's label, 10 sp in the medium face, its letters a little narrower (textScaleX) and closer than the
+         face's own, so it stays quiet under its icon; shrinking toward 8 dp only where a large font would not fit it on
+         its line (#298). -->
+    <style name="Widget.Pix.CameraMenuOption.Label" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">16dp</item>
+        <item name="android:layout_marginTop">6dp</item>
+        <item name="android:autoSizeMaxTextSize">10sp</item>
+        <item name="android:autoSizeMinTextSize">8dp</item>
+        <item name="android:autoSizeTextType">uniform</item>
+        <item name="android:duplicateParentState">true</item>
+        <item name="android:gravity">center</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Caption</item>
+        <item name="android:fontFamily">@font/pix_medium</item>
+        <item name="fontFamily">@font/pix_medium</item>
+        <item name="android:letterSpacing">-0.02</item>
+        <item name="android:textScaleX">0.94</item>
+        <item name="android:textColor">@color/camera_menu_option</item>
+    </style>
+
+    <!-- One part of a switch, such as the library's filters or Thin / Normal / Thick; selection is View.isSelected.
+         48 dp tall, the touch target of NFR-16 (#298). -->
     <style name="Widget.Pix.Button.Segment" parent="Widget.Material3.Button.TextButton">
         <item name="android:minWidth">0dp</item>
-        <item name="android:minHeight">40dp</item>
+        <item name="android:minHeight">48dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <item name="android:paddingStart">12dp</item>
@@ -355,9 +449,12 @@
         <item name="android:textAppearance">@style/TextAppearance.Pix.Label.Bold</item>
     </style>
 
-    <!-- The switch in a section's header, such as All / With <name> over the descriptions used before (FR-4.11). -->
+    <!-- The switch in a section's header, such as All / With <name> over the descriptions used before (FR-4.11): a 32 dp
+         shape in a 48 dp touch area (#298), on bg_segment_track_small, whose track is inset to match. -->
     <style name="Widget.Pix.Button.Segment.Small">
-        <item name="android:minHeight">32dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:insetTop">8dp</item>
+        <item name="android:insetBottom">8dp</item>
         <item name="cornerRadius">14dp</item>
     </style>
 
@@ -419,10 +516,27 @@
         <item name="android:layout_width">48dp</item>
         <item name="android:layout_height">48dp</item>
         <item name="android:layout_marginStart">-12dp</item>
-        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+        <item name="android:background">@drawable/bg_header_icon</item>
         <item name="android:src">@drawable/ic_arrow_back</item>
         <item name="android:contentDescription">@string/back</item>
         <item name="tint">@color/pix_text</item>
+    </style>
+
+
+    <!-- An item of a menu card that a header's ⋮ opens (bg_menu_card, the library's, #297): a row 48 dp tall
+         (NFR-16) of body text in the text color, its light rounded inside the card. -->
+    <style name="Widget.Pix.MenuItem" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:gravity">center_vertical|start</item>
+        <item name="android:background">@drawable/bg_menu_item</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.BodyLarge</item>
+        <item name="android:textColor">@color/pix_text</item>
     </style>
 
     <!-- The chevron at the end of a row or card that a tap opens (#204). Its tip is drawn 8 dp inside its 24 dp box,
@@ -475,6 +589,21 @@
         <item name="closeIcon">@drawable/ic_close</item>
         <item name="closeIconTint">@color/pix_text_muted</item>
         <item name="closeIconSize">16dp</item>
+    </style>
+
+    <!-- An option of Generate poses (FR-4.15): a tap writes its words into the description, and it is checked, in the
+         accent, while they are there. No check mark: the color says it. -->
+    <style name="Widget.Pix.OptionChip" parent="Widget.Material3.Chip.Filter">
+        <item name="chipBackgroundColor">@color/option_chip_background</item>
+        <item name="chipStrokeColor">@color/option_chip_stroke</item>
+        <item name="chipStrokeWidth">1dp</item>
+        <item name="chipMinHeight">36dp</item>
+        <item name="chipCornerRadius">18dp</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Label</item>
+        <item name="android:textColor">@color/option_chip_text</item>
+        <item name="rippleColor">@color/pix_ripple</item>
+        <item name="checkedIconVisible">false</item>
+        <item name="chipIconVisible">false</item>
     </style>
 
     <style name="Widget.Pix.PoseCard" parent="Widget.Material3.CardView.Outlined">
@@ -542,8 +671,11 @@
         <item name="tint">@color/pix_handle</item>
     </style>
 
+    <!-- 18 sp, which Android's dialog title takes by itself when a title does not fit on one line at a larger size: every
+         dialog's title is that size, long or short. -->
     <style name="MaterialAlertDialog.Pix.Title.Text" parent="MaterialAlertDialog.Material3.Title.Text">
         <item name="android:textAppearance">@style/TextAppearance.Pix.SheetTitle</item>
+        <item name="android:textSize">18sp</item>
     </style>
 
     <style name="MaterialAlertDialog.Pix.Body.Text" parent="MaterialAlertDialog.Material3.Body.Text">
@@ -552,8 +684,15 @@
     </style>
 
     <!-- Material's 12 dp set again as start and end: the theme's materialButtonStyle gives every button 20 dp there,
-         which would win over the left and right of Material's dialog style. -->
+         which would win over the left and right of Material's dialog style. The row of buttons is 24 dp in from the
+         dialog's sides, as the title is, so the 12 dp end margin taken back puts the last button's text 24 dp from the
+         right edge, as far in as the title is from the left; 20 dp at the start keeps the buttons' texts 32 dp apart, and
+         stacked buttons stay in line. -->
     <style name="Widget.Pix.Button.Dialog" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:layout_marginStart">20dp</item>
+        <item name="android:layout_marginLeft">20dp</item>
+        <item name="android:layout_marginEnd">-12dp</item>
+        <item name="android:layout_marginRight">-12dp</item>
         <item name="android:paddingStart">12dp</item>
         <item name="android:paddingEnd">12dp</item>
         <item name="android:textColor">@color/button_text_text</item>
@@ -562,5 +701,39 @@
 
     <style name="Widget.Pix.Button.Dialog.Positive">
         <item name="android:textColor">@color/pix_accent</item>
+    </style>
+
+    <!-- A notice's own theme (ui/Notices.kt): Material's Snackbar fades out over motionDurationMedium1, Material 3's
+         250 ms, which went too fast; here it is the notice's own going, as long as its slide after a swipe. -->
+    <style name="ThemeOverlay.Pix.Notice" parent="">
+        <item name="motionDurationMedium1">@integer/notice_out_ms</item>
+    </style>
+
+    <!-- A short notice (#298): a Snackbar, not a Toast, placed by ui/Notices.kt. An info card's 16 dp corners on
+         pix_surface_3, so it stands out from the ground and from the glass over the camera's image, with its action,
+         such as Undo, in the accent, as every act is. -->
+    <style name="Widget.Pix.Snackbar" parent="Widget.Material3.Snackbar">
+        <item name="backgroundTint">@color/pix_surface_3</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.Pix.Notice</item>
+        <item name="android:layout_margin">12dp</item>
+    </style>
+
+    <!-- Up to four lines, so a notice says all a Toast did. -->
+    <style name="Widget.Pix.Snackbar.TextView" parent="Widget.Material3.Snackbar.TextView">
+        <item name="android:textColor">@color/pix_text</item>
+        <item name="android:maxLines">4</item>
+    </style>
+
+    <!-- Start and end set again, as for Widget.Pix.Button.Dialog. -->
+    <style name="Widget.Pix.Snackbar.Action" parent="Widget.Material3.Button.TextButton.Snackbar">
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:textColor">@color/pix_accent</item>
+        <item name="android:textAppearance">@style/TextAppearance.Pix.Action.Small</item>
+    </style>
+
+    <style name="ShapeAppearance.Pix.Notice" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">16dp</item>
     </style>
 </resources>

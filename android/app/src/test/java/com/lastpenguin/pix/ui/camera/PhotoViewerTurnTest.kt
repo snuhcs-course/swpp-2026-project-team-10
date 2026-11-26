@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.Manifest
@@ -7,8 +7,10 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.os.Looper
+import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.Navigation
 import androidx.navigation.testing.TestNavHostController
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.R
@@ -16,6 +18,7 @@ import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.databinding.ViewPhotoViewerBinding
 import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.OwnActivities
+import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.settings.boundsOnScreen
@@ -42,7 +45,8 @@ import org.robolectric.shadows.ShadowChoreographer
  * out as the screen, the photo between the header and the strip; held sideways, it is a landscape screen, the photo
  * over all of it and the header and the strip over the photo. Each way, Back is at the top left as the user sees it,
  * and the photo on screen stays. The first turn, as the viewer first opens, is there at once. A drag down the photo as
- * the user sees it closes the viewer, also held sideways. Sideways, the header has a scrim behind its icons.
+ * the user sees it goes back to the album's grid, also held sideways. Sideways, the header has a scrim behind its
+ * icons, and the grid, under the header, holds about as many more photos a row as the screen is wider: 10 for 5.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -70,10 +74,15 @@ class PhotoViewerTurnTest {
     }
 
     /**
-     * The Camera screen with the phone held at [turn], and Pix's album open in the viewer at its newest; with [paused],
-     * the display's frames stop just before it opens, so nothing has played or been laid out since.
+     * The Camera screen with the phone held at [turn], and Pix's album open in the viewer, at its newest photo unless
+     * [grid]; with [paused], the display's frames stop just before it opens, so nothing has played or been laid out
+     * since.
      */
-    private fun viewer(turn: Int = 0, paused: Boolean = false): Pair<FragmentCameraBinding, ViewPhotoViewerBinding> {
+    private fun viewer(
+        turn: Int = 0,
+        paused: Boolean = false,
+        grid: Boolean = false,
+    ): Pair<FragmentCameraBinding, ViewPhotoViewerBinding> {
         val app = ApplicationProvider.getApplicationContext<Application>()
         shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
         modules = TestAppContainer().install()
@@ -90,6 +99,13 @@ class PhotoViewerTurnTest {
         val camera = FragmentCameraBinding.bind(fragment.requireView())
         if (paused) ShadowChoreographer.setPaused(true)
         camera.galleryButton.performClick()
+        // As a tap on its place in the grid would, which has no place before a frame lays it out.
+        if (!grid) {
+            ViewModelProvider(
+                fragment,
+                PixViewModels.Factory,
+            )[CameraViewModel::class.java].pickPhoto(album.last())
+        }
         if (paused) idle() else settleReads()
         return camera to photoViewerOn(camera.root)
     }
@@ -160,8 +176,9 @@ class PhotoViewerTurnTest {
         viewer.assertSideways(-90f)
         viewer.assertBackNear(left = true, top = false, why = "90")
         assertSame(newest, viewer.pageShows())
-        assertEquals(2, viewer.photoViewerPages.currentItem)
-        assertEquals(2, viewer.stripSelected())
+        // The newest is the first page, at the left.
+        assertEquals(0, viewer.photoViewerPages.currentItem)
+        assertEquals(0, viewer.stripSelected())
 
         turn(270)
         viewer.assertSideways(90f)
@@ -198,12 +215,32 @@ class PhotoViewerTurnTest {
     }
 
     @Test
-    fun heldSideways_aDragDownThePhotoAsSeen_closesTheViewer() {
+    fun heldSideways_aDragDownThePhotoAsSeen_goesBackToTheGrid() {
         val (_, viewer) = viewer(turn = 270)
         val density = viewer.root.resources.displayMetrics.density
 
         viewer.dragPhotoDown(ZoomablePhotoView.DISMISS_DP * density + 40f)
+        settleReads()
 
-        assertFalse(viewer.root.isShown)
+        assertTrue(viewer.root.isShown)
+        assertTrue(viewer.gridShown())
+        assertFalse(viewer.photoViewerPages.isShown)
+    }
+
+    @Test
+    fun theAlbumsGrid_underTheHeader_holdsFivePhotosARowUpright_andTenSideways() {
+        val (_, viewer) = viewer(grid = true)
+        val columns = { (viewer.photoViewerGrid.layoutManager as GridLayoutManager).spanCount }
+        assertTrue(viewer.gridShown())
+        assertEquals(5, columns())
+        assertTrue(viewer.photoViewerAlbum.top >= viewer.photoViewerHeader.bottom)
+
+        turn(90)
+        assertEquals(10, columns())
+        assertTrue(viewer.photoViewerAlbum.top >= viewer.photoViewerHeader.bottom)
+        viewer.assertBackNear(left = true, top = false, why = "90")
+
+        turn(0)
+        assertEquals(5, columns())
     }
 }

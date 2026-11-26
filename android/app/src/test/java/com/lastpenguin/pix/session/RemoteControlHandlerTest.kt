@@ -1,31 +1,72 @@
-// AI-generated with Claude Code, 2026-10-22, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.ShutterTimer
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/*
+ * The photographer's side of remote control (Design 2.6.5; Testing Documentation 2.1.6), plain JVM on the fakes: the
+ * subject's zoom, brightness, flash, and guide moves applied, clamped, echoed, and reported once, with the cases the
+ * camera does not apply or applies late, and one phone zooming at a time. The tap to focus (FR-7.7, #273), by
+ * partition: a camera that focuses on a point / one with a brightness range only (no focus action); the brightness away
+ * from the base (set again, and its state echoed as the subject's) / at the base already, or no range at all
+ * (answered at once, nothing set); a point inside the frame, at its edges (0 and 1), just outside, and no number; a camera that is not ready; a
+ * drag's request still outstanding, which keeps its own answer; the tap's answer marked as such, and no other echo
+ * of the subject's (a brightness set after the tap); a base the camera does not apply, answered with the current
+ * state after the wait and then forgotten, so a later change to that value is the photographer's. The photographer's
+ * own focus (`camera.focus`) and timer's countdown (`camera.timer`, FR-1.17): told
+ * to the subject while the session runs, and to no one before it starts or after it stops; the subject's flash while
+ * the countdown runs (answered unchanged) and after its 0 (applied).
+ * The timer set from the subject's phone (#318): said at the start; a request (set, echoed as the subject's, one
+ * action); the photographer's own change (echoed as theirs, no action); a request during the countdown (unchanged,
+ * applied after it); seconds this Pix does not offer (unchanged); the value it has (answered, one action).
+ * The subject's shutter (#314): taken by the Camera screen (answered, one action); refused by it; no Camera screen in
+ * front; two presses in a row, each answered; taken up by the photographer's timer (its start), a cancel (its stop),
+ * and one the timer leaves as it is (no action), each answered as the timer's.
+ * The subject's start of AI poses (#276): begun by the Camera screen (answered, one action); not begun by it; no Camera
+ * screen in front; a situation this phone does not know; each answer naming its request; the photographer asked for
+ * their agreement, said at once, then the one answer; one answered after the session ended or in another session
+ * (no one told), and after a reconnection of the same session or during it (told).
+ * The subject's guide panel (FR-7.2): Hide and Show (applied, attributed, one action each; the state it has already, a
+ * guide since replaced, and no guide, all dropped); the opacity (steps applied without an action, the last value
+ * clamped to 10–90 % with one action; a hidden guide, a replaced guide, and no number dropped); ✕ (the guide removed
+ * and reported with where it was; a replaced guide dropped). Undo (`guide.restore`): the guide removed last, by the
+ * subject's ✕ or by this phone's (removedHere), back where it was, attributed to the subject, with one action, and only
+ * once; another guide's id, or a guide on the camera meanwhile, changes nothing.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemoteControlHandlerTest {
 
-    private val session = FakeSessionManager()
+    /** The handler runs in a session only: this one, as the photographer. */
+    private val connected = SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER)
+    private val session = FakeSessionManager().apply { setState(connected) }
     private val camera = FakeCameraController(exposureRange = -4..4, hasFlash = true)
     private val guides = InMemoryGuideRepository()
     private var now = 0L
     private val attributions = mutableListOf<Role?>()
     private val handler = RemoteControlHandler(session, camera, guides, attributions::add, clock = { now })
     private val actions = mutableListOf<RemoteAction>()
+
+    /** A camera that focuses on a point (FR-7.7); the base brightness is 0 EV, index 0. */
+    private val focusCamera = FakeCameraController(exposureRange = -4..4, supportsFocusPoint = true)
+    private val focusHandler = RemoteControlHandler(session, focusCamera, guides, clock = { now })
 
     private fun echoes(): List<SessionMessage.CameraStateUpdate> =
         session.sent.filterIsInstance<SessionMessage.CameraStateUpdate>()
@@ -453,6 +494,150 @@ class RemoteControlHandlerTest {
     }
 
     @Test
+    fun `a flash request while the photographer's timer counts down is answered unchanged, and applies after`() =
+        runTest {
+            backgroundScope.launch { handler.actions.collect { actions += it } }
+            handler.start(this)
+            advanceTimeBy(200)
+            runCurrent()
+            handler.countdownHere(3)
+            session.sent.clear()
+
+            handler.handle(SessionMessage.FlashSet(FlashMode.ON))
+            runCurrent()
+
+            assertTrue(camera.flashRequests.isEmpty())
+            assertEquals(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true), echoes().single())
+            assertTrue(actions.isEmpty())
+
+            handler.countdownHere(0)
+            handler.handle(SessionMessage.FlashSet(FlashMode.AUTO))
+            runCurrent()
+            assertEquals(listOf(FlashMode.AUTO), camera.flashRequests)
+            handler.stop()
+        }
+
+    // ---- The timer set from the subject's phone (#318) ------------------------------------------------------------
+
+    @Test
+    fun `starting says the timer as chosen, for a subject that connects`() = runTest {
+        handler.timerChoice.set(ShutterTimer.TEN)
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        assertEquals(10, lastFinal().timer)
+        handler.stop()
+    }
+
+    @Test
+    fun `a timer request sets the timer, is echoed as the subject's, and reported once`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        handler.handle(SessionMessage.TimerSet(3))
+        runCurrent()
+
+        assertEquals(ShutterTimer.THREE, handler.timerChoice.timer.value)
+        assertEquals(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, timer = 3),
+            echoes().single(),
+        )
+        assertEquals(listOf<RemoteAction>(RemoteAction.Timer(ShutterTimer.THREE)), actions)
+        handler.stop()
+    }
+
+    @Test
+    fun `the photographer's own change of the timer is echoed as theirs, and is no action`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        // The menu on Camera, through CameraViewModel.
+        handler.timerChoice.set(ShutterTimer.THREE)
+        runCurrent()
+
+        assertEquals(
+            SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, timer = 3),
+            echoes().single(),
+        )
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
+    fun `a timer request while the countdown runs is answered unchanged, and applies after`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        handler.timerChoice.set(ShutterTimer.THREE)
+        runCurrent()
+        handler.countdownHere(3)
+        session.sent.clear()
+
+        handler.handle(SessionMessage.TimerSet(0))
+        runCurrent()
+
+        // Camera's own Timer waits while it counts down (FR-1.17), and so does the subject's.
+        assertEquals(ShutterTimer.THREE, handler.timerChoice.timer.value)
+        assertEquals(
+            SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true, timer = 3),
+            echoes().single(),
+        )
+        assertTrue(actions.isEmpty())
+
+        handler.countdownHere(0)
+        handler.handle(SessionMessage.TimerSet(0))
+        runCurrent()
+        assertEquals(ShutterTimer.OFF, handler.timerChoice.timer.value)
+        handler.stop()
+    }
+
+    @Test
+    fun `a timer request for seconds this Pix does not offer is answered unchanged`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        handler.handle(SessionMessage.TimerSet(5))
+        runCurrent()
+
+        assertEquals(ShutterTimer.OFF, handler.timerChoice.timer.value)
+        assertEquals(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true), echoes().single())
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
+    fun `a timer request for the value it has is answered as the subject's, with one action`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.timerChoice.set(ShutterTimer.TEN)
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        // Both people chose 10 s at the same moment: the subject's phone still gets its answer.
+        handler.handle(SessionMessage.TimerSet(10))
+        runCurrent()
+
+        assertEquals(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, timer = 10),
+            echoes().single(),
+        )
+        assertEquals(listOf<RemoteAction>(RemoteAction.Timer(ShutterTimer.TEN)), actions)
+        handler.stop()
+    }
+
+    @Test
     fun `a guide move is clamped by the repository, attributed to the subject, and reported once per gesture`() =
         runTest {
             guides.setGuide(fakeGuide("g1"))
@@ -551,6 +736,778 @@ class RemoteControlHandlerTest {
         assertTrue(attributions.isEmpty())
         assertTrue(actions.isEmpty())
         handler.stop()
+    }
+
+    // ---- The subject's guide panel (FR-7.2) -------------------------------------------------------------------------
+
+    @Test
+    fun `the subject's Hide and Show are applied, attributed to the subject, and reported once each`() = runTest {
+        guides.setGuide(fakeGuide("g1"))
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        runCurrent()
+
+        handler.handle(SessionMessage.GuideVisibleSet("g1", visible = false))
+        runCurrent()
+        assertFalse(guides.state.value.visible)
+        handler.handle(SessionMessage.GuideVisibleSet("g1", visible = true))
+        runCurrent()
+
+        assertTrue(guides.state.value.visible)
+        assertEquals(listOf<Role?>(Role.SUBJECT, Role.SUBJECT), attributions)
+        assertEquals(listOf<RemoteAction>(RemoteAction.GuideVisible(false), RemoteAction.GuideVisible(true)), actions)
+        handler.stop()
+    }
+
+    @Test
+    fun `a Hide for a guide that was replaced, for no guide, or for one hidden already is dropped`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        runCurrent()
+
+        handler.handle(SessionMessage.GuideVisibleSet("g1", visible = false))
+        guides.setGuide(fakeGuide("g2"))
+        handler.handle(SessionMessage.GuideVisibleSet("g1", visible = false))
+        runCurrent()
+        assertTrue(guides.state.value.visible)
+
+        guides.update(final = true) { it.copy(visible = false) }
+        handler.handle(SessionMessage.GuideVisibleSet("g2", visible = false))
+        runCurrent()
+
+        assertTrue(attributions.isEmpty())
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
+    fun `the subject's opacity is applied at each step and reported once at its clamped last value`() = runTest {
+        guides.setGuide(fakeGuide("g1"))
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        runCurrent()
+
+        handler.handle(SessionMessage.GuideOpacitySet("g1", 0.7f))
+        runCurrent()
+        assertEquals(0.7f, guides.state.value.opacity, EPSILON)
+        assertTrue(actions.isEmpty())
+
+        // Past the slider's end, as a newer phone could send: kept within 10–90 % (FR-3.4).
+        handler.handle(SessionMessage.GuideOpacitySet("g1", 1.5f, final = true))
+        runCurrent()
+
+        assertEquals(GuideState.MAX_OPACITY, guides.state.value.opacity, EPSILON)
+        assertEquals(listOf<Role?>(Role.SUBJECT, Role.SUBJECT), attributions)
+        assertEquals(listOf<RemoteAction>(RemoteAction.GuideOpacity(GuideState.MAX_OPACITY)), actions)
+        handler.stop()
+    }
+
+    @Test
+    fun `an opacity for a hidden guide, a replaced guide, or no number is dropped`() = runTest {
+        guides.setGuide(fakeGuide("g1"))
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        runCurrent()
+
+        handler.handle(SessionMessage.GuideOpacitySet("g1", Float.NaN, final = true))
+        handler.handle(SessionMessage.GuideOpacitySet("g2", 0.2f, final = true))
+        guides.update(final = true) { it.copy(visible = false) }
+        handler.handle(SessionMessage.GuideOpacitySet("g1", 0.2f, final = true))
+        runCurrent()
+
+        assertEquals(0.5f, guides.state.value.opacity, EPSILON)
+        assertTrue(attributions.isEmpty())
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
+    fun `the subject's remove takes the guide off and reports it with where it was`() = runTest {
+        val guide = fakeGuide("g1")
+        guides.setGuide(guide)
+        guides.update(final = true) { it.copy(cx = 0.3f, opacity = 0.8f) }
+        val before = guides.state.value
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        runCurrent()
+
+        handler.handle(SessionMessage.GuideRemove("g2"))
+        runCurrent()
+        assertEquals(guide, guides.guide.value)
+        assertTrue(actions.isEmpty())
+
+        handler.handle(SessionMessage.GuideRemove("g1"))
+        runCurrent()
+
+        assertNull(guides.guide.value)
+        assertEquals(listOf<RemoteAction>(RemoteAction.GuideRemove(guide, before)), actions)
+        handler.stop()
+    }
+
+    @Test
+    fun `the subject's Undo puts back the guide removed last, by either phone, where it was, once`() = runTest {
+        val guide = fakeGuide("g1")
+        guides.setGuide(guide)
+        guides.update(final = true) { it.copy(cx = 0.3f, opacity = 0.8f) }
+        val where = guides.state.value
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        runCurrent()
+        handler.handle(SessionMessage.GuideRemove("g1"))
+        runCurrent()
+        attributions.clear()
+        actions.clear()
+
+        handler.handle(SessionMessage.GuideRestore("g1"))
+        runCurrent()
+        assertSame(guide, guides.guide.value)
+        assertEquals(where, guides.state.value)
+        assertEquals(listOf<Role?>(Role.SUBJECT), attributions)
+        assertEquals(listOf<RemoteAction>(RemoteAction.GuideRestore), actions)
+
+        // This phone's own ✕, told by Camera, is put back the same way.
+        handler.removedHere(guide, where)
+        guides.setGuide(null)
+        handler.handle(SessionMessage.GuideRestore("g1"))
+        handler.handle(SessionMessage.GuideRestore("g1"))
+        runCurrent()
+        assertSame(guide, guides.guide.value)
+        assertEquals(2, actions.size)
+        handler.stop()
+    }
+
+    @Test
+    fun `an Undo for another guide, or with a guide on the camera meanwhile, changes nothing`() = runTest {
+        guides.setGuide(fakeGuide("g1"))
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        runCurrent()
+        handler.handle(SessionMessage.GuideRemove("g1"))
+        runCurrent()
+        actions.clear()
+
+        handler.handle(SessionMessage.GuideRestore("g2"))
+        val other = fakeGuide("g3")
+        guides.setGuide(other)
+        handler.handle(SessionMessage.GuideRestore("g1"))
+        runCurrent()
+
+        assertSame(other, guides.guide.value)
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    // ---- The subject's shutter (FR-7.8, #314) ---------------------------------------------------------------------
+
+    private fun answers(): List<SessionMessage.ShutterAnswer> =
+        session.sent.filterIsInstance<SessionMessage.ShutterAnswer>()
+
+    @Test
+    fun `the subject's shutter takes a photo through the Camera screen, and is answered and reported once`() = runTest {
+        var presses = 0
+        handler.shutter = {
+            presses++
+            ShutterOutcome.TAKEN
+        }
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.ShutterPress(press = 1))
+        runCurrent()
+
+        assertEquals(1, presses)
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = true, press = 1)), answers())
+        assertEquals(listOf<RemoteAction>(RemoteAction.Shutter), actions)
+        handler.stop()
+    }
+
+    @Test
+    fun `a press the Camera screen takes no photo for is answered so, and is no action`() = runTest {
+        // The scene photo is being framed, or the camera still takes the photo before.
+        handler.shutter = { ShutterOutcome.REFUSED }
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.ShutterPress(press = 1))
+        runCurrent()
+
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), answers())
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
+    fun `a press while the Camera screen is not in front is answered as not taken`() = runTest {
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.ShutterPress(press = 1))
+        runCurrent()
+
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), answers())
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
+    fun `two presses in a row are each asked of the Camera screen and each answered`() = runTest {
+        // The camera takes the first and is busy for the second, as with two taps on its own shutter.
+        val outcomes = ArrayDeque(listOf(ShutterOutcome.TAKEN, ShutterOutcome.REFUSED))
+        handler.shutter = { outcomes.removeFirst() }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.ShutterPress(press = 4))
+        handler.handle(SessionMessage.ShutterPress(press = 5))
+        runCurrent()
+
+        // Each answer names its press, so the subject's phone can tell them apart.
+        assertEquals(
+            listOf(
+                SessionMessage.ShutterAnswer(taken = true, press = 4),
+                SessionMessage.ShutterAnswer(taken = false, press = 5),
+            ),
+            answers(),
+        )
+        handler.stop()
+    }
+
+    @Test
+    fun `a press the photographer's timer takes up is answered as the timer's, and reported as its start`() = runTest {
+        val asked = mutableListOf<Boolean>()
+        handler.shutter = { cancel ->
+            asked += cancel
+            ShutterOutcome.TIMER_STARTED
+        }
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.ShutterPress(press = 1))
+        runCurrent()
+
+        // No photo yet, and no refusal: the countdown's end takes it.
+        assertEquals(listOf(false), asked)
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1, timer = true)), answers())
+        assertEquals(listOf<RemoteAction>(RemoteAction.TimerStart), actions)
+        handler.stop()
+    }
+
+    @Test
+    fun `a press that cancels is asked as a cancel, answered as the timer's, and reported as its stop`() = runTest {
+        val asked = mutableListOf<Boolean>()
+        handler.shutter = { cancel ->
+            asked += cancel
+            ShutterOutcome.TIMER_STOPPED
+        }
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.ShutterPress(press = 2, cancel = true))
+        runCurrent()
+
+        assertEquals(listOf(true), asked)
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 2, timer = true)), answers())
+        assertEquals(listOf<RemoteAction>(RemoteAction.TimerStop), actions)
+        handler.stop()
+    }
+
+    @Test
+    fun `a press the timer leaves as it is is answered as the timer's, and is no action`() = runTest {
+        // A press for a photo that met a running countdown, or a cancel that found none.
+        handler.shutter = { ShutterOutcome.TIMER_KEPT }
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.ShutterPress(press = 3, cancel = true))
+        runCurrent()
+
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 3, timer = true)), answers())
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    // ---- The subject's start of AI poses (FR-6.15, #276) ----------------------------------------------------------
+
+    private fun startAnswers(): List<SessionMessage.PoseStartAnswer> =
+        session.sent.filterIsInstance<SessionMessage.PoseStartAnswer>()
+
+    @Test
+    fun `the subject's situation begins the scene photo through the Camera screen, answered and reported once`() =
+        runTest {
+            val asked = mutableListOf<Situation>()
+            handler.poseStarter = { situation, answer ->
+                asked += situation
+                answer(PoseStartStep.STARTED)
+            }
+            backgroundScope.launch { handler.actions.collect { actions += it } }
+            handler.start(this)
+            advanceTimeBy(200)
+            runCurrent()
+
+            handler.handle(SessionMessage.PoseStart("full_body", request = 7))
+            runCurrent()
+
+            assertEquals(listOf(Situation.FULL_BODY), asked)
+            // The answer names its request, so the subject's phone can tell it from an earlier one's.
+            assertEquals(listOf(SessionMessage.PoseStartAnswer(started = true, request = 7)), startAnswers())
+            assertEquals(listOf<RemoteAction>(RemoteAction.PoseStart), actions)
+            handler.stop()
+        }
+
+    @Test
+    fun `a start the Camera screen cannot begin is answered so, and is no action`() = runTest {
+        // A step of the photographer's own already runs, or the phone has no front camera for a selfie.
+        handler.poseStarter = { _, answer -> answer(PoseStartStep.REFUSED) }
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        handler.handle(SessionMessage.PoseStart("selfie"))
+        runCurrent()
+
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers())
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
+    fun `a start while the Camera screen is not in front, or for a situation this phone does not know, is refused`() =
+        runTest {
+            handler.start(this)
+            advanceTimeBy(200)
+            runCurrent()
+
+            handler.handle(SessionMessage.PoseStart("full_body"))
+            runCurrent()
+            assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers())
+
+            var asked = 0
+            handler.poseStarter = { _, answer ->
+                asked++
+                answer(PoseStartStep.STARTED)
+            }
+            handler.handle(SessionMessage.PoseStart("a situation of a later Pix"))
+            runCurrent()
+            assertEquals(0, asked)
+            assertEquals(2, startAnswers().count { !it.started })
+            handler.stop()
+        }
+
+    @Test
+    fun `a start that waits for the photographer's agreement says so at once, and is answered when they answer`() =
+        runTest {
+            var later: ((PoseStartStep) -> Unit)? = null
+            handler.poseStarter = { _, answer ->
+                answer(PoseStartStep.ASKING)
+                later = answer
+            }
+            backgroundScope.launch { handler.actions.collect { actions += it } }
+            handler.start(this)
+            advanceTimeBy(200)
+            runCurrent()
+
+            handler.handle(SessionMessage.PoseStart("default", request = 3))
+            runCurrent()
+            // The AI notice is up on the photographer's phone: the subject's phone hears that, and no more yet.
+            assertEquals(
+                listOf(SessionMessage.PoseStartAnswer(started = false, request = 3, asking = true)),
+                startAnswers(),
+            )
+            assertTrue(actions.isEmpty())
+
+            checkNotNull(later)(PoseStartStep.STARTED)
+            // Answered once: what the screen says after its answer changes nothing.
+            checkNotNull(later)(PoseStartStep.REFUSED)
+            runCurrent()
+            assertEquals(SessionMessage.PoseStartAnswer(started = true, request = 3), startAnswers().last())
+            assertEquals(2, startAnswers().size)
+            assertEquals(listOf<RemoteAction>(RemoteAction.PoseStart), actions)
+            handler.stop()
+        }
+
+    @Test
+    fun `an agreement answered after the session ended tells no one`() = runTest {
+        var later: ((PoseStartStep) -> Unit)? = null
+        handler.poseStarter = { _, answer -> later = answer }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        handler.handle(SessionMessage.PoseStart("default"))
+        runCurrent()
+
+        handler.stop()
+        session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        checkNotNull(later)(PoseStartStep.STARTED)
+        runCurrent()
+
+        assertTrue(startAnswers().isEmpty())
+    }
+
+    @Test
+    fun `an agreement answered after a reconnection is still told, by its request`() = runTest {
+        var later: ((PoseStartStep) -> Unit)? = null
+        handler.poseStarter = { _, answer ->
+            answer(PoseStartStep.ASKING)
+            later = answer
+        }
+        // Each run of the handler has a scope of its own, as SessionViewModel gives it.
+        handler.start(backgroundScope)
+        advanceTimeBy(200)
+        runCurrent()
+        handler.handle(SessionMessage.PoseStart("default", request = 3))
+        runCurrent()
+
+        // The link drops while the photographer reads the notice, and comes back: the same session, run anew.
+        handler.stop()
+        session.setState(SessionState.Reconnecting("s1", 0L, peer = connected.peer, role = Role.PHOTOGRAPHER))
+        session.setState(connected.copy(drops = 1))
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        checkNotNull(later)(PoseStartStep.STARTED)
+        runCurrent()
+
+        assertEquals(SessionMessage.PoseStartAnswer(started = true, request = 3), startAnswers().last())
+        handler.stop()
+    }
+
+    @Test
+    fun `an agreement answered while the link reconnects is told too`() = runTest {
+        var later: ((PoseStartStep) -> Unit)? = null
+        handler.poseStarter = { _, answer ->
+            answer(PoseStartStep.ASKING)
+            later = answer
+        }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        handler.handle(SessionMessage.PoseStart("default", request = 3))
+        runCurrent()
+
+        handler.stop()
+        session.setState(SessionState.Reconnecting("s1", 0L, peer = connected.peer, role = Role.PHOTOGRAPHER))
+        // The session keeps the answer for the link's return, as any reliable message.
+        checkNotNull(later)(PoseStartStep.REFUSED)
+        runCurrent()
+
+        assertEquals(SessionMessage.PoseStartAnswer(started = false, request = 3), startAnswers().last())
+    }
+
+    @Test
+    fun `an agreement answered in another session tells no one`() = runTest {
+        var later: ((PoseStartStep) -> Unit)? = null
+        handler.poseStarter = { _, answer -> later = answer }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        handler.handle(SessionMessage.PoseStart("default"))
+        runCurrent()
+
+        handler.stop()
+        session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        session.setState(SessionState.Connected("s2", PeerInfo("Sungmin"), Role.PHOTOGRAPHER))
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        checkNotNull(later)(PoseStartStep.STARTED)
+        runCurrent()
+
+        assertTrue(startAnswers().isEmpty())
+        handler.stop()
+    }
+
+    @Test
+    fun `a focus request focuses there, puts the brightness back to the base, and is reported as one action`() =
+        runTest {
+            // A drag before the tap left the camera at 3; the base is 0 EV, index 0.
+            focusCamera.state.value = focusCamera.state.value.copy(exposure = 3)
+            backgroundScope.launch { focusHandler.actions.collect { actions += it } }
+            focusHandler.start(this)
+            advanceTimeBy(200)
+            runCurrent()
+            session.sent.clear()
+
+            focusHandler.handle(SessionMessage.FocusSet(0.62f, 0.4f))
+            runCurrent()
+
+            assertEquals(listOf(0.62f to 0.4f), focusCamera.focusPoints)
+            assertEquals(listOf(0), focusCamera.exposureRequests)
+            // The tap's answer: the state with the base, as the subject's, and no brightness notice.
+            assertEquals(
+                SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 0, focused = true),
+                echoes().single(),
+            )
+            assertEquals(listOf<RemoteAction>(RemoteAction.Focus(0.62f, 0.4f)), actions)
+            focusHandler.stop()
+        }
+
+    @Test
+    fun `a focus request at the base brightness already is answered with the unchanged state`() = runTest {
+        backgroundScope.launch { focusHandler.actions.collect { actions += it } }
+        focusHandler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        focusHandler.handle(SessionMessage.FocusSet(0f, 1f))
+        runCurrent()
+
+        assertEquals(listOf(0f to 1f), focusCamera.focusPoints)
+        // The camera will not report a brightness it already has, and the subject's bar waits for where it starts.
+        assertTrue(focusCamera.exposureRequests.isEmpty())
+        assertEquals(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, focused = true),
+            echoes().single(),
+        )
+        assertEquals(listOf<RemoteAction>(RemoteAction.Focus(0f, 1f)), actions)
+        focusHandler.stop()
+    }
+
+    @Test
+    fun `a focus request outside the frame, or while the camera is not ready, changes nothing`() = runTest {
+        focusCamera.state.value = focusCamera.state.value.copy(exposure = 3)
+        backgroundScope.launch { focusHandler.actions.collect { actions += it } }
+        focusHandler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        focusHandler.handle(SessionMessage.FocusSet(1.2f, 0.5f))
+        focusHandler.handle(SessionMessage.FocusSet(0.5f, -0.1f))
+        focusHandler.handle(SessionMessage.FocusSet(Float.NaN, 0.5f))
+        focusCamera.setStatus(CameraStatus.STARTING)
+        focusHandler.handle(SessionMessage.FocusSet(0.5f, 0.5f))
+        runCurrent()
+
+        assertTrue(focusCamera.focusPoints.isEmpty())
+        assertTrue(focusCamera.exposureRequests.isEmpty())
+        assertTrue(echoes().isEmpty())
+        assertTrue(actions.isEmpty())
+        focusHandler.stop()
+    }
+
+    @Test
+    fun `on a camera without point focus the tap only puts the brightness back, and is no focus action`() = runTest {
+        // The class's camera: a brightness range, no point focus. Its handler has the default base, 0 EV.
+        camera.state.value = camera.state.value.copy(exposure = 2)
+        backgroundScope.launch { handler.actions.collect { actions += it } }
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        handler.handle(SessionMessage.FocusSet(0.5f, 0.5f))
+        runCurrent()
+
+        assertTrue(camera.focusPoints.isEmpty())
+        assertEquals(listOf(0), camera.exposureRequests)
+        assertEquals(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, focused = true),
+            echoes().single(),
+        )
+        assertTrue(actions.isEmpty())
+        handler.stop()
+    }
+
+    @Test
+    fun `on a camera with point focus and no brightness range the tap focuses and is answered at once`() = runTest {
+        val plain = FakeCameraController(supportsFocusPoint = true)
+        val plainHandler = RemoteControlHandler(session, plain, guides, clock = { now })
+        backgroundScope.launch { plainHandler.actions.collect { actions += it } }
+        plainHandler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        plainHandler.handle(SessionMessage.FocusSet(0.5f, 0.5f))
+        runCurrent()
+
+        assertEquals(listOf(0.5f to 0.5f), plain.focusPoints)
+        assertTrue(plain.exposureRequests.isEmpty())
+        assertEquals(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, focused = true),
+            echoes().single(),
+        )
+        assertEquals(listOf<RemoteAction>(RemoteAction.Focus(0.5f, 0.5f)), actions)
+        plainHandler.stop()
+    }
+
+    @Test
+    fun `only the tap's answer is marked as it, not the subject's later echoes`() = runTest {
+        focusCamera.state.value = focusCamera.state.value.copy(exposure = 3)
+        focusHandler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+
+        focusHandler.handle(SessionMessage.FocusSet(0.5f, 0.5f))
+        runCurrent()
+        focusHandler.handle(SessionMessage.ExposureSet(2, final = true))
+        runCurrent()
+
+        assertEquals(listOf(true, false), echoes().map { it.focused })
+        assertEquals(listOf(Role.SUBJECT, Role.SUBJECT), echoes().map { it.by })
+        focusHandler.stop()
+    }
+
+    @Test
+    fun `a base the camera does not apply is answered with the current state, and then forgotten`() = runTest {
+        focusCamera.state.value = focusCamera.state.value.copy(exposure = 3)
+        focusHandler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+        focusCamera.applies = false
+
+        focusHandler.handle(SessionMessage.FocusSet(0.5f, 0.5f))
+        advanceTimeBy(400)
+        runCurrent()
+        assertTrue(echoes().isEmpty())
+
+        advanceTimeBy(200)
+        runCurrent()
+        // Where the camera is, as the tap's answer: the subject's bar starts from there.
+        assertEquals(
+            SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 3, focused = true),
+            echoes().single(),
+        )
+
+        // The photographer's own change to the base, later, is not the subject's.
+        session.sent.clear()
+        focusCamera.state.value = focusCamera.state.value.copy(exposure = 0)
+        runCurrent()
+        assertEquals(SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true), echoes().single())
+        focusHandler.stop()
+    }
+
+    @Test
+    fun `a focus request leaves a drag's outstanding brightness request to be answered`() = runTest {
+        focusHandler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+        // The camera takes neither the drag's last value nor the base that the tap asks for.
+        focusCamera.applies = false
+
+        focusHandler.handle(SessionMessage.ExposureSet(3, final = true))
+        focusHandler.handle(SessionMessage.FocusSet(0.5f, 0.5f))
+        advanceTimeBy(600)
+        runCurrent()
+
+        assertEquals(listOf(3, 0), focusCamera.exposureRequests)
+        // The subject's bar still learns where the camera is: the drag's answer, then the tap's.
+        assertEquals(
+            listOf(
+                SessionMessage.CameraStateUpdate(1f, Role.PHOTOGRAPHER, final = true),
+                SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, focused = true),
+            ),
+            echoes(),
+        )
+        focusHandler.stop()
+    }
+
+    @Test
+    fun `the subject's quick step glides the camera, and a pinch's steps are applied as they come`() = runTest {
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+
+        // One final value, as a tap on Subject view's readout sends.
+        handler.handle(SessionMessage.ZoomSet(2f, final = true))
+        runCurrent()
+        assertEquals(listOf(2f), camera.glideRequests)
+
+        handler.handle(SessionMessage.ZoomSet(2.4f, final = false))
+        handler.handle(SessionMessage.ZoomSet(2.8f, final = false))
+        runCurrent()
+        assertEquals(listOf(2f), camera.glideRequests)
+        assertEquals(listOf(false, false), camera.requestFinals.takeLast(2))
+
+        // The pinch's last value settles the same way; the camera shows it at once where the picture already is.
+        handler.handle(SessionMessage.ZoomSet(3f, final = true))
+        runCurrent()
+        assertEquals(listOf(2f, 3f), camera.glideRequests)
+
+        handler.stop()
+    }
+
+    @Test
+    fun `what the photographer did is told to the subject only while the session runs`() = runTest {
+        handler.didHere(PhotographerAction.Zoom(2f))
+        assertTrue(session.sent.isEmpty())
+
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+        handler.didHere(PhotographerAction.Zoom(2f))
+        handler.didHere(PhotographerAction.Flash(FlashMode.ON))
+        assertEquals(
+            listOf<SessionMessage>(
+                SessionMessage.PhotographerDid("zoom", zoom = 2f),
+                SessionMessage.PhotographerDid("flash", flash = FlashMode.ON),
+            ),
+            session.sent.toList(),
+        )
+
+        handler.stop()
+        session.sent.clear()
+        handler.didHere(PhotographerAction.GuideMove)
+        assertTrue(session.sent.isEmpty())
+    }
+
+    @Test
+    fun `the photographer's countdown is told to the subject only while the session runs`() = runTest {
+        handler.countdownHere(3)
+        assertTrue(session.sent.isEmpty())
+
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+        handler.countdownHere(3)
+        handler.countdownHere(0)
+        assertEquals(
+            listOf<SessionMessage>(SessionMessage.Countdown(3), SessionMessage.Countdown(0)),
+            session.sent.toList(),
+        )
+
+        handler.stop()
+        session.sent.clear()
+        handler.countdownHere(2)
+        assertTrue(session.sent.isEmpty())
+    }
+
+    @Test
+    fun `the photographer's own focus is told to the subject only while the session runs`() = runTest {
+        handler.focusedHere(0.2f, 0.3f)
+        assertTrue(session.sent.isEmpty())
+
+        handler.start(this)
+        advanceTimeBy(200)
+        runCurrent()
+        session.sent.clear()
+        handler.focusedHere(0.2f, 0.3f)
+        assertEquals(listOf<SessionMessage>(SessionMessage.Focused(0.2f, 0.3f)), session.sent.toList())
+
+        handler.stop()
+        session.sent.clear()
+        handler.focusedHere(0.5f, 0.5f)
+        assertTrue(session.sent.isEmpty())
     }
 
     @Test

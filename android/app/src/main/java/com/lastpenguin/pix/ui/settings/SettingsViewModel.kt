@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import androidx.lifecycle.ViewModel
@@ -22,7 +22,8 @@ import kotlinx.coroutines.launch
 
 /**
  * The settings screen's choices (FR-10.1), shared by the activity: the camera screens read the guide's look and the
- * latency indicator from here, so a change applies the moment they show again. The AI consent is
+ * latency indicator from here, so a change applies the moment they show again, and read and set the grid and the horizon
+ * bar of their camera menu (FR-1.17). The AI consent is
  * `GenerationViewModel`'s, which asks for it.
  * Owner: Settings (#123).
  */
@@ -36,8 +37,11 @@ class SettingsViewModel(
 
     val showLatency: StateFlow<Boolean> = settings.showLatency
 
-    /** The Camera screen's base brightness in EV (FR-1.11), which its tap to focus goes back to. */
-    val baseBrightness: StateFlow<Float> = settings.baseBrightness
+    /** Whether Camera and Subject view draw the 3×3 grid (FR-1.9), which their camera menu turns off and on. */
+    val showGrid: StateFlow<Boolean> = settings.showGrid
+
+    /** Whether Camera draws the horizon bar (FR-1.10), which its camera menu turns off and on. */
+    val showLevel: StateFlow<Boolean> = settings.showLevel
 
     /** Whether release builds send crash reports and usage data (FR-10.6); null until the stored answer is read. */
     val shareUsage: StateFlow<Boolean?> = settings.shareUsage
@@ -57,12 +61,33 @@ class SettingsViewModel(
         viewModelScope.launch { settings.setShowLatency(show) }
     }
 
-    fun setBaseBrightness(ev: Float) {
-        viewModelScope.launch { settings.setBaseBrightness(ev) }
+    /** The camera menu's *Grid*: off or on from what is stored, so two quick taps go there and back. */
+    fun toggleShowGrid() {
+        viewModelScope.launch { settings.toggleShowGrid() }
+    }
+
+    /** The camera menu's *Horizon*, as [toggleShowGrid]. */
+    fun toggleShowLevel() {
+        viewModelScope.launch { settings.toggleShowLevel() }
     }
 
     fun setShareUsage(share: Boolean) {
         viewModelScope.launch { settings.setShareUsage(share) }
+    }
+
+    // Set at once, as the tips closed are: the stored answer comes back later, and a second delete must not offer again.
+    private val accessOfferedHere = MutableStateFlow(false)
+
+    /**
+     * Whether Pix has offered to manage the phone's media for deleting another app's photo (FR-1.16): only once. While
+     * the stored answer is unread it counts as offered, so the offer never comes twice.
+     */
+    fun mediaAccessOffered(): Boolean = accessOfferedHere.value || settings.mediaAccessOffered.value != false
+
+    /** The media access was offered now, so it never is again. */
+    fun markMediaAccessOffered() {
+        accessOfferedHere.value = true
+        viewModelScope.launch { settings.setMediaAccessOffered() }
     }
 
     /** Set at once: the stored answer comes back later, and a screen shown again must not show its tips twice. */

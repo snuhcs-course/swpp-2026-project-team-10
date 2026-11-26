@@ -1,6 +1,9 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
+import android.app.PendingIntent
+import android.content.Intent
+import android.content.IntentSender
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.camera.core.ImageCapture
@@ -8,6 +11,7 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelStore
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.camera.AspectRatio
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -17,8 +21,11 @@ import com.lastpenguin.pix.camera.CameraState
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.FrameSink
+import com.lastpenguin.pix.camera.PhoneAlbum
 import com.lastpenguin.pix.camera.PhoneTurns
+import com.lastpenguin.pix.camera.PhotoAccess
 import com.lastpenguin.pix.camera.PhotoDeleter
+import com.lastpenguin.pix.camera.PhotoDeletion
 import com.lastpenguin.pix.guide.GuideChange
 import com.lastpenguin.pix.guide.GuideRepository
 import com.lastpenguin.pix.guide.GuideSource
@@ -223,15 +230,24 @@ class CameraViewModelTest {
     // Camera's thumbnail (FR-1.6; Iter4-A2): outside a session the newest in Pix's album, taken here or received, and a
     // photo taken here at once; in a session only the session's newest, none until its first; after it, the album's
     // newest again. The viewer (FR-1.6): outside a session Pix's album, with a photo just taken; in a session only the
-    // session's photos; none to open without photos, and it closes when a session starts or ends. A photo deleted from
-    // it leaves its pages and the thumbnail at once, before MediaStore tells of it, also one just taken; the last one
-    // closes it; a delete that fails keeps the photo and says so once.
+    // session's photos; none to open without photos, and it closes when a session starts or ends. Pix's album opens as
+    // its grid, and a photo picked there opens its page, from which Back goes to the grid and Back again closes it; a
+    // photo not in the album picks nothing; in a session there is no grid and nothing to pick. Access (FR-1.6): with
+    // every photo, nothing to open without one; with Pix's own or the chosen ones, the grid opens also empty, to say
+    // so, but not in a session; an answer to the permission reads the photos again and opens the grid on them, or
+    // leaves it open. A photo deleted from it leaves its pages and the thumbnail at once, before MediaStore tells of
+    // it, also one just taken; the last one closes it, the pick gone with it; a delete that fails keeps the photo and
+    // says so once. Another app's photo goes to Android's question, whose yes drops it at once and whose no keeps it
+    // with nothing to say; on Android 10 the yes lets Pix delete it, and a second question there is a failure. The
+    // tabs: Photos at each opening, changed only on either tab; on Albums, an album of the phone's opens as its grid,
+    // whose photos alone the viewer shows, kept through a new read, and gone once its photos are; Back goes from a page
+    // to its grid, to the albums, and closes.
     private fun photo(id: Int): Uri = Uri.parse("content://media/external/images/media/$id")
 
     @Test
     fun lastPhoto_outsideASession_isTheAlbumsNewest_orThePhotoJustTaken() = runTest {
         val album = MutableStateFlow(listOf(photo(10)))
-        val shooting = CameraViewModel(camera, guides, albumPhotos = album)
+        val shooting = CameraViewModel(camera, guides, phonePhotos = album)
         runCurrent()
         assertEquals(photo(10), shooting.uiState.value.lastPhoto)
 
@@ -257,7 +273,7 @@ class CameraViewModelTest {
     fun lastPhoto_inASession_isOnlyTheSessionsNewest_noneUntilItsFirst_andTheAlbumsAfterIt() = runTest {
         val album = MutableStateFlow(listOf(photo(10)))
         val session = MutableStateFlow<List<Uri>?>(null)
-        val shooting = CameraViewModel(camera, guides, albumPhotos = album, sessionPhotos = session)
+        val shooting = CameraViewModel(camera, guides, phonePhotos = album, sessionPhotos = session)
         runCurrent()
 
         session.value = emptyList()
@@ -287,7 +303,7 @@ class CameraViewModelTest {
     fun photos_outsideASession_openPixsAlbum_withThePhotoJustTaken_andCloseWhenASessionStarts() = runTest {
         val album = MutableStateFlow(emptyList<Uri>())
         val session = MutableStateFlow<List<Uri>?>(null)
-        val shooting = CameraViewModel(camera, guides, albumPhotos = album, sessionPhotos = session)
+        val shooting = CameraViewModel(camera, guides, phonePhotos = album, sessionPhotos = session)
         runCurrent()
         shooting.openPhotos()
         assertFalse(shooting.uiState.value.photosOpen)
@@ -314,10 +330,61 @@ class CameraViewModelTest {
     }
 
     @Test
+    fun photos_outsideASession_openAsTheAlbumsGrid_aPickOpensItsPage_andBackGoesToTheGridThenCloses() = runTest {
+        val album = MutableStateFlow(listOf(photo(10), photo(11), photo(12)))
+        val session = MutableStateFlow<List<Uri>?>(null)
+        val shooting = CameraViewModel(camera, guides, phonePhotos = album, sessionPhotos = session)
+        runCurrent()
+
+        shooting.openPhotos()
+        assertTrue(shooting.uiState.value.photosGrid)
+        assertNull(shooting.uiState.value.pickedPhoto)
+
+        // Only a photo of the album.
+        shooting.pickPhoto(photo(99))
+        assertTrue(shooting.uiState.value.photosGrid)
+        shooting.pickPhoto(photo(11))
+        assertTrue(shooting.uiState.value.photosOpen)
+        assertFalse(shooting.uiState.value.photosGrid)
+        assertEquals(photo(11), shooting.uiState.value.pickedPhoto)
+
+        // A new photo in the album keeps the page.
+        album.value = listOf(photo(10), photo(11), photo(12), photo(13))
+        runCurrent()
+        assertEquals(photo(11), shooting.uiState.value.pickedPhoto)
+
+        shooting.closePhotos()
+        assertTrue(shooting.uiState.value.photosOpen)
+        assertTrue(shooting.uiState.value.photosGrid)
+        shooting.closePhotos()
+        assertFalse(shooting.uiState.value.photosOpen)
+        assertFalse(shooting.uiState.value.photosGrid)
+
+        // Each opening is the grid again; a session's start closes it, pick and all.
+        shooting.openPhotos()
+        shooting.pickPhoto(photo(12))
+        shooting.closePhotos()
+        shooting.pickPhoto(photo(13))
+        session.value = listOf(photo(20))
+        runCurrent()
+        assertFalse(shooting.uiState.value.photosOpen)
+        assertNull(shooting.uiState.value.pickedPhoto)
+
+        // In a session: its photo at once, no grid, and nothing to pick.
+        shooting.openPhotos()
+        assertTrue(shooting.uiState.value.photosOpen)
+        assertFalse(shooting.uiState.value.photosGrid)
+        shooting.pickPhoto(photo(20))
+        assertNull(shooting.uiState.value.pickedPhoto)
+        shooting.closePhotos()
+        assertFalse(shooting.uiState.value.photosOpen)
+    }
+
+    @Test
     fun photos_inASession_openOnlyTheSessions_andCloseWhenItEnds() = runTest {
         val album = MutableStateFlow(listOf(photo(10)))
         val session = MutableStateFlow<List<Uri>?>(emptyList())
-        val shooting = CameraViewModel(camera, guides, albumPhotos = album, sessionPhotos = session)
+        val shooting = CameraViewModel(camera, guides, phonePhotos = album, sessionPhotos = session)
         runCurrent()
         // The album has a photo, but none is the session's.
         shooting.openPhotos()
@@ -345,10 +412,10 @@ class CameraViewModelTest {
             CameraViewModel(
                 camera,
                 guides,
-                albumPhotos = album,
+                phonePhotos = album,
                 deleter = PhotoDeleter {
                     deleted += it
-                    true
+                    PhotoDeletion.Deleted
                 },
             )
         runCurrent()
@@ -362,17 +429,274 @@ class CameraViewModelTest {
         assertEquals(photo(10), shooting.uiState.value.lastPhoto)
         assertTrue(shooting.uiState.value.photosOpen)
 
+        shooting.pickPhoto(photo(10))
         shooting.deletePhoto(photo(10))
         runCurrent()
         assertEquals(emptyList<Uri>(), shooting.uiState.value.viewerPhotos)
         assertNull(shooting.uiState.value.lastPhoto)
         assertFalse(shooting.uiState.value.photosOpen)
+        assertNull(shooting.uiState.value.pickedPhoto)
+    }
+
+    @Test
+    fun photos_withoutEveryPhoto_openTheGridAlsoEmpty_andAnAnswerReadsThemAgain_andOpensIt() = runTest {
+        val album = MutableStateFlow(emptyList<Uri>())
+        val access = MutableStateFlow(PhotoAccess.OWN)
+        val session = MutableStateFlow<List<Uri>?>(null)
+        var rereads = 0
+        val shooting = CameraViewModel(
+            camera,
+            guides,
+            phonePhotos = album,
+            photoAccess = access,
+            rereadPhotos = {
+                rereads++
+                access.value = PhotoAccess.ALL
+                album.value = listOf(photo(30), photo(31))
+            },
+            sessionPhotos = session,
+        )
+        runCurrent()
+
+        // No photo of Pix's own yet, but the grid opens, to say what it shows.
+        assertTrue(shooting.uiState.value.opensPhotos)
+        shooting.openPhotos()
+        assertTrue(shooting.uiState.value.photosGrid)
+        shooting.closePhotos()
+
+        // Answered from the thumbnail: read again, and the grid opens on every photo.
+        shooting.photoAccessAnswered()
+        runCurrent()
+        assertEquals(1, rereads)
+        assertEquals(PhotoAccess.ALL, shooting.uiState.value.photoAccess)
+        assertTrue(shooting.uiState.value.photosGrid)
+        assertEquals(listOf(photo(30), photo(31)), shooting.uiState.value.viewerPhotos)
+        assertEquals(photo(31), shooting.uiState.value.lastPhoto)
+
+        // Answered from the grid, which stays open.
+        shooting.photoAccessAnswered()
+        runCurrent()
+        assertTrue(shooting.uiState.value.photosGrid)
+
+        // Every photo and none on the phone: nothing to open.
+        shooting.closePhotos()
+        album.value = emptyList()
+        runCurrent()
+        assertFalse(shooting.uiState.value.opensPhotos)
+        // The chosen photos, none of them yet: the grid opens to say so; not in a session, which has its own.
+        access.value = PhotoAccess.CHOSEN
+        runCurrent()
+        assertTrue(shooting.uiState.value.opensPhotos)
+        session.value = emptyList()
+        runCurrent()
+        assertFalse(shooting.uiState.value.opensPhotos)
+
+        // The screen's start reads them again too.
+        shooting.readPhotosAgain()
+        runCurrent()
+        assertEquals(3, rereads)
+    }
+
+    @Test
+    fun photos_theTabs_photosAtEachOpening_anAlbumOpenedFromAlbums_isWhatTheViewerShows_andBackGoesStepByStep() =
+        runTest {
+            val album = MutableStateFlow(listOf(photo(10), photo(11), photo(12)))
+            val cameraAlbum = PhoneAlbum("c", "Camera", "DCIM/Camera/", listOf(photo(10), photo(12)))
+            val shotsAlbum = PhoneAlbum("s", "Screenshots", "Pictures/Screenshots/", listOf(photo(11)))
+            val albums = MutableStateFlow(listOf(cameraAlbum, shotsAlbum))
+            val shooting = CameraViewModel(
+                camera,
+                guides,
+                phonePhotos = album,
+                photoAlbums = albums,
+                deleter = PhotoDeleter { PhotoDeletion.Deleted },
+            )
+            runCurrent()
+            assertEquals(listOf(cameraAlbum, shotsAlbum), shooting.uiState.value.photoAlbums)
+
+            // Photos first; no album opens from it, nor a tab changes while the viewer is closed.
+            shooting.chooseGalleryTab(GalleryTab.ALBUMS)
+            assertEquals(GalleryTab.PHOTOS, shooting.uiState.value.galleryTab)
+            shooting.openPhotos()
+            assertTrue(shooting.uiState.value.photosGrid)
+            shooting.openAlbum("c")
+            assertNull(shooting.uiState.value.album)
+
+            // Albums: no grid of photos, and only an album of the phone's opens.
+            shooting.chooseGalleryTab(GalleryTab.ALBUMS)
+            assertTrue(shooting.uiState.value.albumsShown)
+            assertFalse(shooting.uiState.value.photosGrid)
+            shooting.openAlbum("gone")
+            assertNull(shooting.uiState.value.album)
+            shooting.openAlbum("c")
+            assertEquals(cameraAlbum, shooting.uiState.value.album)
+            assertTrue(shooting.uiState.value.photosGrid)
+            assertEquals(listOf(photo(10), photo(12)), shooting.uiState.value.viewerPhotos)
+
+            // Inside it, no tab changes; a photo of another album is none of its.
+            shooting.chooseGalleryTab(GalleryTab.PHOTOS)
+            assertEquals(GalleryTab.ALBUMS, shooting.uiState.value.galleryTab)
+            shooting.pickPhoto(photo(11))
+            assertNull(shooting.uiState.value.pickedPhoto)
+            shooting.pickPhoto(photo(12))
+            assertEquals(photo(12), shooting.uiState.value.pickedPhoto)
+
+            // A new read keeps the album with its new photos.
+            albums.value = listOf(cameraAlbum.copy(photos = listOf(photo(10), photo(12), photo(13))), shotsAlbum)
+            album.value = listOf(photo(10), photo(11), photo(12), photo(13))
+            runCurrent()
+            assertEquals(listOf(photo(10), photo(12), photo(13)), shooting.uiState.value.viewerPhotos)
+
+            // Back, a step at a time: the album's grid, the albums, the camera.
+            shooting.closePhotos()
+            assertEquals(cameraAlbum.id, shooting.uiState.value.album?.id)
+            shooting.closePhotos()
+            assertTrue(shooting.uiState.value.albumsShown)
+            shooting.closePhotos()
+            assertFalse(shooting.uiState.value.photosOpen)
+
+            // Each opening starts at Photos.
+            shooting.openPhotos()
+            assertEquals(GalleryTab.PHOTOS, shooting.uiState.value.galleryTab)
+            assertNull(shooting.uiState.value.album)
+
+            // An album whose last photo is deleted from its page goes, with that photo: the albums show again, not the
+            // photo's place among all the phone's.
+            shooting.chooseGalleryTab(GalleryTab.ALBUMS)
+            shooting.openAlbum("s")
+            shooting.pickPhoto(photo(11))
+            assertEquals(photo(11), shooting.uiState.value.pickedPhoto)
+            shooting.deletePhoto(photo(11))
+            runCurrent()
+            assertNull(shooting.uiState.value.album)
+            assertNull(shooting.uiState.value.pickedPhoto)
+            assertTrue(shooting.uiState.value.photosOpen)
+            assertTrue(shooting.uiState.value.albumsShown)
+            assertEquals(listOf("c"), shooting.uiState.value.photoAlbums.map { it.id })
+        }
+
+    @Test
+    fun deletePhoto_ofAnotherApp_goesToAndroidsQuestion_whoseYesDropsIt_andWhoseNoKeepsIt() = runTest {
+        val album = MutableStateFlow(listOf(photo(10), photo(11), photo(12)))
+        val question = PendingIntent.getActivity(
+            ApplicationProvider.getApplicationContext(),
+            0,
+            Intent("delete"),
+            PendingIntent.FLAG_IMMUTABLE,
+        ).intentSender
+        val asked = mutableListOf<Uri>()
+        val shooting = CameraViewModel(
+            camera,
+            guides,
+            phonePhotos = album,
+            deleter = object : PhotoDeleter {
+                override suspend fun delete(uri: Uri): PhotoDeletion {
+                    asked += uri
+                    return PhotoDeletion.NeedsConsent(question, deletesItself = uri != photo(12))
+                }
+
+                override fun asksFirst(uri: Uri) = false
+            },
+        )
+        val questions = mutableListOf<IntentSender>()
+        val notices = mutableListOf<Unit>()
+        backgroundScope.launch { shooting.deleteQuestions.collect { questions += it } }
+        backgroundScope.launch { shooting.photoNotDeleted.collect { notices += it } }
+        runCurrent()
+        shooting.openPhotos()
+        shooting.pickPhoto(photo(11))
+        assertFalse(shooting.asksBeforeDeleting(photo(11)))
+
+        // A no keeps it, and says nothing.
+        shooting.deletePhoto(photo(11))
+        runCurrent()
+        assertEquals(listOf(question), questions)
+        shooting.deleteAnswered(yes = false)
+        runCurrent()
+        assertEquals(listOf(photo(10), photo(11), photo(12)), shooting.uiState.value.viewerPhotos)
+        assertTrue(notices.isEmpty())
+
+        // A yes deleted it: it leaves at once, before MediaStore tells of it.
+        shooting.deletePhoto(photo(11))
+        runCurrent()
+        shooting.deleteAnswered(yes = true)
+        runCurrent()
+        assertEquals(listOf(photo(10), photo(12)), shooting.uiState.value.viewerPhotos)
+        assertEquals(listOf(photo(11), photo(11)), asked)
+
+        // Android 10: the yes lets Pix delete it, asked again; a second question there is a failure, said once.
+        shooting.deletePhoto(photo(12))
+        runCurrent()
+        shooting.deleteAnswered(yes = true)
+        runCurrent()
+        assertEquals(listOf(photo(11), photo(11), photo(12), photo(12)), asked)
+        assertEquals(3, questions.size)
+        assertEquals(1, notices.size)
+        assertEquals(listOf(photo(10), photo(12)), shooting.uiState.value.viewerPhotos)
+
+        // An answer with no question open changes nothing.
+        shooting.deleteAnswered(yes = true)
+        runCurrent()
+        assertEquals(listOf(photo(10), photo(12)), shooting.uiState.value.viewerPhotos)
+    }
+
+    @Test
+    fun allowAccess_thenAndroidsScreenCloses_deletesThePhotoAskedFor_throughAndroidsRequest_once() = runTest {
+        val album = MutableStateFlow(listOf(photo(10), photo(11)))
+        val question = PendingIntent.getActivity(
+            ApplicationProvider.getApplicationContext(),
+            0,
+            Intent("delete"),
+            PendingIntent.FLAG_IMMUTABLE,
+        ).intentSender
+        var access = false
+        val asked = mutableListOf<Uri>()
+        val shooting = CameraViewModel(
+            camera,
+            guides,
+            phonePhotos = album,
+            deleter = object : PhotoDeleter {
+                override suspend fun delete(uri: Uri): PhotoDeletion {
+                    asked += uri
+                    return PhotoDeletion.NeedsConsent(question, deletesItself = true)
+                }
+
+                override fun needsAccess(uri: Uri) = !access
+            },
+        )
+        val questions = mutableListOf<IntentSender>()
+        backgroundScope.launch { shooting.deleteQuestions.collect { questions += it } }
+        runCurrent()
+        shooting.openPhotos()
+        assertTrue(shooting.needsAccessToDelete(photo(11)))
+
+        // Nothing goes while Android's screen is open.
+        shooting.deleteAfterAccess(photo(11))
+        runCurrent()
+        assertTrue(asked.isEmpty())
+
+        // The user allowed it: the photo goes through Android's request, which no longer asks.
+        access = true
+        shooting.accessAnswered()
+        runCurrent()
+        assertFalse(shooting.needsAccessToDelete(photo(11)))
+        assertEquals(listOf(photo(11)), asked)
+        assertEquals(listOf(question), questions)
+        shooting.deleteAnswered(yes = true)
+        runCurrent()
+        assertEquals(listOf(photo(10)), shooting.uiState.value.viewerPhotos)
+
+        // The screen closing again, with nothing asked for, deletes nothing more.
+        shooting.accessAnswered()
+        runCurrent()
+        assertEquals(listOf(photo(11)), asked)
     }
 
     @Test
     fun deletePhoto_thePhotoJustTaken_leavesThePages_beforeMediaStoreTellsOfIt() = runTest {
         val album = MutableStateFlow(listOf(photo(10)))
-        val shooting = CameraViewModel(camera, guides, albumPhotos = album, deleter = PhotoDeleter { true })
+        val shooting =
+            CameraViewModel(camera, guides, phonePhotos = album, deleter = PhotoDeleter { PhotoDeletion.Deleted })
         runCurrent()
         shooting.onShutter()
         runCurrent()
@@ -389,7 +713,8 @@ class CameraViewModelTest {
     @Test
     fun deletePhoto_thatFails_keepsThePhoto_andSaysSoOnce() = runTest {
         val album = MutableStateFlow(listOf(photo(10)))
-        val shooting = CameraViewModel(camera, guides, albumPhotos = album, deleter = PhotoDeleter { false })
+        val shooting =
+            CameraViewModel(camera, guides, phonePhotos = album, deleter = PhotoDeleter { PhotoDeletion.Failed })
         val notices = mutableListOf<Unit>()
         backgroundScope.launch { shooting.photoNotDeleted.collect { notices += it } }
         runCurrent()
@@ -490,7 +815,7 @@ class CameraViewModelTest {
         assertEquals(listOf(Triple("s1", photo, 1_000L)), share.shared)
     }
 
-    /** A session s1 until a test changes it. */
+    /** In a session until a test sets [session] to null; each shot is named after the session it was taken in. */
     private class RecordingShare : PhotoShare {
         var session: String? = "s1"
         val shared = mutableListOf<Triple<String, Uri, Long>>()
@@ -498,12 +823,12 @@ class CameraViewModelTest {
 
         override fun shutter() = session
 
-        override fun taken(sessionId: String, uri: Uri, takenAt: Long) {
-            shared += Triple(sessionId, uri, takenAt)
+        override fun taken(shot: String, uri: Uri, takenAt: Long) {
+            shared += Triple(shot, uri, takenAt)
         }
 
-        override fun notTaken(sessionId: String) {
-            failed += sessionId
+        override fun notTaken(shot: String) {
+            failed += shot
         }
     }
 
@@ -741,6 +1066,13 @@ class CameraViewModelTest {
             zoomRequests.add(ratio)
             zoomFinals.add(final)
         }
+
+        /** The ratios asked for as a glide (#310), each also a final request, as the camera makes it. */
+        val glides = mutableListOf<Float>()
+        override fun glideZoom(ratio: Float) {
+            glides += ratio
+            setZoom(ratio, final = true)
+        }
         override fun setFocusPoint(x: Float, y: Float) = Unit
         override fun setExposure(index: Int) = Unit
         override fun setFlash(mode: FlashMode) = Unit
@@ -781,55 +1113,102 @@ class CameraViewModelTest {
 
     @Test
     fun `removing the guide clears the repository`() = runTest(dispatcher) {
+        val guide = guide("g1")
+        guides.setGuide(guide)
         runCurrent()
 
         model.onRemoveGuide()
         runCurrent()
 
-        assertEquals(listOf<ReferenceGuide?>(null), guides.set)
+        assertEquals(listOf(guide, null), guides.set)
         assertNull(model.uiState.value.guide)
     }
 
     @Test
-    fun `a new guide starts edit mode, and the shutter, hiding, or removing the guide ends it`() = runTest(dispatcher) {
+    fun `removing without a guide changes nothing`() = runTest(dispatcher) {
         runCurrent()
-        assertFalse(model.uiState.value.guideEditing)
-        model.setGuideEditing(true)
-        assertFalse(model.uiState.value.guideEditing)
 
-        guides.setGuide(guide("g1"))
+        model.onRemoveGuide()
         runCurrent()
-        assertTrue(model.uiState.value.guideEditing)
-        model.setGuideEditing(false)
-        assertFalse(model.uiState.value.guideEditing)
-        model.setGuideEditing(true)
-        assertTrue(model.uiState.value.guideEditing)
 
-        model.onShutter()
-        assertFalse(model.uiState.value.guideEditing)
-        camera.capture.complete(Result.success(Uri.parse("content://media/1")))
-        runCurrent()
-        assertFalse(model.uiState.value.guideEditing)
-
-        guides.setGuide(guide("g2"))
-        runCurrent()
-        assertTrue(model.uiState.value.guideEditing)
-        guides.state.value = guides.state.value.copy(visible = false)
-        runCurrent()
-        assertFalse(model.uiState.value.guideEditing)
-        model.setGuideEditing(true)
-        assertFalse(model.uiState.value.guideEditing)
-        guides.state.value = guides.state.value.copy(visible = true)
-        runCurrent()
-        assertFalse(model.uiState.value.guideEditing)
-        model.setGuideEditing(true)
-        assertTrue(model.uiState.value.guideEditing)
-
-        model.setGuideEditing(true)
-        guides.setGuide(null)
-        runCurrent()
-        assertFalse(model.uiState.value.guideEditing)
+        // Nothing to clear, and nothing for Undo to put back (#298).
+        assertEquals(emptyList<ReferenceGuide?>(), guides.set)
     }
+
+    @Test
+    fun `a tap on the readout and a pinch's last value glide, and a pinch's steps are applied as they come`() =
+        runTest(dispatcher) {
+            runCurrent()
+
+            model.onZoomTap()
+            assertEquals(listOf(2f), camera.glides)
+
+            // A pinch: each step at once, so the picture follows the fingers; its last value settles as a tap's does,
+            // which the camera shows at once where the picture already is.
+            model.onZoomChanged(2.4f, final = false)
+            model.onZoomChanged(2.8f, final = false)
+            assertEquals(listOf(2f), camera.glides)
+            assertEquals(listOf(2.4f, 2.8f), camera.zoomRequests.takeLast(2))
+            assertEquals(listOf(false, false), camera.zoomFinals.takeLast(2))
+            model.onZoomChanged(3f, final = true)
+            assertEquals(listOf(2f, 3f), camera.glides)
+        }
+
+    @Test
+    fun `a new guide keeps the camera's gestures, and the shutter, another guide, hiding, or removal ends edit mode`() =
+        runTest(dispatcher) {
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+            model.setGuideEditing(true)
+            assertFalse(model.uiState.value.guideEditing)
+
+            // A guide is added: a pinch still zooms and a tap still focuses, until the toggle says otherwise (#304).
+            guides.setGuide(guide("g1"))
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+            model.setGuideEditing(true)
+            assertTrue(model.uiState.value.guideEditing)
+            model.setGuideEditing(false)
+            assertFalse(model.uiState.value.guideEditing)
+            model.setGuideEditing(true)
+            assertTrue(model.uiState.value.guideEditing)
+
+            // Saving it leaves it the same guide, so the mode stays under the finger.
+            model.onSaveGuide()
+            runCurrent()
+            assertTrue(model.uiState.value.guideSaved)
+            assertTrue(model.uiState.value.guideEditing)
+
+            model.onShutter()
+            assertFalse(model.uiState.value.guideEditing)
+            camera.capture.complete(Result.success(Uri.parse("content://media/1")))
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+
+            // Another guide in place of one being edited is a new guide too.
+            model.setGuideEditing(true)
+            assertTrue(model.uiState.value.guideEditing)
+            guides.setGuide(guide("g2"))
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+
+            model.setGuideEditing(true)
+            guides.state.value = guides.state.value.copy(visible = false)
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+            model.setGuideEditing(true)
+            assertFalse(model.uiState.value.guideEditing)
+            guides.state.value = guides.state.value.copy(visible = true)
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+            model.setGuideEditing(true)
+            assertTrue(model.uiState.value.guideEditing)
+
+            model.setGuideEditing(true)
+            guides.setGuide(null)
+            runCurrent()
+            assertFalse(model.uiState.value.guideEditing)
+        }
 
     private fun guide(id: String): ReferenceGuide {
         val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)

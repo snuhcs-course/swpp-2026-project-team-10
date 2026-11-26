@@ -1,10 +1,9 @@
-// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix
 
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -17,6 +16,7 @@ import com.lastpenguin.pix.databinding.ActivityMainBinding
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.session.PhotoNotice
 import com.lastpenguin.pix.ui.session.SessionViewModel
+import com.lastpenguin.pix.ui.showNotice
 import kotlinx.coroutines.launch
 
 /** The only activity. Every screen is a destination in `res/navigation/nav_graph.xml` (Design 2.8). */
@@ -51,7 +51,7 @@ class MainActivity : AppCompatActivity() {
                         PhotoNotice.Saved -> getString(R.string.session_photo_saved)
                         is PhotoNotice.SaveFailed -> getString(R.string.session_photo_save_failed, notice.name)
                     }
-                    Toast.makeText(this@MainActivity, text, Toast.LENGTH_SHORT).show()
+                    showNotice(text)
                 }
             }
         }

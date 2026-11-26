@@ -1,6 +1,7 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Sungmin Jo and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
+import com.lastpenguin.pix.camera.exposureIndexOf
 import java.text.DecimalFormat
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -23,8 +24,7 @@ internal object ExposureScale {
     fun index(value: Float, range: IntRange): Int = value.roundToInt() - 1 + range.first
 
     /** The exposure index nearest [ev] for a camera of [step] EV per index, within its [range] (the base brightness). */
-    fun indexOf(ev: Float, step: Float, range: IntRange): Int =
-        if (step <= 0f || !ev.isFinite()) 0.coerceIn(range) else (ev / step).roundToInt().coerceIn(range)
+    fun indexOf(ev: Float, step: Float, range: IntRange): Int = exposureIndexOf(ev, step, range)
 
     /** An EV value, such as "+0.7" or "0". */
     fun formatEv(ev: Float): String = if (abs(ev) < 0.05f) "0" else evFormat.format(ev)

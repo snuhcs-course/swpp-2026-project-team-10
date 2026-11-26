@@ -1,9 +1,10 @@
-// AI-generated with Claude Code, 2026-11-18, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.net.Uri
 import com.lastpenguin.pix.camera.PhotoAlbum
 import com.lastpenguin.pix.camera.PhotoDeleter
+import com.lastpenguin.pix.camera.PhotoDeletion
 import com.lastpenguin.pix.session.protocol.PhotoRefusal
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import java.io.ByteArrayInputStream
@@ -51,12 +52,13 @@ import org.robolectric.RobolectricTestRunner
  * Photographer, the shutter (state-based): a photo belongs to the session at its shutter, so another session never gets
  * it, one that ended during the save counts it once, a reconnect keeps it, and one that could not be saved is not
  * counted. A connected subject hears of the shutter at once (`photo.shutter`, Iter3-A12); while reconnecting, and
- * outside a session, no one does.
+ * outside a session, no one does. Each shutter has its own shot, which its photo's `photo.begin` names (#271).
  * Photographer, the limits (boundary): 0 B, one chunk, one byte more, 40 MiB, one byte more; 32 chunks past the last
  * `photo.ack` and one more; a chunk that waits in `sendBulk` goes once.
  * Photographer, failures (fault injection): a photo that cannot be opened or read, one the subject refuses, one with
  * no answer for 30 s (just before and just after), and `sendBulk` saying the session is over; each is one `sendFailed`,
- * and the next photo goes on.
+ * and the next photo goes on. One that could not be saved or opened, before its `photo.begin`, is said `photo.dropped`
+ * (#271), and one sent is not; outside a session nothing is said.
  * Photographer, the session's end: every unconfirmed photo counted once, the one going included; a confirmed one not;
  * failures nothing read counted too. No failure is lost, however many come before they are read.
  * Subject, one photo (state-based): saved once with its `takenAt`, then its file gone; a `photo.ack` every 16 chunks.
@@ -69,6 +71,16 @@ import org.robolectric.RobolectricTestRunner
  * Subject, what it tells: no saved photo is lost unread, and what a session left unread does not reach the next one.
  * Subject, the session's other messages: a slow save, on real threads, leaves `incoming` read.
  * Subject, the shutter: each `photo.shutter` reaches a screen that listens; one that came before is not kept.
+ * Subject, a photo on its way (state-based, boundary; #271): none at first; from a shutter until that photo is saved,
+ * or refused by the album; from a `photo.begin` whose shutter was lost or came during a drop; two shutters until both
+ * photos, or one photo and the other's `photo.dropped`; a `photo.dropped` whose shutter was lost, which ends no other
+ * photo's wait; a shutter that comes after its photo's drop or save, which starts none; one the photographer gave up for the next; a photographer's phone before #271, whose messages name no
+ * shot, counted by its shutters; 30 s without a photo message (just before and just after), a chunk starting that time
+ * again; and the session's end.
+ * Both, a drop (boundary; #293): the time the link is down does not count toward giving a photo up or ending its wait,
+ * for the subject's answer, an ack, and the subject's own wait, with the drop late in the wait and as long as the
+ * session tries; once the link is back the time starts over (just before its end / at its end), also after a drop so
+ * short that no reader saw its Reconnecting, which only the state after it tells.
  * Both, the session's photos (state-based; Iter4-A2): none outside a session and an empty list at its start; on the
  * subject's phone each saved photo joins them in order, and a refused or broken photo, one the album fails to save, and
  * one saved before do not, nor one whose save ends after its session ended and another started; on the photographer's
@@ -113,10 +125,10 @@ class PhotoSyncerTest {
     private val deleted = mutableListOf<Uri>()
     private var deleteFails = false
     private val deleter = PhotoDeleter { uri ->
-        if (deleteFails) return@PhotoDeleter false
+        if (deleteFails) return@PhotoDeleter PhotoDeletion.Failed
         deleted += uri
         photos.remove(uri)
-        true
+        PhotoDeletion.Deleted
     }
 
     private val parts: File get() = File(folder.root, "parts")
@@ -124,8 +136,14 @@ class PhotoSyncerTest {
     private fun TestScope.syncer(partDir: File = parts) =
         PhotoSyncer(session, reader, album, partDir, StandardTestDispatcher(testScheduler))
 
-    private fun connectedAs(role: Role) {
-        session.setState(SessionState.Connected("s_1", PeerInfo("Dongje", null), role))
+    private fun connectedAs(role: Role, drops: Int = 0) {
+        session.setState(SessionState.Connected("s_1", PeerInfo("Dongje", null), role, drops = drops))
+    }
+
+    /** A drop over before any reader runs: a state flow shows only its latest value, the state after it (#293). */
+    private fun dropTooShortToSee(role: Role) {
+        session.setState(SessionState.Reconnecting("s_1", since = 0))
+        connectedAs(role, drops = 1)
     }
 
     private fun uri(name: String): Uri = Uri.parse("content://media/$name")
@@ -167,6 +185,81 @@ class PhotoSyncerTest {
 
     private fun deliverSaved(photoId: String, ok: Boolean = true, reason: PhotoRefusal? = null) {
         session.deliver(SessionMessage.PhotoSaved(photoId, ok, reason))
+    }
+
+    /** The link drops late in a photo's wait and stays down for all but the last millisecond of its own wait (#293). */
+    private fun TestScope.dropLateInTheWait() {
+        advanceTimeBy(PhotoSyncer.STALL_MS - 1_000)
+        session.setState(SessionState.Reconnecting("s_1", since = 0))
+        runCurrent()
+        advanceTimeBy(RtcSessionManager.RECONNECT_BUDGET_MS - 1)
+        runCurrent()
+    }
+
+    @Test
+    fun `a drop's time does not count toward giving a photo up, and the time starts over once the link is back`() =
+        runTest {
+            val (syncer, failed) = sender()
+            syncer.shoot(photo("1", 10), takenAt = 1)
+            runCurrent()
+
+            dropLateInTheWait()
+            assertEquals(0, failed())
+
+            connectedAs(Role.PHOTOGRAPHER)
+            runCurrent()
+            advanceTimeBy(PhotoSyncer.STALL_MS - 1)
+            runCurrent()
+            assertEquals(0, failed())
+            advanceTimeBy(2)
+            runCurrent()
+            assertEquals(1, failed())
+        }
+
+    @Test
+    fun `a drop too short to be seen starts the time over all the same`() = runTest {
+        val (syncer, failed) = sender()
+        syncer.shoot(photo("1", 10), takenAt = 1)
+        runCurrent()
+        advanceTimeBy(PhotoSyncer.STALL_MS - 1_000)
+
+        dropTooShortToSee(Role.PHOTOGRAPHER)
+        runCurrent()
+
+        advanceTimeBy(PhotoSyncer.STALL_MS - 1)
+        runCurrent()
+        assertEquals(0, failed())
+        advanceTimeBy(2)
+        runCurrent()
+        assertEquals(1, failed())
+    }
+
+    @Test
+    fun `a photo that waited through a drop is sent when the subject answers after it`() = runTest {
+        val (syncer, failed) = sender()
+        syncer.shoot(photo("1", 10), takenAt = 1)
+        runCurrent()
+        dropLateInTheWait()
+
+        connectedAs(Role.PHOTOGRAPHER)
+        runCurrent()
+        deliverSaved(begins[0].photoId)
+        advanceTimeBy(PhotoSyncer.STALL_MS + 1)
+        runCurrent()
+
+        assertEquals(0, failed())
+    }
+
+    @Test
+    fun `a drop's time does not count toward the wait for an ack either`() = runTest {
+        val (syncer, failed) = sender()
+        syncer.shoot(photo("1", (PhotoSyncer.WINDOW_CHUNKS + 1) * PhotoSyncer.CHUNK_BYTES), takenAt = 1)
+        runCurrent()
+
+        dropLateInTheWait()
+
+        assertEquals(0, failed())
+        assertTrue(ends.isEmpty())
     }
 
     @Test
@@ -270,10 +363,23 @@ class PhotoSyncerTest {
     fun `the shutter tells a connected subject at once, before the photo is saved`() = runTest {
         val (syncer, _) = sender()
 
-        checkNotNull(syncer.shutter())
+        val shot = checkNotNull(syncer.shutter())
 
-        assertEquals(listOf(SessionMessage.PhotoShutter), sentOf(SessionMessage.PhotoShutter::class.java))
+        assertEquals(listOf(SessionMessage.PhotoShutter(shot)), sentOf(SessionMessage.PhotoShutter::class.java))
         assertTrue(begins.isEmpty())
+    }
+
+    @Test
+    fun `each shutter has its own shot, which its photo's begin names`() = runTest {
+        val (syncer, _) = sender()
+        val first = checkNotNull(syncer.shutter())
+        val second = checkNotNull(syncer.shutter())
+
+        syncer.taken(first, photo("1", 10), takenAt = 1)
+        runCurrent()
+
+        assertTrue(first != second)
+        assertEquals(listOf(first), begins.map { it.shot })
     }
 
     @Test
@@ -296,6 +402,29 @@ class PhotoSyncerTest {
         syncer.notTaken(shot)
 
         assertEquals(0, syncer.drop())
+    }
+
+    @Test
+    fun `a photo that could not be saved is said dropped to the subject`() = runTest {
+        val (syncer, _) = sender()
+        val shot = checkNotNull(syncer.shutter())
+
+        syncer.notTaken(shot)
+        runCurrent()
+
+        assertEquals(listOf(SessionMessage.PhotoDropped(shot)), sentOf(SessionMessage.PhotoDropped::class.java))
+    }
+
+    @Test
+    fun `a photo not saved after its session ended is said to no one`() = runTest {
+        val (syncer, _) = sender()
+        val shot = checkNotNull(syncer.shutter())
+        session.setState(SessionState.Waiting("123456"))
+
+        syncer.notTaken(shot)
+        runCurrent()
+
+        assertTrue(sentOf(SessionMessage.PhotoDropped::class.java).isEmpty())
     }
 
     @Test
@@ -402,6 +531,9 @@ class PhotoSyncerTest {
 
         assertEquals(1, failed())
         assertEquals(listOf(2L), begins.map { it.takenAt })
+        // The first never began, so the subject hears it will not come; the second began, so it is not dropped.
+        val shots = sentOf(SessionMessage.PhotoShutter::class.java).map { it.shot }
+        assertEquals(listOf(shots.first()), sentOf(SessionMessage.PhotoDropped::class.java).map { it.shot })
     }
 
     @Test
@@ -551,8 +683,9 @@ class PhotoSyncerTest {
         chunks: Int = chunksOf(
             bytes.size,
         ),
+        shot: String? = null,
     ) {
-        session.deliver(SessionMessage.PhotoBegin(id, "jpeg", bytes.size.toLong(), chunks, takenAt))
+        session.deliver(SessionMessage.PhotoBegin(id, "jpeg", bytes.size.toLong(), chunks, takenAt, shot))
         runCurrent()
     }
 
@@ -578,8 +711,8 @@ class PhotoSyncerTest {
         runCurrent()
     }
 
-    private fun TestScope.deliverWhole(id: String, bytes: ByteArray, takenAt: Long = 1) {
-        deliverBegin(id, bytes, takenAt)
+    private fun TestScope.deliverWhole(id: String, bytes: ByteArray, takenAt: Long = 1, shot: String? = null) {
+        deliverBegin(id, bytes, takenAt, shot = shot)
         deliverChunks(id, bytes)
         deliverEnd(id, bytes)
     }
@@ -879,7 +1012,7 @@ class PhotoSyncerTest {
     @Test
     fun `the photographer's shutter reaches a listening screen, and one that came before is not kept`() = runTest {
         val (syncer, _, _) = receiver()
-        session.deliver(SessionMessage.PhotoShutter)
+        session.deliver(SessionMessage.PhotoShutter("a"))
         runCurrent()
 
         var shutters = 0
@@ -887,9 +1020,229 @@ class PhotoSyncerTest {
         runCurrent()
         assertEquals(0, shutters)
 
-        session.deliver(SessionMessage.PhotoShutter)
+        session.deliver(SessionMessage.PhotoShutter("b"))
         runCurrent()
         assertEquals(1, shutters)
+    }
+
+    // ---- A photo on its way --------------------------------------------------------------------------------------
+
+    private suspend fun PhotoSyncer.isReceiving(): Boolean = receiving.first()
+
+    @Test
+    fun `a shutter says a photo is on its way, until that photo is saved`() = runTest {
+        val (syncer, _, _) = receiver()
+        assertFalse(syncer.isReceiving())
+
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        runCurrent()
+        assertTrue(syncer.isReceiving())
+
+        deliverWhole("p1", jpeg(10), shot = "a")
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `a photo the album could not save is no longer on its way`() = runTest {
+        val (syncer, _, _) = receiver()
+        albumFails = true
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        runCurrent()
+
+        deliverWhole("p1", jpeg(10), shot = "a")
+
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `a photo whose shutter was lost or came during a drop is on its way from its begin`() = runTest {
+        val (syncer, _, _) = receiver()
+        val bytes = jpeg(10)
+
+        deliverBegin("p1", bytes, shot = "a")
+        assertTrue(syncer.isReceiving())
+
+        deliverChunks("p1", bytes)
+        deliverEnd("p1", bytes)
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `two shutters wait for both photos, also when the first was given up for the second`() = runTest {
+        val (syncer, _, _) = receiver()
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        session.deliver(SessionMessage.PhotoShutter("b"))
+        runCurrent()
+        val first = jpeg(2 * PhotoSyncer.CHUNK_BYTES)
+
+        // The photographer gives the first up halfway and sends the second.
+        deliverBegin("p1", first, shot = "a")
+        deliverChunks("p1", first, until = 1)
+        deliverWhole("p2", jpeg(10), shot = "b")
+
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `a photo the photographer dropped before its begin is no longer waited for`() = runTest {
+        val (syncer, _, _) = receiver()
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        session.deliver(SessionMessage.PhotoShutter("b"))
+        runCurrent()
+
+        session.deliver(SessionMessage.PhotoDropped("a"))
+        runCurrent()
+        assertTrue(syncer.isReceiving())
+        deliverWhole("p2", jpeg(10), shot = "b")
+
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `a photo the photographer dropped is said as not saved, once`() = runTest {
+        val (_, _, received) = receiver()
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        runCurrent()
+        assertTrue(received.isEmpty())
+
+        // The camera failed after its shutter, or the photo could not be read or sent (#314).
+        session.deliver(SessionMessage.PhotoDropped("a"))
+        runCurrent()
+        assertEquals(listOf(false), received)
+
+        session.deliver(SessionMessage.PhotoDropped("a"))
+        runCurrent()
+        assertEquals(listOf(false), received)
+    }
+
+    @Test
+    fun `a dropped photo whose shutter was lost is said too`() = runTest {
+        val (_, _, received) = receiver()
+
+        session.deliver(SessionMessage.PhotoDropped("b"))
+        runCurrent()
+
+        assertEquals(listOf(false), received)
+    }
+
+    @Test
+    fun `a dropped photo whose shutter was lost ends no other photo's wait`() = runTest {
+        val (syncer, _, _) = receiver()
+        // The second shutter is lost on the realtime channel, or was pressed while the link reconnected.
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        runCurrent()
+
+        session.deliver(SessionMessage.PhotoDropped("b"))
+        runCurrent()
+        assertTrue(syncer.isReceiving())
+
+        deliverWhole("p1", jpeg(10), shot = "a")
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `a shutter that comes after its photo's drop starts no wait`() = runTest {
+        val (syncer, _, _) = receiver()
+        // The drop, on the reliable channel, overtakes its shutter on the realtime one.
+        session.deliver(SessionMessage.PhotoDropped("a"))
+        runCurrent()
+
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        runCurrent()
+
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `a shutter that comes after its photo was saved starts no wait`() = runTest {
+        val (syncer, _, _) = receiver()
+        deliverWhole("p1", jpeg(10), shot = "a")
+
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        runCurrent()
+
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `a photographer's phone before #271, whose messages name no shot, is counted by its shutters`() = runTest {
+        val (syncer, _, _) = receiver()
+        session.deliver(SessionMessage.PhotoShutter())
+        session.deliver(SessionMessage.PhotoShutter())
+        runCurrent()
+
+        deliverWhole("p1", jpeg(10))
+        assertTrue(syncer.isReceiving())
+
+        deliverWhole("p2", jpeg(10))
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `thirty seconds without a photo message end the wait, and a chunk starts that time again`() = runTest {
+        val (syncer, _, _) = receiver()
+        val bytes = jpeg(2 * PhotoSyncer.CHUNK_BYTES)
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        runCurrent()
+
+        advanceTimeBy(PhotoSyncer.STALL_MS / 2)
+        deliverBegin("p1", bytes, shot = "a")
+        advanceTimeBy(PhotoSyncer.STALL_MS - 1)
+        runCurrent()
+        assertTrue(syncer.isReceiving())
+
+        advanceTimeBy(2)
+        runCurrent()
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `a drop's time does not end the wait for a photo, which starts over once the link is back`() = runTest {
+        val (syncer, _, _) = receiver()
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        runCurrent()
+
+        dropLateInTheWait()
+        assertTrue(syncer.isReceiving())
+
+        connectedAs(Role.SUBJECT)
+        runCurrent()
+        advanceTimeBy(PhotoSyncer.STALL_MS - 1)
+        runCurrent()
+        assertTrue(syncer.isReceiving())
+        advanceTimeBy(2)
+        runCurrent()
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `a drop too short to be seen starts the wait for a photo over all the same`() = runTest {
+        val (syncer, _, _) = receiver()
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        runCurrent()
+        advanceTimeBy(PhotoSyncer.STALL_MS - 1_000)
+
+        dropTooShortToSee(Role.SUBJECT)
+        runCurrent()
+
+        advanceTimeBy(PhotoSyncer.STALL_MS - 1)
+        runCurrent()
+        assertTrue(syncer.isReceiving())
+        advanceTimeBy(2)
+        runCurrent()
+        assertFalse(syncer.isReceiving())
+    }
+
+    @Test
+    fun `the session's end ends the wait`() = runTest {
+        val (syncer, job, _) = receiver()
+        session.deliver(SessionMessage.PhotoShutter("a"))
+        runCurrent()
+
+        job.cancel()
+        runCurrent()
+
+        assertFalse(syncer.isReceiving())
     }
 
     // ---- The session's photos ----------------------------------------------------------------------------------
@@ -992,8 +1345,8 @@ class PhotoSyncerTest {
             runCurrent()
 
             // Photo 1 is going, photo 2 waits behind it: both leave the viewer, and both stay to be read.
-            assertTrue(syncer.delete(uri("1"), deleter, backgroundScope))
-            assertTrue(syncer.delete(uri("2"), deleter, backgroundScope))
+            assertEquals(PhotoDeletion.Deleted, syncer.delete(uri("1"), deleter, backgroundScope))
+            assertEquals(PhotoDeletion.Deleted, syncer.delete(uri("2"), deleter, backgroundScope))
             runCurrent()
             assertEquals(emptyList<Uri>(), syncer.sessionPhotos.first())
             assertTrue(deleted.isEmpty())
@@ -1039,15 +1392,15 @@ class PhotoSyncerTest {
             runCurrent()
 
             deleteFails = true
-            assertFalse(syncer.delete(uri("1"), deleter, backgroundScope))
+            assertEquals(PhotoDeletion.Failed, syncer.delete(uri("1"), deleter, backgroundScope))
             assertEquals(listOf(uri("1"), uri("2")), syncer.sessionPhotos.first())
 
             deleteFails = false
-            assertTrue(syncer.delete(uri("1"), deleter, backgroundScope))
+            assertEquals(PhotoDeletion.Deleted, syncer.delete(uri("1"), deleter, backgroundScope))
             assertEquals(listOf(uri("1")), deleted)
             assertEquals(listOf(uri("2")), syncer.sessionPhotos.first())
 
-            assertTrue(syncer.delete(uri("9"), deleter, backgroundScope))
+            assertEquals(PhotoDeletion.Deleted, syncer.delete(uri("9"), deleter, backgroundScope))
             assertEquals(listOf(uri("2")), syncer.sessionPhotos.first())
         }
 

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.guide
 
 import android.content.DialogInterface
@@ -18,10 +18,12 @@ import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.SheetAddGuideBinding
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.generation.SituationTiles
+import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
 import com.lastpenguin.pix.ui.settings.tutorialFor
@@ -34,7 +36,8 @@ import kotlinx.coroutines.launch
  * *Keep the current guide* closes it (FR-3.6). Opened from Subject view ([ARG_FROM_SUBJECT]), the guide goes to the
  * photographer, and the situations wait for the shared steps (FR-6.15, Design 2.6.5). A tile dims and shrinks under the
  * finger and goes on at release; once a tap goes on, the sheet ignores every other (#243). The first time it opens from
- * Camera, its tutorial tips come over it (FR-10.4).
+ * Camera, its tutorial tips come over it (FR-10.4). Back on Reference confirm and on No person found open it again for
+ * a photo picked from it, the second with the gallery's picker over it ([ARG_OPEN_GALLERY], #294).
  * Owner: PM (#5); *Generate poses here* starts #7; saved guides #58; from Subject view Iter3-P9; the library #170; the
  * tiles as buttons and the picker kept open #243.
  */
@@ -43,6 +46,7 @@ class AddGuideSheet : BottomSheetDialogFragment() {
     private val referenceViewModel: ReferenceViewModel by activityViewModels { PixViewModels.Factory }
     private val generationViewModel: GenerationViewModel by activityViewModels { PixViewModels.Factory }
     private val settingsViewModel: SettingsViewModel by activityViewModels { PixViewModels.Factory }
+    private val sessionViewModel: SessionViewModel by activityViewModels { PixViewModels.Factory }
 
     /**
      * Set once a tap goes on from this sheet (#243): to the scene photo, the library, the picker, or the camera. Every
@@ -73,19 +77,22 @@ class AddGuideSheet : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = SheetAddGuideBinding.bind(view)
         referenceViewModel.openFor(arguments?.getBoolean(ARG_FROM_SUBJECT) == true)
-        val poses = !referenceViewModel.forSubject
-        binding.newPosesSection.isVisible = poses
+        // From Subject view too (#276): the subject picks the situation, and the photographer's phone goes on from
+        // there as if its own user had picked it, with the scene photo taken there (FR-6.15).
+        val forSubject = referenceViewModel.forSubject
         val situations = SituationTiles(binding.situationRowTop, binding.situationRowBottom, { leaving }) { situation ->
+            // This phone's own cameras decide only a scene photo taken here.
+            val go = if (forSubject) ({ askThePhotographer(situation) }) else ::takeScenePhoto
             when {
-                leaving || !generationViewModel.chooseSituation(situation) -> false
+                leaving || (!forSubject && !generationViewModel.chooseSituation(situation)) -> false
 
                 generationViewModel.needsConsent -> {
-                    showConsentNotice()
+                    showConsentNotice(forSubject, go)
                     false
                 }
 
                 else -> {
-                    goOn(::takeScenePhoto)
+                    goOn(go)
                     true
                 }
             }
@@ -102,16 +109,24 @@ class AddGuideSheet : BottomSheetDialogFragment() {
             goOn { findNavController().navigate(R.id.action_addGuide_to_library) }
         }
         binding.cancelButton.setOnClickListener { goOn(::dismiss) }
+        // Back on No person found opens this sheet with its gallery (#294): the picker at once, as a tap on its row,
+        // and only for the sheet as it first opens, not for one made anew while the picker is up.
+        if (savedInstanceState == null && arguments?.getBoolean(ARG_OPEN_GALLERY) == true) goOn(pickPhoto)
 
         val savedGuides = SavedGuideList(binding)
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                // Its tutorial tips the first time it opens (FR-10.4); from Subject view it lacks the poses they point at.
-                if (!referenceViewModel.forSubject) {
+                // Its tutorial tips the first time it opens from Camera (FR-10.4); from Subject view it shows none.
+                if (!forSubject) {
                     launch { showTutorialWhenDue(settingsViewModel.tutorialFor(TutorialScreen.ADD_GUIDE)) }
                 }
                 launch { referenceViewModel.savedGuides.collect(savedGuides::render) }
-                launch { generationViewModel.selfieAvailable.collect(situations::render) }
+                // The subject's selfie is taken with the photographer's front camera, which answers when it has none.
+                if (forSubject) {
+                    situations.render(true)
+                } else {
+                    launch { generationViewModel.selfieAvailable.collect(situations::render) }
+                }
             }
         }
     }
@@ -134,17 +149,29 @@ class AddGuideSheet : BottomSheetDialogFragment() {
         super.onDismiss(dialog)
     }
 
-    /** Asked before the first request only (FR-4.2). *Not now* sends nothing and leaves this sheet open. */
-    private fun showConsentNotice() {
+    /**
+     * Asked before the first request only (FR-4.2). *Not now* sends nothing and leaves this sheet open. On the
+     * subject's phone it says that the photographer takes the photo (#276), and agreeing goes [on] to ask them.
+     */
+    private fun showConsentNotice(forSubject: Boolean, on: () -> Unit) {
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.consent_title)
-            .setMessage(R.string.consent_message)
+            .setMessage(if (forSubject) R.string.consent_message_subject else R.string.consent_message)
             .setPositiveButton(R.string.consent_agree) { _, _ ->
                 generationViewModel.onConsentGiven()
-                goOn(::takeScenePhoto)
+                goOn(on)
             }
             .setNegativeButton(R.string.not_now, null)
             .show()
+    }
+
+    /**
+     * From Subject view: the photographer's phone is asked to begin the poses for [situation] (FR-6.15, #276). What
+     * became of it is said on Subject view, which this sheet gives way to.
+     */
+    private fun askThePhotographer(situation: Situation) {
+        sessionViewModel.askForPoses(situation)
+        dismiss()
     }
 
     /** The poses start from a photo, for the tile's situation, that the user takes on the camera behind it (FR-4.1). */
@@ -156,5 +183,8 @@ class AddGuideSheet : BottomSheetDialogFragment() {
     companion object {
         /** The navigation argument set by Subject view's *Guide* button. */
         const val ARG_FROM_SUBJECT = "fromSubject"
+
+        /** The navigation argument set by Back on No person found: the gallery's picker opens with the sheet (#294). */
+        const val ARG_OPEN_GALLERY = "openGallery"
     }
 }

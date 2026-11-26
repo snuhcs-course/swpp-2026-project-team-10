@@ -1,15 +1,15 @@
-// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.settings
 
 import android.content.Intent
 import android.provider.Settings
-import android.view.MotionEvent
+import android.view.ViewGroup
+import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.google.android.material.slider.Slider
 import com.lastpenguin.pix.BuildConfig
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.account.Account
@@ -21,6 +21,7 @@ import com.lastpenguin.pix.settings.Language
 import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.tutorialOver
 import com.lastpenguin.pix.ui.TestAppContainer
@@ -36,21 +37,22 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
-import org.robolectric.shadows.ShadowToast
 
 /*
  * Settings on the real screen (FR-10.1–10.4, FR-10.6, FR-10.7, FR-3.10, FR-4.2), with the settings in memory behind the
  * ViewModel.
  * Partitions: the defaults (white, normal, the indicator off, the phone's language, an agreement given, usage data
- * shared, signed out); usage data turned off from its switch and on from its row, and its switch while the stored
+ * shared, signed out); no Camera section, the Guide first (the grid, the horizon bar, and the brightness are on Camera
+ * alone, FR-1.17, FR-1.11); usage data turned off from its switch and on from its row, and its switch while the stored
  * answer loads (disabled, saving nothing, also when its restored state changes it) and once it arrives off;
- * the base brightness at 0 EV, slid to +1 EV and saved, and shown as kept; each color and thickness chosen; the indicator turned on from its switch and off from its row; a language chosen and
+ * each color and thickness chosen; the indicator turned on from its switch and off from its row; a language chosen and
  * the dialog cancelled; the agreement withdrawn, the row without one (its value 16 dp from the edge, with no chevron),
  * and the row while the stored answer loads; the
  * account signed in and signed out (Sign in; Friends until #188);
  * notifications, How to use Pix, About Pix, and the privacy policy opened; *Show the tutorial again*, which makes every screen's tips due
  * again and says so. The agreement's text right under its row's title, as the indicator's under its own (#204), with the
- * row still 56 dp tall.
+ * row still 56 dp tall, and the row and its text one tap target that lights whole, the row drawing no light of its own.
+ * Every dialog's title 18 sp, the withdrawal's short one as a long one that Android shrinks.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -117,6 +119,11 @@ class SettingsFragmentTest {
             assertTrue("${body.top - titleTextBottom} px", body.top - titleTextBottom <= 6 * density)
             assertTrue(body.top >= row.top + title.bottom - title.paddingBottom - 1)
             assertTrue(row.height >= (56 * density).toInt())
+            // One light over the row and its text, in the card's rounded shape; none of the row's own.
+            val item = binding.consentItem
+            assertEquals(R.drawable.bg_card_row, shadowOf(item.background).createdFromResId)
+            assertNull(row.background)
+            assertTrue(body.bottom <= item.height && row.parent === item && body.parent === item)
         }
     }
 
@@ -143,42 +150,13 @@ class SettingsFragmentTest {
     }
 
     @Test
-    fun theBaseBrightness_startsAtZero_isSavedAsItIsSlid_andShowsWhatIsKept() {
-        val modules = launch()
+    fun settings_hasNoCameraSection_andStartsWithTheGuide() {
+        launch()
+
+        // The grid and the horizon bar are in the camera menu alone, and no setting sets the brightness (FR-1.11).
         onScreen { binding ->
-            assertEquals(6f, binding.baseBrightnessSlider.value)
-            assertEquals("0", binding.baseBrightnessValue.text.toString())
-        }
-
-        // Three thirds of an EV up: +1 EV.
-        onScreen { binding -> slideTo(binding.baseBrightnessSlider, 9f) }
-        assertEquals(1f, modules.appSettings.baseBrightness.value, 0.001f)
-        onScreen { assertEquals("+1.0", it.baseBrightnessValue.text.toString()) }
-
-        runBlocking { modules.appSettings.setBaseBrightness(-2f) }
-        onScreen { binding ->
-            assertEquals(0f, binding.baseBrightnessSlider.value)
-            assertEquals("-2.0", binding.baseBrightnessValue.text.toString())
-        }
-
-        // Past the ends, the setting keeps to −2..+2 EV, the slider's ends.
-        runBlocking { modules.appSettings.setBaseBrightness(5f) }
-        assertEquals(2f, modules.appSettings.baseBrightness.value, 0.001f)
-        onScreen { binding ->
-            assertEquals(12f, binding.baseBrightnessSlider.value)
-            assertEquals("+2.0", binding.baseBrightnessValue.text.toString())
-        }
-    }
-
-    private fun slideTo(slider: Slider, value: Float) {
-        assertTrue(slider.trackWidth > 0)
-        val x =
-            slider.trackSidePadding +
-                (value - slider.valueFrom) / (slider.valueTo - slider.valueFrom) * slider.trackWidth
-        for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE, MotionEvent.ACTION_UP)) {
-            val event = MotionEvent.obtain(1_000L, 1_000L, action, x, slider.height / 2f, 0)
-            slider.dispatchTouchEvent(event)
-            event.recycle()
+            val sections = binding.settingsScroll.getChildAt(0) as ViewGroup
+            assertEquals(string(R.string.settings_section_guide), (sections.getChildAt(0) as TextView).text.toString())
         }
     }
 
@@ -258,14 +236,17 @@ class SettingsFragmentTest {
     fun theAgreement_isWithdrawnAfterConfirming() {
         val modules = launch()
 
-        onScreen { it.consentRow.root.performClick() }
+        onScreen { it.consentItem.performClick() }
+        // A short title, at the 18 sp of every dialog's.
+        val title = latestDialog().findViewById<TextView>(androidx.appcompat.R.id.alertTitle)!!
+        assertEquals(18f, title.textSize / title.resources.displayMetrics.scaledDensity, 0.5f)
         latestDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         idle()
 
         assertFalse(modules.consent.given)
         onScreen { binding ->
             assertEquals(string(R.string.settings_consent_not_given), binding.consentRow.settingValue.text.toString())
-            assertFalse(binding.consentRow.root.isClickable)
+            assertFalse(binding.consentItem.isClickable)
         }
     }
 
@@ -276,7 +257,7 @@ class SettingsFragmentTest {
         launch(modules)
         onScreen { binding ->
             assertEquals(string(R.string.settings_consent_not_given), binding.consentRow.settingValue.text.toString())
-            assertFalse(binding.consentRow.root.isClickable)
+            assertFalse(binding.consentItem.isClickable)
         }
 
         modules.consent.gate!!.complete(Unit)
@@ -284,7 +265,7 @@ class SettingsFragmentTest {
 
         onScreen { binding ->
             assertEquals(string(R.string.settings_consent_given), binding.consentRow.settingValue.text.toString())
-            assertTrue(binding.consentRow.root.isClickable)
+            assertTrue(binding.consentItem.isClickable)
         }
     }
 
@@ -295,7 +276,7 @@ class SettingsFragmentTest {
 
         onScreen { binding ->
             assertEquals(string(R.string.settings_consent_not_given), binding.consentRow.settingValue.text.toString())
-            assertFalse(binding.consentRow.root.isClickable)
+            assertFalse(binding.consentItem.isClickable)
             assertFalse(binding.consentRow.settingChevron.isVisible)
             // 16 dp from the card's edge, where the other rows' chevrons end (ChevronTest), not the row's 8 dp.
             val value = binding.consentRow.settingValue
@@ -375,7 +356,7 @@ class SettingsFragmentTest {
         }
 
         assertEquals(emptySet<TutorialScreen>(), modules.appSettings.tutorialSeen.value)
-        assertEquals(string(R.string.settings_tutorial_reset), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.settings_tutorial_reset), shownNotice())
         // Nothing opens over Settings: each screen shows its own tips the next time it opens.
         scenario!!.onFragment { assertNull(tutorialOver(it)) }
         assertEquals(R.id.settingsFragment, nav.currentDestination?.id)

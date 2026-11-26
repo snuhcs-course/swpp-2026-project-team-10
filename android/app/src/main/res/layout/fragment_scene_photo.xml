@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The scene photo of Generate poses, large (FR-4.15): the whole photo over the screen, with Back at the top left, as
+     the photo viewer has it, exactly where Generate poses' own Back is. The background is the view's, so it can clear as
+     the photo is dragged away. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/camera_bar"
+    android:fitsSystemWindows="true">
+
+    <com.lastpenguin.pix.ui.camera.ZoomablePhotoView
+        android:id="@+id/scenePhotoLarge"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@string/scene_photo_description" />
+
+    <!-- A screen's header, from the same dimensions as Generate poses' (20 dp sides and 8 dp on top, a 56 dp header
+         reaching 12 dp past them, Back 12 dp past that), so Back stands on the same pixel at any density; a sum such as
+         8 dp would round on its own (HeaderBackPlaceTest). Touches pass through it to the photo. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:clipToPadding="false"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="8dp"
+        tools:ignore="UselessParent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="-12dp"
+            android:layout_marginEnd="-12dp"
+            android:clipToPadding="false"
+            android:gravity="center_vertical"
+            android:minHeight="56dp"
+            android:paddingHorizontal="12dp">
+
+            <ImageButton
+                android:id="@+id/scenePhotoBack"
+                style="@style/Widget.Pix.Header.Back"
+                android:contentDescription="@string/back" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

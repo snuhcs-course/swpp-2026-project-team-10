@@ -2,6 +2,7 @@
 <!-- About Pix, from Settings: the version, and the open-source software and fonts Pix is built with, with their licenses. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:clipToPadding="false"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -11,8 +12,12 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginStart="-12dp"
+        android:layout_marginEnd="-12dp"
+        android:clipToPadding="false"
         android:gravity="center_vertical"
-        android:minHeight="56dp">
+        android:minHeight="56dp"
+        android:paddingHorizontal="12dp">
 
         <ImageButton
             android:id="@+id/backButton"
@@ -62,7 +67,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textAppearance="@style/TextAppearance.Pix.Body"
-                    tools:text="0.1.0" />
+                    tools:text="0.2.0" />
             </LinearLayout>
 
             <TextView

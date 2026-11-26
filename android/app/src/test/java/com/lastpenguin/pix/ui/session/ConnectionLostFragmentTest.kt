@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-10-29, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo
 package com.lastpenguin.pix.ui.session
 
 import androidx.fragment.app.testing.FragmentScenario
@@ -14,6 +14,7 @@ import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.TestAppContainer
 import org.junit.After
@@ -23,13 +24,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
-import org.robolectric.shadows.ShadowToast
 
 /*
  * Connection lost's render paths (R&S 6.6, FR-6.11; Testing Documentation 2.1.6), on the real Fragment.
  * Partitions: the screen as opened; Reconnect without a kept code, as after an invitation (the session ended, back
  * to the camera), and with one (joins the same code again, Reconnect disabled while connecting); the reconnect
- * connecting (to Subject view), finding the room gone (a toast and the camera), or failing otherwise (Reconnect
+ * connecting (to Subject view), finding the room gone (a notice and the camera), or failing otherwise (Reconnect
  * enabled again); Leave.
  */
 @RunWith(AndroidJUnit4::class)
@@ -90,7 +90,7 @@ class ConnectionLostFragmentTest {
         idle()
 
         // An invitation's session, which has no code and which its photographer has ended (Design 2.4).
-        assertEquals(string(R.string.session_ended), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.session_ended), shownNotice())
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
     }
 
@@ -126,7 +126,7 @@ class ConnectionLostFragmentTest {
         modules.session.setState(SessionState.Ended(EndReason.NOT_FOUND))
         idle()
 
-        assertEquals(string(R.string.session_ended), ShadowToast.getTextOfLatestToast())
+        assertEquals(string(R.string.session_ended), shownNotice())
         assertEquals(R.id.cameraFragment, nav.currentDestination?.id)
     }
 

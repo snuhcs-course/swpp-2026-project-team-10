@@ -116,6 +116,32 @@
 | 3.36 | 2026-11-21 | Server logs and alerts: the AWS servers' logs in CloudWatch, with an alarm on 5xx answers (1.2, AD-20, 2.8). |
 | 4.0 | 2026-11-21 | Iteration 5 plan from the kickoff of 11/21: the task table with owners and due dates (2.9); the open decisions (*Still open*: the cutout, the options on *Generate poses*, pose generation started by the subject, the self-timer, the live view after a reconnection, a deleted account's Pix ID, remote focus next to the guide's gestures). Remote focus is planned, and the remote-control switch is dropped (2.5.1, 2.6.5, 2.9). |
 | 4.1 | 2026-11-21 | What an account keeps and the agreement before it is made, deleting an account, the privacy policy in Pix and at `/privacy`, the screens above the keyboard, and the retention pass (Iter5-P2, [#266]) (*Still open*, 2.1, 2.5.3, 2.6.8, 2.7, 2.8). |
+| 4.2 | 2026-11-23 | The subject's guide after a session: gone from Subject view at the session's end, held for the next `hello`, and what the photographer counts on after a `guide.clear` or a drop (Iter5-P4, [#268]) (2.1, 2.2, 2.5.1, 2.6.7). |
+| 4.3 | 2026-11-24 | *Generate poses* (Iter5-P10, [#274]): the field that says Auto, the situations' options as chips that only write into the field, what shows when, *Back to Auto*, one label for the button, and the scene photo large (*Still open*, 2.1, 2.4, 2.6.3, 2.6.5, 2.9). |
+| 4.4 | 2026-11-24 | The scene photo goes straight to *Generate poses* (Iter5-A5, [#296]): `CHECKING` in place of the review, the photo held on Camera and shrinking into its thumbnail, no person said on the camera, Back that shoots again, and a flow of four steps (2.2, 2.4, 2.6.2, 2.6.3, 2.6.5). |
+| 4.5 | 2026-11-24 | UI fixes: switches for the grid and the horizon bar, the guide-edit toggle and the guide's tint, whose camera each phone shows, by the account's name in `hello`, and the photo on its way to the subject, with `photo.dropped` and each photo's `shot` (2.5.1, 2.6.2, 2.6.5, 2.6.8; Iter5-P7, [#271]). |
+| 4.6 | 2026-11-24 | Remote focus as built (Iter5-P9, [#273]): `camera.focus.set` handled and answered with `camera.state`, the base brightness at a remote tap, the focus box and the brightness bar on Subject view (`FocusBrightness`), no tap in guide-edit mode, the notice that does not repeat, `camera.focus` for the photographer's own focus, `focused` on the `camera.state` that answers a tap, TalkBack's action on the video, and the tutorial's tip on the video (2.2, 2.5.1, 2.6.5, 2.6.8, 2.8, 2.9). |
+| 4.7 | 2026-11-24 | A new guide starts with guide-edit mode off on Camera, as on Subject view (2.6.2; Iter5-A8, [#304]). |
+| 4.8 | 2026-11-24 | Camera's hint chip shows only "Guide hidden"; the line about the pinch went (2.6.8; Iter5-A9, [#306]). |
+| 4.9 | 2026-11-25 | Back on *Reference confirm* and *No person found* returns to where the reference was chosen: *Add a pose guide* is opened again, since a sheet cannot stay under a screen (2.6.2; Iter5-A3, [#294]). |
+| 4.10 | 2026-11-25 | Who is zooming, on both phones, and what the photographer did, on the subject's: `camera.did`, `SessionViewModel.subjectZooming`, `SubjectViewModel.photographerLines` (Iter5-A1, [#292]). A single change of the zoom glides: `CameraController.glideZoom`, `ZoomGlide` (Iter5-A10, [#310]) (2.2, 2.5.1, 2.6.5, 2.8). |
+| 4.11 | 2026-11-25 | The library's situations and memos (Iter5-P6, [#270]): `ReferenceGuide.situation`, kept by the ♥, *Select*, and *Save guide* on both phones; `situation` in `pose.step` and `guide.image.begin`; `situation` and `memo` in `meta.json`, `setMemo`; the situation chips and the memo dialog (AD-16, 2.1, 2.3, 2.5.1, 2.6.2, 2.6.3, 2.8). |
+| 4.12 | 2026-11-25 | The library's history, favorites, and selection (Iter5-A6, [#297]): `PoseLibrary` keeps each candidate, and a used photo guide is kept, as history; ♥ and *Save guide* mark favorites (`setFavorite`, `favorite` in `meta.json`); no limit of 100; the tabs *All* and *Favorites*, opening on *All*, with no tab per kind and no *Add photo*, a ♥ on each cell (`onToggleFavorite`), *Save guide* drawn as a ♥, selection, and ⋮; Back on *Generating poses* and *Pick a pose* without asking, with `posesKept` and *View* (AD-16, 2.1, 2.3, 2.4, 2.6.2, 2.6.3, 2.8). |
+| 4.13 | 2026-11-25 | Reconnection tries for 30 s, not 10 s; Camera says who it reconnects with for the whole wait (`SessionViewModel.reconnectingWith`), read from `Reconnecting`'s new `peer` and `role`; a photo's 30 s without word no longer count a drop, which `Connected`'s new `drops` tells of (Iter5-A2, [#293]; 1.1.3, 1.1.4, 2.3, 2.4, 2.6.7, 2.8). |
+| 4.14 | 2026-11-25 | Impeccable's findings: notices as Snackbars through `ui/Notices.kt`, *Undo* after *Remove guide* with the tip kept aside in `PoseTips`, *Leave* and *End session* asked first, and the camera screens at large fonts (2.6.2, 2.6.3, 2.6.7, 2.8; Iter5-A7, [#298]). |
+| 4.15 | 2026-11-25 | The self-timer and the camera menu (Iter5-P8, [#272]): `ShutterTimer` and the countdown in `CameraViewModel`, cancelled by a second tap or the screen stopping; the menu's button with *Flash*, *Timer*, *Grid*, *Horizon*, and *Settings* in place of the flash and the gear on both phones; `camera.timer` and the countdown on Subject view; *Still open* without the timer; Settings without its *Camera* section: the grid and the horizon bar only in the menu, toggled in one edit, and no base brightness, so each tap to focus goes back to 0 EV; *End session* and the subject's *Flash* waiting during the countdown; one 32 dp pill for the top bar's buttons, and `reveal` for the menu and the ratios (2.1, 2.2, 2.3, 2.5.1, 2.6.2, 2.6.5, 2.6.8, 2.8). |
+| 4.16 | 2026-11-25 | Ratio-change fixes: the ratio controls keep an open pose tip, a new ratio closes the brightness bar, Subject view sends no tap while its video reshapes, and no ratio while the scene photo's shutter waits (2.5.1, 2.8). |
+| 4.17 | 2026-11-26 | The phone's photos in the viewer (`PhonePhotos`, the photo permission, the grid, *All photos* and *Albums*, deletes Android asks for); the scene photo in Camera's bar with the camera menu; the pose flow's motions (`FLOW`, `HAND_OFF`, `SceneHandOff`, `HeaderUnfold`); touch lights in their shapes; *Generate poses* folding when its field is left empty; library tabs that keep their place (Iter5-A13, [#320]; 2.1, 2.6.2, 2.6.3, 2.6.5, 2.8). |
+| 4.18 | 2026-11-25 | The subject's shutter (Iter5-A11, [#314]): `camera.shutter`, a numbered press on the realtime channel, and `camera.shutter.answer`, taken by the Camera screen alone and only in front (`RemoteControlHandler.shutter`, `takeForSubject`), `SubjectViewModel.onShutter` with its wait, the photographer's timer serving the press, with `cancel` and `timer` (`CameraViewModel.onSubjectShutter`, `ShutterOutcome`), a dropped photo said on the subject's phone, and *Subject view*'s row as Camera's, with the camera's name above the shutter and a step's button beside the thumbnail (1.1.4, 2.5.1, 2.6.5, 2.6.8). |
+| 4.19 | 2026-11-25 | The subject starts AI poses (Iter5-P12, [#276]): `pose.start`, on the realtime channel, and `pose.start.answer`, numbered, one request at a time, with the photographer asked said at once, a 2 s limit on the subject's phone, and the answer kept through a reconnection, begun by the Camera screen as its own tile begins it (`RemoteControlHandler.poseStarter`, `startPosesForSubject`), consent on each phone, and what each phone says; no longer among the open points (*Still open*, 2.5.1, 2.6.3, 2.6.5, 2.9). |
+| 4.20 | 2026-11-25 | A photo turns into its guide on *Reference confirm* (Iter5-A4, [#295]): `PhotoToGuideView` and `PhotoToGuide` in place of the screenshot's cut, `ReferenceGuide.photo`, `withoutPicked`, and `OutlineExtractor.lines` (2.3, 2.6.1). |
+| 4.21 | 2026-11-26 | The timer set from the subject's phone (Iter5-A12, [#318]): `ShutterTimerChoice`, the one choice `CameraViewModel` and `RemoteControlHandler` both set; `camera.timer.set`, the timer in `camera.state`, and a `timer` action of `camera.did`; *Timer* in *Subject view*'s menu, and the flash's and the timer's icons beside its button as on Camera (2.5.1, 2.6.2, 2.6.5, 2.6.8). |
+| 4.22 | 2026-11-26 | The course servers over HTTPS and WSS from every network, through the course's proxy, at `team10.swpp-2026-a.snu.ac.kr` and `team10.swpp-2026-b.snu.ac.kr` (1.1.1, 1.1.3, AD-11, AD-19, 2.5.2, 2.5.3, 2.8). |
+| 4.23 | 2026-11-26 | Notices in the zoom row's place (`noticeLine`) and swiped down (`SwipeDownToDismiss`), the timer's ring on the shutter (`CountdownShutterDrawable`), and the pose tip closed only by its lit button (2.6.2, 2.6.3, 2.6.5, 2.8; Iter5-A14, [#327]). |
+| 4.24 | 2026-11-26 | The viewer's pages newest first, Pix's question before every delete, the media access offered once on its own (`needsAccess`, `mediaAccessOffered`, `MANAGE_MEDIA`), and notices above the viewer's strip (2.6.5, 2.8; Iter5-A14, [#327]). |
+| 4.25 | 2026-11-26 | Iter5-A15 ([#329]): the guide's panel on *Subject view* (`guide.visible.set`, `guide.opacity.set`, `guide.remove`), the photographer's panel in `camera.did`, Camera's line that says who watches (`SessionCaption`), the 1:1 stream in its 4:3 (`streamCrop`), and the focus tip beside its point (2.1, 2.5.1, 2.6.2, 2.6.4, 2.6.5, 2.6.8, 2.8). |
+| 4.26 | 2026-11-26 | Iter5-A15 ([#329]): `SessionGuideKeeper` and `poseGuideId`, so both phones keep each other's guides and candidates; `guide.restore` and *Undo* on both phones; *Subject view*'s tip beside the toggle; the dialogs' buttons (2.5.1, 2.6.3, 2.6.5, 2.8). |
+| 4.27 | 2026-11-26 | Two-phone sync fixes: a guide gesture without a final value settles on the mirror, the description field asks again after a one-sided drop, each reader of `incoming` has its own queue, an unmoved finger sends no brightness, 0 EV is reported when the camera opens, and Back undoes the pick of a subject who left (2.4, 2.6.5, 2.8). |
 
 </details>
 
@@ -126,11 +152,7 @@ Audience: the development team. This page describes Pix's design as built throug
 | Decision | Current proposal | Owner | Decide by |
 |----|----|----|----|
 | The cutout as a guide (FR-2.2) | A guide can show the person's cutout from the reference photo, on both phones, drawn with the guide's opacity and never in a photo or the stream. Open: how the user switches between the outline and the cutout, for each guide or in the settings, and what is sent to the subject's phone, the reference copy it already gets or a larger one (AD-6, NFR-13; [#275]). | 한준형 | Iteration 5 |
-| Options on *Generate poses* (FR-4.15) | The screen offers options to choose, so a set starts with nothing typed. Open: what the options are and where they come from (a fixed list, the AI's suggestions, or both), and how they sit next to typing ([#274]). | 박동제 | Iteration 5 |
-| Pose generation started by the subject (FR-6.15) | The subject's *Add a pose guide* offers the situations, and the flow then runs on both phones as today. Open: how the scene photo is taken, since it comes from the photographer's camera: who takes it, and who reviews it ([#276]). | 한준형 | Iteration 5 |
-| The self-timer (FR-1.17) | A countdown over the preview before the photo. Open: the delays, and whether the subject's phone shows the countdown, which needs a message ([#272]). | 박재완 | Iteration 5 |
 | The live view after a reconnection (NFR-6) | Measure the resolution, bitrate, and frame rate before a drop and after the reconnection first. Open: fix it, show a notice while the quality is low, or record it as a limit ([#269]). | 박재완 | Iteration 5 |
-| Remote focus next to the guide's gestures (FR-7.7) | A tap on the video sets the photographer's focus. Open: the tap while guide-edit mode is on, and next to the pinch ([#273]). | 박동제 | Iteration 5 |
 
 The tips' open question (Testing Documentation 3.2) is not planned: the kickoff of 11/21 left it out.
 
@@ -161,12 +183,12 @@ The tips' open question (Testing Documentation 3.2) is not planned: the kickoff 
 
 Pix is one Android app in two roles, **photographer** and **subject**, plus a small **Pix server**. A control plane and a media plane are kept apart:
 
-- **Control plane (client-server).** The server connects the phones (signaling), keeps accounts, friends, and invitations, and sends push notifications. It forwards pose requests to external models once a decision model has checked the text and the scene photo (2.6.3). It runs behind nginx as two servers, one for `main` and one for `dev`, each in two versions: on a course server, over HTTP and WS on port 80, and on AWS, over HTTPS and WSS (AD-11, 2.8).
+- **Control plane (client-server).** The server connects the phones (signaling), keeps accounts, friends, and invitations, and sends push notifications. It forwards pose requests to external models once a decision model has checked the text and the scene photo (2.6.3). It runs behind nginx as two servers, one for `main` and one for `dev`, each in two versions, on a course server and on AWS, both over HTTPS and WSS (AD-11, 2.8).
 - **Media plane (peer-to-peer).** The live video and all messages between the phones go directly over WebRTC. Without a direct path, as often on cellular data, a managed TURN relay forwards the still-encrypted packets (AD-14).
 
 ![Architecture](images/design_target_architecture.png)
 
-*Figure 1. High-level architecture. The phones talk to each other over WebRTC and to the Pix server over HTTPS and WSS on an AWS server, or over HTTP and WS on port 80 on a course server. Through OpenRouter, a decision model checks each text and scene photo before the vision and image models see it. Saved guides stay on the phone. Push notifications and the relay, drawn dashed, are built (Iter3-P13, Iter3-P15). The relay is Cloudflare's service, not a process on the Pix server (AD-11, AD-14, AD-18). Release builds send crash reports and usage events to Firebase, while the user allows it (AD-19).*
+*Figure 1. High-level architecture. The phones talk to each other over WebRTC and to the Pix server over HTTPS and WSS, on an AWS server or a course server. Through OpenRouter, a decision model checks each text and scene photo before the vision and image models see it. Saved guides stay on the phone. Push notifications and the relay, drawn dashed, are built (Iter3-P13, Iter3-P15). The relay is Cloudflare's service, not a process on the Pix server (AD-11, AD-14, AD-18). Release builds send crash reports and usage events to Firebase, while the user allows it (AD-19).*
 
 #### 1.1.2 Components and interfaces
 
@@ -191,16 +213,16 @@ Pix is one Android app in two roles, **photographer** and **subject**, plus a sm
 | Flow | Path | Transport | Latency budget |
 |----|----|----|----|
 | **Reference photo → guide** | Photo → downscale → screenshot cut (FR-2.10) → ML Kit segmentation → mask smoothing → person box and outline → guide store | On device | ≤ 2 s (NFR-3) |
-| **Pose generation** | Scene photo → person check on the phone → *Use* → resized JPEG, no EXIF → `POST /pose-suggestions` (filter) → four parallel `POST /poses` (filter, person check) → image model → candidates → reference flow → `POST /pose-tips`. A description's own `POST /poses` starts at once. | HTTPS to the server (HTTP to a course server) and to OpenRouter | First ≤ 20 s, all ≤ 30 s (NFR-4) |
+| **Pose generation** | Scene photo → person check on the phone → *Use* → resized JPEG, no EXIF → `POST /pose-suggestions` (filter) → four parallel `POST /poses` (filter, person check) → image model → candidates → reference flow → `POST /pose-tips`. A description's own `POST /poses` starts at once. | HTTPS to the server and to OpenRouter | First ≤ 20 s, all ≤ 30 s (NFR-4) |
 | **Session setup** | Room code or invitation → signaling → SDP and ICE → peer connection | WebSocket, then WebRTC | ≤ 10 s after Join (US-13) |
 | **Live view** | CameraX frames → NV21 (`NV21Buffer`), cropped to the frame → H.264 or VP8 → subject's renderer | SRTP, peer-to-peer | ≤ 0.5 s on Wi-Fi, ≤ 0.8 s on cellular or relay (NFR-5) |
 | **Guide sync** | Guide store → `guide.image.*` (the mask, once per guide), `guide.reference.*` (thumbnail photo), `guide.state` → the other phone's mirror → overlay. The photographer adopts a guide made on the subject's phone. | Data channel | ≤ 0.3 s (NFR-7) |
-| **Remote control** | Subject → `camera.zoom.set`, `camera.exposure.set`, `camera.flash.set`, or `guide.move` → clamp and apply → echo in `camera.state` or `guide.state` | Data channel | ≤ 0.5 s (NFR-7) |
+| **Remote control** | Subject → `camera.zoom.set`, `camera.exposure.set`, `camera.flash.set`, `guide.move`, `guide.visible.set`, `guide.opacity.set`, or `guide.remove` → clamp and apply → echo in `camera.state`, `guide.state`, or `guide.clear` | Data channel | ≤ 0.5 s (NFR-7) |
 | **Shared pose steps** | `pose.description.*` from both phones → generation on the photographer's phone → `pose.planned`, `pose.candidate.*`, `pose.step` → first `pose.pick` decides → `guide.confirm.*` → first `guide.confirm.use` decides (2.6.5) | Data channel | — |
 | **Session photo** | Shutter → `photo.shutter` → saved in Pictures/Pix → `photo.begin`, `.chunk`, `.end`, paced by `photo.ack` → subject's Pictures/Pix → `photo.saved` | Data channel | — |
 | **Sign-in** | Pix ID and password → `POST /auth/login` or `/auth/signup`, or Google ID token → `POST /auth/google` → tokens in DataStore. A signed-in phone in front holds a signaling socket for presence. | HTTP, WebSocket | — |
 | **Invitation** | `POST /invitations` → session with the photographer's place → push, link, or *See their camera* → `POST /invitations/{id}/accept` → the friend's place → both phones `session.join` → session setup | HTTP, FCM, WebSocket, WebRTC | Push ≤ 5 s; live view ≤ 10 s after *Accept* (NFR-9) |
-| **Reconnection** | ICE disconnected → `Reconnecting` on both phones → each `session.join` over a new socket → the photographer's ICE restart on the same connection → connected, or *Connection lost* after 10 s | WebSocket, WebRTC | ≤ 10 s (NFR-11) |
+| **Reconnection** | ICE disconnected → `Reconnecting` on both phones → each `session.join` over a new socket → the photographer's ICE restart on the same connection → connected, or *Connection lost* after 30 s | WebSocket, WebRTC | ≤ 30 s (NFR-11) |
 | **Saved guide** | Guide store ↔ app private storage; the library reads thumbnails on demand (2.8) | On device | — |
 
 #### 1.1.4 Main sequences
@@ -251,7 +273,7 @@ sequenceDiagram
   Note over S: snaps to the applied zoom
 ```
 
-*Figure 3. The photographer's phone applies each request and echoes the applied value, so both phones end on the same zoom. Only the photographer takes photos.*
+*Figure 3. The photographer's phone applies each request and echoes the applied value, so both phones end on the same zoom. A photo is taken on the photographer's phone, at either phone's shutter (2.6.5).*
 
 **Invitation (Iteration 3)**
 
@@ -289,8 +311,8 @@ sequenceDiagram
   participant SV as Pix server
   participant P as Photographer app
   Note over S,P: the subject's network drops, ICE state DISCONNECTED on both phones
-  S->>S: SessionState Reconnecting (10 s budget)
-  P->>P: SessionState Reconnecting (10 s budget), takes its place again over a new socket
+  S->>S: SessionState Reconnecting (30 s budget)
+  P->>P: SessionState Reconnecting (30 s budget), takes its place again over a new socket
   S->>SV: session.join (sessionId, rejoin, rejoinToken) over a new socket
   SV-->>S: session.joined
   SV-->>P: peer.rejoined
@@ -299,7 +321,7 @@ sequenceDiagram
   S->>SV: signal (answer)
   SV->>P: signal (answer)
   Note over P,S: ICE connected again on the same connection, whose channels stayed open
-  Note over S: or, after 10 s, Connection lost
+  Note over S: or, after 30 s, Connection lost
 ```
 
 *Figure 3c. A short drop recovers without a new invitation (FR-6.12, NFR-11). The photographer creates every offer, so it also starts the ICE restart.*
@@ -351,15 +373,15 @@ App versions are from `android/gradle/libs.versions.toml`; server versions are t
 | AD-8 | **One session abstraction with pluggable entry points (room code, invitation)** | Streaming and sync work without accounts, and each entry point only yields a `sessionId`. | Building accounts and invitations first |
 | AD-9 | **One app for both roles** | Friends swap roles between shots: one codebase, one install, the role chosen per session. | A separate viewer app |
 | AD-10 | **One frame in the chosen aspect ratio (3:4, 9:16, or 1:1), shown whole (fit) on both phones** | One CameraX `ViewPort` makes what you see what is captured, with the same guide coordinates on both phones; 9:16 fits Instagram stories. The crops: 2.6.2. | Fixed 3:4; full-screen 9:16 with cropping |
-| AD-11 | **One server for `main` and one for `dev`, each with Docker and nginx in two versions: on a course server and on AWS** | Both versions have the same setup. The course servers (Server A, Server B) open only HTTP on port 80, without TLS (NFR-14), and only to the campus network. The AWS servers (AWS main, AWS dev) answer from every network, cellular data included, over HTTPS with a Let's Encrypt certificate for an sslip.io hostname, which needs no domain. So the builds use the AWS servers: release builds (the store's build) AWS main, and debug builds AWS dev. Each AWS server has its own instance, so a deploy of `dev`, which builds on the server, never slows `main` (2.8, Hosting). | One version only, on the course servers (campus network only) or on AWS (cost); both branches on one AWS instance (a deploy builds on the server, beside the live `main`); an AWS load balancer with an ACM certificate (cost, and a domain of our own); a TLS front such as a Cloudflare Tunnel (domain and approval); GitHub hosting; a laptop with port forwarding |
+| AD-11 | **One server for `main` and one for `dev`, each with Docker and nginx in two versions: on a course server and on AWS** | Both versions have the same setup. The course servers (Server A, Server B) are reached through the course's proxy, which serves HTTPS from every network with the course's certificate and passes requests to their port 80 (NFR-14). The AWS servers (AWS main, AWS dev) answer from every network, cellular data included, over HTTPS with a Let's Encrypt certificate for an sslip.io hostname, which needs no domain. The builds use the AWS servers: release builds (the store's build) AWS main, and debug builds AWS dev. Each AWS server has its own instance, so a deploy of `dev`, which builds on the server, never slows `main` (2.8, Hosting). | One version only, on the course servers or on AWS (cost); both branches on one AWS instance (a deploy builds on the server, beside the live `main`); an AWS load balancer with an ACM certificate (cost, and a domain of our own); a TLS front such as a Cloudflare Tunnel (domain and approval); GitHub hosting; a laptop with port forwarding |
 | AD-12 | **Sign-in with a Pix ID and a password or with Google; the server issues its own tokens** | No Google account is needed, and Google is one tap. The Pix ID is the login name, with no email; either account can add the other (FR-5.13). Tokens and password hashes: 2.8, Accounts. | Email and password; Kakao sign-in (not on every test phone) |
 | AD-13 | **Invitations by Firebase Cloud Messaging, with an invite link as the fallback** | Only a push reaches a friend whose Pix is closed, and a link through any messenger covers a lost push. | WebSocket presence only; KakaoTalk-only invitations |
 | AD-14 | **A managed TURN relay (Cloudflare Realtime TURN), with short-lived credentials from the server** | STUN often fails behind carrier NAT, and the course servers cannot host a relay (port 80 only). Cloudflare's needs no host, fits its free allowance, and also listens on TCP 80 and TLS 443. The key stays on the server, and media stays SRTP-encrypted (NFR-14). | coturn on the server host (no open ports) or on AWS (cost, upkeep); a media server (SFU); no relay |
 | AD-15 | **The guide is an outline only and never shows the reference photo's pixels** | Framing the person matters more than the background, and reference pixels over the live scene confuse; a thumbnail shows the reference (AD-6). | Semi-transparent cutout; a faint background guide |
-| AD-16 | **Saved guides live in the app's private storage** | Reuse with nothing in the gallery or on the server (FR-3.8, NFR-13). The library (FR-3.11) is this store: up to 100 guides, thumbnails read on demand. | Gallery album; server-side guides |
+| AD-16 | **Saved guides live in the app's private storage** | Reuse with nothing in the gallery or on the server (FR-3.8, NFR-13). The library (FR-3.11) is this store, with no limit, thumbnails read on demand ([#297]). Each guide keeps its source, a pose's situation, a memo ([#270]), and whether it is a favorite ([#297]); the others are history. | Gallery album; server-side guides |
 | AD-17 | **Pinch zoom with a guide-edit mode toggle on both phones** | A pinch is the natural zoom, and one toggle decides: on, gestures edit the guide; off, a pinch zooms. The subject moves the guide (FR-7.2) and zooms too. | A zoom slider; deciding by where the finger lands |
 | AD-18 | **Session state lives in a Redis session store, not in the server process** | Workers share the state, and a new copy takes over during a deploy without losing a waiting room (2.8). The small, short-lived state fits Redis's atomic scripts, expiry, and pub/sub (2.7). Cost: one more service and Lua room transitions; NFR-18's 50 sessions fit in one worker. | One process with in-memory state; routing rooms by code; the relational database |
-| AD-19 | **Crash reports and usage events through Firebase Crashlytics and Analytics, behind one `Telemetry` facade** | Pix already uses Firebase for pushes, so no account or server is added. The phones send over HTTPS from any network, which the course servers cannot receive. One facade with typed events keeps personal data out (NFR-13) and lets tests record what is sent. Release builds only, while the user allows it (FR-10.6). | An endpoint on the Pix server (plain HTTP, campus only, our own storage and dashboards); Sentry (another account and SDK) |
+| AD-19 | **Crash reports and usage events through Firebase Crashlytics and Analytics, behind one `Telemetry` facade** | Pix already uses Firebase for pushes, so no account or server is added. The phones send over HTTPS from any network. One facade with typed events keeps personal data out (NFR-13) and lets tests record what is sent. Release builds only, while the user allows it (FR-10.6). | An endpoint on the Pix server (our own storage and dashboards); Sentry (another account and SDK) |
 | AD-20 | **Server logs in CloudWatch Logs, with a CloudWatch alarm on 5xx answers, all in AWS** | The AWS servers already run there, so no account or agent is added. The logs outlive deploys and can be searched without SSH, and the team gets an email when a server answers with errors (2.8, *Server logs and alerts*). | Sentry (another account and SDK); Prometheus and Grafana, ELK, or Loki (a system to run); an uptime check from outside: Route 53 health checks alarm only in `us-east-1`, which the account's organization blocks, and UptimeRobot is another account (not needed for the course) |
 
 ## 2. Design Details
@@ -395,14 +417,16 @@ android/app/src/main/java/com/lastpenguin/pix/
 │               ScreenTransitions (PixNavHostFragment, ScreenNavigator, ScreenMotion) and Motion; camera/TurningIcons
 │               (TurningButton, TurningLabel, TurningFrame) turns the controls and the photo viewer with the phone
 ├─ camera/      CameraController*, CameraXController, CameraSettings (aspect ratio in DataStore), PhotoSaver (PhotoAlbum),
-│               PixAlbumPhotos, CameraZoom, CameraZoomPlan, CameraFrameCache, PhoneTurns (SensorPhoneTurns)
+│               PhonePhotos (PhonePhotoSource, PhoneAlbum, PhotoDeleter), CameraZoom, CameraZoomPlan,
+│               CameraFrameCache, PhoneTurns (SensorPhoneTurns)
 ├─ guide/       GuideModels*, GuideRepository*, ReferenceGuideMaker*, SavedGuideStore*, GuideLook* (GuideColor,
 │               GuideThickness, GuideOutlines), InMemoryGuideRepository, MlKitReferenceGuideMaker, FileSavedGuideStore,
 │               GuideGeometry, SubjectSegmenter, MaskSmoothing (functions), OutlineExtractor, MaskPng,
 │               ScreenshotPhoto and SharedPostCard (the screenshot cut), GuideOverlayView
 ├─ generation/  GenerationModels*, PoseGenerator*, PoseTipper*, RemotePoseGenerator, RemotePoseTipper, PoseTips,
 │               PoseImageCodec, GenerationConsent (DataStore), PromptHistory* (DataStore), PersonDetector*
-│               (RuleBasedPersonDetector, MlKitPersonSignals), ScreenLanguage
+│               (RuleBasedPersonDetector, MlKitPersonSignals), ScreenLanguage, PoseOptions (an option in the
+│               description's text)
 ├─ settings/    AppSettings* (DataStore), AppLanguage* (Android's per-app language)
 ├─ account/     AccountModels*, AuthRepository*, FriendsRepository*, AuthTokens, BearerTokens, AccountRules, ApiMapping,
 │               RemoteAuthRepository, RemoteFriendsRepository, PresenceConnection, GoogleIdTokens,
@@ -411,7 +435,7 @@ android/app/src/main/java/com/lastpenguin/pix/
 ├─ telemetry/   Telemetry (the facade), TelemetryEvent, GatedTelemetry (ReportedError), FirebaseTelemetry
 ├─ session/     SessionModels*, SessionManager*, RtcSessionManager, SignalingClient, OkHttpSignalingClient,
 │               PeerConnectionClient, WebRtcPeerConnectionClient, WebRtcRuntime, CameraFrameSource, RemoteVideo,
-│               GuideImageCodec, GuideSyncer, GuideReference (GuideReferenceCodec, MirrorReference),
+│               GuideImageCodec, GuideSyncer, HeldGuide, GuideReference (GuideReferenceCodec, MirrorReference),
 │               PoseSyncer (PoseShare, MirrorPoseSet), PoseCandidates (PoseCandidateCodec),
 │               ConfirmSyncer (ConfirmShare, MirrorConfirm), DescriptionSyncer (DescriptionShare, MirrorDescription),
 │               PhotoSyncer (PhotoShare, PhotoReader), TipSyncer, RemoteControlHandler, MobileDataNotice
@@ -423,7 +447,7 @@ android/app/src/main/java/com/lastpenguin/pix/
 
 **Transitions between screens (Iter3-A14, [#181]; R&S 6.9).** `ui/ScreenTransitions.kt` sets every move in one place. `activity_main.xml` hosts the graph in `PixNavHostFragment`, Navigation's `NavHostFragment` with `ScreenNavigator` as its fragment navigator. `nav_graph.xml` names no animation.
 
-- `ScreenNavigator` sets the four `NavOptions` animators from `ScreenMotion.between`: forward between the shown and the next screen, back between the next and the screen beneath it after the move.
+- `ScreenNavigator` sets the four `NavOptions` animators from `ScreenMotion.between`: forward between the shown and the next screen, back between the next and the screen beneath it after the move. Only `HAND_OFF` differs by direction.
 - After `popUpTo`, the screen beneath is not the shown one: Back from *Generating poses* goes to Camera, so it fades.
 - Back, the back gesture, and *Back to camera* pop the back stack and play the back pair, also on a screen a notification or link opened (`MainActivity.open`). Options with their own animations keep them; the first screen has none.
 - Each transition lasts 300 ms on Material's standard curve (`res/animator/screen_*`, `res/values/motion.xml`). The going screen fades out in the first 35 %, and the coming one fades in over the rest.
@@ -433,7 +457,9 @@ android/app/src/main/java/com/lastpenguin/pix/
 | Pair | Transition | Why |
 |----|----|----|
 | Camera or *Subject view* and any screen | `FADE`: Material's fade through, without its scale | A live camera image should not slide. `PreviewView` (`COMPATIBLE`, a `TextureView`) fades with its screen. `SurfaceViewRenderer` takes no view alpha, so `SubjectFragment.onCreateAnimator` hides the video. |
-| Any other two screens | `SHARED_AXIS` along x: the next screen comes 30 dp in from the right, the last goes 30 dp left; back reverses it | A deeper step: *Share my camera* → *Add a friend*, the library → *Reference confirm*, *Generate poses* → *Generating poses* → *Pick a pose* |
+| Two steps of the pose flow after the scene photo (`ScreenMotion.STEPS`, [#320]) | `FLOW`: the next step fades in over the last, which stays under it; back, the step fades out over the one before. Each step paints its own ground, so the last shows only through the fade | The steps share their header: Back and the flow's bar stay in place, and only what changes changes. The flow's bar fills on from the last step's (`FlowProgressView.arrive`, `shownStep`) |
+| Camera, during the scene photo, → *Generate poses* | `HAND_OFF`: *Generate poses* is there at once, drawn as Camera looked, and unfolds from it (2.6.3); back fades through, as `FADE` | The scene photo's bar is Camera's, so the two headers differ: a fade would show both |
+| Any other two screens | `SHARED_AXIS` along x: the next screen comes 30 dp in from the right, the last goes 30 dp left; back reverses it | A deeper step: *Share my camera* → *Add a friend*, the library → *Reference confirm* |
 | A sheet (*Add a pose guide*, *Who takes the photo?*, *Account*, *Room code*, *Invite sent*) and the screen under it | None: the sheet keeps its own slide | `ScreenNavigator` does not move dialog destinations. A screen a sheet opens moves from the screen under it: Camera → *Reference confirm* fades. |
 
 **Insets and the keyboard (R&S 6.9).** From Android 15, Pix draws behind the system bars, and the window no longer shrinks for the keyboard. So `MainActivity` pads the screens by the bars and, while it is open, by the keyboard. A form's `ScrollView` then shrinks above the keyboard and scrolls the focused field into view.
@@ -469,8 +495,9 @@ interface CameraController {
     fun setFacing(facing: CameraFacing)               // rebinds after any photo being saved, at 1x and brightness 0;
                                                       // a front camera that fails gives the rear one back
     fun setZoom(ratio: Float, final: Boolean = true)  // clamped to [minZoom, maxZoom]; pinch and remote; newest value once
+    fun glideZoom(ratio: Float)                         // a single change, over 250 ms where the bound lens can show it (#310)
                                                       // per display frame; final = false holds the lens (2.6.5)
-    fun setFocusPoint(x: Float, y: Float)             // frame coordinates 0..1 (FR-1.4); also remote focus (Could)
+    fun setFocusPoint(x: Float, y: Float)             // frame coordinates 0..1 (FR-1.4); also remote focus (FR-7.7)
     fun setExposure(index: Int)                       // within capabilities.exposureRange (FR-1.11)
     fun setFlash(mode: FlashMode)                     // ignored without capabilities.hasFlash (FR-1.12)
     fun setTorch(on: Boolean)                         // the scene photo's light (FR-4.1); kept across rebinds; none on a
@@ -502,13 +529,16 @@ interface GuideRepository {
 
 interface SavedGuideStore {                             // FR-3.8, FR-3.11, AD-16: the library, app-private storage only
     val saved: StateFlow<List<SavedGuide>>              // newest first; empty until the storage is read once
-    suspend fun save(guide: ReferenceGuide, state: GuideState): Result<GuideSaved>   // one copy per guide id
+    suspend fun save(guide: ReferenceGuide, state: GuideState, favorite: Boolean = true): Result<SavedGuide>
+                                                        // one copy per guide id; history when favorite is false
     suspend fun load(id: String): Result<Pair<ReferenceGuide, GuideState>>
     suspend fun thumbnail(id: String): Bitmap?         // read when a cell shows; null for an unknown id or unreadable files
-    suspend fun delete(id: String)                      // an unknown id does nothing
+    suspend fun delete(ids: Collection<String>)         // an unknown id does nothing; delete(id) for one
+    suspend fun setMemo(id: String, memo: String): Result<Unit>   // memoOf(memo); empty removes it (#270)
+    suspend fun setFavorite(id: String, favorite: Boolean): Result<Unit>   // ♥ and Save guide (#297)
     class InMemory : SavedGuideStore                    // for tests and screens that keep no guides
     companion object {
-        const val MAX_SAVED = 100                       // the oldest goes first
+        const val MAX_MEMO = 40                         // characters; memoOf keeps one line, trimmed, cut to it
         const val THUMBNAIL_WIDTH = 384                 // a library cell's 3:4 on a 3x screen, never enlarged
         const val THUMBNAIL_HEIGHT = 512
     }
@@ -522,12 +552,16 @@ interface CameraSettings {                              // the last aspect ratio
 interface AppSettings {                                 // FR-10.1, 2.6.8: the settings screen's choices, in DataStore
     val guideLook: StateFlow<GuideLook>                 // color and thickness of every guide on this phone (FR-3.10)
     val showLatency: StateFlow<Boolean>                 // the latency indicator in a session (FR-10.3); off by default
-    val baseBrightness: StateFlow<Float>                // Camera's base brightness in EV (FR-1.11); 0 by default
+    val showGrid: StateFlow<Boolean>                    // the grid (FR-1.9), from the camera menu; on by default
+    val showLevel: StateFlow<Boolean>                   // the horizon bar (FR-1.10), from the camera menu; on by default
     val tutorialSeen: StateFlow<Set<TutorialScreen>?>   // screens whose tips were seen (FR-10.4); null until read
     suspend fun setGuideColor(color: GuideColor)
     suspend fun setGuideThickness(thickness: GuideThickness)
     suspend fun setShowLatency(show: Boolean)
-    suspend fun setBaseBrightness(ev: Float)            // kept within BASE_BRIGHTNESS_EV, -2..2 (key base_brightness_ev)
+    suspend fun setShowGrid(show: Boolean)              // key show_grid
+    suspend fun setShowLevel(show: Boolean)             // key show_level
+    suspend fun toggleShowGrid()                        // the camera menu's Grid: from what is stored, in one edit
+    suspend fun toggleShowLevel()                       // the camera menu's Horizon, as toggleShowGrid
     suspend fun setTutorialSeen(screens: Set<TutorialScreen>)   // adds them to the tips seen
     suspend fun resetTutorial()                         // *Show the tutorial again*: every screen's tips due again
     class InMemory : AppSettings                        // for tests
@@ -640,7 +674,12 @@ classDiagram
     +uiState StateFlow~CameraUiState~
     +guideSaveNotices Flow
     +toggleLabels Flow
+    +menuNotices Flow~MenuNotice~
+    +timedShots Flow
     +onShutter() Boolean
+    +cancelCountdown()
+    +onTimerTap()
+    +setMenuOpen(open)
     +onZoomChanged(ratio, final)
     +onZoomTap()
     +onSwitchCamera()
@@ -711,9 +750,12 @@ classDiagram
     +outputOptions(mirrored) OutputFileOptions
     +save(file, photoId, takenAt) Result~Uri~
   }
-  class PixAlbumPhotos {
+  class PhonePhotos {
     +photos StateFlow~List~
-    +delete(uri) Boolean
+    +albums StateFlow~List~
+    +access StateFlow~PhotoAccess~
+    +refresh()
+    +delete(uri) PhotoDeletion
   }
   class CameraSettings {
     <<interface>>
@@ -754,10 +796,12 @@ classDiagram
   class SavedGuideStore {
     <<interface>>
     +saved StateFlow
-    +save(guide, state) Result~GuideSaved~
+    +save(guide, state, favorite) Result~SavedGuide~
     +load(id)
     +thumbnail(id) Bitmap
-    +delete(id)
+    +delete(ids)
+    +setMemo(id, memo)
+    +setFavorite(id, favorite)
   }
   class FileSavedGuideStore
   class GuideGeometry {
@@ -779,7 +823,7 @@ classDiagram
   CameraViewModel --> SavedGuideStore
   CameraXController ..|> CameraController
   CameraXController --> PhotoSaver
-  CameraViewModel --> PixAlbumPhotos : the thumbnail and the viewer outside a session
+  CameraViewModel --> PhonePhotos : the thumbnail and the viewer outside a session
   MlKitReferenceGuideMaker ..|> ReferenceGuideMaker
   MlKitReferenceGuideMaker --> ScreenshotPhoto : cut a screenshot first
   ScreenshotPhoto --> SharedPostCard : a post shared in a story
@@ -822,6 +866,7 @@ classDiagram
   class SessionViewModel {
     +state StateFlow~SessionState~
     +transitions SharedFlow~SessionState~
+    +remoteFocus SharedFlow~RemoteFocus~
     +startRoom()
     +invite(friend)
     +cancelInvite()
@@ -863,7 +908,7 @@ classDiagram
   class GuideSyncer {
     +adopted SharedFlow~String~
     +offerFailed Flow~String~
-    +startAsSender(scope)
+    +startAsSender(scope, resumed)
     +startAsReceiver(scope)
     +attribute(role)
     +offer(guide)
@@ -871,6 +916,12 @@ classDiagram
   class MirrorReference {
     +reference StateFlow~GuideReference~
     +set(reference)
+  }
+  class HeldGuide {
+    +guide ReferenceGuide
+    +reference GuideReference
+    +guideId String
+    +referenceId String
   }
   class PoseShare {
     <<interface>>
@@ -955,6 +1006,8 @@ classDiagram
     +start(scope)
     +stop()
     +handle(message)
+    +focusedHere(x, y)
+    +countdownHere(left)
   }
   class ZoomHold {
     +holder StateFlow~Role~
@@ -969,7 +1022,10 @@ classDiagram
     +onGuideGesture(dx, dy, scale, final)
     +setGuideEditing(on)
     +onExposureGesture(index, final)
+    +onFocusTap(x, y) Boolean
+    +photographerFocus SharedFlow~RemoteFocus~
     +setBrightnessOpen(open)
+    +setMenuOpen(open)
     +onFlashTap()
     +setReferenceExpanded(expanded)
     +setReferenceCorner(corner)
@@ -1009,6 +1065,7 @@ classDiagram
   GuideSyncer --> SessionManager
   GuideSyncer --> GuideRepository
   GuideSyncer --> MirrorReference : subject writes the reference photo
+  GuideSyncer --> HeldGuide : subject keeps the image for hello
   RemoteControlHandler --> SessionManager
   RemoteControlHandler --> CameraController
   RemoteControlHandler --> GuideRepository
@@ -1057,7 +1114,8 @@ classDiagram
     +takeScene()
     +retakeScene()
     +toggleLight()
-    +useScene() Boolean
+    +backToScene()
+    +sceneArrived()
     +onDescriptionChanged(text)
     +onDescriptionFocus(focused) Boolean
     +generate(description)
@@ -1253,13 +1311,15 @@ classDiagram
   class SettingsViewModel {
     +guideLook StateFlow~GuideLook~
     +showLatency StateFlow~Boolean~
-    +baseBrightness StateFlow~Float~
+    +showGrid StateFlow~Boolean~
+    +showLevel StateFlow~Boolean~
     +account StateFlow~AuthState~
     +language Language
     +setGuideColor(color)
     +setGuideThickness(thickness)
     +setShowLatency(show)
-    +setBaseBrightness(ev)
+    +setShowGrid(show)
+    +setShowLevel(show)
     +chooseLanguage(language)
     +tutorialDue(screen) Flow~Boolean~
     +tutorialSeen(screens)
@@ -1269,7 +1329,8 @@ classDiagram
     <<interface>>
     +guideLook StateFlow~GuideLook~
     +showLatency StateFlow~Boolean~
-    +baseBrightness StateFlow~Float~
+    +showGrid StateFlow~Boolean~
+    +showLevel StateFlow~Boolean~
     +tutorialSeen StateFlow~Set~
   }
   class DataStoreAppSettings
@@ -1294,7 +1355,7 @@ classDiagram
   SettingsViewModel --> AuthRepository : the Pix account row
   DataStoreAppSettings ..|> AppSettings
   AndroidAppLanguage ..|> AppLanguage
-  CameraViewModel --> AppSettings : base brightness
+  CameraFragment ..> SettingsViewModel : the menu's grid and horizon bar
   GuideOverlayView ..> SettingsViewModel : followLook
   GuideOverlayView ..> GuideOutlines : another thickness
   TutorialFragment --> SettingsViewModel : tips seen
@@ -1331,10 +1392,14 @@ data class ReferenceGuide(
     val reference: Bitmap? = null,        // the photo, long side ≤ 512 px, for the corner thumbnail only (FR-3.9); the
                                           // subject keeps the photographer's in MirrorReference (guide.reference.*)
     val crop: PhotoCrop? = null,          // the screenshot it was cut from (FR-2.10); null for a whole image or a generated
-                                          // pose; never sent or saved
+                                          // pose; never sent or saved, and dropped on Use (withoutPicked)
+    val photo: Bitmap? = null,            // a photo used whole, long side ≤ 1024 px, for Reference confirm (#295); null
+                                          // with a crop and for a generated pose; kept like crop
+    val situation: Situation? = null,     // a generated pose's situation (FR-4.8), kept in the library (#270); null for
+                                          // a photo guide; forSituation keeps the instance when it changes nothing
 )
 data class PhotoCrop(
-    val original: Bitmap,         // the whole picked image, long side ≤ 1024 px, for Reference confirm's cut
+    val original: Bitmap,         // the whole picked image, long side ≤ 1024 px, for Reference confirm (2.6.1)
     val photo: NormalizedRect,    // the part kept, which mask, anchor, and reference are made from
 )
 data class NormalizedRect(val left: Float, val top: Float, val right: Float, val bottom: Float)   // fractions of an image
@@ -1346,9 +1411,14 @@ data class GuideState(            // places the guide, in frame coordinates (2.6
     val opacity: Float = 0.5f,    // 0.1..0.9, applied to the outline (FR-3.4)
     val visible: Boolean = true,  // false = hidden for a moment (FR-3.6); only the photographer changes it
 )
-data class SavedGuide(val id: String, val savedAt: Long, val source: GuideSource)   // a library entry, no bitmap
-                                                         // (SavedGuideStore.thumbnail); files in app-private storage (2.8)
-data class GuideSaved(val guide: SavedGuide, val removedOldest: Boolean)   // what save did, decided inside the save
+data class SavedGuide(                                   // a library entry, no bitmap (SavedGuideStore.thumbnail);
+    val id: String,                                      // files in app-private storage (2.8)
+    val savedAt: Long,
+    val source: GuideSource,
+    val situation: Situation? = null,                    // a pose's situation (#270)
+    val memo: String = "",                               // the user's memo, shown and edited in the library only
+    val favorite: Boolean = true,                        // ♥ or Save guide marked it; false = history (#297)
+)
 enum class LibraryFilter { ALL, PHOTOS, GENERATED }      // the library's filters (FR-3.11): all, or one GuideSource
 
 // ---- Camera ---------------------------------------------------------------
@@ -1388,8 +1458,8 @@ sealed interface SessionState {   // 2.4
     data class Waiting(val code: String) : SessionState              // photographer: code shown, waiting for the subject
     data class Inviting(val invitationId: String) : SessionState     // photographer: invitation sent, its place taken
     data class Connecting(val sessionId: String?) : SessionState
-    data class Connected(val sessionId: String, val peer: PeerInfo, val role: Role, val partner: SessionPartner? = null) : SessionState
-    data class Reconnecting(val sessionId: String, val since: Long, val partner: SessionPartner? = null) : SessionState
+    data class Connected(val sessionId: String, val peer: PeerInfo, val role: Role, val partner: SessionPartner? = null, val drops: Int = 0) : SessionState   // drops this session came back from
+    data class Reconnecting(val sessionId: String, val since: Long, val partner: SessionPartner? = null, val peer: PeerInfo? = null, val role: Role? = null) : SessionState   // peer and role as Connected said them
     data class Ended(val reason: EndReason) : SessionState
 }
 val SessionState.partner: SessionPartner?   // the friend while Connected or Reconnecting; null over a room code
@@ -1482,7 +1552,6 @@ enum class GuideThickness(val scale: Float) { THIN(0.75f), NORMAL(1f), THICK(1.5
 data class GuideLook(val color: GuideColor = WHITE, val thickness: GuideThickness = NORMAL)   // this phone's; never sent
 enum class Language(val tag: String?) { PHONE(null), ENGLISH("en"), KOREAN("ko") }   // FR-10.2
 enum class TutorialScreen { CAMERA, ADD_GUIDE, GUIDE_ON_CAMERA, GENERATE_POSES, SUBJECT_VIEW }   // FR-10.4
-val BASE_BRIGHTNESS_EV = -2f..2f                             // FR-1.11; a camera's own range clamps it
 ```
 
 ### 2.4 State machines
@@ -1503,8 +1572,8 @@ stateDiagram-v2
   Connected --> Reconnecting: ICE disconnected or failed
   Connected --> Waiting: room code photographer, subject left or link lost
   Reconnecting --> Connected: link connected again, reliable channel open
-  Reconnecting --> Waiting: room code photographer, 10 s passed
-  Reconnecting --> Ended: 10 s passed, reliable channel closed, place gone, leave, or peer left
+  Reconnecting --> Waiting: room code photographer, 30 s passed
+  Reconnecting --> Ended: 30 s passed, reliable channel closed, place gone, leave, or peer left
   Connected --> Ended: leave, peer left, or reliable channel closed
   Ended --> Idle: next room (photographer)
   Ended --> Inviting: next invitation
@@ -1531,7 +1600,7 @@ stateDiagram-v2
 
 - `peer.left` with `CONNECTION_LOST` changes nothing while `Connected` or `Reconnecting`: it is often the other phone's old socket. The link decides.
 - The reliable channel closing ends the session at once, since it closes only when the other phone closed its connection. A realtime channel that closes alone hands its messages to the reliable one.
-- After 10 s the photographer says "&lt;name&gt; disconnected" and returns to `Waiting`, or ends an invitation's session. The subject goes to `Ended(CONNECTION_LOST)`.
+- After 30 s the photographer says "&lt;name&gt; disconnected" and returns to `Waiting`, or ends an invitation's session. The subject goes to `Ended(CONNECTION_LOST)`.
 - The subject's *Reconnect* (`SessionEntry.Rejoin`) retakes its place with its rejoin token while the photographer holds the session; without a token it joins the code again.
 
 A photographer whose app stays in the background for 60 s leaves the session. `Ended` stays until the next session starts, and the screens return to the camera by themselves.
@@ -1551,26 +1620,26 @@ stateDiagram-v2
 
 | Step | States |
 |----|----|
-| *Generate poses* (`DescriptionStep`) | `OPEN` while written → `STARTED` by its button (*Suggest*, *Generate*, or *Regenerate*), or `CLOSED` |
+| *Generate poses* (`DescriptionStep`) | `OPEN` while written → `STARTED` by its button (*Generate* or *Regenerate*), or `CLOSED` |
 | The pose set (`PoseSetStep`) | `GENERATING` → `PICKING` when *Pick a pose* opens with a candidate → `CHOSEN` by the first *Select*; `CLOSED` without a choice |
 | *Reference confirm* of a chosen pose (`ConfirmStep`) | `FINDING` → `READY` with the outline → `USED` by the first *Use*; `CLOSED` without a guide |
 
-**Pose screens (2.6.3, [#199]).** `GenerationUiState.phase` on the photographer's phone. Back on each screen goes one step back, and that step shows what it had. The guide on the camera, or a choice in a session, ends the step (`IDLE`).
+**Pose screens (2.6.3, [#199]).** `GenerationUiState.phase` on the photographer's phone. Back on each screen goes one step back, and that step shows what it had. The guide on the camera, or a choice in a session, ends the step (`IDLE`). Back on *Reference confirm* outside a session undoes the choice (`pickAgain`), also one that a subject made just before leaving: kept, it would send *Pick a pose* on again at every Back.
 
 ```mermaid
 stateDiagram-v2
   [*] --> IDLE
   IDLE --> FRAMING: a situation's tile
   FRAMING --> IDLE: Back
-  FRAMING --> REVIEWING: shutter
-  REVIEWING --> FRAMING: Back
-  REVIEWING --> DESCRIBING: Use, a person found
-  DESCRIBING --> REVIEWING: Back
-  DESCRIBING --> GENERATING: Suggest or Generate
-  GENERATING --> DESCRIBING: Back, confirmed
+  FRAMING --> CHECKING: shutter
+  CHECKING --> DESCRIBING: a person found
+  CHECKING --> FRAMING: no person, said on the camera; or Back
+  DESCRIBING --> FRAMING: Back, the text kept
+  DESCRIBING --> GENERATING: Generate
+  GENERATING --> DESCRIBING: Back
   GENERATING --> PICKING: a candidate ready
   GENERATING --> FAILED: none ready
-  PICKING --> DESCRIBING: Back, confirmed; the set gone
+  PICKING --> DESCRIBING: Back; the set gone, its poses in the library
   PICKING --> GENERATING: Regenerate
   PICKING --> IDLE: the guide on the camera, or a choice in a session
   FAILED --> DESCRIBING: Back
@@ -1578,7 +1647,7 @@ stateDiagram-v2
   FAILED --> FRAMING: Shoot again
 ```
 
-*Figure 9c. The pose screens. `REVIEWING` and `FRAMING` are steps of the Camera screen. Outside a session, *Select* keeps `PICKING` under *Reference confirm*, whose Back returns to the set.*
+*Figure 9c. The pose screens. `FRAMING` and `CHECKING` are steps of the Camera screen; `CHECKING` ends by itself once the phone has looked for a person in the photo ([#296]; until Iteration 5 it was `REVIEWING`, which waited for *Use*). Outside a session, *Select* keeps `PICKING` under *Reference confirm*, whose Back returns to the set.*
 
 ### 2.5 Protocols and APIs
 
@@ -1586,12 +1655,12 @@ Each protocol has a summary table, followed by a JSON example for every message 
 
 #### 2.5.1 Data channel protocol (phone ↔ phone)
 
-The photographer owns the camera, the guide, and the shared steps. The subject sends requests, which the photographer applies and echoes (AD-7). Only the photographer takes photos.
+The photographer owns the camera, the guide, and the shared steps. The subject sends requests, which the photographer applies and echoes (AD-7). A photo is taken on the photographer's phone alone, at its own shutter or at the subject's request (`camera.shutter`, [#314]).
 
 - **Channels.** Before its offer, the photographer opens `realtime` (`ordered = false`, `maxRetransmits = 0`) and `reliable` (ordered, reliable). `ChannelRouter` picks the channel of each message.
 - **Envelope.** `{"v", "t", "seq", "ts", "b"}`: the protocol version (3), the type, a counter per type, the send time in ms, and the body. `MessageCodec` keeps `t`, the class discriminator of `SessionMessage`, at the top and moves the other fields into `b`.
 - **Compatibility.** A `hello` with another `protocol` ends the session with an error. Receivers ignore unknown types and unknown fields, so new types and optional fields keep version 3. A message with an unknown enum value is ignored whole.
-- **Newest value only.** For `guide.state`, `camera.state`, `camera.zoom.set`, `camera.exposure.set`, and `guide.move`, receivers drop a message whose `seq` is not newer than the last one applied for its type. This holds on either channel. Other types are never dropped.
+- **Newest value only.** For `guide.state`, `camera.state`, `camera.zoom.set`, `camera.exposure.set`, `guide.move`, and `guide.opacity.set`, receivers drop a message whose `seq` is not newer than the last one applied for its type. This holds on either channel. Other types are never dropped.
 - **Steps.** A gesture sends steps on `realtime`, at most every 50 ms, the newest winning. Its last value goes once on `reliable` with `final: true`.
 - **Order.** `hello` goes first on `reliable`. Reliable messages wait in one ordered queue until `hello` is sent and while the channel's `bufferedAmount` is 256 KiB or more. Realtime messages go at once or not at all (2.8). If `realtime` closes alone, its messages go on `reliable` (2.6.7).
 - **Chunks.** An image or photo goes in three parts. `.begin` holds the id, `format`, `bytes`, `chunks`, and an image's `width` and `height`. Each `.chunk` holds the id, `index`, and `data`, and `.end` the id and the `crc32` of the whole file. `data` is the Base64 of at most 9 KiB of the file (at most 12 KiB of text), so a message stays under 16 KiB. A skipped index, a wrong size, or a wrong CRC drops the transfer. An image `begin` over 2 MiB, or with a `chunks` that does not fit `bytes`, is refused.
@@ -1603,12 +1672,20 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `session.leave` | both | reliable | `reason` | Leaving on purpose |
 | `ping` / `pong` | both | realtime | `ts` | Round-trip time, every 2 s |
 | `camera.capabilities` | P→S | reliable | `capabilities` | Zoom and exposure ranges, flash, aspect ratios |
-| `camera.state` | P→S | steps realtime, final reliable | `zoom`, `exposure`, `flash`, `aspect`, `facing`, `by`, `final` | The applied camera values, and who changed them |
+| `camera.state` | P→S | steps realtime, final reliable | `zoom`, `exposure`, `flash`, `aspect`, `facing`, `by`, `final`, `focused`, `timer` | The applied camera values, with the timer's seconds ([#318]), and who changed them |
 | `camera.zoom.set` | S→P | steps realtime, final reliable | `ratio`, `final`, `cancel` | The subject's pinch or readout tap (FR-7.1), or the cancel of a pinch held back (FR-7.6) |
 | `camera.zoom.hold` | P→S | reliable | `by` | Whose pinch holds the zoom, or null when it is free (FR-7.6) |
-| `camera.exposure.set` | S→P | steps realtime, final reliable | `index`, `final` | The subject's brightness slider (FR-7.3) |
+| `camera.exposure.set` | S→P | steps realtime, final reliable | `index`, `final` | The subject's brightness bar (FR-7.3) |
 | `camera.flash.set` | S→P | reliable | `mode` | The subject's flash choice (FR-7.3) |
-| `camera.focus.set` | S→P | reliable | `x`, `y` | The subject's focus point (FR-7.7; Could, Iteration 5, [#273]) |
+| `camera.focus.set` | S→P | reliable | `x`, `y` | The subject's tap to focus, in the photographer's frame (FR-7.7, [#273]); answered with `camera.state` |
+| `camera.focus` | P→S | reliable | `x`, `y` | Where the photographer's own tap focused, in the photographer's frame (FR-7.7, [#273]); not kept |
+| `camera.did` | P→S | reliable | `action`, `zoom`, `exposure`, `flash`, `seconds`, `opacity` | What the photographer did on their own camera, for the subject's line (FR-7.4, [#292]); not kept |
+| `camera.timer` | P→S | reliable | `left` | The photographer's countdown: each second, then 0 at its end (FR-1.17, [#272]); not kept |
+| `camera.timer.set` | S→P | reliable | `seconds` | The timer as the subject's menu chose it, 0 for off ([#318]); answered with `camera.state` |
+| `camera.shutter` | S→P | realtime | `press`, `cancel` | The subject's press of *Subject view*'s shutter, numbered: for a photo, or to cancel the timer's countdown (FR-7.8, [#314]); answered with `camera.shutter.answer` |
+| `camera.shutter.answer` | P→S | reliable | `taken`, `press`, `timer` | Whether the press of that number took a photo, or was the timer's; the photo itself goes as any other (`photo.shutter`, `photo.begin`) |
+| `pose.start` | S→P | realtime | `situation`, `request` | The situation the subject picked on its *Add a pose guide*, numbered (FR-6.15, [#276]); answered with `pose.start.answer` |
+| `pose.start.answer` | P→S | reliable | `started`, `request`, `asking` | Whether the photographer's Camera began the scene photo for that request, or asks its user first; the steps after it go as `pose.*` |
 | `control.permission` | P→S | reliable | `allowed` | Whether remote control is allowed (FR-7.5, dropped at the kickoff of 11/21; never sent) |
 | `guide.image.begin` / `.chunk` / `.end` | both | reliable | chunks | The guide's mask; S→P for a guide made on the subject's phone |
 | `guide.reference.begin` / `.chunk` / `.end` | both | reliable | chunks | The guide's reference photo, for the other phone's thumbnail (FR-3.9); S→P for a guide made on the subject's phone |
@@ -1617,11 +1694,15 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `guide.tip` (It 4) | P→S | reliable | `guideId`, `text` | The tip of the guide on the photographer's camera (FR-4.10) |
 | `guide.tip.clear` (It 4) | P→S | reliable | none | That guide has no tip, or none any more |
 | `guide.move` | S→P | steps realtime, final reliable | `guideId`, `cx`, `cy`, `height`, `final` | The subject's drag or pinch on the guide (FR-7.2) |
+| `guide.visible.set` | S→P | reliable | `guideId`, `visible` | The subject's *Hide* or *Show* (FR-7.2); echoed in `guide.state` |
+| `guide.opacity.set` | S→P | steps realtime, final reliable | `guideId`, `opacity`, `final` | The subject's opacity slider (FR-7.2); echoed in `guide.state` |
+| `guide.remove` | S→P | reliable | `guideId` | The subject's ✕ (FR-7.2); answered with `guide.clear` |
+| `guide.restore` | S→P | reliable | `guideId` | The subject's *Undo* after either phone's ✕ (FR-7.2); the guide comes back as any guide does |
 | `pose.description` | P→S | reliable | `descriptionId`, `step`, `text`, `writer`, `rejected`, `setId`, `situation` | The photographer's *Generate poses* (FR-6.15) |
 | `pose.scene.begin` / `.chunk` / `.end` | P→S | reliable | chunks | The scene photo, for the subject's *Generate poses* |
 | `pose.description.edit` | S→P | reliable | `descriptionId`, `holding`, `text` | The subject's field takes or returns the description |
 | `pose.description.go` | S→P | reliable | `descriptionId`, `text`, `suggest` | The subject's *Generate poses* button |
-| `pose.step` | P→S | reliable | `setId`, `step`, `poseIds`, `poseId`, `by`, `failure`, `sceneTurn` | The photographer's set of candidates (FR-6.15), why a closed set failed (FR-4.7), and how its scene photo was held ([#206]) |
+| `pose.step` | P→S | reliable | `setId`, `step`, `poseIds`, `poseId`, `by`, `failure`, `sceneTurn`, `situation` | The photographer's set of candidates (FR-6.15), why a closed set failed (FR-4.7), and how its scene photo was held ([#206]) |
 | `pose.planned` | P→S | reliable | `setId`, `poseIds` | The set's slots in order (Iter3-A13) |
 | `pose.candidate.begin` / `.chunk` / `.end` | P→S | reliable | chunks | One candidate, for *Generating poses* and *Pick a pose* |
 | `pose.candidate.failed` | P→S | reliable | `setId`, `poseId`, `descriptionRejected` (only when true) | A candidate that could not be created (Iter3-A13), and whether the service refused the set's description itself (Iter4-P3) |
@@ -1629,15 +1710,16 @@ The photographer owns the camera, the guide, and the shared steps. The subject s
 | `guide.confirm` | P→S | reliable | `confirmId`, `step`, `guideId`, `by` | The photographer's *Reference confirm* of a chosen pose (FR-6.15) |
 | `guide.confirm.image.begin` / `.chunk` / `.end` | P→S | reliable | chunks | The outline's mask, for the subject's *Your reference* |
 | `guide.confirm.use` | S→P | reliable | `confirmId`, `guideId` | The subject's *Use* |
-| `photo.shutter` | P→S | realtime | none | The shutter was pressed (Iter3-A12) |
-| `photo.begin` / `.chunk` / `.end` | P→S | reliable, bulk | chunks, with `takenAt` | A photo taken in the session, as saved (FR-6.14) |
+| `photo.shutter` | P→S | realtime | `shot` | The shutter was pressed (Iter3-A12) |
+| `photo.dropped` | P→S | reliable | `shot` | A shuttered photo will not come: not saved, unreadable, or too large ([#271]) |
+| `photo.begin` / `.chunk` / `.end` | P→S | reliable, bulk | chunks, with `takenAt` and `shot` | A photo taken in the session, as saved (FR-6.14) |
 | `photo.ack` | S→P | reliable | `photoId`, `next` | The chunk the subject expects next |
 | `photo.saved` | S→P | reliable | `photoId`, `ok`, `reason` | Whether the photo is in the subject's album |
 
 | Transfer | Ids | Format and size | The receiver refuses | The subject keeps it |
 |----|----|----|----|----|
-| `guide.image.*` | `guideId` | `mask-png`: the smoothed mask as an 8-bit gray PNG, ≤ 720 px tall, a few KB | A PNG over 1280 px wide or 720 px tall, read from its header before inflating | As the guide; S→P, the photographer adopts it |
-| `guide.reference.*` | `guideId` | `jpeg`, quality 85, long side ≤ 512 px | A photo over 512 px | In memory (`MirrorReference`) until another guide or `guide.clear`; *Save guide* stores it with the guide; S→P, the photographer adopts it with its guide |
+| `guide.image.*` | `guideId` | `mask-png`: the smoothed mask as an 8-bit gray PNG, ≤ 720 px tall, a few KB | A PNG over 1280 px wide or 720 px tall, read from its header before inflating | As the guide, and past the session in `HeldGuide`; S→P, the photographer adopts it |
+| `guide.reference.*` | `guideId` | `jpeg`, quality 85, long side ≤ 512 px | A photo over 512 px | In memory until another guide or `guide.clear`: in `MirrorReference` while its session runs, and past it in `HeldGuide`; *Save guide* stores it with the guide; S→P, the photographer adopts it with its guide |
 | `pose.candidate.*` | `setId`, `poseId` | `jpeg`, quality 85, else 70 or 55 to fit 1 MiB; long side ≤ 1024 px | Over 1024 px or 1 MiB, at `begin` | In memory, with its set; the ♥ on *Pick a pose* can save it (FR-4.14) |
 | `pose.scene.*` | `descriptionId` | As a candidate | As a candidate | In memory, with its description; never saved |
 | `guide.confirm.image.*` | `confirmId`, `guideId` | `mask-png`, as `guide.image.*` | Over 1280 px wide or 720 px tall, at `begin`; an outline its copy is not `READY` with | In memory, on *Your reference* only; never saved |
@@ -1654,7 +1736,7 @@ The subject never draws a reference photo, candidate, scene photo, or outline as
          "haveGuideId": null, "haveReferenceId": null } }
 ```
 
-Both phones send it once both channels are open. `name` is the device name from the system settings, or the model, at most 40 characters; it is not the Pix display name. Only the subject sets `haveGuideId` and `haveReferenceId`: the guide image and the reference photo it already holds, which the photographer then skips.
+Both phones send it once both channels are open. `name` is the signed-in account's display name, or, signed out, the device name from the system settings or the model, at most 40 characters, counted by code point so an emoji is never cut in two ([#271]). Only the subject sets `haveGuideId` and `haveReferenceId`: the guide image and the reference photo it already holds, which the photographer then skips. The subject holds them past a session, in memory (`HeldGuide`), until another guide's image replaces them or a `guide.clear` drops them ([#268]).
 
 </details>
 
@@ -1680,12 +1762,14 @@ Sent when the session connects and at each change. For example, `hasFlash` is fa
 { "v": 3, "t": "guide.image.begin", "seq": 3, "ts": 1759212345702,
   "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "format": "mask-png",
          "width": 540, "height": 720, "bytes": 9120, "chunks": 1, "aspect": 0.75,
-         "anchor": { "left": 0.31, "top": 0.21, "right": 0.69, "bottom": 0.95 }, "source": "GALLERY" } }
+         "anchor": { "left": 0.31, "top": 0.21, "right": 0.69, "bottom": 0.95 }, "source": "GENERATED",
+         "situation": "landmark" } }
 ```
 
-Only the smoothed mask travels, never the reference's pixels (AD-6, AD-15). `MaskPng` writes and reads it losslessly on both phones. `aspect` is the mask's width / height. `anchor` is the mask's box in its reference photo, in fractions, right and bottom exclusive (`ReferenceGuide.anchor`); `source` is `GALLERY` or `GENERATED`. Each goes only when the guide has it.
+Only the smoothed mask travels, never the reference's pixels (AD-6, AD-15). `MaskPng` writes and reads it losslessly on both phones. `aspect` is the mask's width / height. `anchor` is the mask's box in its reference photo, in fractions, right and bottom exclusive (`ReferenceGuide.anchor`); `source` is `GALLERY` or `GENERATED`. `situation` is a generated pose's situation, by its name on the server ([#270]). Each goes only when the guide has it.
 
-- **P→S.** Skipped when `hello` reported the same `haveGuideId`. The `guide.state` after every image places the guide, also for a subject that joins late (2.6.2). The subject keeps `anchor` and `source` for *Save guide*.
+- **P→S.** Skipped when `hello` reported the same `haveGuideId` and no `guide.clear` followed. After a drop in the same session the photographer counts the images it has sent instead, because `hello` is not sent again (2.6.7, [#268]). The `guide.state` after every image places the guide, also for a subject that joins late (2.6.2). The subject keeps `anchor`, `source`, and `situation` for *Save guide*. It reads an unknown `situation` as none.
+- **The session's end.** The subject empties what Subject view draws, the mirror and `MirrorReference`, and holds the image and its reference photo for the next `hello`. The next session draws nothing until a `guide.state` names the held guide, which then needs no image ([#268]).
 - **S→P.** The photographer adopts the guide, under the same `guideId`, in place of its own, starting at `anchor` (FR-3.1). It answers with `guide.state` `by: SUBJECT` and no image (2.6.5, *Guide from the subject*). An anchor that is not finite, lies outside 0..1, or has no area starts the guide centered; a missing `source` means `GALLERY`. The guide's reference photo comes just before its image (`guide.reference.*`), and the photographer adopts the guide with it, for its thumbnail (FR-3.9). A refused image leaves the photographer's guide as it was. Without a `guide.state` that names the guide within 5 s, the subject shows the photographer's guide again.
 
 </details>
@@ -1721,7 +1805,7 @@ The receiver traces the outline from the mask with the sender's `OutlineExtracto
          "width": 384, "height": 512, "bytes": 41210, "chunks": 5 } }
 ```
 
-- **P→S.** Sent once per guide, after the guide's image and `guide.state`, so the subject draws the guide first. Skipped for a guide without a reference photo, and when `hello` reported the same `haveReferenceId`. The subject shows it only with its guide (FR-3.9, AD-6).
+- **P→S.** Sent once per guide, after the guide's image and `guide.state`, so the subject draws the guide first. Skipped for a guide without a reference photo, and when the subject holds it, by the image's rule with `haveReferenceId`. The subject shows it only with its guide (FR-3.9, AD-6).
 - **S→P.** Sent just before the image of a guide made on the subject's phone, since a guide does not change once set. The photographer keeps it only for the image that follows with the same `guideId`, and never sends it back. A guide without a reference photo sends none, and its guide has no thumbnail.
 
 </details>
@@ -1736,7 +1820,7 @@ The receiver traces the outline from the mask with the sender's `OutlineExtracto
          "final": false, "by": "PHOTOGRAPHER" } }
 ```
 
-`state` holds the fields of `GuideState` (2.3); `visible: false` hides the guide on both phones (FR-3.6). The photographer sends it when the session connects and after every image. `by` is `SUBJECT` on the echo of an applied `guide.move`, and a missing `by` means the photographer.
+`state` holds the fields of `GuideState` (2.3); `visible: false` hides the guide on both phones (FR-3.6). The photographer sends it when the session connects and after every image. `by` is `SUBJECT` on the echo of an applied `guide.move`, `guide.visible.set`, or `guide.opacity.set`, and a missing `by` means the photographer.
 
 </details>
 
@@ -1746,6 +1830,8 @@ The receiver traces the outline from the mask with the sender's `OutlineExtracto
 ```json
 { "v": 3, "t": "guide.clear", "seq": 413, "ts": 1759212351002, "b": {} }
 ```
+
+The subject drops the image and the reference photo it holds, so the photographer sends the next guide in full ([#268]).
 
 </details>
 
@@ -1774,7 +1860,25 @@ The receiver traces the outline from the mask with the sender's `OutlineExtracto
   "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "cx": 0.41, "cy": 0.52, "height": 0.82, "final": false } }
 ```
 
-The center and height the subject asks for, in frame coordinates. The photographer clamps and applies them like its own gesture (FR-3.2, FR-3.3) and echoes `guide.state`. It drops a move while the guide is hidden, and a move for a guide it no longer shows (2.6.2, 2.6.5). Only the photographer changes opacity and visibility.
+The center and height the subject asks for, in frame coordinates. The photographer clamps and applies them like its own gesture (FR-3.2, FR-3.3) and echoes `guide.state`. It drops a move while the guide is hidden, and a move for a guide it no longer shows (2.6.2, 2.6.5).
+
+</details>
+
+<details>
+<summary><code>guide.visible.set</code>, <code>guide.opacity.set</code>, <code>guide.remove</code>, <code>guide.restore</code> · S→P</summary>
+
+```json
+{ "v": 3, "t": "guide.visible.set", "seq": 3, "ts": 1759212356000,
+  "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "visible": false } }
+{ "v": 3, "t": "guide.opacity.set", "seq": 14, "ts": 1759212356200,
+  "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17", "opacity": 0.7, "final": true } }
+{ "v": 3, "t": "guide.remove", "seq": 1, "ts": 1759212356400,
+  "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17" } }
+{ "v": 3, "t": "guide.restore", "seq": 1, "ts": 1759212358400,
+  "b": { "guideId": "5f0c2b9e-7a41-4d3c-9b1e-2f6a8d0c4e17" } }
+```
+
+*Subject view*'s guide panel (FR-7.2). The photographer applies each as its own panel's control: the echo is a `guide.state` with `by: SUBJECT`, or `guide.clear` for a removal. `opacity` is kept within 0.1–0.9 (FR-3.4), and its steps and `final` work as a move's. It drops a request for a guide it no longer shows, a `guide.visible.set` that changes nothing, and an opacity while the guide is hidden. A missing `final` means a step. `guide.restore` names the guide removed last, by either phone: the photographer puts it back where it was, as its own *Undo* does, unless another guide went on since; its image and `guide.state` then go as for any guide.
 
 </details>
 
@@ -1785,7 +1889,7 @@ The center and height the subject asks for, in frame coordinates. The photograph
 { "v": 3, "t": "camera.zoom.set", "seq": 17, "ts": 1759212352310, "b": { "ratio": 2.0, "final": true } }
 ```
 
-A tap on the readout (a quick step, 2.6.2) and its *Zoom in* / *Zoom out* accessibility actions send one final request. The photographer clamps, applies, and echoes it (2.6.5).
+A tap on the readout (a quick step, 2.6.2) and its *Zoom in* / *Zoom out* accessibility actions send one final request. The photographer clamps, applies, and echoes it (2.6.5). The camera glides to it (`glideZoom`, 2.6.5): the states on the way are echoed as the photographer's, and the one that arrives as the subject's, so the subject's readout keeps its step until then ([#310]).
 
 `cancel: true`, always with `final: true`, ends a pinch that the photographer's hold stopped (2.6.5). The photographer applies no zoom for it; `ratio` is the photographer's zoom as the subject last saw it. As a `camera.zoom.set`, it makes a step sent before it stale. A missing `cancel` means false. Only a photographer that sends `camera.zoom.hold` gets one.
 
@@ -1810,7 +1914,7 @@ A tap on the readout (a quick step, 2.6.2) and its *Zoom in* / *Zoom out* access
   "b": { "zoom": 2.0, "exposure": 3, "flash": "AUTO", "aspect": "R16_9", "by": "SUBJECT", "final": true } }
 ```
 
-Each zoom the camera reports applied goes at once as a step, and once more as final 100 ms after the last one. A change of exposure, flash, or ratio goes at once as final; a step of the subject's slider is echoed as a step. Every message holds the whole applied state, from the first one after `hello`; a missing `exposure`, `flash`, or `aspect` means 0, `OFF`, or `R4_3`. `by` is `SUBJECT` when the change answers the subject's request. The subject keeps the last message as `SessionManager.peerCamera` and fits its video area to `aspect` (AD-10). It logs `zoom.echo`, with the exposure and flash, for each final one with `by: SUBJECT` (NFR-7).
+Each zoom the camera reports applied goes at once as a step, and once more as final 100 ms after the last one. A change of exposure, flash, or ratio goes at once as final; a step of the subject's bar is echoed as a step. Every message holds the whole applied state, from the first one after `hello`; a missing `exposure`, `flash`, or `aspect` means 0, `OFF`, or `R4_3`. `by` is `SUBJECT` when the change answers the subject's request. `focused` is true only on the state that answers `camera.focus.set` ([#273]); an older photographer sends none. The subject keeps the last message as `SessionManager.peerCamera` and fits its video area to `aspect` (AD-10). It logs `zoom.echo`, with the exposure and flash, for each final one with `by: SUBJECT` (NFR-7).
 
 </details>
 
@@ -1837,13 +1941,86 @@ When `hasFlash` is false, the photographer answers with the unchanged state.
 </details>
 
 <details>
-<summary><code>camera.focus.set</code> · reliable · S→P · Could</summary>
+<summary><code>camera.focus.set</code> · reliable · S→P</summary>
 
 ```json
 { "v": 3, "t": "camera.focus.set", "seq": 1, "ts": 1759212355000, "b": { "x": 0.62, "y": 0.4 } }
 ```
 
-Planned (FR-7.7, Could): a tap on the live video, in frame coordinates; the photographer calls `setFocusPoint`, with no echo. The type is in `SessionMessage`, but no phone sends or handles it yet.
+The subject's tap on the live video (FR-7.7): `x` and `y` are fractions of the photographer's frame, 0 to 1, as the photographer's preview shows it. The subject's video of the rear camera is a mirror, so the subject sends 1 − x of what it sees; the front camera's video is mirrored on both phones. The photographer calls `setFocusPoint` and sets its brightness back to 0 EV (2.6.5). The point has no echo, since focus has no lasting state. The answer is the `camera.state` with that brightness, `by: SUBJECT` and `focused: true`. A point outside 0 to 1 is dropped. So is a tap while the camera is not ready. Subject view therefore sends no tap while its video reshapes for a new ratio, until a frame of the new shape shows.
+
+</details>
+
+<details>
+<summary><code>camera.focus</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "camera.focus", "seq": 7, "ts": 1759212355000, "b": { "x": 0.38, "y": 0.4 } }
+```
+
+Where the photographer's own tap on Camera focused (FR-7.7, [#273]), in the same coordinates as `camera.focus.set`. The subject shows the focus box there, at 1 − x on the rear camera's mirror. It is sent only for a point the camera took, and never for the subject's own tap, whose box the subject shows itself. Nothing is kept: a subject that connects later gets none. An older subject ignores the type, as any unknown one.
+
+</details>
+
+<details>
+<summary><code>camera.did</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "camera.did", "seq": 8, "ts": 1759212355000, "b": { "action": "zoom", "zoom": 2.0 } }
+```
+
+What the photographer did on their own camera (FR-7.4, [#292]), once, when the action ends. `action` is `zoom` with `zoom`, `brightness` with `exposure`, `flash` with `flash`, `timer` with `seconds`, `guide.move`, `guide`, `guide.hide`, `guide.show`, `guide.opacity` with `opacity`, `guide.remove`, or `guide.restore`; a value that does not belong to the action is left at its default. The subject says it in a line and changes nothing: the camera's values still come as `camera.state`, and the guide as `guide.state`. `action` is a string, so a subject that does not know one drops that line alone. The photographer's own focus has `camera.focus`, since the subject draws its box too. Nothing is kept: a subject that connects later gets none.
+
+</details>
+
+<details>
+<summary><code>camera.timer</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "camera.timer", "seq": 10, "ts": 1759212355000, "b": { "left": 3 } }
+```
+
+The photographer's self-timer (FR-1.17, [#272]). `left` is the seconds before the photo: one message a second, from the timer's seconds down to 1, then 0 as the countdown ends, with its photo or cancelled. The subject shows the number, and takes it down at 0, at a drop, or 2 s after the last second. Nothing is kept: a subject that connects during a countdown sees it from its next second. An older subject ignores the type, as any unknown one.
+
+</details>
+
+<details>
+<summary><code>camera.timer.set</code> · reliable · S→P</summary>
+
+```json
+{ "v": 3, "t": "camera.timer.set", "seq": 13, "ts": 1759212355000, "b": { "seconds": 3 } }
+{ "v": 3, "t": "camera.state", "seq": 21, "ts": 1759212355100, "b": { "zoom": 1.0, "by": "SUBJECT", "final": true, "timer": 3 } }
+{ "v": 3, "t": "camera.did", "seq": 22, "ts": 1759212356000, "b": { "action": "timer", "seconds": 10 } }
+```
+
+The timer as *Subject view*'s menu chose it ([#318]): `seconds` is 0, 3, or 10. It sets the photographer's one timer, and the answer is the `camera.state` that carries it, as the subject's. Every `camera.state` carries `timer`, so a subject that connects or reconnects shows it, and a missing one is off. A request while the timer counts down, or for seconds the photographer's Pix does not offer, is answered with the unchanged state, which puts the subject's item back. The photographer's own change goes as `camera.state` and, for the subject's line, as a `camera.did` with `action` `timer` and its `seconds`. A photographer's phone that does not know the type ignores it, so the subject's phone puts the item back after 2 s without an answer (`SubjectViewModel.TIMER_WAIT_MS`).
+
+</details>
+
+<details>
+<summary><code>camera.shutter</code> · realtime · S→P, and <code>camera.shutter.answer</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "camera.shutter", "seq": 9, "ts": 1759212355000, "b": { "press": 7 } }
+{ "v": 3, "t": "camera.shutter.answer", "seq": 4, "ts": 1759212355100, "b": { "taken": true, "press": 7 } }
+{ "v": 3, "t": "camera.shutter", "seq": 11, "ts": 1759212357000, "b": { "press": 9, "cancel": true } }
+{ "v": 3, "t": "camera.shutter.answer", "seq": 6, "ts": 1759212357100, "b": { "taken": false, "press": 9, "timer": true } }
+```
+
+The subject's press of *Subject view*'s shutter, and what became of it (FR-7.8, [#314]). The photographer's phone takes the photo at once, as at its own shutter, and answers every press. `taken` is true when its camera was asked for the photo; the answer does not wait for the picture, which can take longer than the subject's 2 s, so a photo that fails after it is told by `photo.dropped`, and the subject's phone says "Couldn't save Dongje's photo". With the photographer's timer on (FR-1.17), the press starts the countdown instead and is answered with `timer`; the countdown's end takes the photo. `cancel` marks a press made while the subject's phone showed the countdown: it stops the countdown, and never takes a photo or starts a countdown, should it arrive after the countdown ended. A press for a photo that meets a running countdown leaves it be. Both are answered with `timer`, and the subject's phone says nothing for them. With neither `taken` nor `timer`, the press was refused: the Camera screen is not in front, it frames a pose's scene photo, or its camera still takes the photo before. Nothing is kept for later. A press is a moment that is wrong late, so it goes on the realtime channel, at once or not at all: on the reliable one it could wait behind a full buffer or a drop and take a photo after the subject was told that none was taken. A lost press frees the subject's shutter after 2 s, and the subject presses again. `press` numbers the subject's presses, and the answer names its press: an answer that comes after its press was given up is not the next press's. With the realtime channel lost, the other realtime messages go on the reliable one (2.6.7), but the press is not sent (`ChannelRouter.neverLate`): that channel queues and retransmits, so a press on it could arrive long after a drop. The subject's phone then says the refusal after 2 s, until the session ends. A phone that does not know the types ignores them, so `protocol` stays 3.
+
+</details>
+
+<details>
+<summary><code>pose.start</code> · realtime · S→P, and <code>pose.start.answer</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "pose.start", "seq": 12, "ts": 1759212355000, "b": { "situation": "full_body", "request": 3 } }
+{ "v": 3, "t": "pose.start.answer", "seq": 6, "ts": 1759212355100, "b": { "started": false, "request": 3, "asking": true } }
+{ "v": 3, "t": "pose.start.answer", "seq": 7, "ts": 1759212361000, "b": { "started": true, "request": 3, "asking": false } }
+```
+
+The situation the subject picked for AI poses, and whether the photographer's Camera began the scene photo for it (FR-6.15, [#276]). `situation` is the situation's name on the server, kept a string: a phone that does not know one refuses that request alone. `started` is false when the photographer's phone could not begin: its Camera is not in front or is already in a step, its timer counts down, it has no front camera for a selfie, or its user answered the AI notice with *Not now*. With that notice up, an answer with `asking` goes at once, and the last answer when the notice is answered. `request` numbers the subject's requests, and each answer names its request, so a late answer is not taken for a later request's. The subject's phone waits 2 s for any answer and then counts the request as refused; `asking` ends that limit. Like the shutter's press, the request goes on the realtime channel, at once or not at all, and is not sent on the reliable one when the realtime channel is lost: kept behind a full buffer or a drop, it would open the notice or the scene photo's step after the subject was told that nothing started. An answer can be late too. One that comes for the request the limit gave up is still heard: `asking` brings the request back, with "Waiting for Dongje to agree", and `started` is said; a late refusal was said at the limit. One request waits at a time. The answer goes while the session is the same, by its id: a drop while the photographer reads the notice restarts `RemoteControlHandler`, and the answer after it is still the request's. Nothing is kept for later.
 
 </details>
 
@@ -1868,12 +2045,12 @@ Planned (FR-7.5, Could): sent after `hello` and at each change of the photograph
 
 | `step` | When | Fields |
 |----|----|----|
-| `GENERATING` | *Generate poses*' button started a set | `sceneTurn`: how the photographer held the scene photo, 90, 180, or 270; left out when upright ([#206]) |
+| `GENERATING` | *Generate poses*' button started a set | `sceneTurn`: how the photographer held the scene photo, 90, 180, or 270; left out when upright ([#206]). `situation`: the set's situation, by its name on the server, for the subject's ♥ ([#270]) |
 | `PICKING` | The photographer's *Pick a pose* opened | `poseIds`: the candidates whose copy went out, in its order |
 | `CHOSEN` | A *Select* decided | `poseId`, `by` |
 | `CLOSED` | No choice: Back, *Regenerate*, or no candidate | `failure` with no candidate: why, a `GenerationError` by name ([#203]) |
 
-Each set, *Try again* and *Regenerate* included, has a new `setId`. `failure` is a string, not an enum, so a subject that does not know a newer name keeps the message and reads it as `SERVER`. An older photographer sends none, and an older subject ignores it. The subject reads a `sceneTurn` that is not a quarter turn, or none, as upright; an older subject ignores it.
+Each set, *Try again* and *Regenerate* included, has a new `setId`. `failure` is a string, not an enum, so a subject that does not know a newer name keeps the message and reads it as `SERVER`. An older photographer sends none, and an older subject ignores it. The subject reads a `sceneTurn` that is not a quarter turn, or none, as upright; an older subject ignores it. It reads an unknown `situation`, or none, as none.
 
 </details>
 
@@ -1971,10 +2148,21 @@ Sent once per description, after its first `pose.description`.
 <summary><code>photo.shutter</code> · realtime · P→S</summary>
 
 ```json
-{ "v": 3, "t": "photo.shutter", "seq": 1, "ts": 1759212499870, "b": {} }
+{ "v": 3, "t": "photo.shutter", "seq": 1, "ts": 1759212499870, "b": { "shot": "8d41c2e0-5b7a-4f3e-9c26-1a0f7e5d3b84" } }
 ```
 
-Sent at each shutter press while connected, not while reconnecting, so the subject's video blinks at that moment (2.6.4, Iter3-A12). `photo.begin` comes only seconds later, once the photo is saved. A lost `photo.shutter` shows no blink.
+Sent at each shutter press while connected, not while reconnecting, so the subject's video blinks at that moment (2.6.4, Iter3-A12). `photo.begin` comes only seconds later, once the photo is saved. A lost `photo.shutter` shows no blink. `shot` names the photo of this press, and its `photo.begin` or `photo.dropped` carries the same, so the subject waits for each photo by name ([#271]). A phone before #271 sends no `shot`.
+
+</details>
+
+<details>
+<summary><code>photo.dropped</code> · reliable · P→S</summary>
+
+```json
+{ "v": 3, "t": "photo.dropped", "seq": 1, "ts": 1759212500410, "b": { "shot": "8d41c2e0-5b7a-4f3e-9c26-1a0f7e5d3b84" } }
+```
+
+Sent in a live session for a shuttered photo given up before its `photo.begin`: its save failed, or it could not be read or is over 40 MiB ([#271]). The subject stops waiting for that `shot` only, so a drop whose `photo.shutter` was lost ends no other photo's wait (2.6.5). A phone that does not know the type ignores it and waits until its 30 s end, so `protocol` stays 3.
 
 </details>
 
@@ -1983,10 +2171,11 @@ Sent at each shutter press while connected, not while reconnecting, so the subje
 
 ```json
 { "v": 3, "t": "photo.begin", "seq": 1, "ts": 1759212500000,
-  "b": { "photoId": "3c7e1a52-9f0b-4d68-a1c4-6e2d8b7f0a19", "format": "jpeg", "bytes": 4718592, "chunks": 512, "takenAt": 1759212499870 } }
+  "b": { "photoId": "3c7e1a52-9f0b-4d68-a1c4-6e2d8b7f0a19", "format": "jpeg", "bytes": 4718592, "chunks": 512, "takenAt": 1759212499870,
+         "shot": "8d41c2e0-5b7a-4f3e-9c26-1a0f7e5d3b84" } }
 ```
 
-One photo at a time, in the order taken (2.6.5, *Photos on both phones*). `bytes` is the size of the JPEG as saved, so the subject keeps every pixel and the EXIF rotation. `takenAt` is when the photo was taken.
+One photo at a time, in the order taken (2.6.5, *Photos on both phones*). `bytes` is the size of the JPEG as saved, so the subject keeps every pixel and the EXIF rotation. `takenAt` is when the photo was taken. `shot` is its `photo.shutter`'s ([#271]); a phone before #271 sends none.
 
 </details>
 
@@ -2106,7 +2295,7 @@ Every 2 s from both phones, once connected; `pong` echoes the `ping`'s `ts`. The
 
 #### 2.5.2 Signaling protocol (phone ↔ server, WebSocket)
 
-- **Transport.** JSON text frames, each with a `type` field, over `wss://<host>/ws` on the AWS servers and `ws://<host>/ws` on the course servers, which have no TLS (AD-11). The app takes the scheme from the server URL: `https` gives `wss`. A socket holds at most one place.
+- **Transport.** JSON text frames, each with a `type` field, over `wss://<host>/ws`, or `ws://<host>/ws` on a laptop, which has no TLS (AD-11). The app takes the scheme from the server URL: `https` gives `wss`. A socket holds at most one place.
 - **Sign-in.** A signed-in phone sends its access token in the `Authorization: Bearer` header of the upgrade. The server checks it once, when the socket opens, without the database. A missing, unknown, or expired token leaves the socket anonymous: room codes still work, and the user does not show as online.
 - **Presence (FR-5.9).** While someone is signed in and Pix is in front, `PresenceConnection` holds one socket that sends no messages and joins no session. It opens again 1 s after a close, doubling up to 30 s while it fails, and closes in the background or at sign-out. A session's socket carries the token too. So a friend in a session, a waiting room or an invitation's included, shows *In a session* and is `BUSY` for an invitation (FR-6.9).
 - **Keep-alive.** The app pings every 15 s, so the course's proxy does not close the socket as idle. Uvicorn pings every 20 s and waits 20 s for the answer.
@@ -2263,7 +2452,7 @@ The sender gets no answer. The photographer's `leave` ends the session. The subj
 
 #### 2.5.3 REST API (phone ↔ server)
 
-Base URL `https://<host>/api/v1` on the AWS servers, and `http://<host>/api/v1`, plain HTTP, on the course servers (AD-11). Requests and answers are JSON, except the multipart pose requests.
+Base URL `https://<host>/api/v1`, or `http://<host>/api/v1`, plain HTTP, on a laptop (AD-11). Requests and answers are JSON, except the multipart pose requests.
 
 - **Errors.** One shape: `{"error": {"code": "UNKNOWN_TEMPLATE", "message": "..."}}`. A missing or malformed field is `400 INVALID_REQUEST`; `422` is only `REJECTED`, `DECLINED`, or `NO_PERSON`, and `429` is `RATE_LIMITED` or `DAILY_LIMITED`. Framework answers: a plain `413` for a request over 1 MiB, before reading it; `404 {"detail": "Not Found"}`; `405 {"detail": "Method Not Allowed"}`; a plain `500` for an unexpected failure.
 - **Access.** *auth* needs `Authorization: Bearer <access token>` (*Session tokens* below), otherwise `401 UNAUTHENTICATED`. *Pix ID* also needs a chosen Pix ID, otherwise `403 PIX_ID_REQUIRED`. "—" works without an account (FR-5.1).
@@ -2579,7 +2768,7 @@ Exact match only, with no partial search or listing (FR-5.5, NFR-15). Capitals a
 
 #### 2.6.1 Reference guide: segmentation and outline
 
-1.  **Load.** Decode the picked image with its EXIF rotation and downscale it to a long side of at most 1280 px, never up. **Cut a screenshot (It 3, FR-2.10, [#174], [#177]).** For an image taller than 1.9:1, `findScreenshotPhoto` looks for the photo in it by the rules below, in plain Kotlin on the phone (FR-2.6). Without one, the image is used whole, as are a generated pose and *Use the whole image*. Steps 2–5 see the cut alone, so the mask, `anchor`, and `reference` are the photo's. `crop` keeps the screenshot at 1024 px with the photo's place in it, on this phone only.
+1.  **Load.** Decode the picked image with its EXIF rotation and downscale it to a long side of at most 1280 px, never up. **Cut a screenshot (It 3, FR-2.10, [#174], [#177]).** For an image taller than 1.9:1, `findScreenshotPhoto` looks for the photo in it by the rules below, in plain Kotlin on the phone (FR-2.6). Without one, the image is used whole, as are a generated pose and *Use the whole image*. Steps 2–5 see the cut alone, so the mask, `anchor`, and `reference` are the photo's. `crop` keeps the screenshot at 1024 px with the photo's place in it, on this phone only. A photo used whole is kept as `photo` at 1024 px instead, for *Reference confirm* ([#295]). Both are dropped when the guide is used (`withoutPicked`).
 2.  **Segment.** ML Kit's subject segmenter runs with only the foreground confidence mask. Its model comes from Google Play services; the first use waits for it at most 60 s. A model not ready by then, or an unreadable photo, shows "Couldn't use this photo. Try another one." and returns to the camera.
 3.  **Check for a person.** Fewer than 2 % of pixels with confidence ≥ 0.5 fails with `NoPersonFound` (FR-2.4). All detected subjects are kept (FR-2.5).
 4.  **Smooth the mask (It 2, FR-2.9).** Three box blurs, close to a Gaussian, make the 0.5 level a smooth curve. Their radius is 0.8 % of the largest region's height (9 px for a person 1100 px tall). Separate regions under 1 % of the foreground are dropped, such as a small figure far behind. Holes under 0.2 % are filled; background that touches the photo's edge is never a hole. People of similar size are all kept (FR-2.5). The mask is cropped to its box plus 2 % of the box's longer side, and the box's place in the photo becomes `anchor` (FR-3.1).
@@ -2601,7 +2790,7 @@ Exact match only, with no partial search or listing (FR-5.5, NFR-15). Capitals a
 
 All steps run on `Dispatchers.Default`, within 2 s from selection to *Reference confirm* (NFR-3). `Timings` marks `seg.start`/`seg.end` around the whole, `smooth.start`/`smooth.end` around the smoothing, and `cut.start`/`cut.end` around the cut. On the emulator the whole took 0.25–0.35 s per photo once the model was loaded.
 
-**Reference confirm's cut (It 3, FR-2.10).** For a guide with a `crop`, `ScreenshotCutView` plays the cut once in 2 s, when the person is found while the screen watches. The rest of the screenshot dims around an accent-colored frame, the photo fills the card, and then it goes to the bottom-right corner at 72 dp as the outline fades in. A `ValueAnimator` drives it (`ScreenshotCut`), so *Remove animations* shows the end. Without a cut, the outline fades in over 200 ms, also on the subject's phone (Iter3-A13). *Use the whole image* (`onUseWholeImage`) makes the guide again from the whole image. Screen texts: R&S 6.2.
+**A photo turning into its guide (It 3, It 5, FR-2.3, FR-2.10, [#295]).** For a guide with a `crop` or a `photo`, `PhotoToGuideView` plays once, when the person is found while the screen watches. A photo fills the card and holds for 300 ms. A screenshot's cut comes first, in 1 s: the rest of the screenshot dims around an accent-colored frame, and the photo comes to fill the card. Then the outline is drawn along the person on the photo in 500 ms, while the photo dims to half. In the last 500 ms, the photo goes to the bottom-right corner at 72 dp and the outline to its place, where the outline's view takes over. The photo moves as the scene photo does (`SceneArrival`). A photo takes 1.3 s in all, a screenshot 2 s. The line is the outline view's own drawing, in the settings' look (FR-3.10), kept only along the part of its lines drawn so far. `GuideOutlines.lines` traces those lines from the mask off the main thread (`OutlineExtractor.lines`, the lines `extract` draws); until they arrive, the outline fades in instead. *Use* works throughout, so nothing waits for it (NFR-3). A `ValueAnimator` drives it (`PhotoToGuide`), so *Remove animations* shows the end at once. A generated pose has no picked image: its outline fades in over 200 ms, also on the subject's phone (Iter3-A13). *Use the whole image* (`onUseWholeImage`) makes the guide again from the whole image, which then plays as a photo. Screen texts: R&S 6.2.
 
 **Out of scope: arms and legs in front of the body.** Folded arms or crossed legs disappear inside the silhouette, and the outline does not draw them.
 
@@ -2621,24 +2810,28 @@ guide size on screen:   hPx = height · H · s,   wPx = hPx · aspect
 **How the phone is held (It 4, [#206]).** Every use case keeps `ROTATION_0`, so the frame, the stream, and the guide stay in the portrait coordinates above, whichever way the phone is held. `PhoneTurns` (`SensorPhoneTurns`) reads gravity while a camera screen is resumed and gives the turn in quarters, clockwise as the user sees it: 0, 90 (left side up), 180, or 270. `PhoneTurnTracker` takes a new quarter only within 35° of it, so between 35° and 55° from upright nothing changes, and a phone lying flat keeps its turn. The controls that turn ([#207]) read the same source.
 
 - **Photos.** Before each `takePhoto`, `setPhotoTurn` sets `ImageCapture.targetRotation` from the turn at the press (`targetRotationFor`). The photo's EXIF orientation is then as held, and the viewport's crop and the front camera's EXIF flip stay. The subject's phone saves the same file, so it opens there the same way (FR-6.14).
-- **The scene photo.** The frame is turned upright as held when it is taken (2.6.3), and the review shows it as framed.
+- **The scene photo.** The frame is turned upright as held when it is taken (2.6.3), and Camera holds it as framed while it is checked.
 - **A pose's guide.** Segmentation cuts the guide from the candidate as it is (2.6.1), and *Reference confirm* shows it there. *Use this guide* turns it back by the scene photo's turn into the frame (`intoFrameHeldAt`): its mask, outline, thumbnail, and `anchor`. It then starts where the person stood in the framed photo, and lies on the preview held the same way, on both phones (NFR-8). A picked photo and a saved guide go on as they are, so a pose's ♥ saves its guide already turned back (2.6.3, *Saving a pose*).
-- **The controls (FR-1.15, [#207]).** `TurningIcons` turns the controls the other way by the same quarter, so they stand upright to the user. They turn together, each around its own center, the shortest way, in 250 ms (`Motion.TURN_MS`); a half turn goes clockwise. A new turn during a turn goes on from where they are. The turn as a screen opens, and every turn with Android's animations off, is at once. A `TurningButton` turns its icon through a `RotateDrawable`, so its background and its tap area stay, and a new icon keeps the turn; with `turnsLabel` its label turns too. A `TurningLabel` is a text that turns, such as the zoom readout, in its pill. Both turn a label as one word in its own place and width (`TurnedLabelSpan`), so the view keeps its size. An icon or a thumbnail in a square, and a bottom-row button with its label under its icon, turn whole. On Camera these are the top bar's icons, the ratio, *Shoot together*'s icon, the zoom readout, the guide's icon buttons, the tip's and the guide-edit toggle's icons, *Guide*, the camera switch's icon, and the gallery thumbnail. On Subject view they are the top bar's icons, the zoom readout, the brightness, tip, *Save guide*, and guide-edit icons, *Guide*, *Pick a pose*, and the photo thumbnail; they follow the subject's own phone, and nothing is sent. The other texts stay, such as *Shoot together*'s label, as do the shutter, the preview and everything over it, the reference thumbnail, the panels, and the layout. The brightness bar's sun looks the same at every quarter, so it is not turned. The photo viewer over either screen turns whole, as a landscape screen while sideways (2.6.5).
+- **The controls (FR-1.15, [#207]).** `TurningIcons` turns the controls the other way by the same quarter, so they stand upright to the user. They turn together, each around its own center, the shortest way, in 250 ms (`Motion.TURN_MS`); a half turn goes clockwise. A new turn during a turn goes on from where they are. The turn as a screen opens, and every turn with Android's animations off, is at once. A `TurningButton` turns its icon through a `RotateDrawable`, so its background and its tap area stay, and a new icon keeps the turn; with `turnsLabel` its label turns too. A `TurningLabel` is a text that turns, such as the zoom readout, in its pill. Both turn a label as one word in its own place and width (`TurnedLabelSpan`), so the view keeps its size. An icon or a thumbnail in a square, and a bottom-row button with its label under its icon, turn whole. On Camera these are the top bar's icons (the camera menu's, the flash and the timer beside it, and the camera switch's), the ratio, *Shoot together*'s icon, the zoom readout, the countdown, the guide's icon buttons, the tip's and the guide-edit toggle's icons, the camera menu's items and *Guide* with their labels, and the gallery thumbnail. On Subject view they are the top bar's icon, the zoom readout, the countdown, the tip, *Save guide*, and guide-edit icons, the camera menu's items, *Guide*, and *Pick a pose* with their labels, and the photo thumbnail; they follow the subject's own phone, and nothing is sent. The other texts stay, such as *Shoot together*'s label, as do the shutter, the preview and everything over it, the reference thumbnail, the panels, and the layout. The brightness bar's sun looks the same at every quarter, so it is not turned. The photo viewer over either screen turns whole, as a landscape screen while sideways (2.6.5).
 
-**Photographer composition aids (FR-1.9, FR-1.10).** `CameraCompositionView` draws in the same rectangle. The rule-of-thirds grid is 0.5 dp with a 1 dp dark outline. The horizon bar is 1.5 dp with a 2.5 dp outline, and its middle counter-rotates with the roll. `CameraLevelMonitor` smooths the gravity sensor, or the accelerometer. Beyond 45° of roll the phone counts as on its side (`CameraLevel.baseDegrees`, 0 or 90), and the bar runs along the frame's long side (`cameraLevelFromGravity`; Iter3-A15, [#182]). Level enters within ±2°, exits beyond ±3°, and turns the bar dark yellow (`#D4AC24`). The bar hides past 20° (`MAX_LEVEL_TILT_DEGREES`), on invalid readings, and with the phone face up or down. The aids never enter photos, analysis frames, or the stream.
+**Photographer composition aids (FR-1.9, FR-1.10).** `CameraCompositionView` draws in the same rectangle. The rule-of-thirds grid is 0.5 dp with a 1 dp dark outline. The horizon bar is 1.5 dp with a 2.5 dp outline, and its middle counter-rotates with the roll. `CameraLevelMonitor` smooths the gravity sensor, or the accelerometer. Beyond 45° of roll the phone counts as on its side (`CameraLevel.baseDegrees`, 0 or 90), and the bar runs along the frame's long side (`cameraLevelFromGravity`; Iter3-A15, [#182]). Level enters within ±2°, exits beyond ±3°, and turns the bar dark yellow (`#D4AC24`). The bar hides past 20° (`MAX_LEVEL_TILT_DEGREES`), on invalid readings, and with the phone face up or down. The aids never enter photos, analysis frames, or the stream. Settings turns the grid and the bar off apart (`showGrid`, `showLevel`; 2.6.8).
 
-**Camera zoom and the guide-edit mode (AD-17).** With guide-edit mode off, a pinch on the preview zooms; with it on, every drag and pinch edits the guide. The mode turns on when a guide is added and off at the shutter or when the guide is removed or hidden. On Subject view it starts off and chooses between `camera.zoom.set` and `guide.move` (2.6.5). The zoom row holds the readout, the pose tip's button (Camera only), and the mode's toggle. A tap on the readout steps through `quickZoomSteps` (FR-1.3): the camera's minimum when below 1×, then 1× and 2× where available. `nextZoomStep` takes the first step above the zoom (2 % tolerance), else the first; a tap before the last step is applied goes on from that step. On Subject view a late echo of an earlier step is ignored. The readout's tap area is at least 48 dp wide around a 28 dp pill, with Zoom in / Zoom out accessibility actions. The top bar's ratio button opens 3:4, 9:16, and 1:1 in a row (Iter3-A12, FR-1.13). Brightness is a bar beside the focus box (`ExposureBarView`; 2.8, *Camera labels and brightness*; [#182]). A lens switch keeps the pinch's target through `STARTING`.
+**Camera zoom and the guide-edit mode (AD-17).** With guide-edit mode off, a pinch on the preview zooms; with it on, every drag and pinch edits the guide. A new guide starts with the mode off: people zoom and focus more often than they move the guide, so those gestures work at once ([#304]). The toggle turns it on, and the shutter, another guide, hiding, or removing turns it off. On Subject view it starts off too and chooses between `camera.zoom.set` and `guide.move` (2.6.5). The zoom row holds the readout, the pose tip's button (Camera only), and the mode's toggle. The toggle is one person icon, lit in the guide color while the mode is on. Then `GuideOverlayView.filled` tints the inside of the guide in the guide color at 25 % (`camera_guide_fill`), whatever the line's color. The tint is the mask's inside at the outline's level (`guideInside`), made once per guide off the main thread (`GuideOutlines.inside`), never while drawing, and drawn under the outline ([#271]). A tap on the readout steps through `quickZoomSteps` (FR-1.3): the camera's minimum when below 1×, then 1× and 2× where available. `nextZoomStep` takes the first step above the zoom (2 % tolerance), else the first; a tap before the last step is applied goes on from that step. On Subject view a late echo of an earlier step is ignored. The readout's tap area is at least 48 dp wide around a 28 dp pill, with Zoom in / Zoom out accessibility actions. The top bar's ratio button opens 3:4, 9:16, and 1:1 in a row (Iter3-A12, FR-1.13). Brightness is a bar beside the focus box (`ExposureBarView`; 2.8, *Camera labels and brightness*; [#182]). A lens switch keeps the pinch's target through `STARTING`.
 
-**Screen layout (It 3, Iter3-A2).** `previewArea` puts the image at full width below the top bar: 1:1 inside the 4:3 area with the outside dimmed, not clipped, and 16:9 down under the controls. The controls keep one size and place for every ratio, and the panels above them sit below a 4:3 or 1:1 image and over a 16:9 one. `placeZoomRow` draws the zoom row 8 dp above the image's bottom or the first panel, whichever is higher. Every control takes taps on at least 48 × 48 dp (NFR-16): the top bar's buttons reach 4 dp over the image (`TOP_BAR_OVERHANG_DP`), and everything in the bar centers on the 48 dp above that part, the scene photo's title included (`@dimen/top_bar_overhang`, [#204]); the zoom row sits 6 dp above it (`ZOOM_ROW_MARGIN_DP`). While a session streams, `LiveDotView` blinks a red dot at the frame's top right on both phones (FR-6.6, FR-6.8). Subject view follows the same layout (2.6.5). The screens: R&S 6.2.
+**The camera menu (It 5, FR-1.17, [#272]).** The flash, the timer, the grid, the horizon bar, and Settings share one menu. Its button sits at the top left of the top bar, and it opens a row under the bar on the ratios' glass (`cameraMenu`, `CameraUiState.menuOpen`). The menu and the ratios are never open together. Each comes down 8 dp as it fades in over 150 ms (`reveal` in `ui/Motion.kt`), and goes at once, so the other one or the image is there with the tap. The top bar's buttons draw one pill under a touch, 50 × 32 dp on the bar's line: the menu's button and the ratio also while their panel is open (`camera_top_bar_button_background`). The pill comes from the styles (`Widget.Pix.Button.Icon.TopBar`, `.Text.TopBar`, the `top_bar_pill_inset_*` dimens), never from a view's own insets. The icon buttons' empty line of text is sized in dp, and the ratio's label follows the font only to 130 % (`capPillText`), so neither makes the pill or the bar taller at a large font. Each item is an icon over a one-word label, in a thinner line than the bar's icons, and in the accent while what it sets is on (`isActivated`, `camera_menu_option`). *Flash* and *Timer* go to their next choice at each tap, and a change says so in a short notice (`MenuNotice`): "Flash auto", "Timer 3 s". *Grid* and *Horizon* turn the grid and the horizon bar off and on, and the choice is kept (2.6.8). Each tap turns over what is stored in one DataStore edit (`AppSettings.toggleShowGrid`, `toggleShowLevel`): setting the opposite of the flow's value would let two quick taps both read the value before the first save, and change it once. A choice keeps the menu open; a touch anywhere else, Back, or *Settings* closes it. While the flash is on or auto, and while the timer is on, its icon stands beside the menu's button, at the bar's icons' size and line, on their center line. The icons are 16 dp, so they take no tap of their own: the button's area reaches over them (`reachOverIndicators`, a `TouchDelegate` on their row), and a tap on one is a tap on the button ([#318]). The camera switch sits beside *Shoot together* or *End session*. The scene photo hides the menu, the icons beside it, and the camera switch; its light has its own button (2.6.3). Subject view has the same menu with the photographer's flash, this phone's grid, and Settings (2.6.5).
 
-**Changes on screen (It 3, Iter3-A12, [#179]).** Camera changes animate in 300 ms or less (`ui/Motion.kt`: move 250 ms, turn 300 ms, fade 200 ms, dim 150 ms). With Android's animations off, each shows its end at once.
+**The self-timer (It 5, FR-1.17, [#272]).** The timer is off, 3 s, or 10 s (`ShutterTimer`), kept while Pix runs. The choice is `ShutterTimerChoice`, which `RemoteControlHandler` owns and `CameraViewModel` shares, as it shares the zoom's hold: in a session the subject's menu sets it too, also while the photographer is on another screen ([#318]). With it on, the shutter starts a countdown in `CameraViewModel` instead of a photo. The seconds go down one a second (`COUNTDOWN_STEP_MS`) and show large over the preview (`countdownPanel`); that the shutter cancels is its look, its name meanwhile, and the tutorial's tip, not a line under the number ([#314]). The shutter is then a stop square in the timer's ring (`CountdownShutterDrawable`), the scene photo's accent shutter too (`turnShutter`). The ring fills clockwise in the accent from each second's place (`countdownFill`) to full at the photo, over the seconds left (`CountdownRing`). It reads the clock as it draws, not an animator, so its pace is the clock's at any animation speed; with animations off it stands at each second's place. At 0 the photo is taken as at the shutter, with its blink (`timedShots`). A second tap cancels it, and so does the screen stopping, for another screen or the background (`CameraFragment.onStop`, `cancelCountdown`). A camera that is not ready at 0 takes no photo and shows the failed photo's message. While it counts, *Guide*, the thumbnail, the menu, the ratio, the camera switch, and *Shoot together* or *End session* wait, dimmed to 35 %; zoom and focus still work. Ended during the count, a session would be gone before its photo. The number is 120 dp, not sp, so a large font cannot push it out of its square, and it turns with the phone (FR-1.15). In a session each second, and 0 at the end, goes to the subject as `camera.timer` (2.5.1, 2.6.5).
+
+**Screen layout (It 3, Iter3-A2).** `previewArea` puts the image at full width below the top bar: 1:1 inside the 4:3 area with the outside dimmed, not clipped, and 16:9 down under the controls. The controls keep one size and place for every ratio, and the panels above them sit below a 4:3 or 1:1 image and over a 16:9 one. `placeZoomRow` draws the zoom row 8 dp above the image's bottom or the first panel, whichever is higher. Every control takes taps on at least 48 × 48 dp (NFR-16): the top bar's buttons reach 4 dp over the image (`TOP_BAR_OVERHANG_DP`), and everything in the bar centers on the 48 dp above that part, the scene photo's title included (`@dimen/top_bar_overhang`, [#204]); the zoom row sits 6 dp above it (`ZOOM_ROW_MARGIN_DP`). While a session streams, `LiveDotView` blinks a red dot at the frame's top right on both phones (FR-6.6, FR-6.8). Subject view follows the same layout (2.6.5). At large fonts ([#298]), Camera's bottom row stays 88 dp around the shutter and grows below it for a *Guide* label taller than 16 dp, as Subject view's does, so *Guide*'s icon stays on one line on both; the scene photo's title and Subject view's camera name shrink to 11 and 12 dp, not sp, so each keeps its line at 200 %. The top bar's pill, *Shoot together* or *End session*, and the ratio follow the font only to 130 % (`capPillText`), so the pill fits beside the camera menu's icons, the ratio, and the camera switch, and the ratio's pill stays as tall as the icons', and the camera menu's labels shrink to 8 dp where they would not fit ([#272]). The screens: R&S 6.2.
+
+**Changes on screen (It 3, Iter3-A12, [#179]).** Camera changes animate in 300 ms or less (`ui/Motion.kt`: move 250 ms, turn 300 ms, fade 200 ms, dim 150 ms, a panel under the top bar 150 ms). With Android's animations off, each shows its end at once.
 
 - *New ratio.* The held frame dims to half (`previewScrim`) and blurs 16 dp in 150 ms (`RenderEffect`, Android 12 and later). In 250 ms the image's place, the zoom row, the live dot, and the held frame move to the new ratio's (`FramePlace`, `sceneMove`). The frame scales with the camera image's width around it, `max(width, height × 3/4)`, so the scene lands where the new preview shows it: 4:3 to 16:9 is a third larger, and 16:9 to 1:1 three quarters as large. On the Galaxy S22 the first also moves it 80 dp lower. The grid and guide stay hidden until the new binding streams; then the frame fades out in 200 ms and they fade in (FR-3.7).
 - *Other camera (FR-1.14).* The same hold, with the grid and guide kept. The frame turns over top over bottom in 300 ms (`rotationX`), then fades into the new preview.
 - *Lens change of the zoom.* The held frame goes at once (2.6.5).
-- *Shutter (FR-1.5, FR-1.6).* The preview blinks to 60 % dark and back in 120 ms when a photo is taken (`CameraViewModel.onShutter`, 2.2), not for the scene photo. The new thumbnail grows in from 60 % in 200 ms. The shutter is disabled only until the camera has taken the picture (`CameraUiState.shutterBusy`), so the next photo can follow while this one is saved. Nothing says that a photo is being saved. *Guide*, *Shoot together*, the camera switch, and the ratio wait until every photo is saved (`isSaving`), because leaving Camera or rebinding would lose a photo ([#208]).
+- *Shutter (FR-1.5, FR-1.6).* The preview blinks to 60 % dark and back in 120 ms when a photo is taken (`CameraViewModel.onShutter`, 2.2), not for the scene photo. The new thumbnail grows in from 60 % in 200 ms. The shutter is disabled only until the camera has taken the picture (`CameraUiState.shutterBusy`), so the next photo can follow while this one is saved. Nothing says that a photo is being saved. *Guide*, *Shoot together*, the camera switch, the ratio, and the menu's *Settings* wait until every photo is saved (`isSaving`), because leaving Camera or rebinding would lose a photo ([#208]).
 - *Reference thumbnail (FR-3.9, [#237]).* It follows the finger. At a release, a tap, or a move by TalkBack it settles into its place, size, and opacity in 200 ms (`Motion.THUMBNAIL_MS`, `showReference`). It is laid out once, at the larger of the two sizes, and drawn smaller by its scale, about its middle: growing, at the new size from the start, and shrinking, at the old size until the end. So the photo is never a small one enlarged. Its corner radius and line are divided by that scale at every frame, so they look as at rest (`keepShapeAt`). The same scale flips it for Subject view's mirror, so only `showReference` sets the thumbnail's scale (`mirrored`). A render for the place a glide is already going to leaves the glide running, and so does a press: a second tap turns the glide back from the size it has then, and only a drag stops it, holding the thumbnail by the box it is drawn at then. It shows its end at once when it first appears, with another photo, and with animations off.
-- *Subject view.* The video area moves the same way when `camera.state.aspect` changes. The grid and guide wait for a frame of the new shape (`FrameWatchdog.shape`, within 2 %) or 2 s (2.6.4).
+- *Subject view.* The video area moves the same way when `camera.state.aspect` changes. The grid and guide wait for a frame of the new shape, the area's (`previewAspect`: 1:1 comes as its 4:3), within 2 % (`FrameWatchdog.shape`), or 2 s (2.6.4).
 
 **The guide's own changes (It 3, Iter3-A13, [#180]).** `GuideOverlayView` animates the guide through its paint's alpha and a scale about its middle. A guide with a new id fades in while growing from 95 % in 250 ms (`Motion.GUIDE_MS`), as the old one fades out. *Hide*, *Remove*, and the return after *Show* fade in 150 ms (`Motion.HIDE_MS`). Moves, resizes, and opacity apply at once, and a drag during an animation moves the guide. The guide already there when a view opens shows without animation. Subject view uses the same view.
 
@@ -2650,9 +2843,9 @@ The clamp (`GuideGeometry.clamp`): the guide's normalized width is `height × as
 
 **Hide, show, and replace (FR-3.6, Iter2-P11).** *Hide* sets `visible = false` with a final update, which `guide.state` carries to the subject; *Show* restores the guide in place. While it is hidden, the edit toggle and the opacity slider are disabled. *Hide* and *Show* also label the image for 3 s (2.8). With a guide on the camera, *Add a pose guide* asks to replace it, and a confirmed reference replaces it through `setGuide`.
 
-**Save guide (FR-3.8, Iter2-P18).** The guide's panel holds *Hide*, the opacity slider, *Save guide*, and *Remove*. *Save guide* is a toggle ([#182]): `toggleSaved`, shared with Subject view, saves a guide the library lacks and deletes one it has, by ID. A guide keeps its ID through save and load, so the bookmark stays filled. Each tap shows one notice for 3 s (`GuideSaveNotice`): saved, saved with the oldest of 100 removed (from the save's own `GuideSaved.removedOldest`), removed, or failed. The guide on the camera stays. The store: 2.8, *Guide store*.
+**Save guide (FR-3.8, Iter2-P18).** The guide's panel holds *Hide*, the opacity slider, *Save guide*, and *Remove*. *Save guide* is a toggle ([#182]): `toggleSaved`, shared with Subject view, marks the guide a favorite, keeping it first if the library lacks it, and makes a favorite history again, by ID; nothing is deleted ([#297]). The button is a ♥, filled red while the guide is a favorite (`isFavorite`, `saveGuideTint`), as on *Pick a pose* and in the library. A used photo guide's history entry can be written while *Save guide* saves it; `save` then returns that entry as history, and `toggleSaved` marks it a favorite. A guide keeps its ID through save and load. Each tap shows one notice for 3 s (`GuideSaveNotice`): saved, removed, or failed. The guide on the camera stays. The store: 2.8, *Guide store*.
 
-**The library (FR-3.8, FR-3.11, It 3, [#170]).** *Add a pose guide* has *Choose from the gallery* and *My library* under "Guide from a photo", after the situations ([#243]). Closing the photo picker without a photo leaves the screen that opened it open, the sheet, the library, or *No person found*, with the guide unchanged (FR-2.7). *My library* shows *All N* while guides are saved ([#210]) and opens `LibraryFragment` in the sheet's place, so Back returns to the camera: a grid filtered by kind, newest first, where a tap puts a guide on the camera at its *Starting position* and a long press deletes after asking. Thumbnails load as cells show, through a 24 MB `LruCache`. From Subject view, the library offers the guide to the photographer and leaves when the session ends. The screens: R&S 6.2.
+**The library (FR-3.8, FR-3.11, It 3, [#170]).** *Add a pose guide* has *Choose from the gallery* and *My library* under "Guide from a photo", after the situations ([#243]). Closing the photo picker without a photo leaves the sheet open, with the guide unchanged (FR-2.7). Back on *Reference confirm* and on *No person found* returns to where the reference was chosen (`backToChoosing`, [#294]). The sheet is a dialog destination, which Navigation closes when a screen opens over it, so it cannot wait under these screens: Back opens it again in one move that also closes the screen, with `fromSubject` as it was. After *No person found* the move sets `openGallery`, and the sheet opens its picker at once, only when it first opens and not when it is made anew. A generated pose goes one step back (2.6.3); `ReferenceViewModel.fromPhoto` tells a picked photo from a pose, since in a session the camera is under both. *My library* shows *All N* while guides are saved ([#210]) and opens `LibraryFragment` in the sheet's place, so Back returns to the camera: a grid newest first, where a tap puts a guide on the camera at its *Starting position*. Its tabs are *All* and *Favorites* (`LibraryFilter`, [#297]), and it opens on *All*. Each cell shows its kind's icon; there is no tab per kind. The library adds no guide itself (no *Add photo*): guides come from the poses and the photo guides used. Each cell's ♥ calls `onToggleFavorite`, which `setFavorite` writes; a failed write shows a message. Selection (It 5, [#297]): a long press, or *Select* under ⋮, starts selecting (`ReferenceViewModel.librarySelection`, a set of ids; null while not selecting). A tap then selects or unselects; *Select all* selects every guide listed; *Delete* asks with the count, then deletes them in one `delete(ids)`. Only listed guides stay selected (`libraryPage`), so a tab changed while selecting never deletes what it hides. ✕ or Back ends selecting first. *Select all* under ⋮ starts selecting with every guide the tab lists, as the header's *Select all* does while selecting. ⋮ opens a card in the screens' look (`view_library_more`, a `PopupWindow`), not Android's menu. A tab or a situation shows its own list in place of the last ([#320]), without the grid moving one list's guides into the other's places: where it was left (the grid's saved state per tab and situation, kept under the list the grid shows, which a fast change of tab can leave behind the one asked for: `ListPlaces`), or at its top the first time, fading in. A change of selection rebinds only the cells' marks. Thumbnails load as cells show, through a 24 MB `LruCache`. Situations and memos (Iter5-P6, [#270]): a chip row under the tabs has one chip per situation that a saved guide has, in the order of the sheet's tiles, with its count (`LibraryPage.situations`). A chip filters within the tab; the same chip again clears it. A situation whose last guide is deleted is no longer chosen. Under each cell are the guide's situation and memo, each only when it has one. The pencil at the cell's top right opens a dialog with one field of at most 40 characters (`MAX_MEMO`) and its count; *Save* calls `setMemo`, and a failed write shows a message. A new memo rebinds only the cell's words, so its thumbnail does not blink (`LibraryAdapter`'s payload). Opening *Add a pose guide* again clears the chosen situation. From Subject view, the library offers the guide to the photographer and leaves when the session ends. The screens: R&S 6.2.
 
 **Overlay rendering.** `GuideOverlayView` draws the outline with `opacity` as `Paint.alpha`, in this phone's line color and thickness (2.6.8), clipped to the image, and nothing while `visible == false`. The reference thumbnail (FR-3.9) is a separate view, never in the stream or photos. It starts top left with a 72 dp long side; a tap enlarges it to half the preview's width, or less to fit. A drag drops it into the nearest corner (`ReferenceDragController`), which TalkBack offers as actions. The corner persists, and a new guide starts small. Subject view shows the same thumbnail from `MirrorReference`, with its own corner, which is never sent (It 3, [#132]); it stays while the guide is hidden. A guide from the subject has the subject's reference photo, so Camera shows its thumbnail too ([#234]).
 
@@ -2670,15 +2863,29 @@ The server reaches every model through OpenRouter with one key (`OPENROUTER_API_
 | Description filter | `PIX_FILTER_MODEL`, `typesafe/jev-1.14`, cutoff 0.7 | 2 s | *Description filter*. | `perplexity/pplx-decider-v1.2` |
 | Person check | `PIX_PERSON_MODEL`, `typesafe/jev-1.14`, cutoff 0.5 | 3 s | *Person check*. | — |
 
-1.  **Scene photo, taken by the user and prepared on the phone.** After a situation's tile on *Add a pose guide*, Camera enters a scene-photo state (`GenerationUiState.phase`) for that situation (It 4, [#210], [#243]). The camera is the situation's, the front one for a selfie and the rear one otherwise, and its switch is hidden until the step ends; the hint over the image is the situation's. The shutter copies the latest analysis frame. A flash would not reach that frame, so the flash button switches the phone's light instead, on only while framing (`setTorch`; It 3, Iter3-A5). A shot waits until the light has held for 0.5 s, at most 1.5 s; a lens without a flash does not wait. Its review shows the photo in the middle of the space under the top bar, with *Use* at the top right and Back, which shoots again ([#199]). In a session, *End session* hides until the step ends, so the bar's title fits beside *Use* ([#207]). A frame taken with the phone held sideways is turned upright as held when it is taken (`GenerationUiState.scene`, `sceneTurn`; 2.6.2, [#206]). The person check, the request, and the pose screens get that landscape photo, and the server asks for 4:3 or 16:9 candidates (`ASPECT_RATIOS`). The review shows the frame as it was (`framed`). Without a person, the alert starts the message's first line (`InlineIconSpan`), and two lines break evenly ([#204]). *Use* waits for the phone's *Person check*, and nothing is sent before it. The app sends JPEG at quality 85, long side at most 1024 px, without metadata; the server rejects any other photo and never resizes one (2.5.3).
-2.  **What to pose (It 2, FR-4.8).** *Generate poses* has a description field of up to 100 characters, in Korean or English, the descriptions used before, and one button (It 3, Iter3-A13, [#180]). The button, at the top right ([#199]), reads *Suggest* while the field is blank, spaces included (`PoseRequest.of`), and *Generate* otherwise. The field's ✕ empties it; it hides while the other phone types. The screen: R&S 6.3.
+1.  **Scene photo, taken by the user and prepared on the phone.** After a situation's tile on *Add a pose guide*, Camera enters a scene-photo state (`GenerationUiState.phase`) for that situation (It 4, [#210], [#243]). In a session, the subject's tile begins the same state on the photographer's Camera (2.6.5, [#276]). The camera is the situation's, the front one for a selfie and the rear one otherwise, and its switch is hidden until the step ends; the hint over the image is the situation's. The shutter copies the latest analysis frame; with the timer on, it counts down first, and Back waits (`onSceneShutter`). A flash would not reach that frame, so the camera menu's *Flash* switches the phone's light instead, on only while framing (`setTorch`; It 3, Iter3-A5). A shot waits until the light has held for 0.5 s, at most 1.5 s; a lens without a flash does not wait. The photo then goes on by itself (It 5, Iter5-A5, [#296]): T2 of UAT cycle 2 found the step that asked to use it unneeded (Testing Documentation 4.4). `CHECKING` holds the frame exactly over the preview, as the preview showed it (`sceneStill`), so the image seems to stop, with no button but Back, which shoots again, while the phone looks for a person (*Person check*). With one, the phase is `DESCRIBING` with `sceneArriving`, and Camera opens *Generate poses* from that state, once. First, after the layout that state asks for, Camera records how the step looks (`SceneHandOff`, [#320]): Back's arrow, the title as drawn, the flow's bar, and the held photo's frame, in window pixels. *Generate poses* comes in at once over Camera (`ScreenMotion.HAND_OFF`), drawn as that look, and unfolds from it in 0.5 s, slow to start and slow to settle (`HeaderUnfold`). The photo moves from Camera's frame to its thumbnail, its corners rounding to the thumbnail's (`showArriving`). With it, Back and the title grow from Camera's size and place to the header's, Camera's title fading into this one's; the flow's bar slides down to its place; and the button and everything under the bar fade in. Without a hand-off, the photo starts as wide as the screen under the header, holds for 0.3 s, then moves, as a screenshot's cut moves its photo to its corner (2.6.1). A photo taken with the phone held sideways is upright by then (`scene`), while Camera held the frame as it was (`framed`): it starts in the frame's shape, turned back by `sceneTurn`, and turns upright on its way, so nothing jumps when the screen takes it over. A first try in 0.25 s without the hold was too fast to follow on a phone. It is longer than the other animations (2.6.2), but nothing waits for it: the screen under it takes touches at once. The screen tells the ViewModel at once (`sceneArrived`), so a screen made again does not repeat it; with animations off nothing plays. Back on *Generate poses* returns to `FRAMING` for another photo, with the description kept (`backToScene`). Until Iteration 5 a review showed the photo in the middle of the space under the top bar, with *Use* at the top right ([#199]). In a session, *End session* hides until the step ends ([#207]). A frame taken with the phone held sideways is turned upright as held when it is taken (`GenerationUiState.scene`, `sceneTurn`; 2.6.2, [#206]). The person check, the request, and the pose screens get that landscape photo, and the server asks for 4:3 or 16:9 candidates (`ASPECT_RATIOS`). Camera holds the frame as it was (`framed`). Without a person, the photo is dropped, the camera is live again, and the panel above the shutter, where the framing hint stood, says "No one in this photo" and that poses need a person, with an alert for the light bulb, until a touch or the next shot (`noPerson`; [#296]). Nothing is sent before *Generate*. The app sends JPEG at quality 85, long side at most 1024 px, without metadata; the server rejects any other photo and never resizes one (2.5.3).
+2.  **What to pose (It 2, FR-4.8).** *Generate poses* has a description field of up to 100 characters, in Korean or English, the descriptions used before, and one button (It 3, Iter3-A13, [#180]). The button, at the top right ([#199]), reads *Generate*; a blank field, spaces included, asks for suggested poses (`PoseRequest.of`), and a text for poses of it. Until Iteration 5 the button read *Suggest* while the field was blank, and a ✕ emptied the field. The screen: R&S 6.3.
+    - **Auto (It 5, FR-4.15, [#274]).** Testers did not know what to type, and that nothing had to be typed was said only by the button's label. The empty field now says so itself: left alone, its hint is "Auto" in the accent over what Auto does, drawn as a value, the way a camera shows a setting left on auto, with a line under it that says to tap the field. A tap swaps the hint for an example. The field is three lines high in both states, and the hint's lines are no higher than the text's, so nothing under it moves (`DescriptionForm.autoHint`). *Back to Auto* takes the line's place under the field while the field holds text, and empties it on both phones: one line that always leads to the other choice. A first version, a small mark at the field's end that read "to Auto", looked like part of the text. The line is one touch target high in every state, so a chosen option moves nothing under it.
+    - **The options (It 5, FR-4.15).** Under the field, *Common poses* offers the situation's poses as chips (`Situation.poseOptions`, the table below). They are a fixed list in the app's strings: they show at once, cost no request, and are the same on both phones; the AI's own suggestions are what Auto gives. A chip only writes into the field: its words go in after a comma, and a second tap takes them out (`PoseOptions`). So the description stays the one thing the screen holds: `DescriptionShare` sends it as before, the filter reads it, and the history keeps it, with no new message or request. A chip is checked while one part of the text, cut at the commas, is its words and nothing else, in any letter case; the same words inside a longer word or a sentence are the user's own. A chip whose words would pass 100 characters is off, and no option has a comma. Each phone shows the options in its own language, so a chip chosen on a Korean phone shows on an English one as Korean text, like typing. A description used before that is an option on the screen is not listed again under the options. *Tried (2026-11-24):* one image for each of 20 of the 22 Korean options, sent alone as the description to a local server with a test photo of its situation; "Waving" and "Wink" were not run. 19 gave the pose with the scene kept. "Facing the landmark" (뒤돌아 바라보기) turned the view around instead of the person, which changed the background, and was dropped; "Chin in both hands" came with one hand in a selfie, whose other hand holds the phone.
+    - **What shows when (It 5).** With the field saying Auto, nothing is under it but the line, so the screen reads as ready to go. A tap on the field, or a text in it, also the other phone's, opens the options and the history. The field left empty, by a closed keyboard or *Done*, says Auto again and folds what is under it, so a field that says Auto never has the options under it; a text keeps them. What a chip opened stays when that chip takes the last words out, so the chip does not go from under the finger. What only a text opened, such as the other phone's, folds when the text goes. *Back to Auto* folds it on the phone that taps it.
+    - **The photo, large (It 5; also a step of Iter5-A5, [#296]).** A tap on the scene photo's thumbnail shows it over the screen (`ScenePhotoFragment`), handled as a photo of the photo viewer (`ZoomablePhotoView`). It is a dialog among the screen's child fragments, like the tutorial's tips, not a navigation destination, so the other phone's step can end the screen under it; it takes the photo from that screen and keeps no copy.
+
+    | Situation | *Common poses* |
+    |---|---|
+    | *Auto* | Peace sign, Waving, Hand in pocket, Arms crossed, Looking back, Both arms up |
+    | *Upper body* | Peace sign, Cheek heart, Chin on hand, Arms crossed, Hand through hair, Waving |
+    | *Full body* | Peace sign, Hand in pocket, Looking back, Walking, Both arms up, Thumbs up |
+    | *Scenery* | Back view, Looking into the distance, Walking away, Arms wide, Sitting and looking out |
+    | *Landmark* | Pointing at the landmark, Arms wide, Landmark on the palm, Peace sign, Both arms up |
+    | *Selfie* | Peace sign, Cheek heart, Wink, Chin in both hands, Finger on cheek, Waving |
+
 3.  **Requests.** Without a description, the app asks `POST /pose-suggestions` for four poses, then sends one `POST /poses` per pose. With a description, it sends that description's `POST /poses` at once and asks `POST /pose-suggestions` for three variations, then one `POST /poses` each. A variation missing after 10 s is replaced by the description. Each request (`pose-1` … `pose-4`) gets a `seed` drawn from one seed per set. *Try again* and *Regenerate* on *Pick a pose* repeat the request with a new seed. Back on each screen goes one step back (2.4, Figure 9c; [#199]). On *Generating poses* and *Pick a pose*, where it loses the images the AI service made, it first asks "Go back?", saying they cannot be recovered (`confirmGoingBack`), a dialog that closes with the screen's view, so a set that ends meanwhile leaves no question. *Pick a pose*, *Generating poses*, and *Couldn't create poses* go to *Generate poses* with the photo and the text, the set gone (`describeAgain`, `stopGenerating`); *Generate poses* to the photo's review (`backToReview`). In a session the set is on both phones, so *Pick a pose* has no *Regenerate*. The subject's Back returns to Subject view.
 4.  **Progressive results.** *Generating poses* shows four slots, two by two in the scene's shape, narrower and centered for a 9:16 scene (`CandidateGridFit`), and half the width for a landscape one. A candidate, or its failure, fades in over 200 ms where its spinner was (Iter3-A13). The run ends when all four are done or at 60 s, when open requests are cancelled. With at least one candidate, *Pick a pose* shows each on its own page of a `ViewPager2` (`PosePageAdapter`), in its own shape. The page on screen is the one *Select* takes ([#108]). With none, *Couldn't create poses* opens (FR-4.7). After *Select*, *Pick a pose* stays under *Reference confirm*, whose Back returns to the set (`pickAgain`); the set goes once the screen leaves the back stack. In a session a choice is final, and the set goes at once. The scene photo goes once its tip is asked for.
-5.  **Cancellation.** Back on *Generating poses* cancels the coroutine scope and its HTTP calls. The server sees the closed connection within 0.25 s and cancels its image call, which is then not billed. The course servers' proxy does not pass the cancel on (measured 2026-10-13; 2.8, *Hosting*), so there a cancelled call runs and is billed, bounded by the rate limit.
+5.  **Cancellation.** Back on *Generating poses*, at once since Iteration 5 ([#297]), cancels the coroutine scope and its HTTP calls. Back on it and on *Pick a pose* sends `posesKept` once the library wrote one of the set's candidates, which may be after Back; with none written, for no person or a full storage, nothing is said. *Generate poses* then shows "The poses are in My library." with *View*, which opens the library at *All* and ends the pose flow (`cancel`). The server sees the closed connection within 0.25 s and cancels its image call, which is then not billed. The course servers' proxy does not pass the cancel on (measured 2026-10-13; 2.8, *Hosting*), so there a cancelled call runs and is billed, bounded by the rate limit.
 
 **Prompt history (It 3, FR-4.11, [#124]).** The server keeps no description (NFR-13), so `PromptHistory` keeps them on the phone in DataStore (`prompt_history`), out of backups. It holds one entry per text, newest first, at most 50, each with this phone's role and the friends' account IDs. A set is recorded once the server accepts its description, at its first ready candidate ([#182]), so a description the filter refuses (FR-4.12) is never kept. On the subject, `pose.description`'s `STARTED` step names the set (2.5.1), and `followSubjectSets` records it once that set has a candidate or is `PICKING`. A refused description can still get candidates (Iter4-P3, [#200]). The filter judges each of a set's five requests by itself and lets a request through when it cannot answer in 2 s. One of the description's own requests can pass that way. So can the request for variations, whose variations then pass as other words. The description's own request therefore decides. When a refused pose (`REJECTED`) is the description as written, the set records nothing, and `delete` removes the entry, also one that an earlier set or a build before [#182] kept. A refused variation changes nothing. The photographer's phone says so in `pose.candidate.failed` (`descriptionRejected`, 2.5.1), and the subject's phone then does the same, also when the refusal follows a candidate. When every pose is refused, the refusals and the set's end come as one change. So `PoseSyncer` sends an ended set's refusal before its end, and the subject's history reads a named set from `PoseSyncer.verdicts`, the sets accepted and refused, which keep a set after `mirror` dropped it and after the session ended. A set that is refused and replaced by the next one while the link reconnects sends no refusal (a known gap): an entry the subject's phone kept before then stays. The filter's refusal (`REJECTED`) and the image service's (`DECLINED` since [#203]) both count (decided 2026-11-10). A subject's *Try again* after a set without candidates is not recorded (a known gap). The friend is the invitation's `SessionState.partner`; a room code has none. *Generate poses* lists the entries as chips, which a switch filters to the friend, the name cut at 160 dp. ✕ deletes an entry on this phone only.
 
-**Saving a pose (It 3, FR-4.14, [#171]).** Each page of *Pick a pose*, on either phone, has a ♥. `PoseSaveViewModel`, scoped to the activity, cuts the person out with `ReferenceGuideMaker.make(image, GENERATED)` and saves the guide as an AI pose. Hearts are keyed by set and pose (`PoseKey`): `Saving`, disabled, then `Saved(guideId)` while the library has the guide. A tap on a filled heart deletes the guide. A newly saved ♥ pops to 125 % and back in 200 ms. Whether a save removed the oldest guide is decided under the store's lock (`GuideSaved`): of two hearts tapped at once with 99 saved, only the second removes one. *Select* on a filled heart reuses its saved guide. A candidate of a scene photo held sideways or upside down is saved turned back into the frame (`intoFrameHeldAt`, 2.6.2), as *Select* puts it on the camera, so the library opens it there. *Select* keeps the guide as cut and turns it once. The subject's phone takes the turn from the set's `pose.step` (`sceneTurn`, [#206]). Nothing of a ♥ is sent (2.6.5).
+**Saving a pose (It 3, FR-4.14, [#171]).** Each page of *Pick a pose*, on either phone, has a ♥. History (It 5, [#297]): `PoseLibrary`, one per app (`AppContainer`), keeps each candidate in the library as an AI pose as it arrives, with no tap: `GenerationViewModel` calls `keep` for each `CandidateEvent.Ready` of this phone's sets. It cuts the person out once per candidate (`ReferenceGuideMaker.make(image, GENERATED)`), off the main thread, and saves the guide as history (`favorite = false`). A candidate without a person is not kept. A storage that cannot write leaves the cut usable (`Kept.stored` false), so *Select* still works; the next `keep` of that candidate writes again without cutting. Only the latest set's cuts stay in memory. `PoseSaveViewModel`, scoped to the activity, marks the kept guide a favorite (`setFavorite`). In a session both phones keep the same (#329): `SessionGuideKeeper`, one per app, keeps on the subject's phone each candidate of the photographer's sets as it arrives (`PoseSyncer.mirror`) and each guide on its copy of the camera once its reference photo is here, or once it leaves without one, and on the photographer's phone each guide adopted from the subject. A candidate's guide is named for its set and pose (`poseGuideId`), which both phones share, so a pose is one entry on each, also once it goes on the camera; a guide already kept stays as it is, and each is asked for once, so one deleted meanwhile is not kept again. The guides wait in a queue and are written one at a time, apart from the collectors, so a guide that comes while another is written is not missed. Hearts are keyed by set and pose (`PoseKey`): `Saving`, disabled, then `Saved(guideId)` while the library has the guide as a favorite. A tap on a filled heart makes it history again; one the storage cannot change fills again and says it failed. TalkBack names the ♥ *Add this pose to Favorites* or *Remove this pose from Favorites*. A newly saved ♥ pops to 125 % and back in 200 ms. *Select* waits for the kept cut (`keptGuide`) and goes on with it, so a pose is never kept twice; a guide deleted in the library is kept again with its ID. A candidate of a scene photo held sideways or upside down is saved turned back into the frame (`intoFrameHeldAt`, 2.6.2), as *Select* puts it on the camera, so the library opens it there. *Select* keeps the guide as cut and turns it once. The subject's phone takes the turn from the set's `pose.step` (`sceneTurn`, [#206]). The saved guide keeps the set's situation ([#270]); the subject's phone takes it from `pose.step`'s `situation`. *Select* keeps it too, so *Save guide* on Camera keeps it, and the subject's *Save guide* takes it from `guide.image.begin`. Nothing of a ♥ is sent (2.6.5).
 
 **Pose prompt.** Every candidate uses `pose_prompt` with the pose in `{pose}`: the description as written (Korean included), a suggestion, a variation, or a default pose. It changes the pose and the expression. It lets the model move the person, frame closer (knee-up or waist-up), and raise, lower, or tilt the camera a little, but never show more than the scene photo. Its rules follow the pose, so they win: the same person, clothes, place, and light, and nothing new to lean or sit on. *Why:* with a fixed framing, a distant person stays small; with this prompt, 13 of 16 descriptions were followed in all eight test photos. *Known limits:* a description can still add a prop, clothing, or a second person, and walking toward the camera is mostly cut at the knees. The image service did not refuse a violent description in testing.
 
@@ -2686,7 +2893,7 @@ The server reaches every model through OpenRouter with one key (`OPENROUTER_API_
 
 **Description filter (It 3, FR-4.12).** `DescriptionFilter` judges every description of `POST /poses` and `POST /pose-suggestions` and every pose of `POST /pose-tips`, after the rate limit and before any other model. It asks two yes/no questions from `[filter]` in `prompts.toml`. One asks whether the text asks for harmful content: sexual content, injury, self-harm, hate, or a real person's look. The other asks whether it tries to manipulate the AI: ignore or reveal its rules, a new role, a fake system message, or a closed quotation mark. A probability at the cutoff or above answers `422 REJECTED`. Default poses, suggestion requests, and photos are not judged; other clothes, places, and props pass. The filter fails open, and the log gets only a refusal's question and probability. *Why:* seven decision models were compared on 107 labeled descriptions in English and Korean: 57 harmless, 50 attacks, 29 of them harmful (2026-11-02, `compare_filter_models.py`). Jev 1.14 at 0.7 refused no harmless one and caught every harmful one, in 0.4 s at $0.03 per 1,000 calls. The Decider caught all 50 attacks but refused "Forget the previous pose, try something totally new". *Known limits:* the numbers are optimistic until other descriptions are measured (Testing Documentation 3); a fake note that allows only something harmless can pass.
 
-**Person check (It 3, FR-4.13).** A scene photo without a person is not sent. On the phone, `RuleBasedPersonDetector` checks it after the shutter, and *Use* waits; with no one found, only Back, which shoots again, works. It accepts an ML Kit pose (base model) with at least 8 of 33 landmarks in the frame, at likelihood 0.5 or more. Without one, it accepts any face down to 2 % of the photo's width. Both models are bundled, so it works offline; an error lets the photo go on. On the server, every `POST /poses` asks the person model about `photo` (`[person]`), in parallel with the filter. Below the cutoff it answers `422 NO_PERSON` without calling the image model, unless the filter refused. It fails open, also for a photo under 256 px. *Why:* on 53 scenes (2026-11-03; 39 with people, 14 without, such as statues, graffiti, a dog, and a mannequin), pose and face detection together found everyone; pose alone missed three. Selfie Segmentation marked graffiti as people, and Subject Segmentation marks walls. Jev scored people 0.96–0.98 and the rest 0.02–0.36, in 0.7 s for $0.0001 (`try_person_check.py`). *Known limits:* the phone accepts a cartoon face, a dog, or a mannequin; only distant passers-by can pass the server (0.49 and 0.81 for two edits).
+**Person check (It 3, FR-4.13).** A scene photo without a person is not sent. On the phone, `RuleBasedPersonDetector` checks it after the shutter, and *Generate poses* waits for it; with no one found, the photo does not go on, and the camera says so, ready to shoot again ([#296]). It accepts an ML Kit pose (base model) with at least 8 of 33 landmarks in the frame, at likelihood 0.5 or more. Without one, it accepts any face down to 2 % of the photo's width. Both models are bundled, so it works offline; an error lets the photo go on. On the server, every `POST /poses` asks the person model about `photo` (`[person]`), in parallel with the filter. Below the cutoff it answers `422 NO_PERSON` without calling the image model, unless the filter refused. It fails open, also for a photo under 256 px. *Why:* on 53 scenes (2026-11-03; 39 with people, 14 without, such as statues, graffiti, a dog, and a mannequin), pose and face detection together found everyone; pose alone missed three. Selfie Segmentation marked graffiti as people, and Subject Segmentation marks walls. Jev scored people 0.96–0.98 and the rest 0.02–0.36, in 0.7 s for $0.0001 (`try_person_check.py`). *Known limits:* the phone accepts a cartoon face, a dog, or a mannequin; only distant passers-by can pass the server (0.49 and 0.81 for two edits).
 
 **Suggested poses.** Without a description, the suggestion model gets the photo with `suggestion_prompt` and a JSON schema; its rules match the pose prompt's. The server keeps the first four different poses of 1–100 characters. It fills the rest with the default poses (hands on hips, wave, walking, arms crossed), all four if the model fails or exceeds 8 s, so the endpoint never fails for the model. Apps from before Iteration 2 ask for the default poses by id (`templateId`). Suggestions use the place, such as a door or a step. *Known limit:* the first pose is often the same relaxed standing one.
 
@@ -2708,13 +2915,13 @@ The server reaches every model through OpenRouter with one key (`OPENROUTER_API_
 
 **The choice on the phone (It 4, FR-4.8, [#210]).** *Add a pose guide* offers the six situations as tiles, *Auto* (`default`) first, then the person's framings and the place's. Each tile is the button that starts its poses: it chooses its situation (`GenerationViewModel.situationChoice`) and starts the scene photo, after the consent notice the first time, so no tile is shown as chosen ([#243]). A guide from a photo comes after them. At touch down a tile dims (`camera_pressed`) and shrinks to 97 % in 100 ms (`Motion.PRESS_MS`), at once rather than after the 100 ms a view in a scrolling sheet waits to look pressed. A touch that slides off undoes it. The tile goes on at release and stays pressed while the sheet leaves; under the consent notice it is itself again. Once a tap goes on, the sheet ignores every other tap (`AddGuideSheet.goOn`), so a second tap starts nothing else, nor navigates again from where the first one went. *Auto*'s tile carries the badge *Top pick* (`RECOMMENDED_SITUATION`). *Selfie*'s tile is off without a front camera (`selfieAvailable`, from `CameraController.hasFrontCamera`). A front camera that fails gives the rear one back, so a selfie being framed becomes `default`, with its hint, and stays so when the photo is shot again. The scene photo keeps it (`Situation.forScene`: a front-camera photo is always `selfie`, a rear one never), *Generate poses* names it on the photo's card, on the subject's phone too through `pose.description` (2.5.1), and every request of the set sends it; another situation needs another photo, since the photo was framed for it. The descriptions used before stay one list for every situation (FR-4.11). The tiles' pictures are WebP files (`drawable-nodpi`) from one image of all six that Gemini drew in one style (2026-11-15), toned down to 65% saturation.
 
-**The flow on screen (It 4, R&S 6.3, [#210]).** Five screens make the pose flow: the scene photo, its review, *Generate poses*, *Generating poses*, and *Pick a pose*, the subject's three included. Each shows `FlowProgressView` under its top bar: a 3 dp bar filled to its place, 1 to 5, in the accent dimmed to 75%. TalkBack skips it, since the title already says where the user is. During the scene photo, Camera's top bar stays its own: 48 dp above the image with 16 dp icons, so the preview stays in its place ([#231]). Until then the bar took the other screens' header size, 68 dp with an 18sp title, which on the Galaxy S22 (360 × 780 dp) took 16 dp from the image. The title is in the size of the bar's action, 14sp, and smaller where it would not fit on its line. Back, the light, and the ratio are on its left while framing. The ratio is chosen as on Camera, since the scene photo is a frame of the preview in that ratio and the candidates keep it (FR-4.3); the review has none, and the step's shutter closes the ratios as Camera's does. While framing, the situation's hint is on a panel above the shutter (`sceneGuide`), with a light bulb and "Pix makes four poses from this photo", instead of the hint chip. The panel is small and see-through (`bg_glass_panel`), like the other panels over the image. On the S22 it is under a 3:4 or 1:1 image when its hint is on one line, as every Korean hint is; it covers the image's last 15 dp when the hint takes two lines, and it lies over a 9:16 image. The zoom row moves above it. A touch anywhere takes the panel away, and the touch still does what it does there: the root's `onTouchEnd` calls `GenerationViewModel.dismissSceneHint`. `GenerationUiState.sceneHint` keeps it away through the review, a generated set, and every Back; only `beginScene`, a new start from *Add a pose guide*, shows it again. The shutter is in the accent then (`bg_shutter_scene`). Starting and ending the step animate, so the step reads as a new screen (`ui/Motion.kt`, 2.6.2). In 250 ms the flow's bar fills from empty to its step, the panel rises 12 dp as it fades in, and the shutter crossfades between white and the accent. The title fades in over 200 ms. At a touch the panel fades out in 150 ms, also when the touch changes the light or opens the ratios. The review moves the flow's bar from step 1 to 2, and back.
+**The flow on screen (It 4, R&S 6.3, [#210]).** Four screens make the pose flow: the scene photo, *Generate poses*, *Generating poses*, and *Pick a pose*, the subject's three included; five until the photo's review went ([#296]). Each shows `FlowProgressView` under its top bar: a 3 dp bar filled to its place, 1 to 4, in the accent dimmed to 75%. TalkBack skips it, since the title already says where the user is. During the scene photo, Camera's top bar stays its own: 48 dp above the image with 16 dp icons, so the preview stays in its place ([#231]). Back and the title are as far in as a header has them: Back 8 dp from the edge, the title 4 dp after it, in the size of the bar's action, 14sp, and smaller where it would not fit on its line. The camera menu's button and the ratio are at its end, the ratio ending 20 dp from the edge, where a header's action ends (`placeSceneBar`, [#320]). The menu's *Flash* is the light, and the menu has no *Settings*, which would leave the step. The flow's bar is right under the top bar, at the image's top edge. The other steps have the screens' header, 56 dp under 8 dp, with a 24 dp Back and an 18sp title, so their flow's bar is 64 dp from the top. They fade over each other (`ScreenMotion.FLOW`, 2.1); *Generate poses* unfolds from the scene photo (`HAND_OFF`). The ratio is chosen as on Camera, since the scene photo is a frame of the preview in that ratio and the candidates keep it (FR-4.3); the review has none, and the step's shutter closes the ratios as Camera's does. While framing, the situation's hint is on a panel above the shutter (`sceneGuide`), with a light bulb and "Pix makes four poses from this photo", instead of the hint chip. The panel is small and see-through (`bg_glass_panel`), like the other panels over the image. On the S22 it is under a 3:4 or 1:1 image when its hint is on one line, as every Korean hint is; it covers the image's last 15 dp when the hint takes two lines, and it lies over a 9:16 image. The zoom row moves above it. A touch anywhere takes the panel away, and the touch still does what it does there: the root's `onTouchEnd` calls `GenerationViewModel.dismissSceneHint`. `GenerationUiState.sceneHint` keeps it away through the review, a generated set, and every Back; only `beginScene`, a new start from *Add a pose guide*, shows it again. The shutter is in the accent then (`bg_shutter_scene`). Starting and ending the step animate, so the step reads as a new screen (`ui/Motion.kt`, 2.6.2). In 250 ms the flow's bar fills from empty to its step, the panel rises 12 dp as it fades in, and the shutter crossfades between white and the accent. The title fades in over 200 ms. At a touch the panel fades out in 150 ms, also when the touch changes the light or opens the ratios. The review moves the flow's bar from step 1 to 2, and back.
 
 **Prompts as data.** The prompts, default poses, and questions are in `server/src/pix_server/poses/prompts.toml`, with the `[situations]`, `[filter]`, and `[person]` tables. The server refuses to start on a missing or doubled placeholder, an empty prompt, or other than four default poses of up to 100 characters. A missing or unknown situation, duplicate default poses in a situation, an incomplete `[filter]` or `[person]` table, or an unknown key also stops it. A mistake therefore fails the tests and the image build, not pose requests. The scripts in `server/scripts/` read the same file, so a change can be tried first; `eval_poses.py` runs the AI module tests (Testing Documentation 3.1).
 
 **Image model.** Candidates come from OpenRouter's Image API (`POST https://openrouter.ai/api/v1/images`), with one format, key, and bill for every vendor. Each request asks for `1K` and the closest `aspect_ratio` of 3:4, 9:16, and 1:1 (AD-10), which the listed models all accept (2026-10-30). A model may round the ratio, such as 896 × 1200 for 3:4, so each screen fits a candidate in its own shape. Nothing is cut, since the guide uses the whole candidate. The scene's thumbnails are 72 dp high. The server converts PNG or WebP to JPEG (quality 90) and turns OpenRouter's `403` into `422 REJECTED`.
 
-**Pose tips (It 3, FR-4.10; rebuilt in It 4, [#213]).** When *Reference confirm* finds the person in a chosen candidate, `PoseTips` calls `POST /pose-tips` with the scene, the candidate (at most 768 px), and the pose. The request takes about 2.8 s (median of 100, 90 % within 3.5 s), hidden behind that screen.
+**Pose tips (It 3, FR-4.10; rebuilt in It 4, [#213]).** When *Reference confirm* finds the person in a chosen candidate, `PoseTips` calls `POST /pose-tips` with the scene, the candidate (at most 768 px), and the pose. The request takes about 2.8 s (median of 100, 90 % within 3.5 s), hidden behind that screen. A guide removed from Camera keeps its tip aside until another guide goes on, so *Undo* (2.8), which puts back the same instance, brings the tip too; a saved copy is another instance and gets none ([#298]).
 
 The model only describes; the server decides and writes.
 
@@ -2743,7 +2950,7 @@ The model only describes; the server decides and writes.
 
 After a language change, also on Android 10–12 (2.6.8), `PoseTips` asks again. A newer guide, another photo, or Back on *Reference confirm* cancels the request, also on the server, which cancels both model requests. The tip for the guide on Camera stays until another guide replaces it. A saved guide and a selfie's candidate get no tip.
 
-Camera shows `text` in its banner. In a session `TipSyncer` sends the tip of the guide on Camera to the subject's phone (`guide.tip`, 2.5.1), where a button on Subject view opens it; it never opens by itself there.
+Camera shows `text` in its banner, which opens once by itself for a new guide. Only the light bulb in the zoom row closes and opens it, lit in the accent while the tip is open (`isActivated`, `tip_button_*`). A touch elsewhere leaves it, and one on the banner reaches no image under it (`keepTouches`). In a session `TipSyncer` sends the tip of the guide on Camera to the subject's phone (`guide.tip`, 2.5.1), where the same button on Subject view opens and closes it; it never opens by itself there.
 
 **Time limit.** A run has 60 s on the phone, from the button, suggestions and variations included. Each server call to the image API has 60 s (`PIX_POSE_UPSTREAM_TIMEOUT_SECONDS`, then `504 UPSTREAM_TIMEOUT`). The phone's HTTP client waits 65 s and nginx 75 s, so the run's limit decides; a deploy lets requests finish. *Why:* sets usually finish within NFR-4's 20 s and 30 s, but single requests took up to 46 s on a slow day.
 
@@ -2759,7 +2966,7 @@ Camera shows `text` in its banner. In a session `TipSyncer` sends the tip of the
 |----|----|
 | One candidate | Its slot shows the failure; the others go on. |
 | Every candidate | *Couldn't create poses* says why in one line, with Back to *Generate poses*; the photo is kept (FR-4.7). `failureOf` takes one case from the failed poses and the run's own error: the first of `DAILY_LIMITED`, `RATE_LIMITED`, `NO_PERSON`, `REJECTED`, `DECLINED`, `OFFLINE`, `TIMEOUT`, `SERVER`, since a cause another try would meet again tells more. A suggested set's `REJECTED` is shown as `DECLINED`, since nobody wrote a description. No error at all is `SERVER` ([#203]). |
-| Offline, timeout, server error | *Try again* at the top right. The other cases have none: a limit lasts, a refusal repeats, and a photo without a person needs another photo, which Back reaches through the photo's review. |
+| Offline, timeout, server error | *Try again* at the top right. The other cases have none: a limit lasts, a refusal repeats, and a photo without a person needs another photo, which Back reaches through *Generate poses*. |
 | Suggestions | The run ends before any pose with `GenerationFailedException`, whose error the screen names; a limit is usually reached here first. The run's 60 s limit before any pose is `TIMEOUT`. |
 | Suggestions, over 8 s | The default poses fill in. |
 | Variations, over 10 s | The description fills in. |
@@ -2768,7 +2975,7 @@ Camera shows `text` in its banner. In a session `TipSyncer` sends the tip of the
 
 #### 2.6.4 Video pipeline
 
-- **Capture.** `ImageAnalysis` delivers a 4:3 YUV_420_888 buffer, 960×720 (1280×960 for 16:9, so the crop keeps 720 lines), with `STRATEGY_KEEP_ONLY_LATEST` on its own thread. While streaming, `CameraFrameSource` packs each frame into NV21 from a small pool, crops it to the ratio (960×720, 1280×720, or 720×720), and passes it on with its rotation. The front camera's frames are flipped first (`YuvToNv21.mirror`), because CameraX mirrors only its preview; the subject then sees the photographer's view, and the guide lines up. Likewise the front camera's photo is flipped through EXIF (`PhotoSaver`), its scene photo when turned upright (`CameraFrameCache`), and a focus tap maps to the sensor's other side. The subject's phone shows the rear camera's video as a mirror, so the subject moves the way they see themselves ([#201]). `camera.state` names the camera in use (`facing`; none from an older phone means the rear one). The renderer flips the video (`setMirror`), since a SurfaceView ignores its own scale. The grid, the guide, and the reference photo flip as views. The guide's coordinates stay the photographer's, and a drag on the flipped guide still moves it under the finger. The front camera's video comes flipped already, so it shows as sent. A ratio change rebinds analysis, and WebRTC takes the new size without renegotiation. The source scales down only beyond 1280×720 pixels.
+- **Capture.** `ImageAnalysis` delivers a 4:3 YUV_420_888 buffer, 960×720 (1280×960 for 16:9, so the crop keeps 720 lines), with `STRATEGY_KEEP_ONLY_LATEST` on its own thread. While streaming, `CameraFrameSource` packs each frame into NV21 from a small pool, crops it to what the photographer's preview shows, and passes it on with its rotation: the ratio's crop (960×720 or 1280×720), or for 1:1 the 4:3 around its square (960×720, `streamCrop`), which *Subject view* dims outside the frame as Camera does (FR-1.13). The front camera's frames are flipped first (`YuvToNv21.mirror`), because CameraX mirrors only its preview; the subject then sees the photographer's view, and the guide lines up. Likewise the front camera's photo is flipped through EXIF (`PhotoSaver`), its scene photo when turned upright (`CameraFrameCache`), and a focus tap maps to the sensor's other side. The subject's phone shows the rear camera's video as a mirror, so the subject moves the way they see themselves ([#201]). `camera.state` names the camera in use (`facing`; none from an older phone means the rear one). The renderer flips the video (`setMirror`), since a SurfaceView ignores its own scale. The grid, the guide, and the reference photo flip as views. The guide's coordinates stay the photographer's, and a drag on the flipped guide still moves it under the finger. The front camera's video comes flipped already, so it shows as sent. A ratio change rebinds analysis, and WebRTC takes the new size without renegotiation. The source scales down only beyond 1280×720 pixels.
 - **Encoding.** Hardware H.264 is preferred, with VP8 as the fallback, at up to 30 fps and 2.5 Mbps for every ratio (NFR-12). *Maintain framerate* lowers resolution first on poor networks (NFR-6). A TURN relay keeps the cap and adds latency within NFR-5 (0.8 s).
 - **Rendering.** The subject's `SurfaceViewRenderer` uses aspect-fit scaling, `wrap_content`, centered, so it takes the video's shape. At `match_parent` it would crop the frames, and the overlays would not line up ([#86]). `GuideOverlayView` and `CameraCompositionView` fit the same rectangle from `camera.state` (2.6.2). The whole video area takes the pinch. `videoScrim` darkens the video (It 3, Iter3-A12). It is full until `FrameWatchdog` sees the first frame, then clears in 200 ms. It is 60 % under text and during a ratio change, and blinks to 50 % and back in 120 ms at the photographer's shutter (`photo.shutter`, 2.5.1).
 - **Later optimization.** If CPU or battery use misses NFR-12, switch to a GPU path: a CameraX Preview surface backed by WebRTC's `SurfaceTextureHelper` avoids the YUV copy.
@@ -2782,17 +2989,25 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - `CameraViewModel` takes it for the photographer's pinch. `RemoteControlHandler` takes it for the subject's, and frees it 2 s after the subject's last request when the final value never comes; the camera then settles its lens, as in `stop()`.
   - While one phone holds it, the other's pinch changes nothing until its own fingers lift. A quick step or a zoom action never takes it, and changes nothing while the other phone holds it. The photographer drops the subject's requests and answers a final one with the current zoom.
   - A subject's pinch with a request dropped stays dropped up to its final value or its cancel, even once the zoom is free, since an older subject keeps sending its steps.
+  - Each phone says who is zooming from the other's first step ([#292]). On Camera, `SessionViewModel.subjectZooming` names the subject while their pinch holds the zoom, and for 1 s after a pinch that ended without an applied value (`ZOOMING_LINGER_MS`), so the line holds until the ratio's notice. On Subject view, `SubjectViewModel.photographerZooming` follows `peerZoomHolder`. Both lines have no time of their own and go when the ratio's line takes their place. Another notice or label that comes meanwhile keeps its own time, and the line is back after it while the pinch still runs.
   - Each change of the holder goes to the subject as `camera.zoom.hold`, and again when the session connects. The subject's session keeps it, so a screen that opens late knows it. Subject view then sends nothing, ends a pinch that is running with a cancel (`camera.zoom.set` with `cancel`), which changes no zoom, and its readout follows the echo.
   - The phone held back says who is zooming in its toggle label (2.8).
 - **Unanswered requests.** `RemoteControlHandler` gives a final zoom, brightness, or flash request 500 ms, and longer while the camera is `STARTING`. It then confirms a request the camera holds, or answers with the current state, `by: PHOTOGRAPHER`, so the control snaps back. A request applied within 5 s still counts as the subject's.
-- **Brightness and flash (It 2, FR-7.3).** Subject view's brightness button opens a slider over the exposure range from `camera.capabilities`. It stays a slider, since the subject sets no focus for Camera's bar (2.8, [#182]). The flash button is in the top bar. Each control hides when the camera lacks it.
-  - The slider sends `camera.exposure.set` like zoom. The flash button sends `camera.flash.set` and shows the tapped mode until the echo.
+- **Brightness and flash (It 2, FR-7.3).** Subject view sets the brightness with Camera's bar, over the exposure range from `camera.capabilities`. The bar comes up beside the focus box at a tap on the video (remote focus below, 2.8). Until Iteration 4 it was a slider opened from a button ([#182], [#273]). The flash is *Flash* in the camera menu, with this phone's *Grid* and *Settings* (2.6.2, [#272]). Each control hides when the camera lacks it.
+  - The bar sends `camera.exposure.set` like zoom. *Flash* sends `camera.flash.set` and shows the tapped mode until the echo.
   - The photographer clamps and calls `setExposure` or `setFlash`. It answers a request the camera cannot take with the unchanged `camera.state`.
-  - Each exposure, flash, or ratio change, from either phone, goes out as `camera.state`, `by: SUBJECT` when it matches the subject's request. A slider step is echoed as a step. Camera's own controls call the same methods (FR-1.11, FR-1.12).
+  - Each exposure, flash, or ratio change, from either phone, goes out as `camera.state`, `by: SUBJECT` when it matches the subject's request. A step of the bar is echoed as a step. Camera's own controls call the same methods (FR-1.11, FR-1.12).
 - **Guide moves (It 2, FR-7.2).** Subject view shows the guide-edit toggle and its label while a guide is on the video, off by default (2.6.2, 2.8).
   - With it on, drags and pinches move the guide locally, clamped by `GuideGeometry` for the photographer's frame. `guide.move` sends the guide's id, center, and height: steps at most every 50 ms, the final value at once.
   - `RemoteControlHandler` drops a move for a missing, hidden, or replaced guide. Otherwise the photographer's `GuideRepository` clamps and applies it, and `GuideSyncer` echoes `guide.state` with `by: SUBJECT`.
   - During the gesture the subject takes only `visible` and `opacity` from the mirror. The first `guide.state` after the final value settles the guide. Of two moves, the later wins (FR-7.6).
+  - A gesture that ends without a final value gets no echo: the mode went off under it, the guide was hidden, or the link dropped. The subject's guide then goes back to the mirror's state at once (`SubjectViewModel.endGuideGesture`). At a drop it does so also after a final value, which may not arrive.
+- **The guide's panel (It 5, FR-7.2, [#329]).** While a guide is on the video, *Subject view* has Camera's panel above the line that names the camera: *Hide* / *Show*, the opacity slider, ♥, and ✕.
+  - *Hide* sends `guide.visible.set` with the other state and ✕ sends `guide.remove`; neither changes the guide here before the echo. The slider sends `guide.opacity.set` like a move (`opacitySender`): the guide here takes each value at once, the mirror's opacity waits meanwhile, and the first `guide.state` after the final value settles it.
+  - `RemoteControlHandler` applies them as Camera's own panel does, `attribute(SUBJECT)` for the echo, and drops a request for a replaced guide or an opacity for a hidden one. So while a guide offered from *Subject view* waits for the photographer's phone to adopt it (`GuideSyncer.offering`), the three and guide-edit mode wait too: that phone does not have the guide yet, and would drop its moves. Camera says "Joonhyung hid the guide", "… showed the guide", "… set the guide's opacity to 70%", "… put the guide back", or "… removed the guide" with *Undo*, which puts the same guide back where it was (`RemoteAction.GuideRemove` carries both; `CameraViewModel.onUndoRemoteRemove`).
+  - After either phone's ✕, both phones offer *Undo*. *Subject view* says "Guide removed" once its own ✕'s guide is gone, or the photographer's line "Dongje removed the guide", each with *Undo*, which sends `guide.restore` for the last guide it showed (`SubjectViewModel.onUndoRemove`). `RemoteControlHandler` keeps the guide removed last and where it was, by the subject's ✕ or by Camera's (`removedHere`, from `CameraViewModel`), and puts it back; Camera's own *Undo* tells the subject as `camera.did`. Each phone takes its *Undo* down once a guide is on the camera again. A removal waits in a buffered channel until its screen reads it (`SessionViewModel.guideRemovals`, `SubjectViewModel.guideRemoved`, the photographer's said once its guide is gone), so a screen stopped meanwhile, as under Settings, still offers *Undo*, unless a guide is back by then.
+  - ♥ is this phone's own *Save guide* (FR-6.16), sent nowhere. The photographer's own *Hide*, slider, and ✕ go to the subject as `camera.did`, a line on *Subject view*.
+  - The open tip keeps the panel while the tip, the panel, and the zoom row fit between the top bar and the shutter's row. At a font too large for that, the panel gives way to the tip until it closes (`panelFitsBesideTheTip`), as the line that names the camera always does.
 - **Guide from the subject (It 3, FR-6.15, FR-6.16, [#113]).** *Guide* on Subject view opens *Add a pose guide* with the subject's *My library* (2.6.2), without the situations.
   - `ReferenceViewModel` hands the guide to `GuideSyncer.offer`. The mirror shows it at once, at its `anchor` clamped for the narrowest frame, with its reference photo. `guide.reference.*` sends the photo, then `guide.image.*` the guide with `anchor` and `source` (2.5.1).
   - The photographer adopts it with `attribute(SUBJECT)` and its reference photo, which Camera shows as the thumbnail ([#234]). It sends neither back. Camera says "Joonhyung set a pose guide". The guide is then the photographer's own, to move, hide, save, or remove.
@@ -2802,15 +3017,16 @@ Subject view's controls are requests. The photographer's phone applies them in a
 - **Shared steps (It 3, FR-6.15, US-16, [#120]).** Only the photographer's phone generates poses. Its *Generate poses*, *Generating poses*, *Pick a pose*, and *Reference confirm* also show on the subject's phone (2.5.1).
   - The photographer's syncer sends each step while connected, with images encoded off the main thread. After a reconnect it sends the current step, or only its end (2.6.7).
   - The subject's syncer keeps a mirror in memory (`MirrorDescription`, `MirrorPoseSet`, `MirrorConfirm`) through a reconnect, until its end, the next one, or the session's end.
-  - Subject view opens each one once by itself while it is the current destination (`claimSetOpening`, `claimConfirmOpening`, `claimDescribeOpening`). Otherwise a button in the middle of the bottom row, where Camera's shutter is, opens it. One that arrives under *Add a pose guide* opens when the sheet closes.
+  - Subject view opens each one once by itself while it is the current destination (`claimSetOpening`, `claimConfirmOpening`, `claimDescribeOpening`). Otherwise a button beside the thumbnail, which moves aside for it, opens it ([#314]; in the row's middle until then). One that arrives under *Add a pose guide* opens when the sheet closes.
   - The subject's paused video says "Dongje is describing a pose…", "Dongje is creating poses…", "Dongje is picking a pose…", or "Dongje is checking the guide…".
   - The first request to reach the photographer's phone decides (AD-7). One unanswered for 5 s says "Couldn't send your request", "Couldn't send your pick", or "Couldn't send your choice".
   - Each subject screen follows the session itself. The shared screens say "… sees this too".
-- **Generate poses on both phones.** `DescriptionShare` reports the opening at *Use* on the scene photo, or at Back from *Pick a pose*, *Generating poses*, or *Couldn't create poses* (scene photo, text, refusal), each change of text and `descriptionWriter`, and the end, `STARTED` or `CLOSED`. The scene copy (`PoseCandidateCodec`) follows the first message.
+- **Generate poses on both phones.** `DescriptionShare` reports the opening once the scene photo has a person in it ([#296]; at *Use* until Iteration 5), or at Back from *Pick a pose*, *Generating poses*, or *Couldn't create poses* (scene photo, text, refusal), each change of text and `descriptionWriter`, and the end, `STARTED` or `CLOSED`. The scene copy (`PoseCandidateCodec`) follows the first message.
   - One field at a time holds the description, from a tap until Done, the keyboard closing, a button, or leaving (`DescriptionForm`). The subject's `pose.description.edit` gets it only while the photographer's field is free.
-  - The other phone waits and shows "Joonhyung is typing…" or "Dongje is typing…". A subject's chip sends its text at once.
+  - The other phone waits and shows "Joonhyung is typing…" or "Dongje is typing…". A subject's chip, of the history or of the options (FR-4.15), sends its text at once.
   - `pose.description.go` starts the set with the subject's text, or the photographer's when nobody held the field. It is refused while the photographer's field holds it.
   - A drop frees the subject's field (`DescriptionRequest.Gone`). The photographer's Back closes the subject's screen with "Dongje closed Generate poses". The subject's Back closes only its own.
+  - A drop that only one phone saw loses the field's hold or its release. The subject's `DescriptionSyncer` therefore keeps what its field asked for last (`reassert`). What could not be sent goes out when the link is back, also text typed into a field it still holds. What was sent goes out again when `pose.description` names another holder. The text is not compared, since an echo of an earlier text is on its way whenever the subject types. The photographer's own field holding the description ends that: the subject's hold was not taken.
   - Subject view shows a description only while it holds no set or confirm.
   - `STARTED` carries the text and `setId`. The subject records the text once that set has a candidate or is `PICKING` (2.6.3, Prompt history).
 - **Pick a pose on both phones.** `PoseShare` reports `GENERATING`, the planned slots and failed candidates (Iter3-A13), each candidate, `PICKING` in pager order, and `CHOSEN` or `CLOSED`.
@@ -2827,27 +3043,43 @@ Subject view's controls are requests. The photographer's phone applies them in a
 - **Photos on both phones (FR-6.14, US-14, [#121]).** Each session photo reaches the subject's "Pix" album.
   - A photo belongs to the session at its shutter (`PhotoShare.shutter`), then follows as `taken` or `notTaken`. In a connected session the shutter also sends `photo.shutter`, so the subject's video blinks (2.6.4).
   - `PhotoSyncer` sends the saved JPEG itself, with its EXIF rotation, over the encrypted data channel, not through the Pix server (FR-1.5, NFR-13). It sends one photo at a time in shutter order, read from the gallery at its turn.
-  - `SessionManager.sendBulk` sends a chunk only while no reliable message waits and under 64 KiB are buffered (2.8, NFR-7). `photo.ack` allows 32 unacknowledged chunks, within the phones' 64- and 256-message buffers.
+  - `SessionManager.sendBulk` sends a chunk only while no reliable message waits and under 64 KiB are buffered (2.8, NFR-7). `photo.ack` allows 32 unacknowledged chunks, within the 256 events the peer connection buffers.
   - The subject writes chunks to a cache file. At `photo.end`, `PhotoAlbum` saves it to Pictures/Pix through a pending MediaStore row dated `takenAt`. `photo.saved` answers, `ok: true` again for a repeat.
   - The subject sees "Photo saved to your Pix album" or "Couldn't save Dongje's photo". The photographer sees "Couldn't send a photo to Joonhyung" for an unreadable or refused photo, one over 40 MiB, or one stalled for 30 s.
   - `PhotoSyncer.sessionPhotos` lists the session's photos on this phone, oldest first: those taken on the photographer's phone, those saved on the subject's. It is null outside a session, empty until the first, and kept through a reconnect, which keeps the session's id ([#235]).
   - In a session, both phones' thumbnails show only the newest of these, so neither shows a photo from before. Both thumbnails are empty until the session's first photo. *Subject view*'s bottom row is Camera's, in thirds: *Guide* in the middle of the left third, where Camera's is, and the thumbnail in the middle of the right third (`showPhotoThumbnails`), on *Guide*'s icon line.
+  - Right above its shutter, *Subject view* says "Dongje's camera" and "Live" on one line once connected ([#271]; in the shutter's place until [#314]). The line is in the panels above the bottom row, where Camera shows its notices. A name too long for the line, such as a Galaxy's own name "길동의 Galaxy S23 Ultra", is cut short, so "'s camera" stays; at a font too large for one line, the name stands over "Live" (`SessionCaption`, as Camera's line, 2.6.5). While a step's button shows, the line is the name alone, without the red dot, which says "live" as the light over the video does. The open tip takes the line's place until its button closes it, since the two do not fit above the shutter at the largest font. Each photo is waited for by its `shot`: from its `photo.shutter`, or its `photo.begin` when the shutter was lost or came during a drop, until it is saved or refused. Meanwhile `PhotoSyncer.receiving` is true, and "Live" becomes "Receiving photo…" with a spinner. A photo the photographer gave up, before its begin (`photo.dropped`) or for the next photo, is not waited for, and each ends only its own wait. A `photo.shutter` that comes after its photo's `photo.dropped` or save, as the realtime channel allows, starts none (`Waits.ended`). A phone before #271 names no `shot`, so its photos are counted instead. 30 s without a photo message, as from a phone that does not send `photo.dropped`, or the session's end, ends the wait (`STALL_MS`).
   - A tap on either opens the session's photos in a viewer over the whole screen, inside Pix (`PhotoViewer`): one page each, opened at the newest, under a header with Back, *Share*, and *Delete* and no title, decoded to the screen's long side (`photoToView`). The phone's gallery would put Pix in the background, where the video stops and, on the photographer's phone, the session ends after 60 s (2.8, *Lifecycle*).
   - A newer photo adds a page and keeps the page on screen. Back closes the viewer, and so does the session's end. On the subject's phone, a step the photographer starts meanwhile opens once it closes. While it is open, TalkBack reads only the viewer.
   - The viewer works as a gallery app's (FR-1.16, [#247]). A strip of 40 dp thumbnails is under the photo, each taking taps on 48 dp, with the one on screen outlined and the others dimmed. A tap on one shows its photo, and the strip scrolls to keep it in the middle. There is no counter; TalkBack reads each page and thumbnail as "Photo 2 of 12".
   - Each page is a `ZoomablePhotoView`. A pinch zooms up to 4× around the fingers, a double tap zooms to 2.5× where it lands or back out, and a drag pans without passing the photo's edges. While zoomed, the page keeps every touch from the pager, so a sideways drag pans; zoomed out, it swipes. A page swiped away shows its whole photo again.
   - While the photo is whole, a drag down moves it with the finger and fades the background. A lift past 96 dp, or a flick faster than 1000 dp/s, closes the viewer, and a shorter drag springs back. The drag and the flick are measured on the screen, since the photo's own coordinates move with it. A tap on the photo fades the header and the strip out or back in, and each opening shows them.
   - Held sideways, the viewer turns with the phone as a landscape screen (FR-1.16, [#207]). Its content is the child of a `TurningFrame`, which `TurningIcons` turns with the controls. From halfway through a quarter turn, the frame lays the content out with the screen's width and height swapped. The photo then takes the whole screen, under the header, on a scrim, and the strip; between them a landscape photo would be smaller than upright. Before the new size, the pager's list is scrolled to its page, or ViewPager2 keeps its scrolled pixels and lands on another page. A drag down and a flick are turned into the photo's own way (`ZoomablePhotoView.upright`). The share sheet and *Delete*'s question are windows of their own and stay upright.
-  - *Share* sends the photo's content URI through the share sheet (`ACTION_SEND`, with leave to read it). *Delete* asks first, then calls `AppContainer.photoDeleter`: `PhotoSyncer.delete` drops the photo from the session's photos and has `PixAlbumPhotos.delete` remove its MediaStore row. Camera drops it from the album's pages at once, before MediaStore tells of the change.
-  - On the photographer's phone, the sender reads each photo only at its turn. A photo deleted while it waits to go, or goes, leaves the viewer at once but stays on the phone until it has reached the subject, failed, or its session ended, and is deleted then. Deleted at once, it would never reach the subject, and no copy would be left. Pix needs no permission to delete, since every photo it lists is its own. A delete that fails keeps the photo and shows "Couldn't delete this photo."; the last photo deleted closes the viewer.
-  - Outside a session, Camera's thumbnail is the newest photo in Pix's album, taken here or received, and a tap opens the whole album in the same viewer, at the newest (`PixAlbumPhotos`, FR-1.6, [#247]). A photo just taken is a page at once, before MediaStore tells of it. The viewer closes when a session starts or ends, so it never turns from one list to the other. The phone's gallery, given one photo through `ACTION_VIEW`, would show that photo alone, in Pix's task. The album is read from MediaStore at the app's start and at each MediaStore change, so a photo deleted in the gallery leaves it. Without a storage permission Pix sees only the photos it saved, so after a reinstall the album is empty until the next.
+  - *Share* sends the photo's content URI through the share sheet (`ACTION_SEND`, with leave to read it). *Delete* asks first, then calls `AppContainer.photoDeleter`: `PhotoSyncer.delete` drops the photo from the session's photos and has `PhonePhotos.delete` remove its MediaStore row. Camera drops it from the album's pages at once, before MediaStore tells of the change.
+  - On the photographer's phone, the sender reads each photo only at its turn. A photo deleted while it waits to go, or goes, leaves the viewer at once but stays on the phone until it has reached the subject, failed, or its session ended, and is deleted then. Deleted at once, it would never reach the subject, and no copy would be left. Pix needs no permission to delete a session's photo, since each is its own. A delete that fails keeps the photo and shows "Couldn't delete this photo."; the last photo deleted closes the viewer.
+  - Outside a session, Camera's thumbnail is the newest photo on the phone, and a tap opens the phone's photos in the same viewer (`PhonePhotos`, FR-1.6, [#247], [#320]). The phone's gallery, given one photo through `ACTION_VIEW`, would show that photo alone, in Pix's task. With the photo permission (`READ_MEDIA_IMAGES`, or `READ_EXTERNAL_STORAGE` to Android 12) Pix reads every photo; with Android 14's chosen photos (`READ_MEDIA_VISUAL_USER_SELECTED`), those; without, only the photos it saved (`PhotoAccess`). The thumbnail's first tap asks. Camera reads the access again at each start, so a change in Android's settings shows. A line under the tabs says what shows, with *Change* or *Allow all*, which open Android's settings for Pix. Pix is not on Google Play, whose policy limits this permission to gallery apps.
+  - The viewer opens on a grid (`CameraUiState.photosGrid`): every photo, five a row, newest first, by date taken. Each square is read at its cell's size, four at a time (`ThumbnailReader`). The header has Back and the tabs *All photos* and *Albums* (`GalleryTab`). *Albums* groups the photos by MediaStore's bucket (`PhoneAlbum`), the album with the newest photo first, each as its newest photo, its name, and its count, two a row; Camera, Screenshots, and Downloads take their own names. An album opens its grid, with its name and count in the header. A tap on a photo opens its page at once (`pickPhoto`; the pager's item animations are off, so it never scrolls through the others), with the strip, *Share*, and *Delete*. The pages and the strip run newest first, as the grid does: `PhotoViewer` shows the list reversed (`asReversed`), so the newest is at the left and a swipe to the left goes back in time; a photo that comes is one more page before the one on screen, which stays. The strip spans the screen and pads each end by half its width less a thumbnail (`PhotoViewer.padStrip`), so the thumbnail on screen stands in its middle as a photo opens and at each swipe, the first and the last too. TalkBack still counts from the oldest, as in the grid.
+  - Back goes one step (`CameraViewModel.closePhotos`): the page to its grid, an album to *Albums*, the grid to Camera; a drag down on a photo does the same. The viewer grows out of the thumbnail and shrinks back into it, from 0.9 of its size as it fades. A page grows out of its square and shrinks back into it. An album and the *Albums* tab slide in by a quarter of the width over the list going.
+  - A photo just taken is a page at once, before MediaStore tells of it. The viewer closes when a session starts or ends, so it never turns from one list to the other. The photos are read from MediaStore at the app's start and at each MediaStore change, so a photo deleted in the gallery leaves. An edit another app saves over a photo keeps its URI, so each read compares the photos' change times (`DATE_MODIFIED`), and a change counts an edit (`PhonePhotos.edits`): Camera's thumbnail and the viewer's kept pictures, cached by URI, are read again.
+  - *Delete* outside a session: Pix's own photo goes after Pix asks. Another app's photo needs the user's consent, which only Android can ask for (`MediaStore.createDeleteRequest` from Android 11, a `RecoverableSecurityException` on Android 10); Camera launches Android's question (`PhotoDeletion.NeedsConsent`) and drops the photo once it is gone. From Android 12 the user can let Pix manage media, a special access (`MANAGE_MEDIA`, `MediaStore.canManageMedia`), after which Android grants that request without its question. So from Android 12 Pix asks before every delete (`PhotoDeleter.asksFirst`), with *Cancel* and *Delete* only. While the access is off and Pix may read every photo (`PhotoDeleter.needsAccess`), the first such *Delete* offers it in a question of its own (`PhotoViewer.offersAccess`), once; with chosen photos alone Android asks all the same, since MediaProvider checks the read permission too, so nothing is offered then: `AppSettings.mediaAccessOffered` keeps that it was; until DataStore's first read it is unknown (null), which counts as offered, so a delete right after a start never offers it twice. *Allow access* opens Android's screen for it (`Settings.ACTION_REQUEST_MANAGE_MEDIA`), and the photo is deleted when the screen closes (`CameraViewModel.deleteAfterAccess`, `accessAnswered`), without Android's question once allowed; *Not now* goes on to Android's question, and Back keeps the photo. On Android 11 only Android asks, so the user is never asked twice there. Pix tells its own photos apart by a query for its own package alone: from Android 14 a query that names the owner leaves out the photos of every app Pix cannot see, so the photos' own query names none.
   - Ending the session drops unconfirmed photos without asking. 3 s later Camera says "Couldn't send 2 photos to Joonhyung". The subject deletes partial files, also at each session start.
   - IT-20 measures the live view while photos go (NFR-6). FR-6.13's notice is unchanged.
-- **Remote focus (Could, FR-7.7).** A tap on the video would send `camera.focus.set` to `setFocusPoint`, with no echo. Planned for Iteration 5 (Iter5-P9, [#273]), with the brightness beside the focus box (FR-7.3); only the message exists.
+- **Remote focus (It 5, FR-7.7, [#273]).** A tap on Subject view's video does what a tap on Camera does (FR-1.4), on the photographer's camera.
+  - `PinchZoomController` owns the video's touches and reports the tap and a one-finger drag up or down, as on Camera. In guide-edit mode it is off, so a tap does not focus: the touch is the guide's. A tap outside the image does nothing. Nor does one while the video is not showing, as under "The photographer's camera is paused.": that camera would drop the request, and a box would show a focus never set.
+  - `SubjectViewModel.onFocusTap` sends `camera.focus.set` with the point in the photographer's frame (2.5.1). It needs a camera that focuses on a point or has a brightness range (`camera.capabilities`).
+  - `RemoteControlHandler` calls `setFocusPoint` on a camera that takes a point, and sets the brightness back to 0 EV (`CameraCapabilities.baseExposureIndex`, the rule Camera's own tap uses). A camera that is not `READY` drops the tap.
+  - Every tap is answered with a `camera.state`, `by: SUBJECT` and `focused: true`: at once when the camera has the base already, and otherwise when the camera reports it. A camera that has not taken the base after 500 ms is answered for with its current state, and the base is no longer waited for, so a later change to that value is not taken for it. The tap makes no brightness notice. The mark keeps the subject from taking another echo of its own for the answer, such as an earlier pinch's, which still carries the old brightness.
+  - Subject view shows the focus box at the tap and the brightness bar beside it (`FocusBrightness`, 2.8). A drag that starts with the bar down taps first. It then waits for the tap's answer (`SubjectUiState.baseAwaited`), at most 1 s: the 500 ms the photographer's phone itself waits for its camera, and 500 ms for the link, so the bar starts from the photographer's base, which this phone does not know otherwise. If the bar went while the drag waited, the drag moves nothing. A finger put on the bar itself, a drag on the video with the bar already up, or TalkBack's change waits for the same answer (`ExposureBarView.awaitingValue`): until then the bar shows the brightness from before the tap.
+  - The bar closes when Subject view's view goes, as under Settings or *Add a pose guide*: it stood beside a box of that view, on that view's time.
+  - The bar goes when the photographer's ratio or camera changes: it stood beside a point of the old frame.
+  - TalkBack has no tap at a place on the video. The video's click action, "Focus and set the brightness", asks for the focus at the image's middle and moves TalkBack's focus onto the bar, which stays up while it has it.
+  - The photographer's Camera shows the focus box alone where the subject tapped (`SessionViewModel.remoteFocus`). A brightness bar it has up goes, unless a finger is on it. The notice "Joonhyung set the focus" shows for 1.5 s, and no tap in the 2 s after it makes another (`FOCUS_NOTICE_MS`, `FOCUS_NOTICE_QUIET_MS`), so taps in a row do not repeat it. Another session's first tap is said again.
+  - The photographer's own tap goes the other way. `CameraViewModel.onFocusTap` tells `RemoteControlHandler.focusedHere`, which sends `camera.focus` while a session runs. Subject view shows the focus box alone at that place (`SubjectViewModel.photographerFocus`), with no notice, as the photographer's other changes have none there. A bar it has up goes, unless a finger is on it.
 - **Permission (Could, FR-7.5).** `control.permission` with `allowed: false` would disable the subject's controls and drop its requests. Dropped at the kickoff of 11/21: short of time, and judged less important. Only the message exists, so remote control is always allowed.
 - **Ultrawide routing.** `CameraZoomPlan` prefers the primary camera's native sub-1× zoom. A separate rear ultrawide extends the range only when its range reaches the primary's. The controller converts each request to the bound camera's native `setZoomRatio`, and `ZoomState` back, so every ratio is primary-relative.
 - **Zoom without stutter (It 2, Must, NFR-19).**
   - `CameraXController.setZoom` applies only the newest request, once per `Choreographer` frame, and skips a native ratio already asked for. This is a precaution: the S23 Ultra showed no stutter either way.
+  - **A single change glides (It 5, FR-1.3, [#310]).** A tap on the readout, a zoom action, and a pinch's last value go through `CameraController.glideZoom`, on either phone's request. `ZoomGlide` gives the ratio for each display frame: 250 ms, fastest at the tap and slow into the step, along the logarithm of the ratio, so the picture grows evenly to the eye. From the request on, the controller reports the step as the zoom, not the ratios on the way, until the camera is asked for the step itself (`heldZoom`), so the readout and the subject's phone say where the zoom is going. That holds where the step does not glide too, as behind a lens that opens or a photo being saved. A glide starts from the ratio last asked for, not the one last applied, which a pinch has left some steps behind when its fingers lift. The camera shows a requested zoom only some frames later: on the S22 the first frame with a new zoom was done 246 ms after its request (11/25, `zoom.apply` to `zoom.frame`). A readout that followed the requests ran ahead of the picture, and a slow start added to that wait. The controller asks for each as a pinch's step and for the last as the final value, from the same frame callback as a pinch. It applies the step at once instead where a glide cannot show: another lens has to open (a held frame covers the rebind), the picture is already there, a photo is being saved, the camera is opening, or the phone's animations are off. A second tap starts from where the first glide is. A pinch's step, and so the other phone's pinch, takes a glide over; the shutter ends it at its step, so the photo has the zoom the tap asked for. A quick step never takes `ZoomHold`.
   - A pinch holds the bound lens until the ratio is 5 % past the primary's minimum, 0.95× to 1.05× (`CameraZoomPlan.lensFor`, `HOLD_BAND`). The final value picks the lens. `RemoteControlHandler.stop` ends a pinch whose final value never came.
   - A new binding publishes its zoom only after restoring the kept one, so no phone shows the new lens's own 1×.
   - `PreviewHold` keeps the last frame, without a spinner, from `READY` → `STARTING` until `READY` with the preview streaming, at most 2 s. The grid and the guide stay over it (2.6.2, *Changes on screen*).
@@ -2862,8 +3094,32 @@ Subject view's controls are requests. The photographer's phone applies them in a
   - *Zero-shutter-lag is not used.* It took the picture in 0.18 s and stopped the preview for 0.1 s instead of 0.35 s. Its photos carry twice the noise, and CameraX turns it off on the S22's US models for its colors (`ZslDisablerQuirk`), a list the Korean model is not on. It also does not work with the flash on or on auto.
   - *The shutter is free while a photo is saved.* `takePhoto` calls `onCaptured` when the camera has taken the picture (CameraX's `onCaptureStarted`), and `CameraViewModel` frees the shutter then. CameraX takes the photos asked for meanwhile in order, but it can finish saving a later one first: it saves one at a time only on low-memory phones. `CameraViewModel` therefore publishes each result after the one of the press before, so the thumbnail is the newest photo and the session sends the photos as they were taken (`PhotoSyncer`). Saving takes 0.2 s to 0.5 s more at 3:4. At 9:16 and 1:1 CameraX decodes, crops, and encodes the photo again, 0.2 s more on a plain scene; asking the camera for a 16:9 size does not avoid it, since that size is not exactly 16:9.
   - Not done yet: the photos against the phone's own camera on the same scenes, CameraX Extensions (`HDR`, `NIGHT`), and the S21.
-- **Photos.** Only the photographer takes photos.
-- **Notices.** Camera shows each final remote action for 3 s, named from `hello` (FR-7.4, 2.5.1): "Joonhyung set zoom to 2×", "… moved the guide", "… set brightness to +1.0", "… turned the flash on" or "off", "… set the flash to auto", or "… set a pose guide".
+- **Photos.** A photo is taken on the photographer's phone, at either phone's shutter (FR-7.8, [#314]).
+  - *Subject view*'s shutter sends `camera.shutter` (`SubjectViewModel.onShutter`). `RemoteControlHandler` asks the Camera screen to take the photo and answers with `camera.shutter.answer`.
+  - Only the Camera screen takes it, through its own shutter's code (`CameraFragment.takeForSubject`, `CameraViewModel.onShutter`): the camera is bound there alone, and the photo then has its turn, its order, and its place among the session's photos like any other. The screen gives itself to the handler while it is started (`SessionViewModel.setRemoteShutter`). Without it, the answer is not taken.
+  - Started is not in front: under a sheet, such as *Add a pose guide*, under its own photos, and under a dialog of its own, the AI notice for the subject's poses, "End the session?", or the tutorial's tips, the screen stays started with its camera running. A press is refused then (`cameraInFront`), as a start of AI poses is.
+  - A press is refused while a pose's scene photo is framed or held, which is the photographer's own step, and while the camera is not ready or still takes the photo before. Nothing is queued: a press is one moment. The scene photo's countdown ([#320]) is the timer's like any other, so the subject's cancel stops it too.
+  - The subject's shutter is held from a press to the answer that names it, or for 2 s without one (`SHUTTER_WAIT_MS`). It is dimmed while the photographer's video does not show (`videoShowing`): before the first frame, while the link reconnects, and during the photographer's pose steps. A press that took no photo says "Can't take a photo right now" where the labels show.
+  - The photographer's preview blinks, with "Joonhyung took a photo" (`RemoteAction.Shutter`). The subject's phone needs no line of its own: `photo.shutter` already blinks its video and says "Receiving photo…".
+  - The photographer's timer serves the subject's press too (FR-1.17, `CameraViewModel.onSubjectShutter`, `ShutterOutcome`). With the timer on, a press starts the countdown on both phones and is answered with `timer`; its end takes the photo. Camera says "Joonhyung pressed the shutter" (`RemoteAction.TimerStart`). The subject's phone does not set the timer.
+  - Either phone's shutter stops the countdown. While Subject view shows it, its shutter is Camera's stop square in the timer's ring, over the photographer's timer as chosen (`SubjectUiState.timer`) and from each second as it comes, so a late or lost second moves the ring only a little. It is named *Cancel the timer*, and a press goes with `cancel`. No line under the number says so, on either phone: the tutorial's tip on each shutter does ("Take the photo, or cancel a timer" here, and on Camera "Only the photo is saved, never the guide. Tap again to cancel a timer"). The press says what it meant because it may arrive late: a cancel that finds no countdown does nothing, and a press for a photo that meets a countdown leaves it to its own photo. Camera says "Joonhyung cancelled the timer" (`RemoteAction.TimerStop`). The subject's phone says nothing for a press the timer answered, nor for a cancel that was refused or not answered.
+  - `taken` is said as the camera is asked for the photo, not once it has it: the subject's shutter waits 2 s at most, and a photo with the flash can take longer. A photo that fails after its shutter is `photo.dropped`, which the subject's phone says as a photo it could not save (`PhotoSyncer.received`), once for each shot.
+- **AI poses from the subject's phone (FR-6.15, [#276]).** The subject's *Add a pose guide* offers the situations. A tile sends `pose.start` (`SessionViewModel.askForPoses`) and starts nothing on the subject's phone, whose camera has no part in it.
+  - The photographer's Camera screen begins the scene photo's step for that situation, through the code its own tile runs (`CameraFragment.startPosesForSubject`, `GenerationViewModel.chooseSituation`, `beginScene`). It gives itself to `RemoteControlHandler` while it is started, as for the shutter (`SessionViewModel.setRemotePoseStarter`).
+  - From there nothing differs from the photographer's own start: the photographer takes the scene photo, and `DescriptionShare`, `PoseShare`, and `ConfirmShare` carry the steps to both phones. The subject's shutter stays refused during the scene photo's step.
+  - The start is refused while Camera is not the screen in front, while a scene photo is framed or held, with the photos open over the camera, while the photographer's timer counts down, when their own *Guide* waits too (FR-1.17), and for a selfie on a phone without a front camera. The answer is `pose.start.answer`; nothing is queued.
+  - Consent is each phone's own (FR-4.2). The subject's phone asks before it sends the request, in words that say the photographer takes the photo. The photographer's phone sends the photo, so without its user's consent it shows the notice with "Joonhyung asked for AI poses." and begins once they agree; *Not now*, or leaving Camera, refuses. A second request while the notice is up is refused. The notice goes with its session: when that ends, or another subject's begins, it is taken down unanswered, so agreeing later cannot begin the step for no one or in another session; a drop of the same session keeps it.
+  - Camera says "Joonhyung started AI poses" (`RemoteAction.PoseStart`). Subject view says "Dongje takes the scene photo for the poses", "Waiting for Dongje to agree" while the photographer reads the notice, or "Can't start AI poses right now" (`SessionViewModel.poseStartAnswers`, buffered). Subject view takes an answer, and a refused press, only while it is what its user looks at (`SubjectFragment.uncovered`): under *Add a pose guide*, which leaves it started, under another screen, under its own photos, or under a dialog of its own ("Leave the session?", the tutorial's tips), the line would come and go unseen, so it is said once the screen is uncovered.
+  - The subject's request waits 2 s for the photographer's phone to say anything (`POSE_START_WAIT_MS`), then counts as refused: a message can be lost (2.8). An answer with `asking` ends that limit, since the notice may be read for long. Only the request that waits is answered, by its number, and while it waits another tile asks nothing: the photographer's phone would begin the first and refuse the second, and the subject would be told the refusal. `pose.start` goes on the realtime channel, so a request the subject's phone gave up cannot arrive later and open the step. `RemoteControlHandler` answers while the session's id is the same, not while its own run is: a drop during the photographer's notice stops and restarts it, and the subject, whose limit `asking` ended, would wait without end. A session's end drops its waiting request and any answer no screen has read, so the next session, with another photographer, says nothing of them.
+- **The timer from the subject's phone ([#318]).** *Subject view*'s menu has *Timer*, which sets the photographer's timer as *Flash* sets their flash.
+  - There is one timer, on the photographer's phone (`ShutterTimerChoice`). The subject's tap sends `camera.timer.set` (`SubjectViewModel.onTimerTap`), `RemoteControlHandler` sets the choice, and Camera shows it from there, in its bar and its menu, with "Joonhyung set the timer to 3 s" or "Joonhyung turned the timer off" (`RemoteAction.Timer`).
+  - Every `camera.state` carries the timer, so both menus show one value. The session keeps it (`SessionManager.peerTimerSeconds`), since the first state of a session comes before Subject view exists, so a subject that joins with the timer on sees it at once. The subject's item changes at the tap, and the answer confirms it or puts it back, as for the flash; without an answer in 2 s it goes back to what the photographer's phone said last.
+  - The photographer's own tap sets the same choice, and goes to the subject as `camera.state` and as a `camera.did`, which Subject view says where its labels show.
+  - While the timer counts down, *Timer* waits on both phones: Subject view disables it, and a request that still comes is answered with the unchanged state. Of two changes at once, the later wins, and both phones end on it.
+  - Subject view shows the photographer's flash and timer beside its menu's button while they are on, in Camera's places and sizes (`CameraLayoutTest`), and names its shutter for the timer. A tap on the icons opens the menu, through a 48 dp area over them, since they are 16 dp (NFR-16); on Camera, where the ratio stands right after them, the menu's button takes those taps instead.
+- **The photographer's countdown (It 5, FR-1.17, [#272]).** `CameraViewModel` tells `RemoteControlHandler.countdownHere` each second of the timer and 0 at its end, and the handler sends `camera.timer` while a session runs. Subject view shows the number large over the video with "Dongje is taking a photo" (`SubjectUiState.countdown`). Each second keeps it up for 2 s at most (`COUNTDOWN_STALE_MS`), so a number whose end never came goes by itself, and a drop takes it down. Either phone's shutter cancels it (above). The subject's *Flash* waits as the photographer's does: Subject view disables it, and `RemoteControlHandler` answers a `camera.flash.set` that still comes, sent before the first second arrived, with the unchanged state.
+- **Notices.** Camera shows each final remote action for 3 s, named from `hello` (FR-7.4, 2.5.1): "Joonhyung set zoom to 2×", "… moved the guide", "… set brightness to +1.0", "… turned the flash on" or "off", "… set the flash to auto", or "… set a pose guide". Subject view shows the same lines about the photographer, where its labels show ([#292]). The photographer's phone knows its own user's actions exactly, so it tells each once, when it ends, as `camera.did` (`RemoteControlHandler.didHere`, called by `CameraViewModel` and, for a guide set from a photo or the library, by `ReferenceViewModel`): a state alone would not say whether a brightness was set by hand or put back by a tap to focus. A chosen pose's guide is not told, since its Reference confirm ends with "… used this guide" on the subject's phone. The focus's line comes with `camera.focus`, as rarely as Camera's.
+  - While a subject watches, Camera's line right above the shutter says "Joonhyung" and "Watching your camera", in the form of *Subject view*'s line (`peerCaption`, FR-6.8). Both lines fit through `SessionCaption`: one line while it fits, the name over the rest at a large font, and a long name cut short. The open tip takes its place, and the scene photo's step and a reconnection hide it. No notice says it as well.
 - **The subject gone.** "Joonhyung left" or "… disconnected" (FR-6.10, FR-6.11) stays 10 s (`CameraViewModel.PEER_GONE_NOTICE_MS`), since the photographer may not be looking. It goes once the subject is back. A "Couldn't send" notice waits for it (FR-6.14).
 
 #### 2.6.6 Invitations and push (Iteration 3)
@@ -2897,35 +3153,36 @@ Subject view's controls are requests. The photographer's phone applies them in a
 #### 2.6.7 Reconnection and sessions across networks (Iteration 3)
 
 - **ICE.** Each phone gets its own Cloudflare STUN and TURN credentials from the server's `turn` module, valid for 4 h (AD-14, 2.5.2). Without a key, or when Cloudflare fails or takes over 3 s, it gets STUN only. WebRTC tries a direct path, then the relay. A debug build with `pix.relayOnly=true` uses only the relay (`IceTransportsType.RELAY`).
-- **Drop detection.** `PeerConnection` `DISCONNECTED` or `FAILED` moves both phones to `Reconnecting`, with a 10 s budget (NFR-11).
+- **Drop detection.** `PeerConnection` `DISCONNECTED` or `FAILED` moves both phones to `Reconnecting`, with a 30 s budget (`RtcSessionManager.RECONNECT_BUDGET_MS`, NFR-11). It was 10 s until Iteration 5: T2 of UAT cycle 2 found that too short ([#293]).
   - The subject's video keeps its last frame, dimmed, with "Reconnecting…" (2.6.4). Its controls and shared-step buttons wait (2.6.5).
   - The photographer's live light goes out, *End session* stays, and frames keep flowing. `peer.left` with `CONNECTION_LOST` is ignored then.
+  - Camera says "Reconnecting with &lt;name&gt;…" above the shutter for the whole wait (`SessionViewModel.reconnectingWith`, [#293]). The line has no time of its own, like "… is zooming" (2.6.5), and shows before it. Another notice takes its place for its own time.
+  - `Reconnecting` carries `Connected`'s `peer` and `role`, and the line is read from them alone. A state flow shows a reader only its latest value, so a reader can miss the `Connected` before a drop.
   - The reliable channel closes only when the other phone closed its connection. Its closing ends the session: the photographer returns to `Waiting`, the subject to *Connection lost*.
   - If only the realtime channel closes, its messages use the reliable one (`realtimeLost`).
 - **Restart.**
-  - Each phone opens a new socket at once, since OkHttp's 15 s pings would outlast the budget. It sends `session.join` with `rejoin: true` and its token (2.5.2). The server moves the place, also from a socket it thinks open, and sends `peer.rejoined`.
+  - Each phone opens a new socket at once, since OkHttp's 15 s pings would take most of the budget to find a dead one. It sends `session.join` with `rejoin: true` and its token (2.5.2). The server moves the place, also from a socket it thinks open, and sends `peer.rejoined`.
   - The photographer sends an ICE-restart offer (`restartIce`) when its place is back and at every `peer.rejoined`, even on a working link. A restart waits for the last offer's answer, or 2 s. An answer with no offer pending is dropped.
   - Candidates wait for their description, and the photographer holds the subject's candidates until the new answer applies. Signals go only over a socket that holds the place.
   - The connection, both channels, the video track, and the reliable queue stay. `Reconnecting` ends when ICE connects with both channels open.
-  - The photographer then resends `camera.capabilities`, `camera.state`, the guide image unless `hello` named it, the final `guide.state`, and the open shared steps (2.5.1).
+  - The photographer then resends `camera.capabilities`, `camera.state`, the guide image unless the subject holds it (2.5.1, `guide.image.*`), the final `guide.state`, and the open shared steps (2.5.1).
   - A dropped socket reopens after 1 s, doubling to 30 s. While reconnecting it reopens every second, outside the doubling.
-- **Give up.** After 10 s the photographer says "&lt;name&gt; disconnected". It returns to `Waiting`, or ends an invitation's session. The subject shows *Connection lost*.
+- **Give up.** After 30 s the photographer says "&lt;name&gt; disconnected", in place of the reconnecting line. It returns to `Waiting`, or ends an invitation's session. The subject shows *Connection lost*.
   - *Reconnect* (`SessionEntry.Rejoin`) sends `session.join` with `rejoin: false`, the token, and the first credentials. It works while the photographer holds the session, up to 60 s after its last socket. Without a token it joins the code again. In an invitation's session it says the session has ended.
   - A failure before the server answers keeps the token; a refusal drops it.
   - If the photographer is off the server then, the subject resends `session.join` on `peer.rejoined`, so the photographer still gets `peer.joined`.
   - A refused rejoin (`NOT_FOUND`, `FORBIDDEN`) ends a reconnecting session with "The session has ended". A running session goes on phone to phone.
-- **Photos (FR-6.14).** A photo in flight waits through a drop: the subject keeps its partial file, and `sendBulk` resumes once connected. `PhotoSyncer` runs for the whole session. After 10 s the photographer says "Couldn't send" (2.6.5).
+- **Photos (FR-6.14).** A photo in flight waits through a drop: the subject keeps its partial file, and `sendBulk` resumes once connected. `PhotoSyncer` runs for the whole session. Its 30 s without word (`STALL_MS`) count only while the link is up, and start over once it is back, on both phones ([#293]): the session alone decides how long a drop may last. `Connected.drops` counts the drops a session came back from, so the time also starts over after a drop too short for a reader to see its `Reconnecting`. When the budget ends, the photographer says "Couldn't send" (2.6.5).
 - **Server deploys and restarts.** To a phone these look like a dropped socket. Sessions and room codes continue, since they live in the session store (AD-18, 2.7; 2.8, Deployment). The photographer restarts ICE once (`peer.rejoined`).
-- **Cellular notice (FR-6.13).** The first time a session's selected pair uses a cellular interface (`SessionManager.path`), the app says "The live view uses mobile data." Camera shows it as a notice, Subject view as a toast. It waits in `SessionViewModel.mobileDataPending` until shown, and only then is recorded in DataStore (`MobileDataNotice`). A session that ends first drops it.
+- **Cellular notice (FR-6.13).** The first time a session's selected pair uses a cellular interface (`SessionManager.path`), the app says "The live view uses mobile data." Camera shows it among its notices, Subject view as a Snackbar (2.8). It waits in `SessionViewModel.mobileDataPending` until shown, and only then is recorded in DataStore (`MobileDataNotice`). A session that ends first drops it.
 - **Measurement.** `Timings` marks `ice.connected`, `ice.disconnected`, `ice.restarted`, and the pair type (`host`, `srflx`, `relay`) for NFR-5 and NFR-10. It marks `session.reconnecting`, `signaling.rejoined`, and `session.reconnected <ms>` for NFR-11. `ice.pair` logs each pair, such as `local=relay/tcp remote=srflx network=cellular` (`LinkStatsParser`).
 
 #### 2.6.8 Settings (Iteration 3)
 
-The settings screen (FR-10.1, R&S 6.10; Iter3-P23, [#123]) opens from a gear on Camera's top bar. The gear hides during the scene photo only. In a session it stays beside *End session*, and Subject view has its own beside *Leave* ([#204]). Settings over Subject view covers it, so it watches the session and goes back to Subject view when the session ends, as the guide screens do. On the photographer's phone, Settings leaves Camera, so the subject's video pauses until the photographer comes back. `SettingsViewModel` is activity-scoped, so each screen applies a change when it shows again.
+The settings screen (FR-10.1, R&S 6.10; Iter3-P23, [#123]) opens from *Settings* in the camera menu, on Camera and on Subject view, also in a session (2.6.2, [#204], [#272]). The menu hides during the scene photo only. Settings over Subject view covers it, so it watches the session and goes back to Subject view when the session ends, as the guide screens do. On the photographer's phone, Settings leaves Camera, so the subject's video pauses until the photographer comes back. `SettingsViewModel` is activity-scoped, so each screen applies a change when it shows again.
 
 | Section | Rows |
 |----|----|
-| Camera | *Base brightness* |
 | Guide | Color, thickness, preview |
 | Shoot together | *Show the delay* |
 | General | *Language*, *Notifications* |
@@ -2935,7 +3192,7 @@ The settings screen (FR-10.1, R&S 6.10; Iter3-P23, [#123]) opens from a gear on 
 
 Each section's rows share one card, without dividers.
 
-- **Base brightness (FR-1.11, [#182]).** "Every photo starts from it. Tap to focus, then drag up or down to change it until the next tap." The slider runs from −2 to +2 EV in thirds, 0 by default, and shows its value, such as "+1.0". It is saved as `AppSettings.baseBrightness` (DataStore `base_brightness_ev`). Camera returns to it at each tap to focus (2.8, *Camera labels and brightness*). A camera with a smaller range clamps it.
+- **Grid and horizon bar (FR-1.9, FR-1.10, [#271], [#272]).** Not on this screen: the camera menu's *Grid* and *Horizon* turn them off and on (2.6.2). Both are on by default and kept as `AppSettings.showGrid` and `showLevel` (DataStore `show_grid`, `show_level`). `CameraCompositionView` draws each only while it is on; 1:1's dim stays. The grid applies on Camera and Subject view, which has no horizon bar. Camera's level sensor runs only while the screen is resumed and the bar is on.
 - **Guide look (FR-3.10).** Five colors: white, the default (FR-2.2); black; yellow; mint; and pink. Three thicknesses: about 1.5, 2, and 3 dp (`GuideThickness` 0.75, 1, 1.5), 2 dp by default. DataStore keeps them (`app_settings`).
   - A color is a `SRC_IN` filter on the white outline (`GuideOverlayView.lineColor`). The opacity still applies.
   - `GuideOutlines` traces another thickness from the mask off the main thread and keeps the last four. The default line shows until it is ready.
@@ -2952,15 +3209,17 @@ Each section's rows share one card, without dividers.
   - `TutorialFragment` is a see-through dialog among the screen's child fragments, so the camera and the video keep running, a sheet stays open, and the screen can still navigate.
   - Tips fade in over 200 ms (`Motion.FADE_MS`, Iter3-A14). A tap anywhere and Back mark them seen, pass touches through at once, and fade them out.
   - `CoachMarkLayout` dims the screen and cuts a dashed ring around each control in `TUTORIAL_TIPS`. Each caption is TalkBack text with a dashed arrow, placed to avoid the other captions and rings.
+  - Subject view's tip for the focus and the brightness has no control to ring. It rings a touch point on the video, a third of the way down and left of the middle, with its caption beside it (`pointOn`), as the guide's tip does on the guide ([#273]): above it is the title, and below it the zoom row's caption, which the guide's panel raises.
   - There is no *Got it* button: the whole layer closes the tips on a tap ([#204]). The line "Tap anywhere to close" sits at the bottom's middle, on the navigation bar's edge, on every screen and in either language. The captions keep clear of it.
   - A ring hugs what its control draws, not its touch area (`drawnOnScreen`, [#204]): a button's shape inside its insets; without a shape, its icon in a 36 dp circle, or its text with 8 dp of room. So *Generate poses*' action gets a ring around its text, and Save and ✕ get rings that do not overlap. A ring is around the box its control is drawn in, through its own and its parents' turns and moves, so it stays on a control that turns with the phone (`boundsOnScreen`, [#207]). A ring covers only the part of its control that the scrolling views around it and the window show (`shownOnScreen`, [#210]); a control scrolled out of view, or less than half shown, as on *Add a pose guide* on a short screen, gets none.
   - *Add a pose guide* rings the situations, then the whole *Choose from the gallery* and *My library* rows ([#210], [#243]). Each row's caption sits on its ring's top edge at the right, half over the row, with no arrow (`TutorialTip.onEdge`). The ring stops on both sides of it, as an outlined field's border does at its label. My library's row is the sheet's last, with the closing line under it, so its caption sits on the seam where the gallery's ring meets its own, and both rings stop around it (`seamRing`). A caption keeps to one line, shrinking to 50 % at most; with no room even then, it goes beside the row only where nothing is in the way, or the tip is left out. The two rows touch, so their rings each give up half of what they share and keep 6 dp apart; each gives up as much on its other side, so it stays centered on its row.
   - A ring is a circle only around a near-square control (sides within 4:5). The 3:4 scene photo gets a rounded ring, which keeps its corners, and its caption goes beside it.
   - The *Guide* button's ring goes around its icon, not its label, so the line fits below the controls.
+  - *Subject view*'s tips are *Guide*, the shutter ("Take the photo, or cancel a timer", [#314]), the zoom readout, the tap to focus, and the mode toggle. *Guide*'s and the shutter's captions stand above them, as Camera's.
   - The guide's tips include *Remove*, "Take the guide off", below its ✕ since *Save guide*'s caption is above ([#204]).
   - `showTutorialWhenDue` waits until the screen is in front, checking every 250 ms (`RECHECK_MS`). Camera's tips come 0.8 s after the preview streams, outside a session (FR-1.1, NFR-1); the guide's once a visible guide is drawn, also in a session. Subject view's come 0.8 s after the video shows.
   - `AppSettings.tutorialSeen` (DataStore `tutorial_seen_screens`) is null until read, so seen tips never flash. *Show the tutorial again* clears it (`resetTutorial`).
-- **Fewer words on the screens (FR-10.4).** The screens drop what the tutorial covers: the guide and scene-photo hints, the bodies of *Add a pose guide*, *Generate poses*, and *Pick a pose*, and Subject view's caption. Camera's hint chip shows only "Guide hidden", or "Pinch to zoom" once guide-edit mode is off. Consent, failures, waiting, and TalkBack descriptions stay (NFR-13). NFR-16's hallway test checks the screens without the tutorial.
+- **Fewer words on the screens (FR-10.4).** The screens drop what the tutorial covers: the guide and scene-photo hints, the bodies of *Add a pose guide*, *Generate poses*, and *Pick a pose*, and Subject view's caption. Camera's hint chip shows only "Guide hidden". Its line "Pinch to zoom" went: the tutorial shows the pinch, and Camera without a guide never said it ([#306]). Consent, failures, waiting, and TalkBack descriptions stay (NFR-13). NFR-16's hallway test checks the screens without the tutorial.
 
 ### 2.7 Database
 
@@ -3087,9 +3346,14 @@ erDiagram
 - One activity with a Navigation graph; each wireframe screen is a destination. `PixNavHostFragment` gives every move between screens its transition (2.1).
 - A flow's screens share an activity-scoped ViewModel: account, friends, generation, incoming invitations, pose saving, reference, session, and settings. Camera, Subject view, the subject's shared-step screens, and *Invitation* have their own.
 - A ViewModel takes user events and exposes its UI state as a `StateFlow`. One-shot results and notices come from buffered `Channel`s, so they wait while the screen is stopped.
+- Short notices are Snackbars through `ui/Notices.kt` (`showNotice`), never Toasts, so a notice can offer an action and takes Pix's look (`Widget.Pix.Snackbar`; [#298]). It goes on the activity's content after any navigation in the same turn, so one shown just before Back stays on the screen that follows. A screen that is a `NoticeAnchor`, Camera or Subject view, has it in its zoom row's place, over the readout and the buttons beside it: the anchor is `noticeLine`, a line of no height that `placeZoomRow` keeps where the row stands, 6 dp under it, so the notice sits 12 dp above it, as from the sides. It never covers the shutter or, on Subject view, the line that names the camera. While the photo viewer is open over the screen, the notice sits above the viewer's strip, or at the bottom without it (`PhotoViewer.noticeAnchor`), not over the photo. A sheet that stays open shows it in its own window (`showNoticeInDialog`). It lasts 2 s or 3.5 s, as a Toast did, and 5 s with *Undo*. A swipe down takes any notice away sooner (`SwipeDownToDismiss`): it follows the finger and fades, and goes past half its height or at a fling. The drag starts only while the finger has gone more down than sideways, and a fling counts only when mostly down, so a sideways swipe that wanders down leaves it. Going, by itself or swiped away, takes 300 ms (`notice_out_ms`): Material's own fade lasts `motionDurationMedium1`, 250 ms, which `ThemeOverlay.Pix.Notice` sets for the notices alone. Material's own swipe is sideways and only in a CoordinatorLayout, so `Notices.kt` makes every notice and sets it; no other file makes a Snackbar (`NoToastTest`). A drag may start on the action, which is then not pressed; in a sheet, it moves the notice and not the sheet.
+- A dialog's buttons (`Widget.Pix.Button.Dialog`) take back 12 dp at their end, so the last button's text keeps 24 dp from the dialog's side, as its title does from the other; 20 dp at their start keep the buttons' texts 32 dp apart, and stacked buttons in line ([#329]).
+- *Remove guide* keeps the guide and its `GuideState` in `CameraViewModel` until another guide goes on. *Undo* sets the same instance again with that state, so it stays saved, its tip comes back (2.6.3), and `GuideSyncer` sends it again, since `guide.clear` reset `peerHas`. Camera takes the notice down once a guide is on it ([#298]). The subject's ✕ has the same *Undo* on Camera, with the guide and its state from `RemoteAction.GuideRemove` (2.6.5).
+- *Leave* and *End session* ask first, as system Back on Subject view did. Each question is held by its screen and closed with it; Camera's also closes when the subject leaves first, and its *End session* then ends nothing ([#298]).
 - `AppContainer` creates every module, so a fake can stand in for one that is not ready.
 - Colors are tokens in `colors.xml`, in two sets (Iter4-P5, [#202]): the page tokens (`pix_*`), and the tokens on the image (`camera_*`, `guide_preview_*`), for what is drawn over the camera's image or a photo and for the camera screens' bars and shutter. No layout, drawable, color list, style, or theme writes a color as a value; an icon is white and takes its color from the tint where it is used. *Why:* a theme then changes values, not screens. Light mode, which would have given the page tokens a second value, was dropped on 11/20 ([#212]).
 - `Theme.Pix` is a DayNight theme that takes the mode Pix sets, not the phone's: `PixApplication` always sets dark, since light mode was dropped ([#212]).
+- A touch lights what it touched in its own shape (R&S 6.9, [#320]). A header's icon has a round light 40 dp across (`bg_header_icon`), drawn inside its 48 dp button. The button reaches 12 dp past its header's padding, so each header reaches 12 dp into the screen's padding and pads itself by as much, holding its buttons whole. A screen never stops clipping its children: a list that draws into its padding would then scroll over the header (`HeaderBackTest`). A row in a card has `bg_card_row`, a card that is one tap target `fg_list_card_press`, a thumbnail the press of its corners. An option of the camera menu or the ratios lights 4 dp inside itself, rounded (`bg_panel_option`). Android's `selectableItemBackground` is a square, whose corners show past a rounded shape. Its borderless light is a circle as wide as the view's diagonal, which spreads over the next option and is cut flat by the panel, or spreads past a thumbnail's corners; the scene photo on *Generate poses* lights in its own (`fg_small_thumbnail_press`, `RoundedHighlightTest`). Every dialog's title is 18 sp, the size Android's dialog title takes by itself for a title that does not fit on one line.
 
 **Concurrency**
 
@@ -3108,6 +3372,7 @@ erDiagram
 
 - Reliable messages wait in one ordered queue until `hello` has gone out and while the reliable channel's `bufferedAmount` is 256 KiB or more. Realtime messages never wait.
 - A guide image of tens of KB stays well under that limit, so control messages are not held up. A session photo of megabytes would hold the queue up, so its chunks go through `sendBulk`, outside it. They go one at a time, only while the queue is empty and `bufferedAmount` is below 64 KiB (2.6.5).
+- Each reader of `SessionManager.incoming` has its own queue of 1,024 messages (`MessageFanout`). A reader that falls behind delays only itself. Until Iteration 5 all readers shared one buffer of 64: a main thread that stood still while a photo's chunks arrived filled it, and the next messages were dropped for every reader, the end of a pose step among them.
 
 **Caching**
 
@@ -3122,9 +3387,10 @@ erDiagram
 - `FileSavedGuideStore` keeps each saved guide in `filesDir/guides/<id>/`, never in MediaStore:
   - `mask.png`, as the subject receives it, at most 720 px tall (`mask-png`, 2.5.1);
   - `reference.webp`, the 512 px reference copy;
-  - `meta.json`: `GuideState`, `anchor`, `aspect`, `source`, `savedAt`, and `order`.
-- It keeps at most 100 guides (`MAX_SAVED`); the save that deletes the oldest says so (`GuideSaved.removedOldest`). The increasing `order` sorts the list, so a clock set back cannot reorder it.
+  - `meta.json`: `GuideState`, `anchor`, `aspect`, `source`, `savedAt`, `order`, `favorite` when false ([#297]), and, when the guide has them, `situation` (its name on the server) and `memo` ([#270]). A folder without `favorite` is a favorite: every guide saved before the history was saved by ♥ or *Save guide*. A folder saved before has neither. An unknown `situation` reads as none.
+- It has no limit ([#297]): a guide goes only when the user deletes it, one or several at once (`delete(ids)`). Until Iteration 5 it kept 100 and deleted the oldest. The increasing `order` sorts the list, so a clock set back cannot reorder it.
 - A guide is written to a hidden `.<id>` folder, then renamed. A read deletes half-written folders, folders without a usable `meta.json` or `mask.png`, and any beyond 100. An older folder's `cutout.webp`, whose alpha is the mask, becomes `mask.png` at the first read, and the cutout is deleted.
+- `setMemo` and `setFavorite` write a new `meta.json` beside the old one (`.meta.json`) and rename it over the old one, so a failed write keeps the old values.
 - A start reads only the `meta.json` files, so a full library lists at once. Images are decoded on use or for a thumbnail; an undecodable mask fails the use with a message. A loaded guide's outline is traced again from its mask.
 - `thumbnail(id)` is the middle of the reference, or of the outline without one, cut to 3:4, at most 384 × 512 px, never enlarged.
 - A saved guide starts at its `anchor`, like a new guide, and its stored `GuideState` is not applied (FR-3.1).
@@ -3139,7 +3405,7 @@ erDiagram
 **Error handling**
 
 - Module interfaces return `Result` with typed errors (`NoPersonFoundException`, `GenerationError`, `EndReason`). ViewModels map each to exactly one failure screen.
-- One exception: an unreadable reference photo, or a segmentation model not ready within 60 s, shows the toast "Couldn't use this photo. Try another one." It returns to Camera, or to Subject view for the subject's guide.
+- One exception: an unreadable reference photo, or a segmentation model not ready within 60 s, shows the notice "Couldn't use this photo. Try another one." It returns to Camera, or to Subject view for the subject's guide.
 
 **Timeouts**
 
@@ -3148,11 +3414,11 @@ erDiagram
 | Pose generation | 60 s per run on the phone, 60 s per request from server to image API; the phone usually ends first, before the server's `504` (2.6.3) |
 | Other model calls | Each model's own limit on the server (2.6.3); the phone waits 10 s for variations, then repeats the description, and 15 s for a tip |
 | Session connecting | 15 s |
-| Reconnecting | 10 s before a dropped link counts as lost (2.4, 2.6.7) |
+| Reconnecting | 30 s before a dropped link counts as lost (2.4, 2.6.7) |
 | Signaling socket dropped in a session or while a room waits | Again after 1 s; every 1 s while reconnecting, otherwise doubling to 30 s |
 | Photographer's app in the background | 60 s, then it leaves the session |
 | Remote requests | 500 ms until an unanswered final request is answered; 5 s in which a late one is still the subject's (2.6.5) |
-| Session photo | Given up after 30 s without word from the subject (2.6.5) |
+| Session photo | Given up after 30 s without word from the subject, not counting a drop (2.6.5, 2.6.7) |
 | Room code | 10 min |
 | Invitation | 60 s (`PIX_INVITATION_TTL_SECONDS`); after an accept, at least 15 s for the friend's phone to take its place (`PIX_INVITATION_JOIN_SECONDS`); the photographer's phone gives up after 80 s without the server's word |
 | TURN credentials | 4 h (`PIX_TURN_TTL_SECONDS`, 14400) |
@@ -3163,7 +3429,7 @@ erDiagram
 
 - `BuildConfig.SERVER_URL` is AWS main, `https://swpp26t10.15-134-147-114.sslip.io/`, in release builds, so the store's build works on every network. Debug builds use AWS dev, `https://swpp26t10.3-105-185-251.sslip.io/`, or any server set in `pix.serverUrl`, such as a laptop on the test Wi-Fi. A debug build's `pix.relayOnly=true` forces the relay (2.6.7).
 - `BuildConfig.GOOGLE_SERVER_CLIENT_ID`, one constant in `app/build.gradle.kts`, equals the servers' `PIX_GOOGLE_CLIENT_ID`. Google accepts sign-in only from an APK whose signing key is registered as an Android OAuth client in that project.
-- Release builds allow no plain HTTP or WebSocket traffic (`network_security_config.xml`), so their server must use HTTPS. Debug builds allow it to any host, for a laptop or a course server, which have no TLS (AD-11).
+- Release builds allow no plain HTTP or WebSocket traffic (`network_security_config.xml`), so their server must use HTTPS. Debug builds allow it to any host, for a laptop, which has no TLS (AD-11).
 - `server/.env.example` lists every setting, and a test keeps it in step with the code. Each server must set the names left empty: `OPENROUTER_API_KEY` (never committed), `PIX_GOOGLE_CLIENT_ID`, and Cloudflare's TURN key, `PIX_TURN_KEY_ID` and `PIX_TURN_API_TOKEN` (AD-14). The rest are commented with the app's default, such as `PIX_POSE_MODEL`.
 - On a server, Compose sets `PIX_REDIS_URL`, `PIX_DATABASE_URL`, `PIX_JWT_SECRET`, and `PIX_FCM_CREDENTIALS_FILE`. `deploy.sh` makes the database password and the JWT secret once, in `/opt/pix/db-password` and `/opt/pix/jwt-secret`.
 - The FCM key belongs to a service account of the app's Firebase project that may only send FCM messages. Compose mounts it from `/opt/pix/secrets/`, readable only by the app's user; without it, no push goes out. Other secrets live only in each server's `/opt/pix/.env`.
@@ -3188,7 +3454,7 @@ erDiagram
 | `room.join` with a wrong code | 100 per 10 min | — | `PIX_JOIN_FAILURE_LIMIT`, `PIX_JOIN_FAILURE_WINDOW_SECONDS` (2.5.2) |
 
 - The global limits bound a day's model cost, however many addresses send. The OpenRouter key's spending limit, set in its dashboard, is the last bound. On the course servers, the address is the last `X-Forwarded-For` value, and on the AWS servers the address that connects (*Hosting*).
-- Requests to the AWS servers are encrypted with TLS. Over plain HTTP to a course server or a laptop, a scene photo, a sign-in password, and the tokens travel unencrypted (AD-11). The live view goes phone to phone, encrypted (NFR-14).
+- Requests to the AWS servers and the course servers are encrypted with TLS; on a course server, the course's proxy ends it before nginx. Over plain HTTP to a laptop, a scene photo, a sign-in password, and the tokens travel unencrypted (AD-11). The live view goes phone to phone, encrypted (NFR-14).
 - The AWS servers' logs, which hold the same lines, also go to CloudWatch in the servers' region (*Server logs and alerts*).
 - No URL holds a Pix ID or other personal data, because nginx's error log prints a failed request's whole request line. The lookup is `POST /users/lookup`. nginx and Uvicorn access logs leave out query strings.
 - Password hashes run two at a time per worker. A burst of sign-ins, which needs no account, then queues instead of taking a 64 MiB argon2id buffer per pool thread.
@@ -3218,7 +3484,7 @@ erDiagram
 | `guide_made` | Each guide from a gallery photo or a generated pose, also when it is left before it is made | `source`, `outcome` (`made`, `no_person`, `failed`, `cancelled`), `ms` | NFR-3 |
 | `poses_ended` | Each pose set's end, also when Back leaves it while generating | `request` (`suggested`, `described`), `situation`, `outcome` (`ok`, `cancelled`, or the `GenerationError`), `ready`, `total`, `ms` | FR-4.7, NFR-4 |
 | `session_connect` | Each try to connect, the subject's from its start and the photographer's from the subject joining | `entry`, `role`, `outcome` (`connected` or the `EndReason`), `ms` | NFR-10 |
-| `session_drop` | Each link that dropped while connected, once: back within the 10 s, or not, also when the session or its subject ends first | `role`, `recovered` (1 or 0), `ms` | NFR-11 |
+| `session_drop` | Each link that dropped while connected, once: back within the 30 s, or not, also when the session or its subject ends first | `role`, `recovered` (1 or 0), `ms` | NFR-11 |
 | `photo_taken` | Each shutter press | `outcome` (`saved`, `failed`), `shutter_ms` (until the camera took it), `ms`, `in_session` | NFR-19 |
 
 - Each field is an event-scoped custom definition in the linked Analytics property: a dimension, or a metric for a count or a time (milliseconds for `ms` and `shutter_ms`). Analytics' reports show only registered fields, from their registration on, so a new field is registered before its release.
@@ -3234,13 +3500,13 @@ erDiagram
 
 **Hosting** (AD-11)
 
-| Branch | Course server: campus network, HTTP | AWS server: every network, HTTPS | Builds |
+| Branch | Course server: every network, HTTPS through the course's proxy | AWS server: every network, HTTPS | Builds |
 |----|----|----|----|
-| `main` | Server A, `http://swpp26t10.147-46-242-169.sslip.io` | AWS main, `https://swpp26t10.15-134-147-114.sslip.io` | Release builds use AWS main |
-| `dev` | Server B, `http://swpp26t10.147-46-242-174.sslip.io` | AWS dev, `https://swpp26t10.3-105-185-251.sslip.io` | Debug builds use AWS dev |
+| `main` | Server A, `https://team10.swpp-2026-a.snu.ac.kr` | AWS main, `https://swpp26t10.15-134-147-114.sslip.io` | Release builds use AWS main |
+| `dev` | Server B, `https://team10.swpp-2026-b.snu.ac.kr` | AWS dev, `https://swpp26t10.3-105-185-251.sslip.io` | Debug builds use AWS dev |
 
 - Each branch's server runs in two versions with the same Compose setup, each with its own database and session store. The builds use the AWS versions, which stay on and answer from every network, cellular data included. A debug build reaches a course server through `pix.serverUrl`.
-- The course servers are reachable only through the course's HTTP proxy on port 80, and only from the campus network. They cannot reach each other.
+- The course servers are reachable only through the course's proxy, which serves HTTPS and WSS from every network with the course's certificates (`*.swpp-2026-a.snu.ac.kr`, `*.swpp-2026-b.snu.ac.kr`), sends plain HTTP on to HTTPS, and passes requests to nginx on port 80. They cannot reach each other.
 - The AWS servers serve HTTPS on port 443 with a Let's Encrypt certificate for a hostname that sslip.io resolves to their Elastic IP. certbot renews it through nginx on port 80 (`/.well-known/acme-challenge/`). `deploy.sh` adds `docker-compose.https.yml`, which publishes port 443, once the certificate exists, so the course servers serve port 80 only. On a server with the certificate, it refuses to deploy or roll back to a commit without that file, which would close port 443. nginx passes the scheme on (`X-Forwarded-Proto`), so invite links from the AWS servers start with `https://`.
 - `server/deploy/docker-compose.yml` runs:
   - `nginx` on port 80, and on 443 on the AWS servers, which forwards `/api/v1`, `/ws`, `/health`, the invite link's page `/i/<id>`, and the privacy policy's `/privacy`, serves `/version` and Let's Encrypt's check, and answers `404` to the rest, so FastAPI's `/docs` is not public;
@@ -3271,7 +3537,7 @@ erDiagram
 - Sign-up takes a Pix ID, a display name, and a password, or Google. Either account can add the other sign-in (`PUT /me/google`, `PUT /me/password`; 2.5.3). Without email, a lost password cannot be reset.
 - *Account* › *Delete account* deletes the account after asking (`DELETE /me`, FR-5.18); this phone signs out at once and the others at their next request. Guides and photos on the phone stay.
 - Passwords are hashed with argon2id (`argon2-cffi`'s defaults: 3 passes over 64 MiB) on a worker thread, so a hash does not hold up the worker's sockets. Only the hash is stored.
-- Passwords cross HTTPS to the AWS servers, and plain HTTP to a course server (AD-11, NFR-14). Log-in attempts are not limited.
+- Passwords cross HTTPS to the AWS servers and the course servers (AD-11, NFR-14). Log-in attempts are not limited.
 - Whether a Pix ID exists is not secret: the lookup tells any signed-in user, and `POST /auth/check-pix-id` anyone, for an exact Pix ID only (NFR-15). Neither is limited. A failed log-in answers alike for an unknown Pix ID and a wrong password.
 - `google-auth` verifies Google ID tokens against Google's published keys and our web client ID. The server stores only the Google subject.
 - A sign-in gives a 15-minute access token (`PIX_ACCESS_TOKEN_MINUTES`), a JWT that `PyJWT` signs with HS256 and `PIX_JWT_SECRET`. It also gives a refresh token valid 30 days from its last use (`PIX_SESSION_TTL_DAYS`; 2.5.3, *Session tokens*). The app keeps both in DataStore, in its private files, without Keystore encryption (*Privacy*).
@@ -3295,7 +3561,7 @@ erDiagram
 - CameraX opens every binding without the exposure index and the flash mode. `CameraXController` keeps them, as it keeps the zoom, and applies them again after a rebind, a lens switch, or the screen's return.
 - The camera stays `STARTING` until the exposure index is back, so no photo is taken at 0 EV.
 - While a separately exposed ultrawide without a flash is bound, the capabilities and the state report no flash, so the button hides. The chosen mode returns with the primary camera.
-- The capabilities come from the chosen side's primary camera: rear, or front in selfie mode. A switch of side starts again at 1× and the base brightness.
+- The capabilities come from the chosen side's primary camera: rear, or front in selfie mode. A switch of side starts again at 1× and 0 EV.
 - A tap focuses, meters, and sets the white balance at that point, then returns to continuous focus after 5 s (`FocusMeteringAction`). The point maps from frame to preview buffer through its crop and rotation, mirrored on the front camera.
 
 **Guide-edit mode** (AD-17)
@@ -3308,18 +3574,22 @@ erDiagram
 - Toggles say in words what they did. One chip with an icon at the top of the image (`toggleLabel`) shows *Hide* / *Show* ("Guide hidden", "Guide shown"), a tap on the zoom readout (the step, such as "2×"), a zoom held back while the other phone zooms ("Jaewan is zooming", FR-7.6), and *Save guide*'s notices.
 - The chip shows for 3 s (`CameraViewModel.NOTICE_MS`), and a new label replaces it at once. It is a live region for TalkBack. The hint chip steps aside for it, and opening the ratios takes it down (FR-1.13).
 - The guide-edit mode toggle shows `pinchModeLabel` above it for 3 s: *Guide* in the guide's color while drags and pinches move the guide, *Camera* in white while a pinch zooms. TalkBack reads "Pinch moves the guide" or "Pinch zooms the camera".
-- Subject view shows the same labels for its zoom step, its *Save guide* (no toast), and its toggle.
-- The pose tip's button closes an open tip, as any touch does (FR-4.10). The screen-wide touch skips the button, so one tap does not close and reopen the tip.
+- Subject view shows the same labels for its zoom step, its *Save guide*, and its toggle.
+- Only the pose tip's button closes an open tip (FR-4.10). The screen-wide touch closes the ratios and the camera menu, never the tip; a new ratio keeps the guide, so its tip stays open.
 - Brightness is `ExposureBarView`: a 48 × 128 dp touch area, a 1.5 dp accent line with a 2.5 dp outline, and a sun at the applied exposure index (FR-1.11).
 - A tap to focus brings the bar up beside the focus box: on its right, or its left near the image's right edge, always inside the image. Without point focus, it comes up at the tap.
 - Up without a tap point, as after the screen is made again, the bar stands at the middle of the image's right edge, clear of the horizon bar.
 - A drag on the bar, or one finger's drag up or down anywhere on the preview (`PinchZoomController.VerticalDrag`), moves the sun from where it was, up brighter. It changes the brightness by 1 EV for each 150 dp of the finger's way, whatever the camera's range and step (`ExposureBarView.DP_PER_EV`), so a swipe changes it by about 1 EV and a camera's usual ±2 EV takes a long drag each way, as with an iPhone's sun. Before, the bar's 114 dp of travel spanned the whole range, so a short swipe went most of the way ([#207]). The bar spans the camera's whole range, so the sun moves less than the finger. Each step applies at once, and the last again on release.
 - A drag that starts with the bar down first focuses there, as a tap, and starts from the base. A sideways move or a second finger is no brightness drag; guide-edit mode keeps the preview's drags.
-- Every photo starts from the base brightness in Settings, like iPhone's exposure adjustment (2.6.8). `CameraViewModel` applies `AppSettings.baseBrightness` as the nearest exposure index in the camera's range (`ExposureScale.indexOf`).
-- It applies it when the range is first known, when the range or step changes (another camera), and when the setting changes. Each tap to focus drops a drag's change and sets the base again; the setting stays.
-- TalkBack reads the bar as a slider with scroll actions. The bar fades after 3 s without a touch (`CameraFragment.BRIGHTNESS_IDLE_MS`). It stays while dragged or in TalkBack's focus; the idle time restarts when the focus leaves.
-- The focus box (`bg_focus_ring`) is a 64 dp square of a 1 dp accent line, with a short tick at the middle of each side. Subject view keeps its brightness button and horizontal slider (2.6.5).
-- Beside the bar, the box stays as long as the bar does, and the two fade out together in 200 ms, whatever closes the bar (`focusRingWithBar`). On a camera without brightness, the box fades by itself after about a second. Before, it went after a second while the bar stayed and still changed the brightness ([#207]).
+- Every photo starts at 0 EV, the base, like iPhone's exposure adjustment; no setting changes it ([#272]). `CameraViewModel` applies the index of 0 EV in the camera's range, or the range's nearest end (`CameraCapabilities.baseExposureIndex`), and so does a tap from the subject's phone (2.6.5).
+- It applies it when the range is first known and when the range or step changes (another camera). Each tap to focus drops a drag's change and sets the base again.
+- TalkBack reads the bar as a slider with scroll actions. The bar fades after 3 s without a touch (`FocusBrightness.IDLE_MS`). It stays while dragged or in TalkBack's focus; the idle time restarts when the focus leaves.
+- The focus box (`bg_focus_ring`) is a 64 dp square of a 1 dp accent line, with a short tick at the middle of each side. Subject view has the same box and bar for the photographer's camera, in place of its brightness button and slider (2.6.5, [#273]). `FocusBrightness` places and times both on either screen.
+- Beside the bar, the box stays as long as the bar does, and the two fade out together in 200 ms, whatever closes the bar (`FocusBrightness`). On a camera without brightness, the box fades by itself after about a second. Before, it went after a second while the bar stayed and still changed the brightness ([#207]).
+- A new ratio closes the bar on both screens. The rebind drops the focus point, so the box would mark a focus that is gone.
+- A finger lifted without moving the sun sends no value, and the bar then shows the brightness as it is. The old value would go out over a change the other phone made meanwhile (FR-7.6).
+- A camera that opens with 0 EV asked for reports 0 EV (`CameraXController.restoreExposureIfNeeded`). A change to 0 while the camera was closed was kept but never reported, so both bars showed the old value.
+- The ratio cannot change while the scene photo's shutter waits for its frame (`GenerationUiState.shooting`). A rebind then would leave no frame to take.
 
 **Language** (FR-10.2)
 
@@ -3354,7 +3624,7 @@ Owners follow the README's *Team* section. The Iteration 3 table names who built
 | **Settings and tutorial** (`SettingsViewModel`, `AppSettings`, `TutorialFragment`) | 조성민 (settings), 한준형 (tutorial) | — | — | All screens |
 | **Telemetry** (`telemetry/`) | 박재완 | — | — | All modules |
 
-The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 passed on the S21 and the S22 in Iteration 3, by eye. Remote focus and the remote-control switch (Iter2-P17, Could) move to Iteration 5, left out of Iteration 4 at its kickoff of 11/7. Remote focus is planned for Iteration 5 (Iter5-P9, [#273]); the switch was dropped at its kickoff of 11/21.
+The zoom without stutter was measured on the S23 Ultra in Iteration 2; IT-10 passed on the S21 and the S22 in Iteration 3, by eye. Remote focus and the remote-control switch (Iter2-P17, Could) move to Iteration 5, left out of Iteration 4 at its kickoff of 11/7. Remote focus was built in Iteration 5 (Iter5-P9, [#273]); the switch was dropped at its kickoff of 11/21.
 
 **Iteration 3 tasks** (from the kickoff of 2026-10-25; the tasks due 10/30 were for the user test of 10/31–11/1):
 
@@ -3447,11 +3717,11 @@ Left out of Iteration 4 at its kickoff, for the UAT and its fixes: the remote-co
 | The live view's sharpness after a reconnection (Iter5-P5, [#269]) | 박재완 | 11/25 | Open | 2.6.7, *Still open* |
 | The library's situations and memos (Iter5-P6, [#270]) | 한준형 | 11/26 | Open | 2.6.2, AD-16 |
 | UI fixes: switches for the grid and the horizon bar, "up to 30 s", and UAT cycle 2's opinions (Iter5-P7, [#271]) | 박재완 | 11/27 | Open | 2.6.2, 2.6.8 |
-| A self-timer for the shutter (Iter5-P8, [#272]) | 박재완 | 11/27 | Open | 2.6.2, *Still open* |
-| Remote focus, with the brightness beside the focus box (Iter5-P9, [#273]) | 박동제 | 11/27 | Open | 2.5.1, 2.6.5, *Still open* |
-| Options to choose on *Generate poses* (Iter5-P10, [#274]) | 박동제 | 11/27 | Open | 2.6.3, *Still open* |
+| A self-timer for the shutter (Iter5-P8, [#272]) | 박재완 | 11/27 | Open | 2.2, 2.5.1, 2.6.2, 2.6.5, 2.6.8 |
+| Remote focus, with the brightness beside the focus box (Iter5-P9, [#273]) | 박동제 | 11/27 | Open | 2.5.1, 2.6.5, 2.6.8, 2.8 |
+| Options to choose on *Generate poses* (Iter5-P10, [#274]) | 박동제 | 11/27 | Open | 2.6.3, 2.6.5 |
 | The cutout as a guide (Iter5-P11, [#275]) | 한준형 | 11/27 | Open | AD-6, 2.5.1, 2.6.1, 2.6.8, *Still open* |
-| Pose generation started by the subject (Iter5-P12, [#276]) | 한준형 | 11/27 | Open | 2.5.1, 2.6.3, 2.6.5, *Still open* |
+| Pose generation started by the subject (Iter5-P12, [#276]) | 박동제 | 11/27 | Open | 2.5.1, 2.6.3, 2.6.5 |
 | ONE store: requested by 11/22, registered by 11/29 (Iter5-P13, [#277]) | 조성민 | 11/29 | Open | 2.8 |
 | The beta testing plan (Iter5-P14, [#278]) | 조성민 | 11/29 | Open | Testing Documentation 5 |
 | The alpha test in class (Iter5-P15, [#279]) | 조성민 | 11/30 | Open | Testing Documentation 5 |
@@ -3619,3 +3889,18 @@ To be written in Iteration 5, with at least two patterns in detail. Each lists i
 [#283]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/283
 [#284]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/284
 [#285]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/285
+[#292]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/292
+[#293]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/293
+[#294]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/294
+[#295]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/295
+[#296]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/296
+[#297]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/297
+[#298]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/298
+[#304]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/304
+[#306]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/306
+[#310]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/310
+[#314]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/314
+[#318]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/318
+[#320]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/320
+[#327]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/327
+[#329]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/329

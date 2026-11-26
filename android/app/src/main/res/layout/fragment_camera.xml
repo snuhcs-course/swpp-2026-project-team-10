@@ -25,7 +25,7 @@
         app:layout_constraintTop_toTopOf="parent">
 
         <!-- Back during the scene photo for poses (R&S 6.3, #199): from the live camera to the camera as it was, from the
-             photo's review to the live camera again. -->
+             photo's review to the live camera again. One of the camera bar's buttons, at their size. -->
         <com.lastpenguin.pix.ui.camera.TurningButton
             android:id="@+id/sceneBackButton"
             style="@style/Widget.Pix.Button.Icon.TopBar"
@@ -39,8 +39,10 @@
             app:layout_constraintTop_toTopOf="parent"
             tools:visibility="visible" />
 
-        <!-- Flash (FR-1.12), whose tap moves to the next choice, and the aspect ratio (FR-1.13), whose tap opens the
-             ratios under the bar. During the scene photo, the flash keeps the light on, beside Back. -->
+        <!-- The camera menu (FR-1.17), whose tap opens the flash, the timer, the grid, the horizon bar, and Settings under
+             the bar, with the flash and the timer beside it while either is on; then the aspect ratio (FR-1.13), whose
+             tap opens the ratios under the bar. During the scene photo they move to the bar's end, after the title
+             (placeSceneBar), and the menu's flash is the phone's light, without Settings. -->
         <LinearLayout
             android:id="@+id/cameraSettings"
             android:layout_width="wrap_content"
@@ -51,13 +53,41 @@
             app:layout_constraintTop_toTopOf="parent">
 
             <com.lastpenguin.pix.ui.camera.TurningButton
-                android:id="@+id/flashButton"
+                android:id="@+id/cameraMenuButton"
                 style="@style/Widget.Pix.Button.Icon.TopBar"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:contentDescription="@string/flash_off"
+                android:contentDescription="@string/camera_menu"
+                app:backgroundTint="@color/camera_top_bar_button_background"
+                app:icon="@drawable/ic_tune" />
+
+            <!-- The flash while it is on or auto, and the timer while it is on (FR-1.12, FR-1.17): what the shutter will
+                 do, with the menu closed. The size and line of the bar's other icons, on their line: a bottom margin
+                 of half the bar's overhang centers them where the buttons center their icons. A tap on one opens the
+                 menu: too small for a tap of their own, they are in the reach of the menu's button
+                 (CameraFragment.reachOverIndicators). -->
+            <ImageView
+                android:id="@+id/flashIndicator"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_marginEnd="6dp"
+                android:layout_marginBottom="2dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_flash_on"
                 android:visibility="gone"
-                app:icon="@drawable/ic_flash_off"
+                app:tint="@color/pix_accent"
+                tools:visibility="visible" />
+
+            <ImageView
+                android:id="@+id/timerIndicator"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_marginEnd="6dp"
+                android:layout_marginBottom="2dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_timer_3"
+                android:visibility="gone"
+                app:tint="@color/pix_accent"
                 tools:visibility="visible" />
 
             <com.lastpenguin.pix.ui.camera.TurningButton
@@ -69,10 +99,10 @@
 
         </LinearLayout>
 
-        <!-- The title replaces Shoot together while the scene photo for poses is taken (R&S 6.3), in the size of the
-             bar's own action, since the bar stays the camera's (#231), and smaller where a long title at a large font
-             would not fit on its line beside the light and the ratio. Like the bar's other controls, it centers on the
-             bar above its last 4 dp, which lie over the image (#204). -->
+        <!-- The title while the scene photo for poses is taken (R&S 6.3), right after Back at the camera bar's size, and
+             smaller where a long title at a large font would not fit on its line before the menu and the ratio: down to
+             11 dp, not sp, so it fits at any font scale, 200 % included (#298). Like the bar's other controls, it centers
+             on the bar above its last 4 dp, which lie over the image (#204). -->
         <TextView
             android:id="@+id/sceneTitle"
             android:layout_width="0dp"
@@ -83,7 +113,7 @@
             android:accessibilityHeading="true"
             android:accessibilityLiveRegion="polite"
             android:autoSizeMaxTextSize="14sp"
-            android:autoSizeMinTextSize="11sp"
+            android:autoSizeMinTextSize="11dp"
             android:autoSizeTextType="uniform"
             android:gravity="center_vertical"
             android:maxLines="1"
@@ -92,10 +122,9 @@
             android:textColor="@color/pix_text"
             android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/topBarActions"
-            app:layout_constraintStart_toEndOf="@id/cameraSettings"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_goneMarginStart="0dp" />
+            app:layout_constraintEnd_toStartOf="@id/cameraSettings"
+            app:layout_constraintStart_toEndOf="@id/sceneBackButton"
+            app:layout_constraintTop_toTopOf="parent" />
 
         <!-- The latency indicator during a session, when Settings turns it on (FR-10.3). -->
         <TextView
@@ -122,14 +151,22 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent">
 
-            <!-- Settings (FR-10.1), also in a session beside End session (#204); not during the scene photo. -->
+            <!-- The camera switch (FR-1.14), also in a session beside End session; not during the scene photo, whose
+                 camera is its situation's (FR-4.8). Hidden on a phone without a front camera. Its icon is 2 dp larger
+                 than the bar's others, whose 16 dp its fine lines read small at, with 1 dp less padding each side, so
+                 its pill stays the bar's 50 dp. -->
             <com.lastpenguin.pix.ui.camera.TurningButton
-                android:id="@+id/settingsButton"
+                android:id="@+id/switchCameraButton"
                 style="@style/Widget.Pix.Button.Icon.TopBar"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:contentDescription="@string/settings"
-                app:icon="@drawable/ic_settings" />
+                android:contentDescription="@string/switch_to_front_camera"
+                android:visibility="gone"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                app:icon="@drawable/ic_switch_camera"
+                app:iconSize="18dp"
+                tools:visibility="visible" />
 
             <!-- Named in full, so it is a MaterialButton under any activity, which the tutorial's ring around its pill
                  needs (#204). -->
@@ -150,33 +187,21 @@
                 android:text="@string/end_session"
                 android:visibility="gone"
                 tools:visibility="visible" />
-
-            <!-- The scene photo's review (R&S 6.3, #199): Generate poses opens, once a person is found (FR-4.13). Its
-                 right edge 20 dp from the screen's, like every screen's action at the top right. -->
-            <Button
-                android:id="@+id/usePhotoButton"
-                style="@style/Widget.Pix.Button.Header.Camera"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="10dp"
-                android:text="@string/use"
-                android:visibility="gone"
-                tools:visibility="visible" />
         </LinearLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- Where the scene photo is in the pose flow (R&S 6.3, #210): 1 of 5 while it is framed, 2 while it is reviewed.
-         Along the top bar's bottom edge, over the image's top and over the review, as under the other screens'
-         titles. -->
+    <!-- Where the scene photo is in the pose flow (R&S 6.3, #210): 1 of 4, also while the photo taken is held (#296).
+         Along the image's top edge, right under what the top bar draws, as under the other screens' titles: the bar's
+         last 4 dp lie over the image, so at the bar's own bottom edge it would leave a strip of the image above it. -->
     <com.lastpenguin.pix.ui.FlowProgressView
         android:id="@+id/sceneProgress"
         android:layout_width="0dp"
         android:layout_height="@dimen/flow_progress_height"
         android:translationZ="3dp"
         android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="@id/topBar"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@id/previewContainer"
         tools:visibility="visible" />
 
     <!-- The ratios, opened from the ratio in the top bar (FR-1.13): each drawn in its own shape, the chosen one bright.
@@ -231,6 +256,115 @@
                 android:layout_height="24dp"
                 android:text="@string/aspect_1_1" />
         </FrameLayout>
+    </LinearLayout>
+
+    <!-- The camera menu (FR-1.17), opened from its button in the top bar: the flash (FR-1.12) and the timer, each tap the
+         next choice, the grid (FR-1.9) and the horizon bar (FR-1.10), each tap on or off, and Settings (FR-10.1). Each
+         item in the accent while it is on. A choice keeps it open; a touch anywhere else, or Back, closes it. -->
+    <LinearLayout
+        android:id="@+id/cameraMenu"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginTop="4dp"
+        android:accessibilityPaneTitle="@string/camera_menu"
+        android:background="@drawable/bg_aspect_panel"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:outlineProvider="none"
+        android:paddingHorizontal="8dp"
+        android:translationZ="2dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topBar"
+        tools:visibility="visible">
+
+        <LinearLayout
+            android:id="@+id/menuFlash"
+            style="@style/Widget.Pix.CameraMenuOption"
+            android:contentDescription="@string/flash_off">
+
+            <ImageView
+                android:id="@+id/menuFlashIcon"
+                style="@style/Widget.Pix.CameraMenuOption.Icon"
+                android:src="@drawable/ic_menu_flash_off"
+                tools:ignore="ContentDescription" />
+
+            <TextView
+                style="@style/Widget.Pix.CameraMenuOption.Label"
+                android:text="@string/menu_flash" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/menuTimer"
+            style="@style/Widget.Pix.CameraMenuOption"
+            android:contentDescription="@string/timer_off">
+
+            <ImageView
+                android:id="@+id/menuTimerIcon"
+                style="@style/Widget.Pix.CameraMenuOption.Icon"
+                android:src="@drawable/ic_menu_timer_off"
+                tools:ignore="ContentDescription" />
+
+            <TextView
+                style="@style/Widget.Pix.CameraMenuOption.Label"
+                android:text="@string/menu_timer" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/menuGrid"
+            style="@style/Widget.Pix.CameraMenuOption"
+            android:contentDescription="@string/grid_on">
+
+            <ImageView
+                style="@style/Widget.Pix.CameraMenuOption.Icon"
+                android:src="@drawable/ic_menu_grid"
+                tools:ignore="ContentDescription" />
+
+            <TextView
+                style="@style/Widget.Pix.CameraMenuOption.Label"
+                android:text="@string/settings_grid" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/menuLevel"
+            style="@style/Widget.Pix.CameraMenuOption"
+            android:contentDescription="@string/level_on">
+
+            <ImageView
+                style="@style/Widget.Pix.CameraMenuOption.Icon"
+                android:src="@drawable/ic_menu_horizon_bar"
+                tools:ignore="ContentDescription" />
+
+            <TextView
+                style="@style/Widget.Pix.CameraMenuOption.Label"
+                android:text="@string/menu_level" />
+        </LinearLayout>
+
+        <!-- Sets Settings apart from the camera's own settings; it goes with Settings in the scene photo (#210). -->
+        <View
+            android:id="@+id/menuSettingsDivider"
+            android:layout_width="1dp"
+            android:layout_height="32dp"
+            android:layout_marginHorizontal="4dp"
+            android:background="@color/pix_outline"
+            android:importantForAccessibility="no" />
+
+        <LinearLayout
+            android:id="@+id/menuSettings"
+            style="@style/Widget.Pix.CameraMenuOption"
+            android:contentDescription="@string/settings">
+
+            <ImageView
+                style="@style/Widget.Pix.CameraMenuOption.Icon"
+                android:src="@drawable/ic_menu_settings"
+                tools:ignore="ContentDescription" />
+
+            <TextView
+                style="@style/Widget.Pix.CameraMenuOption.Label"
+                android:text="@string/settings" />
+        </LinearLayout>
     </LinearLayout>
 
     <FrameLayout
@@ -309,8 +443,8 @@
             android:importantForAccessibility="no"
             android:visibility="gone" />
 
-        <!-- Brightness (FR-1.11): a vertical bar beside where a tap focused; a drag up on it or on the preview adds to
-             the base brightness from Settings until the next tap. It fades out after a few seconds without a touch
+        <!-- Brightness (FR-1.11): a vertical bar beside where a tap focused; a drag up on it or on the preview sets it
+             from 0 EV, where each tap puts it back. It fades out after a few seconds without a touch
              (Design 2.8). 48 dp wide for the touch (NFR-16); placed in code. -->
         <com.lastpenguin.pix.ui.camera.ExposureBarView
             android:id="@+id/exposureBar"
@@ -395,13 +529,13 @@
                 tools:text="@string/photo_save_failed"
                 tools:visibility="visible" />
 
-            <!-- What the screen does not show by itself: a hidden guide, or that a pinch zooms (Design 2.6.8). -->
+            <!-- What the screen does not show by itself: a hidden guide (Design 2.6.8). -->
             <TextView
                 android:id="@+id/hintText"
                 style="@style/Widget.Pix.Chip.Small"
                 android:visibility="invisible"
-                tools:drawableStartCompat="@drawable/ic_zoom_small"
-                tools:text="@string/hint_pinch_zoom"
+                tools:drawableStartCompat="@drawable/ic_visibility_off_small"
+                tools:text="@string/hint_guide_hidden"
                 tools:visibility="visible" />
         </LinearLayout>
 
@@ -416,6 +550,33 @@
             android:visibility="gone"
             tools:ignore="RtlHardcoded"
             tools:visibility="visible" />
+
+        <!-- The timer's countdown (FR-1.17): the seconds left, large in the middle of the image, so the people in the photo
+             can read it. That the shutter stops it is the shutter's stop square in the timer's ring meanwhile, its
+             name, and the tutorial's tip, not a line here. The number turns with the phone (FR-1.15) in a square, so it
+             fits either way. It passes touches through. -->
+        <LinearLayout
+            android:id="@+id/countdownPanel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <com.lastpenguin.pix.ui.camera.TurningLabel
+                android:id="@+id/countdownNumber"
+                android:layout_width="200dp"
+                android:layout_height="200dp"
+                android:accessibilityLiveRegion="polite"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:textAppearance="@style/TextAppearance.Pix.Countdown"
+                android:textSize="120dp"
+                tools:ignore="SpUsage"
+                tools:text="3" />
+        </LinearLayout>
 
         <LinearLayout
             android:id="@+id/cameraMessagePanel"
@@ -471,8 +632,10 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Right above the shutter's row: remote action notices, the pose tip, and the guide's controls. In
-         the space below the image when they fit there, and over the image when it reaches the controls (R&S 6.2). -->
+    <!-- Right above the shutter's row: remote action notices, the pose tip, the guide's controls, and in a session
+         the line that says who watches. In the space below the image when they fit there, and over the image when it
+         reaches the controls (R&S 6.2). 4 dp over the row, as on Subject view, so the guide's controls keep clear of
+         the image above them. -->
     <LinearLayout
         android:id="@+id/bottomOverlays"
         android:layout_width="0dp"
@@ -481,7 +644,7 @@
         android:orientation="vertical"
         android:outlineProvider="none"
         android:paddingHorizontal="12dp"
-        android:paddingBottom="8dp"
+        android:paddingBottom="4dp"
         android:translationZ="1dp"
         app:layout_constraintBottom_toTopOf="@id/bottomPanel"
         app:layout_constraintEnd_toEndOf="parent"
@@ -496,8 +659,8 @@
             tools:visibility="visible" />
 
         <!-- How to hold the phone for a generated pose (FR-4.10): open once when its guide comes, "Preparing a
-             tip…" until the tip arrives; a touch anywhere closes it, and the tip button in the top bar opens it
-             again. Translucent, so the preview shows through. -->
+             tip…" until the tip arrives; only the tip button in the zoom row closes and opens it. A touch on it does
+             nothing, and does not reach the image under it. Translucent, so the preview shows through. -->
         <LinearLayout
             android:id="@+id/tipBanner"
             android:layout_width="match_parent"
@@ -505,7 +668,6 @@
             android:layout_marginTop="8dp"
             android:accessibilityLiveRegion="polite"
             android:background="@drawable/bg_glass_panel"
-            android:clickable="true"
             android:focusable="true"
             android:gravity="center_vertical"
             android:minHeight="48dp"
@@ -578,14 +740,14 @@
                 android:textColor="@color/slider_value_text"
                 tools:text="50%" />
 
-            <!-- Save guide (FR-3.8): filled once the guide on the camera is saved. -->
+            <!-- Save guide (FR-3.8): a ♥, filled red once the guide on the camera is a favorite (#297). -->
             <com.lastpenguin.pix.ui.camera.TurningButton
                 android:id="@+id/saveGuideButton"
                 style="@style/Widget.Pix.Button.Icon"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:contentDescription="@string/save_guide"
-                app:icon="@drawable/ic_bookmark" />
+                app:icon="@drawable/ic_heart" />
 
             <!-- Remove guide, its ✕ in light red to set it apart from the panel's other controls (E3, #204). -->
             <com.lastpenguin.pix.ui.camera.TurningButton
@@ -599,8 +761,10 @@
         </LinearLayout>
 
         <!-- While the scene photo for poses is framed (R&S 6.3, FR-4.8, #210): what to frame for the situation, and what
-             the photo is for, until a touch anywhere takes it away (#231). In the space below the image, or over it
-             when it reaches the controls, so it is see-through like the other panels over the image, and small. -->
+             the photo is for, until a touch anywhere takes it away (#231); after a photo without a person, that no one
+             was in it and that another is needed, with an alert for the bulb (FR-4.13, #296). In the space below the
+             image, or over it when it reaches the controls, so it is see-through like the other panels over the image,
+             and small. -->
         <LinearLayout
             android:id="@+id/sceneGuide"
             android:layout_width="match_parent"
@@ -621,6 +785,7 @@
                 android:background="@drawable/bg_scene_guide_icon">
 
                 <ImageView
+                    android:id="@+id/sceneGuideIcon"
                     android:layout_width="18dp"
                     android:layout_height="18dp"
                     android:layout_gravity="center"
@@ -654,12 +819,84 @@
                     android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
+
+        <!-- While a subject watches, right above the shutter, as Subject view's line that names the camera (R&S 6.2):
+             who watches, and that they watch this camera live. At a font too large for one line, the name stands over
+             the rest (SessionCaption). -->
+        <LinearLayout
+            android:id="@+id/peerCaption"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:minHeight="24dp"
+            android:orientation="horizontal"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical">
+
+                <!-- Red, as the live light over the image. -->
+                <ImageView
+                    android:id="@+id/peerCaptionDot"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:layout_marginEnd="6dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_status_dot"
+                    app:tint="@color/pix_recording" />
+
+                <!-- A name too long for the line is cut short (SessionCaption). -->
+                <TextView
+                    android:id="@+id/peerCaptionTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
+                    android:textColor="@color/pix_text"
+                    android:textSize="14sp"
+                    tools:text="Joonhyung" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/peerCaptionSeparator"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:importantForAccessibility="no"
+                    android:includeFontPadding="false"
+                    android:text="@string/caption_separator"
+                    android:textAppearance="@style/TextAppearance.Pix.Label"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/peerCaptionStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:text="@string/peer_caption_status"
+                    android:textAppearance="@style/TextAppearance.Pix.Label"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
     </LinearLayout>
 
     <!-- The applied zoom (FR-1.3), which a pinch on the preview changes, the pose tip's button, and the guide-edit
          mode toggle, over the bottom of the image whatever the ratio, above the panels below when they reach into it
-         (placed in code); the same row as Subject view, which has no tip and keeps a brightness button, since the base
-         brightness is in Settings here (FR-1.11). The readout keeps the Zoom in / Zoom out accessibility actions. -->
+         (placed in code); the same row as Subject view. The readout and the buttons are on glass, so they show on a
+         bright scene (#298). The readout keeps the Zoom in / Zoom out accessibility actions. -->
     <FrameLayout
         android:id="@+id/zoomRow"
         android:layout_width="0dp"
@@ -682,7 +919,7 @@
             android:importantForAccessibility="yes"
             android:minWidth="48dp"
             android:paddingHorizontal="12dp"
-            android:paddingVertical="10dp"
+            android:paddingVertical="8dp"
             android:textAppearance="@style/TextAppearance.Pix.Label.Bold"
             android:textColor="@color/zoom_readout_text"
             android:textSize="11sp"
@@ -694,8 +931,9 @@
             android:layout_gravity="end|center_vertical"
             android:gravity="center_vertical">
 
-            <!-- Opens the pose tip again while the guide on the camera has one (FR-4.10); the dot says a tip came
-                 while the banner was closed. Beside the guide's own button, so the top bar fits any phone. -->
+            <!-- Opens and closes the pose tip while the guide on the camera has one (FR-4.10), lit while the tip is
+                 open; nothing else closes it. The dot says a tip came while the banner was closed. Beside the guide's own
+                 button, so the top bar fits any phone. -->
             <FrameLayout
                 android:id="@+id/tipButtonFrame"
                 android:layout_width="wrap_content"
@@ -706,11 +944,14 @@
 
                 <com.lastpenguin.pix.ui.camera.TurningButton
                     android:id="@+id/tipButton"
-                    style="@style/Widget.Pix.Button.Icon"
+                    style="@style/Widget.Pix.Button.Icon.OnPhoto"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:contentDescription="@string/show_tip"
-                    app:icon="@drawable/ic_lightbulb" />
+                    app:backgroundTint="@color/tip_button_background"
+                    app:icon="@drawable/ic_lightbulb"
+                    app:iconTint="@color/tip_button_icon"
+                    app:strokeColor="@color/tip_button_stroke" />
 
                 <ImageView
                     android:id="@+id/tipDot"
@@ -726,18 +967,19 @@
                     tools:visibility="visible" />
             </FrameLayout>
 
-            <!-- Shown while a guide is on the camera (AD-17); checked while drags and pinches edit the guide. Its icon names
-                 the mode: a person's outline while editing, a camera while a pinch zooms (showGuideEditing, #204). -->
+            <!-- Shown while a guide is on the camera (AD-17); checked while drags and pinches edit the guide. One person's
+                 outline, lit in the guide's color while checked (#271). -->
             <com.lastpenguin.pix.ui.camera.TurningButton
                 android:id="@+id/editGuideButton"
-                style="@style/Widget.Pix.Button.Icon"
+                style="@style/Widget.Pix.Button.Icon.OnPhoto"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checkable="true"
                 android:contentDescription="@string/edit_guide"
                 android:visibility="gone"
                 app:backgroundTint="@color/edit_guide_background"
-                app:icon="@drawable/ic_camera"
+                app:strokeColor="@color/edit_guide_stroke"
+                app:icon="@drawable/ic_guide_mode"
                 app:iconTint="@color/edit_guide_icon"
                 tools:visibility="visible" />
         </LinearLayout>
@@ -759,6 +1001,17 @@
         tools:text="@string/pinch_mode_guide"
         tools:visibility="visible" />
 
+    <!-- The line the zoom row stands on, 6 dp under it: the image's bottom, or the top of the panels over it. A notice
+         sits on it, over the zoom row (ui/Notices.kt, NoticeAnchor). Moved with the zoom row in code. -->
+    <View
+        android:id="@+id/noticeLine"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:importantForAccessibility="no"
+        app:layout_constraintBottom_toTopOf="@id/bottomPanel"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
     <LinearLayout
         android:id="@+id/bottomPanel"
         android:layout_width="0dp"
@@ -775,18 +1028,20 @@
 
         <!-- Guide, shutter, and the last photo, in thirds and on one center line; the Guide label hangs below. The
              shutter keeps its size and place whatever the ratio (R&S 6.2). The panel around it gives the preview's
-             place its height (previewArea), so it stays even with this row alone in it. -->
+             place its height (previewArea), so it stays even with this row alone in it. The row is 88 dp, the shutter
+             and the last photo centered in that, and grows below them only for a Guide label taller than 16 dp, at a
+             large font, as Subject view's row does (#298). -->
         <LinearLayout
             android:id="@+id/captureControls"
             android:layout_width="match_parent"
-            android:layout_height="88dp"
+            android:layout_height="wrap_content"
             android:baselineAligned="false"
-            android:gravity="center_vertical"
+            android:minHeight="88dp"
             tools:ignore="UselessParent">
 
             <FrameLayout
                 android:layout_width="0dp"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:layout_weight="1">
 
                 <LinearLayout
@@ -795,6 +1050,7 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="top|center_horizontal"
                     android:layout_marginTop="24dp"
+                    android:layout_marginBottom="4dp"
                     android:clickable="true"
                     android:contentDescription="@string/guide_add_description"
                     android:focusable="true"
@@ -817,7 +1073,7 @@
 
                     <TextView
                         android:layout_width="wrap_content"
-                        android:layout_height="16dp"
+                        android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:duplicateParentState="true"
                         android:gravity="center"
@@ -831,7 +1087,7 @@
 
             <FrameLayout
                 android:layout_width="0dp"
-                android:layout_height="match_parent"
+                android:layout_height="88dp"
                 android:layout_weight="1">
 
                 <ImageButton
@@ -843,117 +1099,61 @@
                     android:contentDescription="@string/shutter" />
             </FrameLayout>
 
-            <!-- A third of the row, as for Guide and the shutter: the camera switch next to the shutter, then the
-                 gallery button; the gallery button alone keeps the middle on a phone without a front camera. -->
+            <!-- A third of the row, as for Guide and the shutter, the gallery button in its middle, as on Subject view. -->
             <FrameLayout
                 android:layout_width="0dp"
-                android:layout_height="match_parent"
+                android:layout_height="88dp"
                 android:layout_weight="1"
                 tools:ignore="UselessParent">
 
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                <!-- The newest photo: a 40 dp thumbnail in a 48 dp touch area (NFR-16), which takes the taps and
+                     opens Pix's photos in the viewer (FR-1.6); the thumbnail shows its pressed state. -->
+                <FrameLayout
+                    android:id="@+id/galleryButton"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:layout_gravity="center"
-                    android:orientation="horizontal">
+                    android:clickable="true"
+                    android:contentDescription="@string/open_newest_photo"
+                    android:focusable="true">
 
-                    <!-- The camera switch (FR-1.14): a 40 dp glass circle in a 48 dp touch area (NFR-16). -->
-                    <FrameLayout
-                        android:id="@+id/switchCameraButton"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:layout_marginEnd="4dp"
-                        android:clickable="true"
-                        android:contentDescription="@string/switch_to_front_camera"
-                        android:focusable="true"
-                        android:visibility="gone"
-                        tools:visibility="visible">
-
-                        <ImageView
-                            android:id="@+id/switchCameraIcon"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:layout_gravity="center"
-                            android:background="@drawable/bg_guide_button"
-                            android:duplicateParentState="true"
-                            android:importantForAccessibility="no"
-                            android:padding="9dp"
-                            android:scaleType="fitCenter"
-                            android:src="@drawable/ic_switch_camera"
-                            app:tint="@color/guide_button_icon" />
-                    </FrameLayout>
-
-                    <!-- The newest photo: a 40 dp thumbnail in a 48 dp touch area (NFR-16), which takes the taps and
-                         opens Pix's photos in the viewer (FR-1.6); the thumbnail shows its pressed state. -->
-                    <FrameLayout
-                        android:id="@+id/galleryButton"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:clickable="true"
-                        android:contentDescription="@string/open_newest_photo"
-                        android:focusable="true">
-
-                        <com.google.android.material.imageview.ShapeableImageView
-                            android:id="@+id/galleryThumbnail"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:layout_gravity="center"
-                            android:background="@color/pix_glass"
-                            android:duplicateParentState="true"
-                            android:foreground="?attr/selectableItemBackground"
-                            android:importantForAccessibility="no"
-                            android:padding="1dp"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/gallery_placeholder"
-                            app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.Thumbnail"
-                            app:strokeColor="@color/camera_thumbnail_stroke"
-                            app:strokeWidth="1.5dp" />
-                    </FrameLayout>
-                </LinearLayout>
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/galleryThumbnail"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_gravity="center"
+                        android:background="@color/pix_glass"
+                        android:duplicateParentState="true"
+                        android:foreground="@drawable/fg_thumbnail_press"
+                        android:importantForAccessibility="no"
+                        android:padding="1dp"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/gallery_placeholder"
+                        app:shapeAppearanceOverlay="@style/ShapeAppearance.Pix.Thumbnail"
+                        app:strokeColor="@color/camera_thumbnail_stroke"
+                        app:strokeWidth="1.5dp" />
+                </FrameLayout>
             </FrameLayout>
         </LinearLayout>
 
     </LinearLayout>
 
-    <!-- The scene photo that was taken, over the camera, until it is used or Back shoots again (R&S 6.3, #199): in the
-         middle of the room under the top bar, which the bar's last 4 dp of touch height reach over, and what it is for
-         12 dp under it, or over its bottom when the photo leaves no room (placeSceneMessage). -->
-    <FrameLayout
-        android:id="@+id/sceneReview"
+    <!-- The scene photo that was just taken, held exactly over the preview, so the image seems to stop, while the
+         phone looks for a person in it and, with one, until Generate poses has taken it (R&S 6.3, FR-4.13, #296). It
+         fits the preview's place as the frame does, also the square in its 4:3 area. -->
+    <ImageView
+        android:id="@+id/sceneStill"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginTop="-4dp"
-        android:background="@color/camera_bar"
+        android:contentDescription="@string/scene_photo_description"
         android:outlineProvider="none"
+        android:scaleType="fitCenter"
         android:translationZ="2dp"
         android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/topBar">
-
-        <ImageView
-            android:id="@+id/sceneStill"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:contentDescription="@string/scene_photo_description"
-            android:scaleType="fitCenter" />
-
-        <!-- Two lines break evenly, and the no-person alert starts the first one (showSceneMessage, #204). -->
-        <TextView
-            android:id="@+id/sceneMessage"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top|center_horizontal"
-            android:layout_marginHorizontal="20dp"
-            android:accessibilityLiveRegion="polite"
-            android:breakStrategy="balanced"
-            android:gravity="center"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="6dp"
-            android:textAppearance="@style/TextAppearance.Pix.Body.Small"
-            tools:text="@string/scene_review_body" />
-    </FrameLayout>
+        app:layout_constraintBottom_toBottomOf="@id/previewContainer"
+        app:layout_constraintEnd_toEndOf="@id/previewContainer"
+        app:layout_constraintStart_toStartOf="@id/previewContainer"
+        app:layout_constraintTop_toTopOf="@id/previewContainer" />
 
     <!-- In a session, the session's photos (FR-1.6, R&S 6.5), over the whole screen and the camera, which goes on.
          Built in this empty holder when it first opens, so a screen that never opens it builds no pager. -->

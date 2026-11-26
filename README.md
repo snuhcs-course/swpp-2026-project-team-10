@@ -58,7 +58,7 @@ This table lists everything the Iteration 4 build can do. The subsection below l
 | **AI pose generation** | Tap *Guide* and choose what you are taking: *Auto*, *Scenery*, *Upper body*, *Full body*, *Landmark*, or *Selfie*. Take a photo of the scene, upright or sideways. Pix checks that the photo shows a person. Describe a pose, or let Pix suggest four poses for the situation. The Pix server checks the description with a filter model. Then an image model makes four candidates of the same person in the same place, in the scene's ratio. Swipe through the candidates and pick one. It becomes the guide, and a tip on Camera says how far to stand and how to hold the phone. ♥ saves a candidate to *My library*. Descriptions used before show under the text field. Back goes one step back, and a failure says why: offline, an hourly or daily limit, or a refused description. |
 | **Pix ID and friends** | Sign up with a Pix ID and a password, or continue with Google. Find friends by their exact Pix ID. Send and answer friend requests. A friend request arrives as a push notification. Everything else in Pix works without an account. |
 | **Shoot together** | Tap *Shoot together* and choose who takes the photo. The photographer invites a Pix friend or shows a 6-digit code. The friend gets a push notification and accepts the invitation. Without an account, the subject enters the code. The phones connect over Wi-Fi or cellular data. When the phones have no direct path, a TURN relay forwards the encrypted video. After a drop of less than 10 s, the session comes back by itself. When the subject leaves or drops, the photographer's phone says so until they are back. |
-| **Both phones in a session** | The subject's phone shows the live camera in the photographer's ratio, as a mirror, with the same guide and thumbnail. Either phone can add a guide from a photo, and the other phone shows its thumbnail. Both phones show the pose description as either person types it, and the candidates as they arrive. The first phone to pick a candidate decides. The subject can zoom, change the brightness and the flash, move the guide, and open the photographer's tip. One phone zooms at a time, and the other says who is zooming. Only the photographer takes the photo. Both phones save it, and each phone's thumbnail shows the session's photos. |
+| **Both phones in a session** | The subject's phone shows the live camera in the photographer's ratio, as a mirror, with the same guide and thumbnail. Either phone can add a guide from a photo, and the other phone shows its thumbnail. Both phones show the pose description as either person types it, and the candidates as they arrive. The first phone to pick a candidate decides. The subject can zoom, tap the video to focus the photographer's camera and set the brightness beside the focus box, change the flash, move the guide, and open the photographer's tip. One phone zooms at a time, and the other says who is zooming. Only the photographer takes the photo. Both phones save it, and each phone's thumbnail shows the session's photos. |
 | **Settings and help** | The gear on Camera opens *Settings*, also during a session. It has the base brightness, the guide's color and thickness, and the live-view delay. It also has the language (English or Korean), notifications, the AI agreement, *Share usage data*, and the Pix account. At first use, a tutorial shows tips over each screen, and a tap anywhere closes them. *Settings* can show the tutorial again. |
 
 The plan for every iteration is in [Requirements and Specifications §4.1](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Requirements-and-Specifications#41-scope-by-iteration).
@@ -82,7 +82,7 @@ Dropped on 11/20 as not needed: the offline connection with a QR code ([#214]) a
 
 Left for Iteration 5 ([Design Documentation 2.9](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Design-Documentation#29-module-ownership-and-build-order)):
 
-- **The remote-control switch and remote focus** (FR-7.5, FR-7.7): not built. The photographer cannot block the subject's controls, and the subject cannot focus.
+- **The remote-control switch** (FR-7.5): not built. The photographer cannot block the subject's controls. Remote focus (FR-7.7) is built in Iteration 5 ([#273]).
 - **Search, situations, and memos in the library** (FR-3.11): not built.
 
 Known limitations of the Iteration 4 build ([Testing Documentation 3.2](https://github.com/snuhcs-course/swpp-2026-project-team-10/wiki/Testing-Documentation#32-results)):
@@ -90,7 +90,6 @@ Known limitations of the Iteration 4 build ([Testing Documentation 3.2](https://
 - The person check on the phone misses people who are far away or in low light. Pix then refuses the scene photo, so these users get no poses.
 - Suggested poses are often too alike for close-up scenes and selfies. This was not measured again with the situations.
 - When the tip cannot tell the distance, it says to fit the person to the guide's outline.
-- The course servers answer only on the campus network. So debug builds use the AWS server.
 
 ### Next: Iteration 5
 
@@ -103,7 +102,7 @@ Known limitations of the Iteration 4 build ([Testing Documentation 3.2](https://
 ![Architecture](wiki/images/design_target_architecture.png)
 
 - **Pix server** (FastAPI behind nginx, over HTTPS on the AWS servers): connects the two phones (signaling) and keeps accounts, friends, and invitations. It sends push notifications through Firebase Cloud Messaging (FCM). It checks each description and scene photo with a decision model. Then it sends the pose requests to the image and vision models through OpenRouter. The API key stays on the server. The server never sees the video.
-- **Servers**: one server for `main` and one for `dev`, each in two versions with the same setup. On the course servers (Server A and Server B), they answer only on the campus network, over HTTP. On AWS (AWS main and AWS dev), they answer from any network, over HTTPS. So release builds use AWS main, and debug builds AWS dev. Each server deploys a new commit blue-green. The course servers pull it with a timer, and GitHub Actions deploys the AWS servers.
+- **Servers**: one server for `main` and one for `dev`, each in two versions with the same setup. On the course servers (Server A and Server B) and on AWS (AWS main and AWS dev), they answer from any network, over HTTPS. Release builds use AWS main, and debug builds AWS dev. Each server deploys a new commit blue-green. The course servers pull it with a timer, and GitHub Actions deploys the AWS servers.
 - **Phone to phone** (WebRTC): the live video and the photos go directly between the two phones. So do the guide, the shared steps, the candidates, and the subject's controls. Without a direct path, Cloudflare's TURN relay forwards the encrypted packets. Each phone draws the guide itself, so the guide never appears in the video or in saved photos.
 - **On the phone**: CameraX runs the camera, and ML Kit makes the outline and the person check. The guide library, the settings, and the sign-in tokens stay on the phone.
 
@@ -126,7 +125,7 @@ The full design is in the [Design Documentation](https://github.com/snuhcs-cours
 | Android app | Android Studio with its bundled JDK (the unit tests need JDK 21 or later), Kotlin 2.2, and Gradle 9.5 through the wrapper. minSdk 29 (Android 10), target and compile SDK 36. |
 | Server | Only for a local server: Python 3.11 or later and [uv](https://docs.astral.sh/uv/getting-started/installation/). Pose generation needs an [OpenRouter](https://openrouter.ai/) API key with credits. Redis and PostgreSQL are optional locally. Without them, the server keeps rooms in the process and accounts in a SQLite file. |
 | Tested on | Galaxy S21, S22, S23 Ultra, S25 Ultra, and Note20 |
-| Network | Wi-Fi or cellular data on each phone. The AWS servers answer from any network. The course servers answer only on the campus network. |
+| Network | Wi-Fi or cellular data on each phone. The AWS servers and the course servers answer from any network. |
 
 ## Run the demo
 
@@ -142,10 +141,10 @@ git checkout iteration-4-demo
 
 **The AWS dev server (no setup).** A debug build uses the AWS dev server, `https://swpp26t10.3-105-185-251.sslip.io/`, by default. It runs `dev` and answers from any network, cellular data included. To check it, open `https://swpp26t10.3-105-185-251.sslip.io/health` in a phone's browser. It answers `{"status":"ok"}`. A release build always uses the AWS main server, `https://swpp26t10.15-134-147-114.sslip.io/`, which runs `main`.
 
-**Server A (campus network only).** Server A, `http://swpp26t10.147-46-242-169.sslip.io/`, runs `main`. To use it in a debug build, create `android/local.properties` with this line:
+**Server A.** Server A, `https://team10.swpp-2026-a.snu.ac.kr/`, runs `main`. To use it in a debug build, create `android/local.properties` with this line:
 
 ```properties
-pix.serverUrl=http://swpp26t10.147-46-242-169.sslip.io/
+pix.serverUrl=https://team10.swpp-2026-a.snu.ac.kr/
 ```
 
 **A server on the laptop.** Run these commands from the repository root:
@@ -188,12 +187,12 @@ Do the same for the second phone. Google sign-in on a debug build needs the phon
 Pix follows the phone's language, English or Korean. The steps below use the English labels.
 
 1. **Camera.** Pix opens on the camera. At first use, the tutorial shows tips over the screen. Tap anywhere to close them. Tap the ratio button and choose 3:4, 9:16, or 1:1. Tap the preview to focus, then drag the bar beside the focus box. Pinch to zoom, or tap the zoom readout. Tap the camera switch beside the shutter for selfie mode. Turn the phone on its side: the icons turn with it. Take a photo. The thumbnail beside the shutter shows it, without the guide, and opens it in Pix's viewer.
-2. **Guide from a photo.** Tap *Guide* › *Choose from the gallery* and pick a photo of a person, or a screenshot of a post. Tap *Use* at the top right. The outline starts where the person stands in the photo. With the guide-edit toggle on, drag and pinch the guide. The bar under the preview fades, hides, saves, or removes the guide. Drag the thumbnail in the corner to the side to hide it. A saved guide shows in *My library*. At first use, Google Play services downloads the segmentation model. This can take a minute.
-3. **AI poses.** Tap *Guide* and a situation, such as *Auto* or *Full body*. Accept the notice. Take a photo of the scene with a person in it, upright or sideways, and tap *Use* at the top right. Type a pose and tap *Generate* at the top right. Or leave the field empty and tap *Suggest*. The candidates appear as they are ready, usually within 30 s. Swipe through them, tap *Select*, and then *Use*. Back at the top left goes one step back on each screen; *Regenerate* makes a new set of the same request. A tip on how to take the pose shows on Camera. The bulb button shows it again. Each set costs up to four images on OpenRouter.
+2. **Guide from a photo.** Tap *Guide* › *Choose from the gallery* and pick a photo of a person, or a screenshot of a post. Tap *Use* at the top right. The outline starts where the person stands in the photo. A pinch still zooms the camera: tap the guide-edit toggle to drag and pinch the guide. The bar under the preview fades, hides, saves, or removes the guide. Drag the thumbnail in the corner to the side to hide it. A saved guide shows in *My library*. At first use, Google Play services downloads the segmentation model. This can take a minute.
+3. **AI poses.** Tap *Guide* and a situation, such as *Auto* or *Full body*. Accept the notice. Take a photo of the scene with a person in it, upright or sideways; *Generate poses* opens by itself. Leave the field on *Auto* and tap *Generate* at the top right. Or tap the field and type a pose, or choose from *Common poses*, such as *Peace sign*. The candidates appear as they are ready, usually within 30 s. Swipe through them, tap *Select*, and then *Use*. Back at the top left goes one step back on each screen; *Regenerate* makes a new set of the same request. A tip on how to take the pose shows on Camera. The bulb button shows it again. Each set costs up to four images on OpenRouter.
 4. **Pix ID and friends** (two phones). Tap *Shoot together* › *I'll take the photo* › *Sign in to add friends*. Sign up with a Pix ID and a password (*New to Pix? Sign up*), or continue with Google. Do the same on the other phone. Tap *Add a friend* and search for the other Pix ID. The other phone gets a push notification and accepts the request.
 5. **Shoot together with an invitation.** On the photographer's phone, tap *Shoot together* › *I'll take the photo*, then *Invite* next to the friend. The subject's phone gets a notification. Tap it, then tap *Accept*. The invitation also waits for a minute under *Shoot together* › *I'll be in the photo* › *Received invitations*. The subject's phone shows the live camera with the same guide. Try it with one phone on cellular data.
 6. **Shoot together with a code** (no sign-in). On the photographer's phone, tap *Shoot together* › *I'll take the photo* › *Show a code*. On the subject's phone, tap *Shoot together* › *I'll be in the photo*. Enter the code and tap *Connect*.
-7. **In a session.** On the subject's phone, pinch to zoom, change the brightness and the flash, and move the guide with the guide-edit toggle on. The photographer's phone follows. Add a guide or generate poses: the other phone shows each step. Pinch on both phones at once: only the first zooms, and the other says who is zooming. On the subject's phone, the light bulb opens the photographer's tip. The photographer takes the photo, and both phones save it; each phone's thumbnail opens the session's photos. Turn off Wi-Fi on one phone for a few seconds. The session comes back by itself. *Leave* or *End session* ends the session.
+7. **In a session.** On the subject's phone, pinch to zoom, tap the video to focus and drag the bar beside the focus box for the brightness, tap the flash, and move the guide with the guide-edit toggle on. The photographer's phone follows. Add a guide or generate poses: the other phone shows each step. Pinch on both phones at once: only the first zooms, and the other says who is zooming. On the subject's phone, the light bulb opens the photographer's tip. The photographer takes the photo, and both phones save it; each phone's thumbnail opens the session's photos. Turn off Wi-Fi on one phone for a few seconds. The session comes back by itself. *Leave* or *End session* ends the session.
 
 With one phone, `server/tools/fake_photographer.py` or `server/tools/fake_subject.py` can be the other phone against a local server. See the [server README](server/README.md#testing-the-photographers-phone-without-a-second-phone).
 
@@ -263,3 +262,4 @@ SWPP 2026 Team 10:
 [#253]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/253
 [#255]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/255
 [#256]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/256
+[#273]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/273

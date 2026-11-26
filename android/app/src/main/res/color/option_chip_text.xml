@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Faint while the option cannot be chosen: the other person types, or its words would pass 100 characters. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/pix_text_faint" android:state_enabled="false" />
+    <item android:color="@color/pix_accent" android:state_checked="true" />
+    <item android:color="@color/pix_text_soft" />
+</selector>

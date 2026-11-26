@@ -1,9 +1,10 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Dongje Park, Sungmin Jo, and Joonhyung Han
 package com.lastpenguin.pix.ui.guide
 
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModelStore
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
@@ -17,6 +18,8 @@ import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -27,6 +30,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -37,9 +41,19 @@ import org.junit.Test
  * was saved; USED), one replacing the guide on the camera, an id the store cannot load (FAILED, the camera's guide
  * kept), a guide whose values cannot place it (FAILED, no crash), a second tap while the first is opening (one load),
  * the sheet closing before it arrives (the camera's guide kept). A result that comes while no sheet collects waits.
+ * A saved guide put on the camera is told once, for the subject's phone (#292), and one that could not open is not.
  * onDeleteSaved: a saved guide (gone from the list) that is also on the camera (it stays there).
- * library (FR-3.11): both kinds saved (every guide by default, each filter's count), a filter (only its kind, newest
- * first, the counts unchanged), a guide saved meanwhile (listed), Add a pose guide opened again (back to every guide).
+ * library (FR-3.11): both kinds saved as history (All by default, each tab's count), a favorite (still opens on All),
+ * Favorites (only the favorites, newest first, the counts unchanged), a guide saved meanwhile (listed), Add a pose guide
+ * opened again (back to All).
+ * onToggleFavorite (#297): a favorite taken out (Favorites empty, the guide kept) and a guide added, a store that
+ * cannot write it (favoriteFailures says so once).
+ * onLibrarySituation (#270): a situation (its guides only), the same one again (every situation), another one (it
+ * replaces the first), Add a pose guide opened again (no situation chosen).
+ * onSaveMemo (#270): a memo (listed), a store that cannot write it (memoFailures says so once).
+ * Selection (#297, state-based): a long press (that guide), taps (in and out), Select all (every guide listed), stop
+ * (none, and a tap then selects nothing), Select all under ⋮ while not selecting (selecting, with every guide listed),
+ * Delete (the selected at once, selecting ends), Add a pose guide opened again (not selecting).
  * thumbnail: one shown twice (read from the store once), one the store cannot read (null, read again next time), a
  * deleted guide's (not kept).
  */
@@ -89,6 +103,22 @@ class SavedGuidesViewModelTest {
         val model = model()
 
         assertEquals(listOf("g2", "g1"), model.savedGuides.value.map { it.id })
+    }
+
+    @Test
+    fun onUseSaved_tellsThatAGuideWasSet_once_andNotForOneThatCouldNotOpen() = runTest(dispatcher) {
+        saved.save(anchored("g1"), GuideState(guideId = "g1"))
+        var told = 0
+        val model = ReferenceViewModel(UnusedMaker, guides, saved, onGuideSet = { told++ })
+            .also { store.put("telling", it) }
+
+        model.onUseSaved("g1")
+        runCurrent()
+        assertEquals(1, told)
+
+        model.onUseSaved("gone")
+        runCurrent()
+        assertEquals(1, told)
     }
 
     @Test
@@ -201,7 +231,7 @@ class SavedGuidesViewModelTest {
         model.onUseSaved("g1")
         runCurrent()
 
-        model.onDeleteSaved("g1")
+        model.onDeleteSaved(listOf("g1"))
         runCurrent()
 
         assertEquals(emptyList<String>(), model.savedGuides.value.map { it.id })
@@ -213,7 +243,7 @@ class SavedGuidesViewModelTest {
         saved.save(anchored("g1"), GuideState())
         val model = model()
 
-        model.onDeleteSaved("g2")
+        model.onDeleteSaved(listOf("g2"))
         runCurrent()
 
         assertEquals(listOf("g1"), model.savedGuides.value.map { it.id })
@@ -222,26 +252,25 @@ class SavedGuidesViewModelTest {
 
     @Test
     fun library_bothKindsSaved_listsEveryGuideAndCountsEachKind() = runTest(dispatcher) {
-        saved.save(fakeGuide("photo"), GuideState())
-        saved.save(generated("pose"), GuideState())
+        saved.save(fakeGuide("photo"), GuideState(), favorite = false)
+        saved.save(generated("pose"), GuideState(), favorite = false)
 
         val page = model().library.value
 
         assertEquals(LibraryFilter.ALL, page.filter)
         assertEquals(listOf("pose", "photo"), page.guides.map { it.id })
         assertEquals(2, page.count(LibraryFilter.ALL))
-        assertEquals(1, page.count(LibraryFilter.PHOTOS))
-        assertEquals(1, page.count(LibraryFilter.GENERATED))
+        assertEquals(0, page.count(LibraryFilter.FAVORITES))
     }
 
     @Test
-    fun onLibraryFilter_photos_listsOnlyPhotosNewestFirstAndKeepsTheCounts() = runTest(dispatcher) {
+    fun onLibraryFilter_favorites_listsOnlyThemNewestFirstAndKeepsTheCounts() = runTest(dispatcher) {
         saved.save(fakeGuide("photo-1"), GuideState())
-        saved.save(generated("pose"), GuideState())
+        saved.save(generated("pose"), GuideState(), favorite = false)
         saved.save(fakeGuide("photo-2"), GuideState())
         val model = model()
 
-        model.onLibraryFilter(LibraryFilter.PHOTOS)
+        model.onLibraryFilter(LibraryFilter.FAVORITES)
         runCurrent()
 
         assertEquals(listOf("photo-2", "photo-1"), model.library.value.guides.map { it.id })
@@ -251,7 +280,7 @@ class SavedGuidesViewModelTest {
     @Test
     fun library_guideSavedMeanwhile_isListed() = runTest(dispatcher) {
         val model = model()
-        model.onLibraryFilter(LibraryFilter.GENERATED)
+        model.onLibraryFilter(LibraryFilter.FAVORITES)
         runCurrent()
 
         saved.save(generated("pose"), GuideState())
@@ -261,15 +290,177 @@ class SavedGuidesViewModelTest {
     }
 
     @Test
+    fun library_aFavorite_opensOnAllAllTheSame_andAHeartMovesAGuideInAndOutOfFavorites() = runTest(dispatcher) {
+        saved.save(fakeGuide("photo"), GuideState(), favorite = false)
+        saved.save(generated("pose"), GuideState(), favorite = true)
+        val model = model()
+        runCurrent()
+
+        assertEquals(LibraryFilter.ALL, model.library.value.filter)
+        assertEquals(listOf("pose", "photo"), model.library.value.guides.map { it.id })
+
+        model.onLibraryFilter(LibraryFilter.FAVORITES)
+        runCurrent()
+        assertEquals(listOf("pose"), model.library.value.guides.map { it.id })
+
+        // The last favorite taken out: Favorites is empty, and the guide is still kept.
+        model.onToggleFavorite("pose")
+        runCurrent()
+        assertEquals(LibraryFilter.FAVORITES, model.library.value.filter)
+        assertTrue(model.library.value.guides.isEmpty())
+        assertEquals(2, model.library.value.count(LibraryFilter.ALL))
+
+        model.onToggleFavorite("photo")
+        runCurrent()
+        assertEquals(listOf("photo"), model.library.value.guides.map { it.id })
+        assertEquals(1, model.library.value.count(LibraryFilter.FAVORITES))
+    }
+
+    @Test
+    fun onToggleFavorite_aStoreThatCannotWrite_saysSoOnce() = runTest(dispatcher) {
+        val failing = object : SavedGuideStore by saved {
+            override suspend fun setFavorite(id: String, favorite: Boolean): Result<Unit> =
+                Result.failure(IOException("full"))
+        }
+        saved.save(fakeGuide("photo"), GuideState(), favorite = false)
+        val model = model(failing)
+        val failures = mutableListOf<Unit>()
+        backgroundScope.launch { model.favoriteFailures.collect { failures += it } }
+
+        model.onToggleFavorite("photo")
+        runCurrent()
+
+        assertEquals(1, failures.size)
+        assertEquals(false, saved.saved.value.single().favorite)
+    }
+
+    @Test
     fun openFor_addAPoseGuideOpenedAgain_showsEveryGuide() = runTest(dispatcher) {
         val model = model()
-        model.onLibraryFilter(LibraryFilter.GENERATED)
+        model.onLibraryFilter(LibraryFilter.FAVORITES)
         runCurrent()
 
         model.openFor(fromSubject = false)
         runCurrent()
 
         assertEquals(LibraryFilter.ALL, model.library.value.filter)
+    }
+
+    @Test
+    fun onLibrarySituation_aSituation_listsItsGuidesAndASecondTapListsAllAgain() = runTest(dispatcher) {
+        saved.save(generated("landmark").copy(situation = Situation.LANDMARK), GuideState())
+        saved.save(generated("selfie").copy(situation = Situation.SELFIE), GuideState())
+        saved.save(fakeGuide("photo"), GuideState())
+        val model = model()
+
+        model.onLibrarySituation(Situation.LANDMARK)
+        runCurrent()
+        assertEquals(listOf("landmark"), model.library.value.guides.map { it.id })
+
+        model.onLibrarySituation(Situation.SELFIE)
+        runCurrent()
+        assertEquals(listOf("selfie"), model.library.value.guides.map { it.id })
+
+        model.onLibrarySituation(Situation.SELFIE)
+        runCurrent()
+        assertNull(model.library.value.situation)
+        assertEquals(3, model.library.value.guides.size)
+    }
+
+    @Test
+    fun openFor_addAPoseGuideOpenedAgain_choosesNoSituation() = runTest(dispatcher) {
+        saved.save(generated("landmark").copy(situation = Situation.LANDMARK), GuideState())
+        val model = model()
+        model.onLibrarySituation(Situation.LANDMARK)
+        runCurrent()
+
+        model.openFor(fromSubject = false)
+        runCurrent()
+
+        assertNull(model.library.value.situation)
+    }
+
+    @Test
+    fun selecting_startsWithTheLongPressedGuide_togglesWithTaps_selectsAll_andStops() = runTest(dispatcher) {
+        saved.save(fakeGuide("a"), GuideState())
+        saved.save(fakeGuide("b"), GuideState())
+        saved.save(fakeGuide("c"), GuideState())
+        val model = model()
+
+        model.onStartSelecting("b")
+        runCurrent()
+        assertEquals(setOf("b"), model.library.value.selection)
+        model.onToggleSelected("a")
+        model.onToggleSelected("b")
+        runCurrent()
+        assertEquals(setOf("a"), model.library.value.selection)
+        model.onSelectAll()
+        runCurrent()
+        assertEquals(setOf("a", "b", "c"), model.library.value.selection)
+
+        model.onStopSelecting()
+        runCurrent()
+        assertNull(model.library.value.selection)
+        // Not selecting: a tap toggles nothing.
+        model.onToggleSelected("a")
+        runCurrent()
+        assertNull(model.library.value.selection)
+        // Select all under ⋮: selecting starts with every guide listed.
+        model.onSelectAll()
+        runCurrent()
+        assertEquals(setOf("a", "b", "c"), model.library.value.selection)
+    }
+
+    @Test
+    fun onDeleteSaved_selectedGuides_deletesThemAtOnce_andStopsSelecting() = runTest(dispatcher) {
+        saved.save(fakeGuide("a"), GuideState())
+        saved.save(fakeGuide("b"), GuideState())
+        saved.save(fakeGuide("c"), GuideState())
+        val model = model()
+        model.onStartSelecting("a")
+        model.onToggleSelected("c")
+        runCurrent()
+
+        model.onDeleteSaved(model.library.value.selection.orEmpty())
+        runCurrent()
+
+        assertEquals(listOf("b"), saved.saved.value.map { it.id })
+        assertNull(model.library.value.selection)
+    }
+
+    @Test
+    fun openFor_addAPoseGuideOpenedAgain_stopsSelecting() = runTest(dispatcher) {
+        saved.save(fakeGuide("a"), GuideState())
+        val model = model()
+        model.onStartSelecting("a")
+        runCurrent()
+
+        model.openFor(fromSubject = false)
+        runCurrent()
+
+        assertNull(model.library.value.selection)
+    }
+
+    @Test
+    fun onSaveMemo_aMemo_isListed() = runTest(dispatcher) {
+        saved.save(fakeGuide("photo"), GuideState())
+        val model = model()
+
+        model.onSaveMemo("photo", "Han river")
+        runCurrent()
+
+        assertEquals(listOf("Han river"), model.library.value.guides.map { it.memo })
+    }
+
+    @Test
+    fun onSaveMemo_storeCannotWriteIt_saysSo() = runTest(dispatcher) {
+        val model = model(FailingMemos(saved))
+        val failures = backgroundScope.async { model.memoFailures.first() }
+
+        model.onSaveMemo("photo", "Han river")
+        runCurrent()
+
+        assertTrue(failures.isCompleted)
     }
 
     @Test
@@ -302,7 +493,7 @@ class SavedGuidesViewModelTest {
         val model = model()
         model.thumbnail("g1")
 
-        model.onDeleteSaved("g1")
+        model.onDeleteSaved(listOf("g1"))
         runCurrent()
 
         assertNull(model.thumbnail("g1"))
@@ -322,6 +513,10 @@ class SavedGuidesViewModelTest {
     }
 
     /** A store that counts how often a thumbnail is read from it. */
+    private class FailingMemos(private val inner: SavedGuideStore) : SavedGuideStore by inner {
+        override suspend fun setMemo(id: String, memo: String): Result<Unit> = Result.failure(IOException("full"))
+    }
+
     private class CountingThumbnails(private val inner: SavedGuideStore) : SavedGuideStore by inner {
         var reads = 0
 

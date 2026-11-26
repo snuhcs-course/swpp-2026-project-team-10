@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-04, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -6,10 +6,9 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.lastpenguin.pix.generation.Situation
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -34,9 +33,10 @@ import org.robolectric.annotation.GraphicsMode
  * thumbnail: a landscape reference (its middle cut to 3:4, not enlarged), a reference taller than the limit (cut and
  * scaled to 384 × 512), a guide without a reference (the outline, cut to 3:4), an unreadable reference (the outline),
  * an unreadable mask without a reference (null), an unknown id (null).
- * Boundary of MAX_SAVED: the 100th is kept with the others, its save saying it deleted nothing; the 101st deletes the
- * oldest from the list and the storage, and says so; two saves at once with 99 kept, of which only the one that
- * deletes the oldest says so; 101 folders found at a start keep the newest 100.
+ * No limit (#297, boundary of the old 100): a 101st guide, and 101 folders found at a start, are all kept.
+ * Favorites (#297): a favorite and history, each listed so and kept after a restart; a guide kept as history saved again
+ * (still history); setFavorite marking and unmarking (kept after a restart, with its memo and situation), an unknown id
+ * (a failure); a folder saved before the history (a favorite). delete: several at once, with an unknown id.
  * load: a saved guide (mask at most 720 px tall, outline rebuilt, anchor, aspect, source, state, and reference as
  * saved), an unknown id, an unreadable mask.
  * Migration from before the mask-only transfer (#113): a folder with `cutout.webp` and no `mask.png` is listed,
@@ -46,6 +46,11 @@ import org.robolectric.annotation.GraphicsMode
  * broken, and unusable folders (an aspect of 0) are not listed and are deleted; a folder whose mask cannot be decoded is
  * listed, since a start reads no image, and fails when used.
  * delete: a saved guide (gone from the list, the storage, and the next start), an unknown id.
+ * Situation and memo (#270): a generated pose's situation, listed and loaded, and still there after a restart; a photo
+ * guide's none; a folder saved before them, which has neither; a situation name this phone does not know (none). setMemo:
+ * a memo (listed, kept after a restart, with the guide still loading), an empty one (removed), one longer than
+ * MAX_MEMO (cut), one with line breaks and spaces around it (one line), an unknown id (a failure, nothing written), a
+ * folder that cannot be written (a failure, the memo as it was).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -74,8 +79,7 @@ class FileSavedGuideStoreTest {
         val saved = store.save(guide("g2", source = GuideSource.GENERATED), GuideState()).getOrThrow()
 
         assertEquals(listOf("g2", "g1"), store.saved.value.map { it.id })
-        assertEquals(saved.guide, store.saved.value.first())
-        assertFalse(saved.removedOldest)
+        assertEquals(saved, store.saved.value.first())
         assertEquals(listOf(GuideSource.GENERATED, GuideSource.GALLERY), store.saved.value.map { it.source })
     }
 
@@ -154,8 +158,7 @@ class FileSavedGuideStoreTest {
 
         val again = store.save(guide("g1"), GuideState(cx = 0.3f)).getOrThrow()
 
-        assertEquals(first.guide, again.guide)
-        assertFalse(again.removedOldest)
+        assertEquals(first, again)
         assertEquals(listOf("g1"), store.saved.value.map { it.id })
     }
 
@@ -224,46 +227,87 @@ class FileSavedGuideStoreTest {
     }
 
     @Test
-    fun save_hundredthGuide_keepsEveryGuide() = runTest {
-        val store = store()
-
-        repeat(SavedGuideStore.MAX_SAVED) { store.save(smallGuide("g$it"), GuideState()).getOrThrow() }
-
-        assertEquals(100, store.saved.value.size)
-        assertEquals("g0", store.saved.value.last().id)
-    }
-
-    @Test
-    fun save_hundredAndFirstGuide_deletesTheOldestFromListAndStorage() = runTest {
+    fun save_hundredAndFirstGuide_keepsEveryGuide() = runTest {
         val directory = File(folder.root, "guides")
         val store = store(directory)
-        repeat(SavedGuideStore.MAX_SAVED - 1) { store.save(smallGuide("g$it"), GuideState()).getOrThrow() }
-        val hundredth = store.save(smallGuide("g99"), GuideState()).getOrThrow()
 
-        val next = store.save(smallGuide("g100"), GuideState()).getOrThrow()
+        repeat(101) { store.save(smallGuide("g$it"), GuideState(), favorite = false).getOrThrow() }
 
-        // The save itself says whether it deleted the oldest: the 100th did not, the 101st did.
-        assertFalse(hundredth.removedOldest)
-        assertTrue(next.removedOldest)
-        assertEquals(100, store.saved.value.size)
-        assertEquals("g100", store.saved.value.first().id)
-        assertEquals("g1", store.saved.value.last().id)
-        assertFalse(File(directory, "g0").exists())
+        // No limit any longer (#297): nothing goes unless the user deletes it.
+        assertEquals(101, store.saved.value.size)
+        assertEquals("g0", store.saved.value.last().id)
+        assertTrue(File(directory, "g0").exists())
     }
 
     @Test
-    fun save_twoAtOnceWith99Kept_onlyTheOneThatDeletesTheOldestSaysSo() = runTest {
+    fun save_favoriteAndHistory_listsEachAsSavedAndKeepsItAfterARestart() = runTest {
+        val directory = File(folder.root, "guides")
+        val store = store(directory)
+
+        store.save(guide("pose"), GuideState(), favorite = false).getOrThrow()
+        store.save(guide("photo"), GuideState()).getOrThrow()
+        val after = store(directory)
+        advanceUntilIdle()
+
+        assertEquals(listOf(true, false), store.saved.value.map { it.favorite })
+        assertEquals(listOf(true, false), after.saved.value.map { it.favorite })
+    }
+
+    @Test
+    fun save_guideKeptAsHistory_staysHistoryWhenSavedAgain() = runTest {
         val store = store()
-        repeat(SavedGuideStore.MAX_SAVED - 1) { store.save(smallGuide("g$it"), GuideState()).getOrThrow() }
+        store.save(guide("g1"), GuideState(), favorite = false).getOrThrow()
 
-        val both = listOf(
-            async { store.save(smallGuide("a"), GuideState()).getOrThrow() },
-            async { store.save(smallGuide("b"), GuideState()).getOrThrow() },
-        ).awaitAll()
+        val again = store.save(guide("g1"), GuideState(), favorite = true).getOrThrow()
 
-        assertEquals(1, both.count { it.removedOldest })
-        assertEquals(SavedGuideStore.MAX_SAVED, store.saved.value.size)
-        assertFalse(store.saved.value.any { it.id == "g0" })
+        assertFalse("a second save changes nothing; setFavorite does", again.favorite)
+    }
+
+    @Test
+    fun setFavorite_marksAndUnmarks_andKeepsItAfterARestart() = runTest {
+        val directory = File(folder.root, "guides")
+        val store = store(directory)
+        store.save(guide("g1", situation = Situation.SELFIE), GuideState(), favorite = false).getOrThrow()
+        store.setMemo("g1", "kept").getOrThrow()
+
+        store.setFavorite("g1", true).getOrThrow()
+        val marked = store(directory)
+        advanceUntilIdle()
+        store.setFavorite("g1", false).getOrThrow()
+        val unmarked = store(directory)
+        advanceUntilIdle()
+
+        assertTrue(marked.saved.value.single().favorite)
+        assertFalse(unmarked.saved.value.single().favorite)
+        assertEquals("kept" to Situation.SELFIE, unmarked.saved.value.single().let { it.memo to it.situation })
+        assertTrue(store.setFavorite("g2", true).isFailure)
+    }
+
+    @Test
+    fun restart_folderSavedBeforeTheHistory_isAFavorite() = runTest {
+        val directory = File(folder.root, "guides")
+        store(directory).save(guide("g1"), GuideState(), favorite = true).getOrThrow()
+        // A guide saved before #297 was saved by ♥ or *Save guide*: its meta.json says nothing of favorites.
+        assertFalse("favorite" in File(directory, "g1/meta.json").readText())
+
+        val after = store(directory)
+        advanceUntilIdle()
+
+        assertTrue(after.saved.value.single().favorite)
+    }
+
+    @Test
+    fun delete_severalAtOnce_removesThemFromTheListAndTheStorage() = runTest {
+        val directory = File(folder.root, "guides")
+        val store = store(directory)
+        listOf("g1", "g2", "g3").forEach { store.save(smallGuide(it), GuideState()).getOrThrow() }
+
+        store.delete(listOf("g1", "g3", "unknown"))
+
+        assertEquals(listOf("g2"), store.saved.value.map { it.id })
+        assertFalse(File(directory, "g1").exists())
+        assertFalse(File(directory, "g3").exists())
+        assertTrue(File(directory, "g2").exists())
     }
 
     @Test
@@ -373,21 +417,16 @@ class FileSavedGuideStoreTest {
     }
 
     @Test
-    fun restart_hundredAndOneFolders_keepsTheNewestHundredAndDeletesTheOldest() = runTest {
+    fun restart_hundredAndOneFolders_keepsThemAll() = runTest {
         val directory = File(folder.root, "guides")
         val before = store(directory)
-        repeat(SavedGuideStore.MAX_SAVED) { before.save(smallGuide("g$it"), GuideState()).getOrThrow() }
-        // A 101st folder from before, as when an earlier delete stopped halfway: older than every other.
-        File(directory, "g0").copyRecursively(File(directory, "old"))
-        val oldMeta = File(directory, "old/meta.json")
-        oldMeta.writeText(oldMeta.readText().replace(Regex("\"order\":\\d+"), "\"order\":0"))
+        repeat(101) { before.save(smallGuide("g$it"), GuideState(), favorite = false).getOrThrow() }
 
         val after = store(directory)
         advanceUntilIdle()
 
-        assertEquals(SavedGuideStore.MAX_SAVED, after.saved.value.size)
-        assertFalse("old" in after.saved.value.map { it.id })
-        assertFalse(File(directory, "old").exists())
+        assertEquals(101, after.saved.value.size)
+        assertTrue(File(directory, "g0").exists())
     }
 
     @Test
@@ -465,6 +504,130 @@ class FileSavedGuideStoreTest {
         assertNotNull(store.load("g1").getOrNull())
     }
 
+    @Test
+    fun save_generatedPoseWithASituation_listsAndLoadsItAfterARestart() = runTest {
+        val directory = File(folder.root, "guides")
+        val store = store(directory)
+        store.save(
+            guide("g1", source = GuideSource.GENERATED, situation = Situation.LANDMARK),
+            GuideState(),
+        ).getOrThrow()
+        store.save(guide("g2"), GuideState()).getOrThrow()
+
+        val after = store(directory)
+        advanceUntilIdle()
+
+        assertEquals(listOf(null, Situation.LANDMARK), after.saved.value.map { it.situation })
+        assertEquals(Situation.LANDMARK, after.load("g1").getOrThrow().first.situation)
+        assertNull(after.load("g2").getOrThrow().first.situation)
+    }
+
+    @Test
+    fun restart_folderSavedBeforeSituationsAndMemos_hasNeither() = runTest {
+        val directory = File(folder.root, "guides")
+        store(directory).save(guide("g1"), GuideState()).getOrThrow()
+        val meta = File(directory, "g1/meta.json")
+        assertFalse("an empty memo and no situation are not written", "memo" in meta.readText())
+        assertFalse("situation" in meta.readText())
+
+        val after = store(directory)
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(SavedGuide("g1", after.saved.value.single().savedAt, GuideSource.GALLERY)),
+            after.saved.value,
+        )
+    }
+
+    @Test
+    fun restart_situationThisPhoneDoesNotKnow_readsAsNone() = runTest {
+        val directory = File(folder.root, "guides")
+        store(directory).save(guide("g1", situation = Situation.BACKGROUND), GuideState()).getOrThrow()
+        val meta = File(directory, "g1/meta.json")
+        meta.writeText(meta.readText().replace("\"background\"", "\"underwater\""))
+
+        val after = store(directory)
+        advanceUntilIdle()
+
+        assertEquals(listOf("g1"), after.saved.value.map { it.id })
+        assertNull(after.saved.value.single().situation)
+    }
+
+    @Test
+    fun setMemo_savedGuide_isListedAndKeptAfterARestart() = runTest {
+        val directory = File(folder.root, "guides")
+        val store = store(directory)
+        store.save(guide("g1", situation = Situation.HALF_BODY), GuideState()).getOrThrow()
+
+        assertTrue(store.setMemo("g1", "Mom at the beach").isSuccess)
+        val after = store(directory)
+        advanceUntilIdle()
+
+        assertEquals("Mom at the beach", store.saved.value.single().memo)
+        assertEquals("Mom at the beach", after.saved.value.single().memo)
+        assertEquals(Situation.HALF_BODY, after.saved.value.single().situation)
+        assertNotNull(after.load("g1").getOrNull())
+        assertEquals(setOf("mask.png", "reference.webp", "meta.json"), File(directory, "g1").list()?.toSet())
+    }
+
+    @Test
+    fun setMemo_empty_removesIt() = runTest {
+        val store = store()
+        store.save(guide("g1"), GuideState()).getOrThrow()
+        store.setMemo("g1", "first").getOrThrow()
+
+        store.setMemo("g1", "   ").getOrThrow()
+
+        assertEquals("", store.saved.value.single().memo)
+    }
+
+    @Test
+    fun setMemo_longerThanTheLimit_isCut() = runTest {
+        val store = store()
+        store.save(guide("g1"), GuideState()).getOrThrow()
+
+        store.setMemo("g1", "a".repeat(SavedGuideStore.MAX_MEMO + 1)).getOrThrow()
+
+        assertEquals("a".repeat(SavedGuideStore.MAX_MEMO), store.saved.value.single().memo)
+    }
+
+    @Test
+    fun setMemo_lineBreaksAndSpacesAround_isOneLine() = runTest {
+        val store = store()
+        store.save(guide("g1"), GuideState()).getOrThrow()
+
+        store.setMemo("g1", "  Seoul\n tower  ").getOrThrow()
+
+        assertEquals("Seoul tower", store.saved.value.single().memo)
+    }
+
+    @Test
+    fun setMemo_unknownId_failsAndWritesNothing() = runTest {
+        val directory = File(folder.root, "guides")
+        val store = store(directory)
+        store.save(guide("g1"), GuideState()).getOrThrow()
+
+        assertTrue(store.setMemo("g2", "memo").isFailure)
+        assertFalse(File(directory, "g2").exists())
+        assertEquals("", store.saved.value.single().memo)
+    }
+
+    @Test
+    fun setMemo_folderThatCannotBeWritten_failsAndKeepsTheMemo() = runTest {
+        val directory = File(folder.root, "guides")
+        val store = store(directory)
+        store.save(guide("g1"), GuideState()).getOrThrow()
+        store.setMemo("g1", "kept").getOrThrow()
+        val guideFolder = File(directory, "g1")
+        guideFolder.setWritable(false)
+
+        val result = store.setMemo("g1", "lost")
+        guideFolder.setWritable(true)
+
+        assertTrue(result.isFailure)
+        assertEquals("kept", store.saved.value.single().memo)
+    }
+
     /** [guideFolder] as a guide saved before #113 left it: `cutout.webp`, a colored figure whose alpha is the mask. */
     private fun oldCutout(guideFolder: File) {
         File(guideFolder, "mask.png").delete()
@@ -480,9 +643,10 @@ class FileSavedGuideStoreTest {
         reference: Bitmap? = photo(512, 384),
         anchor: NormalizedRect? = NormalizedRect(0.1f, 0.1f, 0.5f, 0.9f),
         source: GuideSource = GuideSource.GALLERY,
+        situation: Situation? = null,
     ): ReferenceGuide {
         val mask = figure(300, 900)
-        return ReferenceGuide(id, mask, mask, 300f / 900f, source, anchor, reference)
+        return ReferenceGuide(id, mask, mask, 300f / 900f, source, anchor, reference, situation = situation)
     }
 
     /** A guide small enough that a hundred saves stay fast. */

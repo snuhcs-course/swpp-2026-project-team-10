@@ -1,9 +1,10 @@
-// AI-generated with Claude Code, 2026-11-10, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.ui.generation
 
 import android.os.Bundle
 import android.view.View
 import androidx.activity.addCallback
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
@@ -13,13 +14,14 @@ import androidx.navigation.fragment.findNavController
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentGeneratingBinding
 import com.lastpenguin.pix.generation.PoseRequest
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.ui.PixViewModels
 import kotlinx.coroutines.launch
 
 /**
- * Generating poses (R&S 6.3). Back at the top left asks first, since the images being created are lost, then stops the
- * set and returns to Generate poses with the photo and the description (#199). Owner: Server/AI/Sync (#7); Back
- * Iter4-P2.
+ * Generating poses (R&S 6.3). Back at the top left stops the set and returns to Generate poses with the photo and the
+ * description (#199), at once: the poses that came are in the library (#297). Owner: Server/AI/Sync (#7); Back
+ * Iter4-P2, #297.
  */
 class GeneratingFragment : Fragment(R.layout.fragment_generating) {
 
@@ -34,9 +36,9 @@ class GeneratingFragment : Fragment(R.layout.fragment_generating) {
             CandidateGridFit(resources.getDimensionPixelSize(R.dimen.pose_card_margin)),
         )
 
-        binding.backButton.setOnClickListener { askToStop() }
+        binding.backButton.setOnClickListener { stop() }
         // System back does what Back does (R&S 6.9).
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { askToStop() }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { stop() }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -45,12 +47,10 @@ class GeneratingFragment : Fragment(R.layout.fragment_generating) {
         }
     }
 
-    /** Back: asks first, as the images being created would be lost. */
-    private fun askToStop() {
-        confirmGoingBack(generating = true, onConfirm = ::stop)
-    }
-
-    /** Back confirmed: the requests stop, and Generate poses shows the photo and the description again. */
+    /**
+     * Back: the requests stop at once, and Generate poses shows the photo and the description again. The poses that
+     * came are in the library, which Generate poses says (#297).
+     */
     private fun stop() {
         val navController = findNavController()
         val generating = viewModel.uiState.value.phase == GenerationUiState.Phase.GENERATING
@@ -62,6 +62,9 @@ class GeneratingFragment : Fragment(R.layout.fragment_generating) {
 
     private fun render(binding: FragmentGeneratingBinding, candidates: PoseCandidateAdapter, state: GenerationUiState) {
         binding.sceneImage.showScene(state.scene)
+        // The situation the photo was taken for (FR-4.8), as Generate poses shows it; Auto shows none.
+        binding.situationTag.isVisible = state.situation != Situation.DEFAULT
+        binding.situationTag.setText(state.situation.title)
         candidates.frameAspect = aspectOf(state.scene)
         candidates.submitList(state.slots())
         // Until the poses are there, the number of slots is not known; suggestions take the first seconds.
@@ -84,7 +87,7 @@ class GeneratingFragment : Fragment(R.layout.fragment_generating) {
             // Nothing is being generated, for example after the app process was restarted on this screen.
             GenerationUiState.Phase.IDLE,
             GenerationUiState.Phase.FRAMING,
-            GenerationUiState.Phase.REVIEWING,
+            GenerationUiState.Phase.CHECKING,
             GenerationUiState.Phase.DESCRIBING,
             -> navController.popBackStack(R.id.cameraFragment, false)
         }

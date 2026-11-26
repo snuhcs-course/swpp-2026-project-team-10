@@ -4,6 +4,8 @@
 <resources>
     <!-- Common -->
     <string name="cancel">취소</string>
+    <!-- A notice's action that takes back what was just done (#298). -->
+    <string name="undo">되돌리기</string>
     <string name="back">뒤로</string>
     <string name="back_to_camera">카메라로 돌아가기</string>
     <string name="try_again">다시 시도</string>
@@ -45,17 +47,14 @@
     <!-- Saved guides (FR-3.8): the button on the guide's panel and its notices. -->
     <string name="save_guide">가이드 저장</string>
     <string name="guide_saved">가이드 저장됨</string>
-    <string name="guide_saved_notice">가이드를 내 보관함에 저장했어요.</string>
-    <string name="guide_saved_oldest_removed_notice">가이드를 저장했어요. %1$d개까지만 보관해서 가장 오래된 가이드를 지웠어요.</string>
-    <string name="guide_removed_notice">내 보관함에서 뺐어요.</string>
+    <string name="guide_saved_notice">가이드를 내 보관함 즐겨찾기에 넣었어요.</string>
+    <string name="guide_removed_notice">즐겨찾기에서 뺐어요. 내 보관함에는 남아 있어요.</string>
     <string name="guide_shown_label">가이드 표시</string>
     <string name="pinch_mode_guide">가이드</string>
     <string name="pinch_mode_camera">카메라</string>
     <string name="pinch_mode_guide_description">핀치로 가이드를 움직여요</string>
     <string name="pinch_mode_camera_description">핀치로 카메라를 확대하거나 축소해요</string>
     <string name="guide_save_failed_notice">가이드를 저장하지 못했어요. 휴대폰 저장 공간을 확인하세요.</string>
-    <string name="delete_saved_guide">저장한 가이드 삭제</string>
-    <string name="delete_saved_guide_title">저장한 가이드를 삭제할까요?</string>
     <string name="delete_saved_guide_message">이 휴대폰에서 지워져요. 카메라에 있는 가이드는 그대로 남아요.</string>
     <string name="delete">삭제</string>
     <string name="saved_guide_open_failed">저장한 가이드를 열지 못했어요.</string>
@@ -63,12 +62,34 @@
     <string name="library_title">보관함</string>
     <string name="library_title_description">보관함, 저장한 가이드 %1$d개</string>
     <string name="library_all">전체 %1$d</string>
-    <string name="library_photos">사진 %1$d</string>
-    <string name="library_generated">AI 포즈 %1$d</string>
+    <string name="library_favorites">즐겨찾기 %1$d</string>
+    <string name="library_more">더보기</string>
+    <string name="library_select">선택</string>
+    <string name="library_select_all">모두 선택</string>
+    <string name="library_close_selection">선택 그만하기</string>
+    <plurals name="library_selected">
+        <item quantity="other">%1$d개 선택됨</item>
+    </plurals>
+    <plurals name="delete_guides_title">
+        <item quantity="other">가이드 %1$d개를 삭제할까요?</item>
+    </plurals>
+    <string name="library_guide_selected">선택됨</string>
+    <string name="library_guide_not_selected">선택 안 됨</string>
+    <string name="library_guide_favorite_description">%1$s, 즐겨찾기</string>
+    <string name="poses_kept_notice">포즈는 내 보관함에 있어요.</string>
+    <string name="poses_kept_view">보기</string>
     <string name="library_empty">아직 저장한 가이드가 없어요</string>
-    <string name="library_empty_body">카메라에서 가이드를 저장하거나 사진을 추가하세요.</string>
-    <string name="library_empty_filter">이 종류의 가이드가 아직 없어요</string>
-    <string name="add_photo">사진 추가</string>
+    <string name="library_empty_body">만든 포즈와 사용한 사진 가이드가 여기에 모여요.</string>
+    <string name="library_empty_favorites">아직 즐겨찾기가 없어요</string>
+    <string name="library_empty_favorites_body">가이드의 ♥를 누르면 여기에 담겨요.</string>
+    <string name="library_memo_edit">메모 편집</string>
+    <string name="library_favorite_add">즐겨찾기에 추가</string>
+    <string name="library_favorite_remove">즐겨찾기에서 빼기</string>
+    <string name="library_memo_title">메모</string>
+    <string name="library_memo_hint">이 가이드에 남길 메모</string>
+    <string name="library_memo_failed">메모를 저장하지 못했어요.</string>
+    <string name="library_guide_situation_description">%1$s, %2$s용</string>
+    <string name="library_guide_memo_description">%1$s. 메모: %2$s</string>
     <string name="saved_photo_guide_description">%1$s에 저장한 사진 가이드</string>
     <string name="saved_pose_guide_description">%1$s에 저장한 AI 포즈 가이드</string>
     <string name="guide_offer_failed">가이드를 보내지 못했어요</string>
@@ -83,24 +104,39 @@
     <string name="show_reference">다시 보기</string>
     <string name="reference_hidden">숨김</string>
     <string name="edit_guide">가이드 편집</string>
+    <!-- After Remove guide, with Undo for a few seconds (FR-3.6, #298). -->
+    <string name="guide_removed_from_camera">가이드를 지웠어요</string>
     <!-- Pose tips (FR-4.10): the banner over the bottom of the preview and the button in the top bar. -->
     <string name="tip_preparing">팁 준비 중…</string>
     <string name="tip_failed">이 포즈의 팁을 받지 못했어요</string>
     <string name="show_tip">팁 보기</string>
     <string name="close_tip">팁 닫기</string>
-    <string name="hint_pinch_zoom">두 손가락으로 확대·축소</string>
     <string name="flash_off">플래시 끔</string>
     <string name="flash_auto">플래시 자동</string>
     <string name="flash_on">플래시 켬</string>
     <string name="scene_light_off">조명 끔</string>
     <string name="scene_light_on">조명 켬</string>
+    <string name="camera_menu">카메라 메뉴</string>
+    <string name="menu_flash">플래시</string>
+    <string name="menu_timer">타이머</string>
+    <string name="menu_level">수평계</string>
+    <string name="timer_off">타이머 끔</string>
+    <string name="timer_seconds">타이머 %1$d초</string>
+    <string name="grid_on">격자선 켬</string>
+    <string name="grid_off">격자선 끔</string>
+    <string name="level_on">수평계 켬</string>
+    <string name="level_off">수평계 끔</string>
+    <string name="shutter_timer">셔터, 타이머 %1$d초</string>
+    <string name="shutter_cancel_timer">타이머 취소</string>
     <string name="aspect_ratio_description">화면 비율 %1$s</string>
     <string name="aspect_ratios">화면 비율</string>
     <string name="brightness">밝기</string>
     <string name="live_badge">실시간 · %1$s님과 연결됨</string>
     <string name="end_session">공유 종료</string>
+    <string name="end_session_title">카메라 공유를 끝낼까요?</string>
     <string name="peer_left">%1$s님이 나갔어요</string>
     <string name="peer_disconnected">%1$s님의 연결이 끊겼어요</string>
+    <string name="peer_reconnecting">%1$s님과 다시 연결하는 중…</string>
     <string name="session_photo_saved">사진을 Pix 앨범에 저장했어요</string>
     <string name="session_photo_save_failed">%1$s님의 사진을 저장하지 못했어요</string>
     <string name="session_photo_not_sent">%1$s님에게 사진을 보내지 못했어요</string>
@@ -108,16 +144,46 @@
     <string name="session_photo">사진</string>
     <string name="session_photo_unavailable">이 사진은 더 이상 앨범에 없어요.</string>
     <string name="photo_page_counter_description">사진 %2$d장 중 %1$d번째</string>
+    <string name="gallery_photos">모든 사진</string>
+    <string name="gallery_albums">앨범</string>
+    <plurals name="photo_album_description">
+        <item quantity="other">%1$s, 사진 %2$d장</item>
+    </plurals>
+    <string name="album_camera">카메라</string>
+    <string name="album_screenshots">스크린샷</string>
+    <string name="album_downloads">다운로드</string>
+    <string name="photos_access_own">Pix가 저장한 사진만 보여요.</string>
+    <string name="photos_access_chosen">허용한 사진만 보여요.</string>
+    <string name="photos_access_allow">모두 허용</string>
+    <string name="photos_access_change">변경</string>
     <string name="share_photo">사진 공유</string>
     <string name="delete_photo">사진 삭제</string>
     <string name="delete_photo_title">이 사진을 삭제할까요?</string>
-    <string name="delete_photo_message">이 휴대폰에서 지워져요.</string>
+    <string name="delete_photo_message">휴대폰 갤러리에서도 삭제되며, 되돌릴 수 없어요.</string>
+    <string name="media_access_title">다른 앱 사진도 바로 삭제할까요?</string>
+    <string name="media_access_message">다른 앱의 사진은 지울 때마다 Android가 한 번 더 물어요. Pix에 미디어 관리를 한 번 허용하면 다음부터는 묻지 않아요.</string>
+    <string name="allow_media_access">권한 허용</string>
     <string name="photo_not_deleted">사진을 삭제하지 못했어요.</string>
     <string name="remote_zoom_notice">%1$s님이 배율을 %2$s×에 맞췄어요</string>
     <string name="zoom_held_label">%1$s님이 배율을 바꾸고 있어요</string>
+    <string name="photographer_timer_label">%1$s님이 사진을 찍고 있어요</string>
     <string name="remote_guide_move_notice">%1$s님이 가이드를 옮겼어요</string>
     <string name="remote_guide_notice">%1$s님이 포즈 가이드를 정했어요</string>
+    <string name="remote_guide_hide_notice">%1$s님이 가이드를 숨겼어요</string>
+    <string name="remote_guide_show_notice">%1$s님이 가이드를 표시했어요</string>
+    <string name="remote_guide_opacity_notice">%1$s님이 가이드 불투명도를 %2$d%%로 바꿨어요</string>
+    <string name="remote_guide_remove_notice">%1$s님이 가이드를 지웠어요</string>
+    <string name="remote_guide_restore_notice">%1$s님이 가이드를 되돌렸어요</string>
+    <string name="peer_caption_title">%1$s님</string>
+    <string name="peer_caption_status">내 카메라를 보는 중</string>
     <string name="remote_brightness_notice">%1$s님이 밝기를 %2$s에 맞췄어요</string>
+    <string name="remote_focus_notice">%1$s님이 초점을 맞췄어요</string>
+    <string name="remote_shutter_notice">%1$s님이 사진을 찍었어요</string>
+    <string name="remote_timer_notice">%1$s님이 타이머를 %2$d초로 설정했어요</string>
+    <string name="remote_timer_off_notice">%1$s님이 타이머를 껐어요</string>
+    <string name="remote_shutter_pressed_notice">%1$s님이 셔터를 눌렀어요</string>
+    <string name="remote_timer_cancel_notice">%1$s님이 타이머를 취소했어요</string>
+    <string name="remote_pose_start_notice">%1$s님이 AI 포즈를 시작했어요</string>
     <string name="remote_flash_on_notice">%1$s님이 플래시를 켰어요</string>
     <string name="remote_flash_off_notice">%1$s님이 플래시를 껐어요</string>
     <string name="remote_flash_auto_notice">%1$s님이 플래시를 자동으로 바꿨어요</string>
@@ -145,17 +211,19 @@
     <string name="person_found">인물을 인식했어요</string>
     <string name="couldnt_use_photo">이 사진은 사용할 수 없어요. 다른 사진을 고르세요.</string>
     <string name="use">사용</string>
-    <string name="choose_another_photo">다른 사진 고르기</string>
     <string name="cut_from_screenshot">스크린샷에서 사진만 남겼어요</string>
-    <string name="kept_photo_description">스크린샷에서 남긴 사진</string>
+    <string name="kept_photo_description">가이드를 만든 사진</string>
     <string name="use_whole_image">이미지 전체 사용</string>
     <string name="no_person_title">인물을 인식하지 못했어요</string>
     <string name="no_person_message">인물 한 명이 또렷하게 나온 사진을 골라 주세요.</string>
+    <string name="no_person_photo_message">뒤로 가서 인물 한 명이 또렷하게 나온 사진을 골라 주세요.</string>
 
     <!-- Flow 2: Pose generation -->
     <string name="generating_title">포즈 생성 중</string>
     <string name="consent_title">이 사진을 AI 서비스로 보낼까요?</string>
     <string name="consent_message">포즈를 생성하기 위해 이어서 찍을 배경 사진을 Pix 서버를 거쳐 외부 AI 이미지 서비스로 보내요. Pix 서버에는 사진이 저장되지 않아요.</string>
+    <string name="pose_start_asked">%1$s님이 AI 포즈를 요청했어요.</string>
+    <string name="consent_message_subject">포즈를 생성하기 위해 촬영자가 이어서 찍을 배경 사진을 Pix 서버를 거쳐 외부 AI 이미지 서비스로 보내요. Pix 서버에는 사진이 저장되지 않아요.</string>
     <string name="consent_agree">동의하고 계속</string>
     <string name="not_now">나중에</string>
     <string name="scene_title">배경 사진 촬영</string>
@@ -166,8 +234,6 @@
     <string name="scene_framing_hint_landmark">랜드마크 전체와 인물이 함께 나오게 찍어 주세요</string>
     <string name="scene_framing_hint_selfie">얼굴과 뒤 배경이 함께 나오게 찍어 주세요</string>
     <string name="scene_guide_next">이 사진으로 AI가 포즈 4개를 만들어요</string>
-    <string name="scene_review_title">이 사진을 사용할까요?</string>
-    <string name="scene_review_body">이 사진으로 포즈를 생성해요.</string>
     <string name="shoot_again">다시 촬영</string>
     <string name="scene_shot_failed">사진을 촬영하지 못했어요. 다시 시도하세요.</string>
     <string name="scene_no_person_title">사진에 사람이 없어요</string>
@@ -176,6 +242,36 @@
     <string name="describe_title">포즈 생성</string>
     <string name="describe_label">원하는 포즈</string>
     <string name="describe_hint">예: 벽에 기대고 한 손은 주머니에</string>
+    <!-- Generate poses' field while it is empty and left alone (FR-4.15): Auto as its value, what Auto does, the
+         line under it that says to tap it, and the button in a field with text that goes back to Auto. -->
+    <string name="describe_auto">자동</string>
+    <string name="describe_auto_body">현재 사진의 배경과 가장 어울리는 포즈 4가지를 자동으로 생성해요</string>
+    <string name="describe_auto_helper">칸을 누르면 직접 원하는 포즈를 입력할 수 있어요</string>
+    <string name="back_to_auto">자동 생성으로 돌아가기</string>
+    <!-- The options under the field (FR-4.15): the section, then each option's words. They go into the description as
+         they are, between commas, so none has a comma (PoseOptions). -->
+    <string name="options_label">자주 찍는 포즈</string>
+    <string name="pose_option_peace_sign">브이</string>
+    <string name="pose_option_waving">손 흔들기</string>
+    <string name="pose_option_hand_in_pocket">주머니에 손</string>
+    <string name="pose_option_arms_crossed">팔짱</string>
+    <string name="pose_option_looking_back">뒤돌아보기</string>
+    <string name="pose_option_arms_up">만세</string>
+    <string name="pose_option_thumbs_up">엄지척</string>
+    <string name="pose_option_walking">걷는 모습</string>
+    <string name="pose_option_cheek_heart">볼 하트</string>
+    <string name="pose_option_chin_on_hand">턱 괴기</string>
+    <string name="pose_option_hand_through_hair">머리 넘기기</string>
+    <string name="pose_option_pointing">손으로 가리키기</string>
+    <string name="pose_option_arms_wide">양팔 벌리기</string>
+    <string name="pose_option_on_the_palm">손바닥에 올리기</string>
+    <string name="pose_option_back_view">뒷모습</string>
+    <string name="pose_option_looking_far">먼 곳 바라보기</string>
+    <string name="pose_option_walking_away">걸어가는 모습</string>
+    <string name="pose_option_sitting_looking">앉아서 바라보기</string>
+    <string name="pose_option_wink">윙크</string>
+    <string name="pose_option_chin_in_hands">꽃받침</string>
+    <string name="pose_option_finger_on_cheek">볼 콕</string>
     <string name="description_refused">지난 요청이 거절됐어요. 설명이나 사진을 바꿔 다시 시도하세요.</string>
     <string name="description_rejected_message">유해한 프롬프트 요청을 받았어요.</string>
     <string name="generation_no_person_message">이 사진에서 사람을 찾지 못했어요.</string>
@@ -186,28 +282,22 @@
     <string name="history_with">%1$s님과</string>
     <string name="history_empty_with">%1$s님과 쓴 설명이 아직 없어요</string>
     <string name="history_delete">“%1$s” 설명을 기록에서 지우기</string>
-    <string name="suggest_poses">추천받기</string>
     <string name="generate_from_description">생성</string>
     <string name="regenerate_poses">다시 생성</string>
-    <string name="clear_description">설명 지우기</string>
     <string name="choosing_poses">포즈 선택 중…</string>
     <string name="scene_photo_description">포즈를 생성할 배경 사진</string>
+    <string name="scene_photo_enlarge">크게 보기</string>
     <string name="creating_pose">생성 중…</string>
     <string name="pose_failed">생성하지 못함</string>
     <string name="ready_count">%2$d개 중 %1$d개 완료</string>
-    <string name="generating_scene_caption">인물과 배경은 그대로 · 최대 60초</string>
     <string name="pick_pose_title">포즈 선택</string>
     <string name="pose_page_counter_description">포즈 %2$d개 중 %1$d번째</string>
     <string name="select_pose">선택</string>
-    <string name="go_back_title">정말 되돌아가시겠습니까?</string>
-    <string name="go_back_generating">되돌아가면 생성 중인 이미지가 사라지며, 다시 복구할 수 없습니다.</string>
-    <string name="go_back_generated">되돌아가면 생성된 이미지가 사라지며, 다시 복구할 수 없습니다.</string>
-    <string name="go_back">되돌아가기</string>
     <!-- ♥ on Pick a pose (FR-4.14): a candidate kept in this phone's library. -->
-    <string name="save_pose">이 포즈를 내 보관함에 저장</string>
-    <string name="remove_saved_pose">이 포즈를 내 보관함에서 빼기</string>
-    <string name="pose_saved_notice">포즈를 내 보관함에 저장했어요.</string>
-    <string name="pose_removed_notice">포즈를 내 보관함에서 뺐어요.</string>
+    <string name="save_pose">이 포즈를 즐겨찾기에 추가</string>
+    <string name="remove_saved_pose">이 포즈를 즐겨찾기에서 빼기</string>
+    <string name="pose_saved_notice">포즈를 내 보관함 즐겨찾기에 넣었어요.</string>
+    <string name="pose_removed_notice">포즈를 즐겨찾기에서 뺐어요. 내 보관함에는 남아 있어요.</string>
     <string name="pose_no_person_notice">이 포즈에서 사람을 찾지 못했어요.</string>
     <!-- Pick a pose on both phones in a session (FR-6.15): the photographer's candidates, first choice wins. -->
     <string name="shared_hint">%1$s님도 보고 있어요</string>
@@ -405,9 +495,18 @@
     <!-- Flow 5: Subject view, Connection lost -->
     <string name="subject_title">%1$s님의 카메라</string>
     <string name="subject_title_placeholder">상대 카메라</string>
+    <string name="subject_live">실시간으로 보는 중</string>
+    <string name="subject_receiving_photo">사진 받는 중…</string>
+    <string name="subject_shutter">%1$s님의 카메라로 사진 찍기</string>
+    <string name="subject_shutter_timer">%1$s님의 카메라로 사진 찍기, 타이머 %2$d초</string>
+    <string name="subject_shutter_refused">지금은 사진을 찍을 수 없어요</string>
+    <string name="subject_poses_asking">%1$s님의 동의를 기다리고 있어요</string>
+    <string name="subject_poses_started">%1$s님이 배경 사진을 찍으면 포즈를 만들어요</string>
+    <string name="subject_poses_refused">지금은 AI 포즈를 시작할 수 없어요</string>
     <string name="leave">나가기</string>
     <string name="leave_session_title">카메라 공유에서 나갈까요?</string>
-    <string name="subject_video_description">화면을 두 손가락으로 벌리거나 오므려 상대 카메라를 확대·축소할 수 있어요</string>
+    <string name="focus_and_brightness_action">초점을 맞추고 밝기 조절</string>
+    <string name="subject_video_description">화면을 두 손가락으로 벌리거나 오므려 상대 카메라를 확대·축소하고, 눌러서 초점을 맞출 수 있어요</string>
     <string name="peer_ended_session">%1$s님이 카메라 공유를 끝냈어요</string>
     <string name="peer_ended_session_unnamed">상대가 카메라 공유를 끝냈어요</string>
     <string name="camera_paused">상대 카메라가 잠시 중지됐어요.</string>
@@ -451,9 +550,7 @@
 
     <!-- Settings, How to use Pix, About Pix -->
     <string name="settings">설정</string>
-    <string name="settings_section_camera">카메라</string>
-    <string name="settings_base_brightness">기본 밝기</string>
-    <string name="settings_base_brightness_body">모든 사진이 이 밝기에서 시작해요. 화면을 눌러 초점을 맞춘 뒤 위아래로 밀면 다음에 누를 때까지 더 밝거나 어둡게 바뀌어요.</string>
+    <string name="settings_grid">격자선</string>
     <string name="settings_section_guide">가이드</string>
     <string name="settings_guide_color">색</string>
     <string name="settings_guide_thickness">두께</string>
@@ -503,7 +600,7 @@
     <string name="help_together_title">카메라 공유</string>
     <string name="help_together_body">카메라 공유에서 누가 찍을지 고르세요. Pix 친구를 초대하거나 찍힐 사람에게 코드를 보여주면, 상대 폰에 내 카메라 화면이 같은 가이드와 함께 실시간으로 보여요.</string>
     <string name="help_remote_title">찍히는 사람의 폰에서</string>
-    <string name="help_remote_body">찍히는 사람은 자기 폰에서 줌, 밝기, 플래시를 바꾸고 가이드를 옮길 수 있어요. 사진은 찍는 사람만 찍어요.</string>
+    <string name="help_remote_body">찍히는 사람은 자기 폰에서 줌, 초점, 밝기, 플래시를 바꾸고, 가이드를 옮기고, 사진도 찍을 수 있어요.</string>
     <string name="about_title">앱 정보</string>
     <string name="about_version">버전</string>
     <string name="about_licenses">오픈소스 라이선스</string>
@@ -511,25 +608,26 @@
     <string name="settings_tutorial">튜토리얼 다시 보기</string>
     <string name="settings_tutorial_reset">화면마다 튜토리얼이 다시 나와요.</string>
     <string name="tutorial_close_hint">아무 곳이나 누르면 닫혀요</string>
-    <string name="tutorial_settings">언어와 가이드 모양을 바꿔요</string>
+    <string name="tutorial_menu">플래시, 타이머, 격자선, 설정</string>
     <string name="tutorial_together">다른 폰과 카메라 화면을 실시간으로 공유해요</string>
     <string name="tutorial_guide">사진이나 AI 포즈로 가이드를 더해요</string>
-    <string name="tutorial_shutter">가이드 없이 사진만 저장돼요</string>
+    <string name="tutorial_shutter">가이드 없이 사진만 저장돼요. 타이머 중에 다시 누르면 취소돼요</string>
     <string name="tutorial_switch">전면 카메라로 바꿔요</string>
     <string name="tutorial_upload">사진 속 사람의 윤곽을 따요</string>
     <string name="tutorial_generate">상황을 고르면 AI가 포즈 4개를 만들어요</string>
     <string name="tutorial_saved">저장한 가이드는 내 보관함에 모여요</string>
     <string name="tutorial_move">끌어서 옮기고, 두 손가락으로 크기 조절</string>
-    <string name="tutorial_edit">이 버튼이 켜져 있을 때만 가이드가 움직여요</string>
+    <string name="tutorial_edit">이 버튼을 켜면 가이드를 옮길 수 있어요</string>
     <string name="tutorial_fade">흐리게 하거나 숨길 수 있어요</string>
-    <string name="tutorial_save">저장해서 다시 써요</string>
+    <string name="tutorial_save">내 보관함 즐겨찾기에 넣어요</string>
     <string name="tutorial_remove">올려 둔 가이드를 내려요</string>
     <string name="tutorial_scene">이 사진으로 포즈를 만들어요</string>
     <string name="tutorial_describe">원하는 포즈를 적어요</string>
     <string name="tutorial_suggest">비워 두면 AI가 제안해요</string>
     <string name="tutorial_friend_title">찍히는 사람이 되면</string>
-    <string name="tutorial_friend_zoom">두 손가락으로 찍는 사람의 카메라를 확대해요</string>
-    <string name="tutorial_friend_brightness">밝기를 조절해요</string>
+    <string name="tutorial_friend_zoom">배율 버튼을 누르거나 두 손가락으로 찍는 사람의 카메라를 확대해요</string>
+    <string name="tutorial_friend_focus">화면을 눌러 초점을 맞추고 옆에서 밝기를 조절해요</string>
     <string name="tutorial_friend_move">가이드를 직접 옮겨요</string>
     <string name="tutorial_friend_guide">내 폰에서 가이드를 골라요</string>
+    <string name="tutorial_friend_shutter">사진을 직접 찍어요. 타이머 중에 다시 누르면 취소돼요</string>
 </resources>

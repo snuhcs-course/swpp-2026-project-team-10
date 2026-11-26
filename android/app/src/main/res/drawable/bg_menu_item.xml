@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An item of a menu card (bg_menu_card) under a touch: the light rounded 10 dp, inside the card's 16 dp corners by the
+     card's 6 dp padding. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/colorControlHighlight">
+    <item android:id="@android:id/mask">
+        <shape android:shape="rectangle">
+            <corners android:radius="10dp" />
+            <solid android:color="@color/pix_text" />
+        </shape>
+    </item>
+</ripple>

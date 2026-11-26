@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A top bar button that opens a panel, the camera menu's (FR-1.17) and the ratio's (FR-1.13): the bar's pill,
+     faint, while its panel is open (activated). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/camera_option_selected" android:state_activated="true" />
+    <item android:color="@android:color/transparent" />
+</selector>

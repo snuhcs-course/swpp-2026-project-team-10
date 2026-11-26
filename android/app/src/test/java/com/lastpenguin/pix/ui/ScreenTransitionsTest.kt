@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-21, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui
 
 import android.animation.AnimatorInflater
@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Looper
 import android.view.View
+import androidx.activity.ComponentDialog
 import androidx.annotation.IdRes
 import androidx.navigation.NavController
 import androidx.navigation.Navigator
@@ -17,13 +18,19 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lastpenguin.pix.MainActivity
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentFailureBinding
+import com.lastpenguin.pix.guide.NoPersonFoundException
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
 import com.lastpenguin.pix.ui.camera.CameraFragment
+import com.lastpenguin.pix.ui.generation.DescribePoseFragment
+import com.lastpenguin.pix.ui.guide.AddGuideSheet
+import com.lastpenguin.pix.ui.guide.ReferenceViewModel
 import com.lastpenguin.pix.ui.settings.SettingsFragment
 import java.time.Duration
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -39,13 +46,16 @@ import org.robolectric.shadows.ShadowChoreographer
  * The transitions between screens (Design 2.1, R&S 6.9, Iter3-A14) on the real activity and navigation graph, with the
  * display's frames paused where a test looks at a transition's start, since idle() plays each to its end (Testing
  * 2.1.8).
- * Every destination (equivalence partitioning): a screen of a live image, any other screen, or a sheet. KINDS names
- * each, so a destination added to the graph fails here until it is named, and then gets the transitions of its kind.
- * Pairs: to or from a live image fades in place; two other screens share the x axis, the next coming from the right
+ * Every destination (equivalence partitioning): a screen of a live image, a step of the pose flow, any other screen, or
+ * a sheet. KINDS names each, so a destination added to the graph fails here until it is named, and then gets the
+ * transitions of its kind. Pairs: two steps of the pose flow fade over each other in place (#210); Camera to Generate
+ * poses hands the scene photo over, the next screen there at once to unfold from the camera's look, and back fades
+ * through; to or from a live image otherwise fades through in place; two other screens share the x axis, the next coming from the right
  * and, going back, the last coming from the left; a sheet leaves the screen under it as it is.
  * Back: the system's Back, a screen's own Back, and *Back to camera* from two screens deep, which pops both at once; a
  * move that closes the screen shown (popUpTo) goes back with the screen beneath it, not the one it closed; a link's
- * screen comes and goes as any other. A tap during a transition acts at once. Each transition lasts 300 ms or less,
+ * screen comes and goes as any other; Back on No person found closes that screen and opens a sheet in one move, over
+ * Camera, with the sheet's photo picker (#294). A tap during a transition acts at once. Each transition lasts 300 ms or less,
  * and with the phone's animations off each screen is at its end at once.
  */
 @RunWith(AndroidJUnit4::class)
@@ -53,6 +63,7 @@ import org.robolectric.shadows.ShadowChoreographer
 @Config(qualifiers = "w360dp-h705dp-xxhdpi")
 class ScreenTransitionsTest {
     private var controller: ActivityController<MainActivity>? = null
+    private lateinit var modules: TestAppContainer
 
     @After
     fun tearDown() {
@@ -62,7 +73,7 @@ class ScreenTransitionsTest {
     }
 
     private fun start(): ActivityController<MainActivity> {
-        TestAppContainer().also { it.auth.signInAs(it.auth.account) }.install()
+        modules = TestAppContainer().also { it.auth.signInAs(it.auth.account) }.install()
         return Robolectric.buildActivity(MainActivity::class.java).setup().also {
             controller = it
             idle()
@@ -135,6 +146,20 @@ class ScreenTransitionsTest {
                     val screen = (destination as FragmentNavigator.Destination).className
                     assertEquals("$name", ScreenMotion.FADE, ScreenMotion.between(camera, screen))
                     assertEquals("$name", ScreenMotion.FADE, ScreenMotion.between(settings, screen))
+                }
+
+                Kind.STEP -> {
+                    val screen = (destination as FragmentNavigator.Destination).className
+                    // The pose flow's steps fade over each other (#210). From the scene photo's Camera, Generate poses
+                    // unfolds; the other steps, and every step back to Camera, fade through.
+                    val handOff = screen == DescribePoseFragment::class.java.name
+                    val fromCamera = if (handOff) ScreenMotion.HAND_OFF else ScreenMotion.FADE
+                    assertEquals("$name", fromCamera, ScreenMotion.between(camera, screen))
+                    assertEquals("$name", ScreenMotion.FADE, ScreenMotion.between(screen, camera))
+                    for (step in ScreenMotion.STEPS) {
+                        assertEquals("$name", ScreenMotion.FLOW, ScreenMotion.between(step, screen))
+                    }
+                    assertEquals("$name", ScreenMotion.SHARED_AXIS, ScreenMotion.between(settings, screen))
                 }
 
                 Kind.SCREEN -> {
@@ -289,6 +314,32 @@ class ScreenTransitionsTest {
     }
 
     @Test
+    fun backFromNoPersonFound_closesIt_andOpensTheSheetOverCameraWithItsGallery() {
+        val pix = start().get()
+        pix.go(R.id.action_camera_to_addGuide)
+        // A photo picked from the sheet, which closes for Reference confirm; no person is found in it.
+        pix.viewModel<ReferenceViewModel>().onPhotoPicked(Uri.parse("content://photos/1"))
+        pix.go(R.id.action_addGuide_to_referenceConfirm)
+        modules.maker.finish(Result.failure(NoPersonFoundException()))
+        idle()
+        assertEquals(R.id.noPersonFoundFragment, pix.nav.currentDestination?.id)
+
+        pix.back()
+
+        // One move on the real navigators (#294): the screen goes, Camera is the screen again, and the sheet, a
+        // dialog, is over it with the system's photo picker asked for.
+        assertEquals(R.id.addGuideSheet, pix.nav.currentDestination?.id)
+        assertTrue(pix.navHost.childFragmentManager.primaryNavigationFragment is CameraFragment)
+        val sheet = pix.navHost.childFragmentManager.fragments.filterIsInstance<AddGuideSheet>().single()
+        assertTrue(sheet.requireDialog().isShowing)
+        assertNotNull(shadowOf(pix).nextStartedActivityForResult)
+        // The sheet is as the Guide button opens it: its own Back, the dialog's, closes it alone.
+        (sheet.requireDialog() as ComponentDialog).onBackPressedDispatcher.onBackPressed()
+        idle()
+        assertEquals(R.id.cameraFragment, pix.nav.currentDestination?.id)
+    }
+
+    @Test
     fun aTapDuringATransition_actsAtOnce() {
         val pix = start().get()
         pix.go(R.id.action_camera_to_settings)
@@ -321,7 +372,7 @@ class ScreenTransitionsTest {
         assertEquals(R.id.cameraFragment, pix.nav.currentDestination?.id)
     }
 
-    private enum class Kind { LIVE, SCREEN, SHEET }
+    private enum class Kind { LIVE, STEP, SCREEN, SHEET }
 
     private companion object {
         /** The longest transition. */
@@ -337,9 +388,9 @@ class ScreenTransitionsTest {
             R.id.libraryFragment to Kind.SCREEN,
             R.id.referenceConfirmFragment to Kind.SCREEN,
             R.id.noPersonFoundFragment to Kind.SCREEN,
-            R.id.describePoseFragment to Kind.SCREEN,
-            R.id.generatingFragment to Kind.SCREEN,
-            R.id.pickPoseFragment to Kind.SCREEN,
+            R.id.describePoseFragment to Kind.STEP,
+            R.id.generatingFragment to Kind.STEP,
+            R.id.pickPoseFragment to Kind.STEP,
             R.id.generationFailedFragment to Kind.SCREEN,
             R.id.friendsFragment to Kind.SCREEN,
             R.id.addFriendFragment to Kind.SCREEN,
@@ -358,9 +409,9 @@ class ScreenTransitionsTest {
             R.id.joinCodeFragment to Kind.SCREEN,
             R.id.sessionNotFoundFragment to Kind.SCREEN,
             R.id.subjectFragment to Kind.LIVE,
-            R.id.subjectDescribeFragment to Kind.SCREEN,
-            R.id.subjectGeneratingFragment to Kind.SCREEN,
-            R.id.subjectPickPoseFragment to Kind.SCREEN,
+            R.id.subjectDescribeFragment to Kind.STEP,
+            R.id.subjectGeneratingFragment to Kind.STEP,
+            R.id.subjectPickPoseFragment to Kind.STEP,
             R.id.subjectConfirmFragment to Kind.SCREEN,
             R.id.connectionLostFragment to Kind.SCREEN,
         )

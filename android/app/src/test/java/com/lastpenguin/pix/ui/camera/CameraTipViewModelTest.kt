@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.camera
 
 import androidx.lifecycle.ViewModelStore
@@ -28,8 +28,9 @@ import org.junit.Test
 /*
  * Partitions for the pose tip on the Camera screen (FR-4.10), state-based. The guide on the camera: none, one with a
  * tip, one without, a newer one with its own tip, removed. The tip: preparing, arriving while the banner is open or
- * closed, failing while it is open or closed, still the older guide's when the newer one comes. The user: a touch anywhere (with the banner open or closed, or no tip),
- * the tip button (with a tip, or after a failure).
+ * closed, failing while it is open or closed, still the older guide's when the newer one comes. The user: the tip
+ * button, the only way to close and open the banner (with it open or closed, with no tip, or after a failure); a touch
+ * anywhere else never reaches this ViewModel (CameraTipScreenTest).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CameraTipViewModelTest {
@@ -82,22 +83,6 @@ class CameraTipViewModelTest {
     }
 
     @Test
-    fun aTouchAnywhereClosesTheBanner_andTheTipButtonOpensItAgain() = runTest(dispatcher) {
-        val model = model()
-        guides.setGuide(fakeGuide("g1"))
-        tips.value = GuideTip("g1", ready)
-        runCurrent()
-
-        model.onAnyTouch()
-        assertFalse(model.tip!!.open)
-        model.onAnyTouch()
-        assertFalse(model.tip!!.open)
-
-        model.onTipButton()
-        assertTrue(model.tip!!.open)
-    }
-
-    @Test
     fun theTipButtonWhileTheBannerIsOpen_closesIt_andAThirdTapOpensItAgain() = runTest(dispatcher) {
         val model = model()
         guides.setGuide(fakeGuide("g1"))
@@ -119,7 +104,7 @@ class CameraTipViewModelTest {
         guides.setGuide(fakeGuide("g1"))
         tips.value = GuideTip("g1", TipState.Preparing)
         runCurrent()
-        model.onAnyTouch()
+        model.onTipButton()
 
         tips.value = GuideTip("g1", ready)
         runCurrent()
@@ -152,7 +137,7 @@ class CameraTipViewModelTest {
         guides.setGuide(fakeGuide("g1"))
         tips.value = GuideTip("g1", TipState.Preparing)
         runCurrent()
-        model.onAnyTouch()
+        model.onTipButton()
 
         tips.value = GuideTip("g1", TipState.Failed)
         runCurrent()
@@ -166,7 +151,7 @@ class CameraTipViewModelTest {
         guides.setGuide(fakeGuide("g1"))
         tips.value = GuideTip("g1", ready)
         runCurrent()
-        model.onAnyTouch()
+        model.onTipButton()
 
         guides.setGuide(fakeGuide("g2"))
         tips.value = GuideTip("g2", TipState.Preparing)
@@ -197,12 +182,11 @@ class CameraTipViewModelTest {
     }
 
     @Test
-    fun aTouchWithoutATipChangesNothing() = runTest(dispatcher) {
+    fun theTipButtonWithoutATipChangesNothing() = runTest(dispatcher) {
         val model = model()
         runCurrent()
         val before = model.uiState.value
 
-        model.onAnyTouch()
         model.onTipButton()
 
         assertEquals(before, model.uiState.value)

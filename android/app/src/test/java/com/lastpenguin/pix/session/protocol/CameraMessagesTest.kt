@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-11, reviewed by Dongje Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-24, reviewed by Dongje Park and Joonhyung Han
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.AspectRatio
@@ -107,5 +107,9 @@ class CameraMessagesTest {
         val message = codec.decode(text)!!.message
         assertEquals(SessionMessage.CameraStateUpdate(1.5f, Role.PHOTOGRAPHER, true), message)
         assertEquals(CameraFacing.BACK, (message as SessionMessage.CameraStateUpdate).facing)
+        // Nor is it the answer to a tap to focus (#273).
+        assertEquals(false, message.focused)
+        val answer = SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, exposure = 2, focused = true)
+        assertEquals(answer, codec.decode(codec.encode(answer))?.message)
     }
 }

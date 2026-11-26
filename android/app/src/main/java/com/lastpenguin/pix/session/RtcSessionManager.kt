@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.os.SystemClock
@@ -18,6 +18,7 @@ import com.lastpenguin.pix.session.signaling.SignalMessage
 import com.lastpenguin.pix.telemetry.Telemetry
 import com.lastpenguin.pix.telemetry.TelemetryEvent
 import java.util.EnumSet
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -27,13 +28,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -54,7 +54,7 @@ internal fun signalingUrl(serverUrl: String): String =
  * 3. **Run the session.** hello, ping, messages on the two channels, reconnecting after a drop, and leaving.
  *
  * Every signaling and WebRTC callback hops onto one serial scope, so the fields below are only touched there
- * (Design 2.8, Concurrency). A link that drops while connected puts both phones in `Reconnecting` for up to 10 s:
+ * (Design 2.8, Concurrency). A link that drops while connected puts both phones in `Reconnecting` for up to 30 s:
  * each takes its place on the server again over a new socket with its rejoin token, and the photographer restarts ICE
  * on the same peer connection (Design 2.6.7). After that, or when the subject leaves, the photographer keeps a room
  * code's room and goes back to `Waiting(code)`, so the subject's *Reconnect* can take its place again (FR-6.10 to
@@ -80,6 +80,8 @@ class RtcSessionManager(
     private val haveReferenceId: () -> String? = { null },
     /** The signed-in user's access token for each socket, or null when nobody is signed in (Design 2.5.2). */
     private val accessToken: suspend () -> String? = { null },
+    /** The signed-in account's name, which `hello` sends in place of the phone's; null when nobody is signed in. */
+    private val accountName: () -> String? = { null },
 ) : SessionManager, RemoteVideo {
 
     private val serial = dispatcher.limitedParallelism(1)
@@ -88,14 +90,17 @@ class RtcSessionManager(
     private val _state = MutableStateFlow<SessionState>(SessionState.Idle)
     override val state: StateFlow<SessionState> = _state.asStateFlow()
 
-    private val _incoming = MutableSharedFlow<SessionMessage>(extraBufferCapacity = 64)
-    override val incoming: Flow<SessionMessage> = _incoming.asSharedFlow()
+    private val _incoming = MessageFanout<SessionMessage>()
+    override val incoming: Flow<SessionMessage> = _incoming.flow
 
     private val _peerCapabilities = MutableStateFlow<CameraCapabilities?>(null)
     override val peerCapabilities: StateFlow<CameraCapabilities?> = _peerCapabilities.asStateFlow()
 
     private val _peerCamera = MutableStateFlow<CameraState?>(null)
     override val peerCamera: StateFlow<CameraState?> = _peerCamera.asStateFlow()
+
+    private val _peerTimerSeconds = MutableStateFlow(0)
+    override val peerTimerSeconds: StateFlow<Int> = _peerTimerSeconds.asStateFlow()
 
     private val _peerZoomHolder = MutableStateFlow<Role?>(null)
     override val peerZoomHolder: StateFlow<Role?> = _peerZoomHolder.asStateFlow()
@@ -118,6 +123,9 @@ class RtcSessionManager(
 
     /** The link that dropped while connected, still open, for its one `session_drop` event (Design 2.8, Telemetry). */
     private var drop: DropStart? = null
+
+    /** How many drops the running session came back from, told in [SessionState.Connected.drops]. */
+    private var dropsOver = 0
     private var role: Role? = null
 
     /** The last round trips of this phone's pings, newest last, for [latencyMs]. */
@@ -250,6 +258,7 @@ class RtcSessionManager(
         socketFailures = 0
         _peerCapabilities.value = null
         _peerCamera.value = null
+        _peerTimerSeconds.value = 0
         _peerZoomHolder.value = null
         // The photographer stays Idle until the code arrives, or waits for the friend of an invitation; the subject is
         // connecting from the first moment.
@@ -761,7 +770,7 @@ class RtcSessionManager(
         val hello = SessionMessage.Hello(
             appVersion = identity.appVersion,
             role = checkNotNull(role),
-            name = identity.name,
+            name = identity.nameFor(accountName()),
             haveGuideId = if (role == Role.SUBJECT) haveGuideId() else null,
             haveReferenceId = if (role == Role.SUBJECT) haveReferenceId() else null,
         )
@@ -774,6 +783,7 @@ class RtcSessionManager(
         if (_state.value !is SessionState.Connecting || openChannels.size != 2) return
         connectTimeout?.cancel()
         connectTimeout = null
+        dropsOver = 0
         _state.value = SessionState.Connected(checkNotNull(sessionId), peerInfo(hello), checkNotNull(role), partner)
         Timings.mark("session.connected")
         reportAttempt(failure = null)
@@ -790,12 +800,14 @@ class RtcSessionManager(
     /**
      * The link dropped while connected: both phones try for [RECONNECT_BUDGET_MS] to restore it (Design 2.6.7, NFR-11).
      * The socket is opened again even if it looks open, since one on a network without internet would take OkHttp's
-     * pings longer than the budget to fail; its `session.join` answer starts the photographer's ICE restart.
+     * pings most of the budget to fail; its `session.join` answer starts the photographer's ICE restart.
      */
     private fun startReconnecting() {
         val id = sessionId ?: return
         val since = clock()
-        _state.value = SessionState.Reconnecting(id, since, partner)
+        // What Connected said goes on with the state, for a reader that never saw that Connected (#293).
+        val connected = _state.value as? SessionState.Connected
+        _state.value = SessionState.Reconnecting(id, since, partner, connected?.peer, connected?.role ?: role)
         if (drop == null) drop = role?.let { DropStart(it, elapsed()) }
         Timings.mark("session.reconnecting")
         clearLatency()
@@ -827,7 +839,10 @@ class RtcSessionManager(
         if (Channel.RELIABLE !in openChannels) return
         reconnectBudget?.cancel()
         reconnectBudget = null
-        _state.value = SessionState.Connected(state.sessionId, peerInfo(hello), checkNotNull(role), partner)
+        // Counted, so this state differs from the one before the drop for a reader that never saw Reconnecting (#293).
+        dropsOver++
+        _state.value =
+            SessionState.Connected(state.sessionId, peerInfo(hello), checkNotNull(role), partner, dropsOver)
         Timings.mark("session.reconnected", "${clock() - state.since} ms")
         reportDrop(recovered = true)
     }
@@ -865,7 +880,7 @@ class RtcSessionManager(
                     return
                 }
                 peerHello = message
-                _incoming.tryEmit(message)
+                _incoming.send(message)
                 maybeConnected()
             }
 
@@ -884,50 +899,61 @@ class RtcSessionManager(
             }
 
             is SessionMessage.Leave -> {
-                _incoming.tryEmit(message)
+                _incoming.send(message)
                 onPeerGone(message.reason)
             }
 
             is SessionMessage.Capabilities -> {
                 _peerCapabilities.value = message.capabilities
-                _incoming.tryEmit(message)
+                _incoming.send(message)
             }
 
             is SessionMessage.CameraStateUpdate -> {
                 _peerCamera.value =
                     CameraState(message.zoom, message.exposure, message.flash, message.aspect, facing = message.facing)
-                _incoming.tryEmit(message)
+                // The timer is no value of the camera's, so it is kept beside the state, for a screen that opens late.
+                _peerTimerSeconds.value = message.timer
+                _incoming.send(message)
             }
 
             is SessionMessage.ZoomHoldUpdate -> {
                 _peerZoomHolder.value = message.by
-                _incoming.tryEmit(message)
+                _incoming.send(message)
             }
 
-            else -> _incoming.tryEmit(message)
+            else -> _incoming.send(message)
         }
     }
 
     /**
      * Realtime messages go out at once or not at all. Reliable messages wait in order until hello has gone out and
-     * the channel's buffer is below the limit (Design 2.8, Backpressure).
+     * the channel's buffer is below the limit (Design 2.8, Backpressure). With the realtime channel lost, its messages
+     * go on the reliable one and wait there like the rest, except a moment that is wrong late
+     * (`ChannelRouter.neverLate`): that one is not sent at all. The reliable channel retransmits, so even with
+     * nothing ahead of it a message can arrive long after a drop, and "at once or not at all" holds only on the
+     * channel that never retransmits.
      */
     private fun sendNow(message: SessionMessage): Boolean {
         val client = peer ?: return false
         val text = codec.encode(message)
         val routed = router.channelFor(message)
-        val channel = if (routed == Channel.REALTIME && realtimeLost) Channel.RELIABLE else routed
+        val standIn = routed == Channel.REALTIME && realtimeLost
+        val channel = if (standIn) Channel.RELIABLE else routed
         return when (channel) {
             Channel.REALTIME -> client.send(Channel.REALTIME, text)
 
             Channel.RELIABLE -> {
                 val wait = !helloSent || reliableQueue.isNotEmpty() ||
                     client.bufferedAmount(Channel.RELIABLE) >= BACKPRESSURE_BYTES
-                if (wait) {
-                    reliableQueue.addLast(text)
-                    true
-                } else {
-                    client.send(Channel.RELIABLE, text)
+                when {
+                    standIn && router.neverLate(message) -> false
+
+                    wait -> {
+                        reliableQueue.addLast(text)
+                        true
+                    }
+
+                    else -> client.send(Channel.RELIABLE, text)
                 }
             }
         }
@@ -1038,7 +1064,7 @@ class RtcSessionManager(
 
     /** Tells the photographer's screen that the subject is gone, as if the subject had sent `session.leave`. */
     private fun notifyPeerGone(reason: EndReason) {
-        if (peerHello != null) _incoming.tryEmit(SessionMessage.Leave(reason))
+        if (peerHello != null) _incoming.send(SessionMessage.Leave(reason))
     }
 
     private fun startConnectTimeout() {
@@ -1146,7 +1172,7 @@ class RtcSessionManager(
     }
 
     /**
-     * Ends the open drop with its one event (NFR-11): recovered when the link came back, and not when the 10 s ran out
+     * Ends the open drop with its one event (NFR-11): recovered when the link came back, and not when the 30 s ran out
      * or the session, or the photographer's subject, ended first.
      */
     private fun reportDrop(recovered: Boolean) {
@@ -1169,7 +1195,7 @@ class RtcSessionManager(
         val iceServers: List<IceServer>,
     )
 
-    private companion object {
+    internal companion object {
         const val TAG = "PixSession"
         const val CONNECT_TIMEOUT_MS = 15_000L
 
@@ -1180,7 +1206,7 @@ class RtcSessionManager(
         const val ANSWER_WAIT_MS = 2_000L
 
         /** How long both phones try to restore a dropped link before giving up (FR-6.12, NFR-11). */
-        const val RECONNECT_BUDGET_MS = 10_000L
+        const val RECONNECT_BUDGET_MS = 30_000L
 
         /** A dropped socket is opened again after 1 s, every second while reconnecting, and otherwise doubling to 30 s. */
         const val SOCKET_RETRY_MS = 1_000L
@@ -1198,5 +1224,39 @@ class RtcSessionManager(
 
         /** A bulk chunk waits below this, so that a control message sent next waits for this much at most. */
         const val BULK_BYTES = 64L * 1024
+    }
+}
+
+/**
+ * Hands each message from the other phone to every reader of [SessionManager.incoming] (Design 2.8, *Backpressure*).
+ * Each reader has a queue of its own, so one that falls behind delays only itself: with one buffer for all, a main
+ * thread that stood still while a photo's chunks came in filled it, and the next messages were dropped for every
+ * reader, the end of a pose step among them. A reader more than [READER_QUEUE] messages behind loses its own newest
+ * ones. Like a shared flow it does not replay: a reader gets what comes after it started to collect.
+ */
+internal class MessageFanout<T : Any> {
+    private val readers = CopyOnWriteArrayList<kotlinx.coroutines.channels.Channel<T>>()
+
+    /** Every message sent while it is collected, in order. */
+    val flow: Flow<T> = flow {
+        val queue = kotlinx.coroutines.channels.Channel<T>(READER_QUEUE)
+        readers += queue
+        try {
+            for (message in queue) emit(message)
+        } finally {
+            readers -= queue
+        }
+    }
+
+    /** From any thread; never waits. */
+    fun send(message: T) {
+        for (queue in readers) {
+            if (queue.trySend(message).isFailure) Log.w(RtcSessionManager.TAG, "A reader is behind: message dropped")
+        }
+    }
+
+    internal companion object {
+        /** About 12 MB of a photo's chunks, more than a reader that still runs falls behind. */
+        const val READER_QUEUE = 1024
     }
 }

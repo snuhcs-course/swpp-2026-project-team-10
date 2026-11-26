@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-05, reviewed by Joonhyung Han and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Joonhyung Han and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.graphics.Bitmap
@@ -11,7 +11,10 @@ internal const val MAX_REFERENCE_LONG_SIDE = 1280
 /** The reference kept for the Camera screen's thumbnail, enlarged to at most half a phone's width (FR-3.9). */
 internal const val REFERENCE_THUMBNAIL_LONG_SIDE = 512
 
-/** A screenshot cut to its photo is kept this small with the guide, for Reference confirm's cut (FR-2.10). */
+/**
+ * The picked image is kept this small with the guide, for Reference confirm (FR-2.10, #295): a screenshot cut to its
+ * photo, or a photo used whole.
+ */
 internal const val CROP_ORIGINAL_LONG_SIDE = 1024
 
 /**

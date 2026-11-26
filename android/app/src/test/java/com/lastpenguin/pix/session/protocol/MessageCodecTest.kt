@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -86,10 +86,13 @@ class MessageCodecTest {
             SessionMessage.PoseDescriptionEdit("d1", holding = true, text = "벽에 기대기"),
             SessionMessage.PoseDescriptionGo("d1", "", suggest = true),
             SessionMessage.PhotoBegin("p1", "jpeg", 4_718_592, 525, 1_759_212_499_870L),
+            SessionMessage.PhotoBegin("p1", "jpeg", 4_718_592, 525, 1_759_212_499_870L, shot = "shot-1"),
             SessionMessage.PhotoChunk("p1", 0, "/9j/4AAQSkZJRgABAQ"),
             SessionMessage.PhotoEnd("p1", 3735928559L),
             SessionMessage.PhotoAck("p1", 48),
-            SessionMessage.PhotoShutter,
+            SessionMessage.PhotoShutter(),
+            SessionMessage.PhotoShutter("shot-1"),
+            SessionMessage.PhotoDropped("shot-1"),
             SessionMessage.PhotoSaved("p1", ok = true),
             SessionMessage.PhotoSaved("p1", ok = false, reason = PhotoRefusal.STORAGE),
             SessionMessage.Leave(EndReason.LEFT),
@@ -268,6 +271,17 @@ class MessageCodecTest {
     }
 
     @Test
+    fun `a shutter and a photo's begin from a phone before #271 are read without a shot`() {
+        val shutter = """{"v": 3, "t": "photo.shutter", "seq": 1, "ts": 0, "b": {}}"""
+        assertEquals(SessionMessage.PhotoShutter(), codec.decode(shutter)!!.message)
+        val begin = """
+            {"v": 3, "t": "photo.begin", "seq": 1, "ts": 0,
+             "b": {"photoId": "p1", "format": "jpeg", "bytes": 10, "chunks": 1, "takenAt": 1}}
+        """.trimIndent()
+        assertEquals(SessionMessage.PhotoBegin("p1", "jpeg", 10, 1, 1), codec.decode(begin)!!.message)
+    }
+
+    @Test
     fun `guide tip clear has an empty body`() {
         val envelope = Json.parseToJsonElement(codec.encode(SessionMessage.GuideTipClear)).jsonObject
         assertEquals("guide.tip.clear", envelope.getValue("t").jsonPrimitive.content)
@@ -295,8 +309,9 @@ class MessageCodecTest {
 
     @Test
     fun `unknown types, unknown fields, and garbage are tolerated`() {
-        // A type a later protocol may add; camera.flash.set, the earlier example here, exists since #57.
-        assertNull(codec.decode("""{"v":1,"t":"camera.timer.set","seq":1,"ts":0,"b":{"seconds":3}}"""))
+        // A type a later protocol may add; camera.flash.set and camera.timer.set, the earlier examples here, exist
+        // since #57 and #318.
+        assertNull(codec.decode("""{"v":1,"t":"camera.lens.set","seq":1,"ts":0,"b":{"lens":"tele"}}"""))
         assertNull(codec.decode("not json"))
         assertNull(codec.decode("""{"v":1}"""))
         val withExtra = codec.decode("""{"v":1,"t":"ping","seq":1,"ts":0,"b":{"ts":5,"extra":true}}""")

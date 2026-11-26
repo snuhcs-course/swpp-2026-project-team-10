@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-19, reviewed by Jaewan Park and Joonhyung Han
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Joonhyung Han
 package com.lastpenguin.pix.ui.camera
 
 import android.graphics.Bitmap
@@ -24,6 +24,55 @@ import org.robolectric.Shadows.shadowOf
 internal fun photoViewerOn(screen: View): ViewPhotoViewerBinding =
     ViewPhotoViewerBinding.bind(checkNotNull(screen.findViewById(R.id.photoViewer)) { "The viewer was never opened" })
 
+/** Whether the grid of the phone's photos shows, faded in over the pages. */
+internal fun ViewPhotoViewerBinding.gridShown(): Boolean = photoViewerGrid.isShown && photoViewerAlbum.alpha == 1f
+
+/** How many photos the grid has, or 0 while it is not shown. */
+internal fun ViewPhotoViewerBinding.gridCount(): Int =
+    if (photoViewerGrid.isShown) photoViewerGrid.adapter!!.itemCount else 0
+
+/** The grid's photo at [position], counted from the top left, as laid out. */
+private fun ViewPhotoViewerBinding.cell(position: Int): View =
+    checkNotNull(photoViewerGrid.findViewHolderForAdapterPosition(position)) { "No photo $position in the grid" }
+        .itemView
+
+/** The thumbnail the grid's photo at [position] shows, or null while it has none. */
+internal fun ViewPhotoViewerBinding.gridShows(position: Int): Bitmap? =
+    (cell(position).findViewById<ImageView>(R.id.photoCellImage).drawable as? BitmapDrawable)?.bitmap
+
+/** What TalkBack reads of the grid's photo at [position]: which photo of how many. */
+internal fun ViewPhotoViewerBinding.gridReads(position: Int): String? = cell(position).contentDescription?.toString()
+
+/** Taps the grid's photo at [position], counted from the top left. */
+internal fun ViewPhotoViewerBinding.tapGrid(position: Int) {
+    cell(position).performClick()
+}
+
+/** How many albums the Albums tab lists, or 0 while it is not shown. */
+internal fun ViewPhotoViewerBinding.albumsCount(): Int =
+    if (photoViewerAlbums.isShown) photoViewerAlbums.adapter!!.itemCount else 0
+
+/** The Albums tab's album at [position], as laid out. */
+private fun ViewPhotoViewerBinding.albumCard(position: Int): View =
+    checkNotNull(photoViewerAlbums.findViewHolderForAdapterPosition(position)) { "No album $position" }.itemView
+
+/** The name and the count the Albums tab's album at [position] shows. */
+internal fun ViewPhotoViewerBinding.albumShows(position: Int): Pair<String, String> {
+    val card = albumCard(position)
+    return card.findViewById<TextView>(R.id.photoAlbumName).text.toString() to
+        card.findViewById<TextView>(R.id.photoAlbumCount).text.toString()
+}
+
+/** What TalkBack reads of the Albums tab's album at [position]: its name and how many photos. */
+internal fun ViewPhotoViewerBinding.albumReads(
+    position: Int,
+): String? = albumCard(position).contentDescription?.toString()
+
+/** Taps the Albums tab's album at [position]. */
+internal fun ViewPhotoViewerBinding.tapAlbum(position: Int) {
+    albumCard(position).performClick()
+}
+
 /** The page of the viewer on screen. */
 private fun ViewPhotoViewerBinding.pageOnScreen(): View? =
     (photoViewerPages.getChildAt(0) as RecyclerView)
@@ -33,11 +82,14 @@ private fun ViewPhotoViewerBinding.pageOnScreen(): View? =
 internal fun ViewPhotoViewerBinding.pageShows(): Bitmap? =
     (pageOnScreen()?.findViewById<ImageView>(R.id.photoPageImage)?.drawable as? BitmapDrawable)?.bitmap
 
+/** Whether the pages show, under no grid. */
+internal fun ViewPhotoViewerBinding.pagesShown(): Boolean = photoViewerPages.isShown && !photoViewerAlbum.isShown
+
 /** Whether the page on screen says its photo is not there. */
 internal fun ViewPhotoViewerBinding.pageSaysUnavailable(): Boolean =
     pageOnScreen()?.findViewById<View>(R.id.photoPageMessage)?.isShown == true
 
-/** Every text the viewer shows, its pages' left out: none, since it has no title and no counter. */
+/** Every text the viewer shows, its pages' left out: none over a page, which has no title and no counter. */
 internal fun ViewPhotoViewerBinding.textsShown(): List<String> {
     fun texts(view: View): List<String> = when {
         !view.isShown || view === photoViewerPages -> emptyList()
@@ -61,6 +113,17 @@ internal fun ViewPhotoViewerBinding.stripCount(): Int =
 /** Which of the strip's thumbnails is selected, by its place in the list; null when none is. */
 internal fun ViewPhotoViewerBinding.stripSelected(): Int? =
     stripItems().firstOrNull { it.isSelected }?.let { photoViewerStrip.getChildAdapterPosition(it) }
+
+/**
+ * How far the selected thumbnail's middle is from the strip's middle, in px, as they show in the window; null when none
+ * is selected.
+ */
+internal fun ViewPhotoViewerBinding.selectedFromStripMiddle(): Int? {
+    val selected = stripItems().firstOrNull { it.isSelected } ?: return null
+    val thumb = IntArray(2).also(selected::getLocationInWindow)
+    val strip = IntArray(2).also(photoViewerStrip::getLocationInWindow)
+    return (thumb[0] + selected.width / 2) - (strip[0] + photoViewerStrip.width / 2)
+}
 
 /** Taps the strip's thumbnail of the photo at [position]. */
 internal fun ViewPhotoViewerBinding.tapStrip(position: Int) {

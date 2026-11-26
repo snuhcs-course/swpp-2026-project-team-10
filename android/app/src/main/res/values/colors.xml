@@ -38,6 +38,9 @@
     <color name="pix_accent_glow">#38F2C14E</color>
     <!-- The accent at 20%: a slider's halo, and the brightness button while its slider is open. -->
     <color name="pix_accent_soft">#33F2C14E</color>
+    <!-- The glass over the image tinted with the accent, as pix_guide_glass is with the guide's color: the tip button
+         while its tip is open (FR-4.10). -->
+    <color name="pix_accent_glass">#A9514221</color>
     <color name="pix_on_accent">#141413</color>
     <!-- The pose flow's bar under the top bar (R&S 6.3, #210): the accent dimmed to 75% over the ground, on a dark
          track. -->
@@ -51,8 +54,10 @@
     <color name="pix_on_live">#0B2A1E</color>
     <color name="pix_guide">#5EEAD4</color>
     <color name="pix_guide_stroke">#805EEAD4</color>
-    <!-- The guide color at 20%: the guide slider's halo, and the guide-edit toggle while the mode is on. -->
+    <!-- The guide color at 20%: the guide slider's halo. -->
     <color name="pix_guide_soft">#335EEAD4</color>
+    <!-- The guide color at 20% over pix_glass, as one color: the guide-edit toggle's glass while the mode is on. -->
+    <color name="pix_guide_glass">#A9254F4A</color>
     <color name="pix_danger">#FF6B57</color>
     <!-- The blinking light while a session streams the camera (FR-6.8), the red of a recording light. -->
     <color name="pix_recording">#FF3B30</color>
@@ -70,10 +75,13 @@
     <color name="camera_shutter">#F4F4F2</color>
     <color name="camera_shutter_pressed">#D6D6D3</color>
     <color name="camera_shutter_disabled">#59F4F4F2</color>
+    <!-- The shutter's ring while the timer counts down (FR-1.17): the white at 28% where the accent has not filled it. -->
+    <color name="camera_countdown_track">#47F4F4F2</color>
     <!-- The shutter while the scene photo for poses is framed (R&S 6.3, #210), and its disc while pressed. -->
     <color name="camera_shutter_scene">#F2C14E</color>
     <color name="camera_shutter_scene_pressed">#D6A93F</color>
-    <!-- The panels over the image (the ratios, the guide's controls) and their edge, 12,12,14 at 62%. -->
+    <!-- The panels over the image (the ratios, the camera menu, the guide's controls) and their edge, 12,12,14 at
+         62%. -->
     <color name="camera_panel">#9E0C0C0E</color>
     <color name="camera_panel_stroke">#1FFFFFFF</color>
     <!-- The inside of the chosen ratio's shape. -->
@@ -93,6 +101,8 @@
     <color name="camera_level">#FFFFFFFF</color>
     <color name="camera_level_outline">#8C000000</color>
     <color name="camera_level_aligned">#D4AC24</color>
+    <!-- The inside of the guide while guide-edit mode is on (#271): the guide color at 25%, so the scene shows through. -->
+    <color name="camera_guide_fill">#405EEAD4</color>
     <!-- The dark outline of the brightness bar beside the focus box (Design 2.8). -->
     <color name="camera_exposure_outline">#5A000000</color>
     <!-- The photo behind Settings' guide preview: a sky over the ground. -->

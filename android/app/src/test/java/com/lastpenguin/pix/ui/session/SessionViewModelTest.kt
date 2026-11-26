@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-17, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.net.Uri
@@ -11,8 +11,10 @@ import com.lastpenguin.pix.account.AccountError
 import com.lastpenguin.pix.account.FakeInvitationManager
 import com.lastpenguin.pix.account.PixUser
 import com.lastpenguin.pix.camera.PhotoAlbum
+import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.generation.GuideTip
 import com.lastpenguin.pix.generation.PoseTip
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.session.EndReason
@@ -28,6 +30,7 @@ import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.PhotoContent
 import com.lastpenguin.pix.session.PhotoReader
 import com.lastpenguin.pix.session.PhotoSyncer
+import com.lastpenguin.pix.session.PoseStartStep
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionEntry
@@ -35,6 +38,7 @@ import com.lastpenguin.pix.session.SessionPartner
 import com.lastpenguin.pix.session.SessionPlace
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.SharedTip
+import com.lastpenguin.pix.session.ShutterOutcome
 import com.lastpenguin.pix.session.TipSyncer
 import com.lastpenguin.pix.session.fakeGuide
 import com.lastpenguin.pix.session.protocol.SessionMessage
@@ -85,6 +89,32 @@ import org.junit.runner.RunWith
  * (#188): ended for the subject's way in; Idle (nothing to end); a session with someone in it or on its way (kept).
  * The guide's tip (#213, Design 2.5.1): the photographer sends it once connected and again after a reconnect, not while
  * waiting alone; the subject keeps it from Connecting on, through a reconnect, until the session ends.
+ * The guide (#268, Design 2.5.1, 2.6.7): after a reconnect the photographer sends one changed while the link was down,
+ * whatever the session's first `hello` named; in another session it goes by that session's `hello`; the subject's
+ * copy stays through a reconnect and goes when the session ends.
+ * The subject's tap to focus (FR-7.7, FR-7.4): its box at every tap; its notice at the first tap, not at a tap while
+ * the notice shows or in the quiet time after it (just before its end / at its end), again at the first tap of the
+ * next session, and not again after a reconnect within that time.
+ * The subject's guide panel (FR-7.2, FR-7.4): hiding, showing, the opacity's last value, and removing are each a notice
+ * with the subject's name, and the subject's Undo too; the removal, with the guide and where it was for Undo, kept until
+ * the Camera screen reads it.
+ * The subject's pinch (#292, FR-7.4): named from its first step, through its steps, until its last value is applied,
+ * when the notice with the ratio follows; a pinch that ends without a last value (a cancel) stays named for
+ * ZOOMING_LINGER_MS (just before its end / at its end); a quick step, one final value, names no one; a session that
+ * ends during a pinch names no one.
+ * The drop on the photographer's phone (#293, FR-6.12): the subject named for the whole wait, however long, until the
+ * link is back; no longer once the wait ends (the room waits again, an invitation's session ends); the subject's
+ * phone names no one; a drop whose Connected this reader never saw, named from the state alone and not by an earlier
+ * session's name.
+ * The subject's shutter (#314): taken through the Camera screen in front, a notice; with that screen gone, not taken
+ * and no notice.
+ * The subject starts AI poses (#276): on the photographer's phone, begun through the Camera screen in front, a notice,
+ * and refused with that screen gone; on the subject's phone, the situation sent with its own number and its answer
+ * heard, begun or not; no answer, refused after POSE_START_WAIT_MS (1 ms before / at it); of the given-up request, a
+ * late refusal unheard, a late "asked" bringing it back with its answer said, and a late start said once; the
+ * photographer asked, waited for without a limit; one request at a time, and "asked" said again at another tile; a
+ * given-up request's refusal not the next one's answer; an answer no screen read and a request that waits, both
+ * gone with their session; and nothing sent without a link, which counts as refused.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 // Robolectric for ProcessLifecycleOwner, which the ViewModel observes for the background limit.
@@ -242,6 +272,97 @@ class SessionViewModelTest {
         session.setState(SessionState.Ended(EndReason.PEER_LEFT))
         runCurrent()
         assertNull(tips.mirror.value)
+    }
+
+    private val guides = InMemoryGuideRepository()
+    private val mirror = InMemoryGuideRepository()
+
+    /** A ViewModel whose guide syncer sends [guides] and draws on [mirror] (#268). */
+    private fun withGuides(): SessionViewModel {
+        val syncer =
+            GuideSyncer(session, guides, mirror, codec, FakeGuideReferenceCodec(), MirrorReference(), dispatcher)
+        val guideModel = SessionViewModel(
+            session,
+            camera,
+            syncer,
+            RemoteControlHandler(session, camera, InMemoryGuideRepository()),
+            mobileData,
+            invitations,
+        )
+        store.put("guides", guideModel)
+        return guideModel
+    }
+
+    private fun imagesSent() = session.sent.filterIsInstance<SessionMessage.GuideImageBegin>().map { it.guideId }
+
+    @Test
+    fun theGuide_changedWhileTheLinkWasDown_goesToTheSubjectOnceItIsBack() = runTest(dispatcher) {
+        withGuides().startRoom()
+        guides.setGuide(fakeGuide("g1"))
+        // The subject joined holding g1, so the image is not sent.
+        val live = SessionState.Connected("s1", PeerInfo("Joonhyung", haveGuideId = "g1"), Role.PHOTOGRAPHER)
+        session.setState(live)
+        runCurrent()
+        assertEquals(emptyList<String>(), imagesSent())
+        guides.setGuide(fakeGuide("g2"))
+        runCurrent()
+        assertEquals(listOf("g2"), imagesSent())
+
+        session.setState(SessionState.Reconnecting("s1", 0L))
+        runCurrent()
+        guides.setGuide(fakeGuide("g1"))
+        runCurrent()
+        session.setState(live)
+        runCurrent()
+
+        // The hello still names g1, but the subject has held g2 since.
+        assertEquals(listOf("g2", "g1"), imagesSent())
+        session.setState(SessionState.Ended(EndReason.LEFT))
+        runCurrent()
+    }
+
+    @Test
+    fun theGuide_inAnotherSessionAfterADrop_goesByThatSessionsHello() = runTest(dispatcher) {
+        withGuides().startRoom()
+        guides.setGuide(fakeGuide("g1"))
+        session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        runCurrent()
+        assertEquals(listOf("g1"), imagesSent())
+
+        // The link is lost for good, and someone else joins the room: their hello names nothing.
+        session.setState(SessionState.Reconnecting("s1", 0L))
+        runCurrent()
+        session.setState(SessionState.Waiting(CODE))
+        runCurrent()
+        session.setState(SessionState.Connected("s2", PeerInfo("Seongmin"), Role.PHOTOGRAPHER))
+        runCurrent()
+
+        assertEquals(listOf("g1", "g1"), imagesSent())
+        session.setState(SessionState.Ended(EndReason.LEFT))
+        runCurrent()
+    }
+
+    @Test
+    fun theSubject_keepsThePhotographersGuideThroughAReconnect_andDropsItWhenTheSessionEnds() = runTest(dispatcher) {
+        withGuides().joinRoom(CODE)
+        session.setState(SessionState.Connecting("s1"))
+        runCurrent()
+        val image = codec.encode(fakeGuide("g1"))
+        session.deliver(image.begin())
+        for (index in image.chunks.indices) session.deliver(image.chunk(index))
+        session.deliver(image.end())
+        runCurrent()
+        assertEquals("g1", mirror.guide.value?.id)
+
+        connected()
+        runCurrent()
+        session.setState(SessionState.Reconnecting("s1", 0L))
+        runCurrent()
+        assertEquals("g1", mirror.guide.value?.id)
+
+        session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        runCurrent()
+        assertNull(mirror.guide.value)
     }
 
     @Test
@@ -421,6 +542,242 @@ class SessionViewModelTest {
     }
 
     @Test
+    fun theSubjectsGuidePanel_isNoticedWithTheirName_andTheRemovalKeepsTheGuideForUndo() = runTest(dispatcher) {
+        val guides = InMemoryGuideRepository()
+        val guide = fakeGuide("g1")
+        guides.setGuide(guide)
+        val model = SessionViewModel(
+            session,
+            camera,
+            GuideSyncer(
+                session,
+                InMemoryGuideRepository(),
+                InMemoryGuideRepository(),
+                codec,
+                FakeGuideReferenceCodec(),
+                MirrorReference(),
+                dispatcher,
+            ),
+            RemoteControlHandler(session, camera, guides),
+            mobileData,
+            invitations,
+        )
+        store.put("panel", model)
+        val notices = mutableListOf<SessionNotice>()
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        session.setState(SessionState.Connected("s_1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        runCurrent()
+
+        session.deliver(SessionMessage.GuideVisibleSet("g1", visible = false))
+        session.deliver(SessionMessage.GuideVisibleSet("g1", visible = true))
+        session.deliver(SessionMessage.GuideOpacitySet("g1", 0.7f, final = true))
+        runCurrent()
+        val before = guides.state.value
+        session.deliver(SessionMessage.GuideRemove("g1"))
+        session.deliver(SessionMessage.GuideRestore("g1"))
+        runCurrent()
+
+        assertEquals(
+            listOf(
+                SessionNotice.RemoteGuideVisible("Test Account 2", visible = false),
+                SessionNotice.RemoteGuideVisible("Test Account 2", visible = true),
+                SessionNotice.RemoteGuideOpacity("Test Account 2", 0.7f),
+                SessionNotice.RemoteGuideRestore("Test Account 2"),
+            ),
+            notices,
+        )
+        // The removal waits for the Camera screen, read here only now, as by a Camera that was stopped meanwhile.
+        assertEquals(SubjectRemovedGuide("Test Account 2", guide, before), model.guideRemovals.first())
+    }
+
+    @Test
+    fun theSubjectsOwnConnection_isNoNotice() = runTest(dispatcher) {
+        val notices = mutableListOf<SessionNotice>()
+        backgroundScope.launch { model.notices.collect { notices += it } }
+
+        session.setState(SessionState.Connected("s_1", PeerInfo("Test Account 1"), Role.SUBJECT))
+        runCurrent()
+
+        assertTrue(notices.isEmpty())
+    }
+
+    /** A ViewModel on a camera that focuses on a point, whose time is [clock]. */
+    private fun withPointFocus(clock: () -> Long): SessionViewModel {
+        val focusCamera = FakeCameraController(supportsFocusPoint = true)
+        val syncer = GuideSyncer(
+            session,
+            InMemoryGuideRepository(),
+            InMemoryGuideRepository(),
+            codec,
+            FakeGuideReferenceCodec(),
+            MirrorReference(),
+            dispatcher,
+        )
+        return SessionViewModel(
+            session,
+            focusCamera,
+            syncer,
+            RemoteControlHandler(session, focusCamera, InMemoryGuideRepository()),
+            mobileData,
+            invitations,
+            clock = clock,
+        ).also { store.put("focus", it) }
+    }
+
+    private fun asPhotographerOf(name: String): MutableList<SessionNotice> {
+        val notices = mutableListOf<SessionNotice>()
+        session.setState(SessionState.Connected("s_1", PeerInfo(name), Role.PHOTOGRAPHER))
+        return notices
+    }
+
+    @Test
+    fun theSubjectsPinch_isNamedFromItsFirstStep_untilItsLastValueIsApplied() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        runCurrent()
+        notices.clear()
+        assertNull(model.subjectZooming.value)
+
+        session.deliver(SessionMessage.ZoomSet(1.5f, final = false))
+        runCurrent()
+        assertEquals("Joonhyung", model.subjectZooming.value)
+
+        // Longer than a notice's own time, as long as the steps come.
+        repeat(4) {
+            advanceTimeBy(1_000)
+            session.deliver(SessionMessage.ZoomSet(1.6f + it * 0.1f, final = false))
+            runCurrent()
+            assertEquals("Joonhyung", model.subjectZooming.value)
+        }
+        assertTrue(notices.isEmpty())
+
+        session.deliver(SessionMessage.ZoomSet(2f, final = true))
+        runCurrent()
+        assertNull(model.subjectZooming.value)
+        assertEquals(listOf<SessionNotice>(SessionNotice.RemoteZoom("Joonhyung", 2f)), notices)
+    }
+
+    @Test
+    fun aPinchThatEndsWithoutALastValue_staysNamedALittle_thenNoLonger() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        runCurrent()
+        notices.clear()
+        session.deliver(SessionMessage.ZoomSet(1.5f, final = false))
+        runCurrent()
+
+        // The subject's phone took the pinch back: no value is applied, so no notice with a ratio comes.
+        session.deliver(SessionMessage.ZoomSet(1.5f, final = true, cancel = true))
+        runCurrent()
+        assertEquals("Joonhyung", model.subjectZooming.value)
+        advanceTimeBy(SessionViewModel.ZOOMING_LINGER_MS - 1)
+        runCurrent()
+        assertEquals("Joonhyung", model.subjectZooming.value)
+        advanceTimeBy(1)
+        runCurrent()
+        assertNull(model.subjectZooming.value)
+        assertTrue(notices.isEmpty())
+    }
+
+    @Test
+    fun aQuickStep_namesNoOneZooming_onlyItsRatio() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        val zooming = mutableListOf<String?>()
+        backgroundScope.launch { model.subjectZooming.collect { zooming += it } }
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.ZoomSet(2f, final = true))
+        runCurrent()
+
+        assertEquals(listOf<String?>(null), zooming)
+        assertEquals(listOf<SessionNotice>(SessionNotice.RemoteZoom("Joonhyung", 2f)), notices)
+    }
+
+    @Test
+    fun aSessionThatEndsDuringThePinch_namesNoOne() = runTest(dispatcher) {
+        asPhotographerOf("Joonhyung")
+        runCurrent()
+        session.deliver(SessionMessage.ZoomSet(1.5f, final = false))
+        runCurrent()
+        assertEquals("Joonhyung", model.subjectZooming.value)
+
+        session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        runCurrent()
+
+        assertNull(model.subjectZooming.value)
+    }
+
+    @Test
+    fun theSubjectsFocus_showsItsBoxAtEveryTap_andItsNoticeOnlyOnceInAWhile() = runTest(dispatcher) {
+        var now = 10_000L
+        val focusModel = withPointFocus { now }
+        val notices = mutableListOf<SessionNotice>()
+        val boxes = mutableListOf<RemoteFocus>()
+        backgroundScope.launch { focusModel.notices.collect { notices += it } }
+        backgroundScope.launch { focusModel.remoteFocus.collect { boxes += it } }
+        session.setState(SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        runCurrent()
+
+        session.deliver(SessionMessage.FocusSet(0.3f, 0.4f))
+        runCurrent()
+        assertEquals(listOf(SessionNotice.RemoteFocus("Joonhyung")), notices)
+
+        // While the notice shows, and at the last moment of the quiet time after it.
+        now += 1_000
+        session.deliver(SessionMessage.FocusSet(0.5f, 0.5f))
+        runCurrent()
+        now = 10_000L + SessionViewModel.FOCUS_NOTICE_MS + SessionViewModel.FOCUS_NOTICE_QUIET_MS - 1
+        session.deliver(SessionMessage.FocusSet(0.6f, 0.6f))
+        runCurrent()
+        assertEquals(listOf(RemoteFocus(0.3f, 0.4f), RemoteFocus(0.5f, 0.5f), RemoteFocus(0.6f, 0.6f)), boxes)
+        assertEquals(1, notices.size)
+
+        now += 1
+        session.deliver(SessionMessage.FocusSet(0.7f, 0.7f))
+        runCurrent()
+        assertEquals(4, boxes.size)
+        assertEquals(List(2) { SessionNotice.RemoteFocus("Joonhyung") }, notices)
+    }
+
+    @Test
+    fun theFocusNotice_comesAgainInTheNextSession_butNotAfterAReconnect() = runTest(dispatcher) {
+        var now = 10_000L
+        val focusModel = withPointFocus { now }
+        val notices = mutableListOf<SessionNotice>()
+        backgroundScope.launch { focusModel.notices.collect { notices += it } }
+        val connected = SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER)
+        session.setState(connected)
+        runCurrent()
+        session.deliver(SessionMessage.FocusSet(0.3f, 0.4f))
+        runCurrent()
+
+        // A short drop within the quiet time: the same session, so no second notice.
+        session.setState(SessionState.Reconnecting("s_1", 0L))
+        runCurrent()
+        session.setState(connected)
+        runCurrent()
+        now += 500
+        session.deliver(SessionMessage.FocusSet(0.5f, 0.5f))
+        runCurrent()
+        assertEquals(1, notices.size)
+
+        // Another session, still within that time.
+        session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        runCurrent()
+        session.setState(SessionState.Connected("s_2", PeerInfo("Sungmin"), Role.PHOTOGRAPHER))
+        runCurrent()
+        now += 500
+        session.deliver(SessionMessage.FocusSet(0.5f, 0.5f))
+        runCurrent()
+        assertEquals(
+            listOf(SessionNotice.RemoteFocus("Joonhyung"), SessionNotice.RemoteFocus("Sungmin")),
+            notices.filterIsInstance<SessionNotice.RemoteFocus>(),
+        )
+    }
+
+    @Test
     fun join_sessionNotFoundOrExpired_keepsTheCodeForEditing() = runTest(dispatcher) {
         model.joinRoom(CODE)
         runCurrent()
@@ -516,6 +873,435 @@ class SessionViewModelTest {
 
         assertNull(model.lastCode)
         assertEquals(SessionEntry.NewRoom to Role.PHOTOGRAPHER, session.starts.last())
+    }
+
+    @Test
+    fun theSubjectsShutter_isTakenByTheCameraScreen_andIsANotice() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        var presses = 0
+        model.setRemoteShutter {
+            presses++
+            ShutterOutcome.TAKEN
+        }
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.ShutterPress(1))
+        runCurrent()
+
+        assertEquals(1, presses)
+        assertEquals(listOf<SessionNotice>(SessionNotice.RemoteShutter("Joonhyung")), notices)
+        assertEquals(SessionMessage.ShutterAnswer(taken = true, press = 1), session.sent.last())
+    }
+
+    @Test
+    fun onceTheCameraScreenIsGone_aPressIsNotTaken_andIsNoNotice() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        model.setRemoteShutter { ShutterOutcome.TAKEN }
+        model.setRemoteShutter(null)
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.ShutterPress(1))
+        runCurrent()
+
+        assertTrue(notices.isEmpty())
+        assertEquals(SessionMessage.ShutterAnswer(taken = false, press = 1), session.sent.last())
+    }
+
+    @Test
+    fun theSubjectsPress_thatStartsOrStopsTheTimer_saysWhoPressed_andWhoCancelled() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        model.setRemoteShutter { cancel -> if (cancel) ShutterOutcome.TIMER_STOPPED else ShutterOutcome.TIMER_STARTED }
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.ShutterPress(1))
+        runCurrent()
+        session.deliver(SessionMessage.ShutterPress(2, cancel = true))
+        runCurrent()
+
+        assertEquals(
+            listOf(SessionNotice.RemoteShutterPress("Joonhyung"), SessionNotice.RemoteTimerCancel("Joonhyung")),
+            notices,
+        )
+    }
+
+    @Test
+    fun theSubjectsChangeOfTheTimer_isANotice_withWhatItIsNow() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.TimerSet(3))
+        runCurrent()
+        session.deliver(SessionMessage.TimerSet(0))
+        runCurrent()
+
+        assertEquals(
+            listOf(
+                SessionNotice.RemoteTimer("Joonhyung", ShutterTimer.THREE),
+                SessionNotice.RemoteTimer("Joonhyung", ShutterTimer.OFF),
+            ),
+            notices,
+        )
+    }
+
+    // ---- The subject starts AI poses (FR-6.15, #276) --------------------------------------------------------------
+
+    @Test
+    fun theSubjectsSituation_beginsTheScenePhotoOnTheCameraScreen_andIsANotice() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        val asked = mutableListOf<Situation>()
+        model.setRemotePoseStarter { situation, answer ->
+            asked += situation
+            answer(PoseStartStep.STARTED)
+        }
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.PoseStart("half_body"))
+        runCurrent()
+
+        assertEquals(listOf(Situation.HALF_BODY), asked)
+        assertEquals(listOf<SessionNotice>(SessionNotice.RemotePoseStart("Joonhyung")), notices)
+        assertEquals(SessionMessage.PoseStartAnswer(started = true), session.sent.last())
+    }
+
+    @Test
+    fun onceTheCameraScreenIsGone_theSubjectsStartIsRefused() = runTest(dispatcher) {
+        val notices = asPhotographerOf("Joonhyung")
+        backgroundScope.launch { model.notices.collect { notices += it } }
+        val starter: (Situation, (PoseStartStep) -> Unit) -> Unit = { _, answer -> answer(PoseStartStep.STARTED) }
+        model.setRemotePoseStarter(starter)
+        model.dropRemotePoseStarter(starter)
+        runCurrent()
+        notices.clear()
+
+        session.deliver(SessionMessage.PoseStart("half_body"))
+        runCurrent()
+
+        assertTrue(notices.isEmpty())
+        assertEquals(SessionMessage.PoseStartAnswer(started = false), session.sent.last())
+    }
+
+    private fun TestScope.poseStartAnswers(): MutableList<PoseStartStep> {
+        val answers = mutableListOf<PoseStartStep>()
+        backgroundScope.launch { model.poseStartAnswers.collect { answers += it } }
+        return answers
+    }
+
+    /** The request sent last, whose number its answers name. */
+    private fun asked(): SessionMessage.PoseStart = session.sent.filterIsInstance<SessionMessage.PoseStart>().last()
+
+    private fun answerPoses(started: Boolean, asking: Boolean = false, request: Int = asked().request) {
+        session.deliver(SessionMessage.PoseStartAnswer(started, request, asking))
+    }
+
+    @Test
+    fun theSubject_asksForPosesWithItsSituation_andHearsWhatBecameOfIt() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+        assertEquals("landmark", asked().situation)
+        assertTrue(answers.isEmpty())
+
+        answerPoses(started = true)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.STARTED), answers)
+
+        model.askForPoses(Situation.SELFIE)
+        runCurrent()
+        answerPoses(started = false)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.STARTED, PoseStartStep.REFUSED), answers)
+        // Each request has its own number.
+        assertEquals(2, session.sent.filterIsInstance<SessionMessage.PoseStart>().map { it.request }.distinct().size)
+    }
+
+    @Test
+    fun aStartWithoutAnAnswer_countsAsRefusedAfterItsWait_andNotBefore() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+
+        advanceTimeBy(SessionViewModel.POSE_START_WAIT_MS - 1)
+        runCurrent()
+        assertTrue(answers.isEmpty())
+        advanceTimeBy(1)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED), answers)
+
+        // A refusal comes after all: the request was given up, and nothing more is said.
+        answerPoses(started = false)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED), answers)
+    }
+
+    @Test
+    fun whileThePhotographerIsAsked_theSubjectWaitsWithoutATimeLimit_forTheirAnswer() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+
+        // The AI notice is up on the photographer's phone, which says so at once.
+        answerPoses(started = false, asking = true)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.ASKING), answers)
+        // However long they read it.
+        advanceTimeBy(60_000)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.ASKING), answers)
+
+        answerPoses(started = true)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.ASKING, PoseStartStep.STARTED), answers)
+    }
+
+    @Test
+    fun whileARequestWaits_anotherIsNotSent_andTheFirstsAnswerIsTheOneSaid() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+        val first = asked().request
+
+        // The sheet again, and another tile, before the photographer's phone answered: one request at a time.
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+        assertEquals(1, session.sent.count { it is SessionMessage.PoseStart })
+        assertTrue(answers.isEmpty())
+
+        answerPoses(started = true, request = first)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.STARTED), answers)
+
+        // Decided: the next tile asks again.
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+        assertEquals(2, session.sent.count { it is SessionMessage.PoseStart })
+    }
+
+    @Test
+    fun whileThePhotographerIsAsked_anotherTileSaysSoAgain_andAsksNothing() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+        answerPoses(started = false, asking = true)
+        runCurrent()
+
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+
+        assertEquals(1, session.sent.count { it is SessionMessage.PoseStart })
+        assertEquals(listOf(PoseStartStep.ASKING, PoseStartStep.ASKING), answers)
+    }
+
+    @Test
+    fun aLateWordThatThePhotographerIsAsked_bringsTheGivenUpRequestBack_andItsAnswerIsSaid() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+        val request = asked().request
+        advanceTimeBy(SessionViewModel.POSE_START_WAIT_MS)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED), answers)
+
+        // The answer was kept behind a full buffer: the photographer's phone has had its notice up all along.
+        answerPoses(started = false, asking = true, request = request)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED, PoseStartStep.ASKING), answers)
+        // The request waits again, so another tile asks nothing.
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+        assertEquals(1, session.sent.count { it is SessionMessage.PoseStart })
+
+        answerPoses(started = true, request = request)
+        runCurrent()
+        assertEquals(PoseStartStep.STARTED, answers.last())
+    }
+
+    @Test
+    fun aLateStartOfAGivenUpRequest_isSaid_andALateRefusalIsNotSaidAgain() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+        val first = asked().request
+        advanceTimeBy(SessionViewModel.POSE_START_WAIT_MS)
+        runCurrent()
+
+        // The poses did begin on the photographer's phone: the subject hears it after all.
+        answerPoses(started = true, request = first)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED, PoseStartStep.STARTED), answers)
+        // Once: the same answer again says nothing.
+        answerPoses(started = true, request = first)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED, PoseStartStep.STARTED), answers)
+
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+        val second = asked().request
+        advanceTimeBy(SessionViewModel.POSE_START_WAIT_MS)
+        runCurrent()
+        answerPoses(started = false, request = second)
+        runCurrent()
+        // "Can't start AI poses right now" was said at the limit already.
+        assertEquals(listOf(PoseStartStep.REFUSED, PoseStartStep.STARTED, PoseStartStep.REFUSED), answers)
+    }
+
+    @Test
+    fun anAnswerToARequestGivenUp_isNotTheNextOnes() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+        val first = asked().request
+        advanceTimeBy(SessionViewModel.POSE_START_WAIT_MS)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED), answers)
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+
+        // The first's refusal, come late: said at its limit already, and not the second's answer.
+        answerPoses(started = false, request = first)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED), answers)
+
+        answerPoses(started = true)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED, PoseStartStep.STARTED), answers)
+    }
+
+    @Test
+    fun anAnswerNoScreenRead_andARequestThatWaits_goWithTheirSession() = runTest(dispatcher) {
+        // No screen reads the answers: Subject view is under Settings.
+        connected()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+        answerPoses(started = true)
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+
+        // The session ends, and another begins with another photographer.
+        session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        runCurrent()
+        session.setState(SessionState.Connected("s2", PeerInfo("Sungmin"), Role.SUBJECT))
+        runCurrent()
+        val answers = poseStartAnswers()
+        advanceTimeBy(SessionViewModel.POSE_START_WAIT_MS + 1)
+        runCurrent()
+
+        // Neither the old session's answer nor its request's time limit says anything in the new one.
+        assertTrue(answers.isEmpty())
+    }
+
+    @Test
+    fun withoutALink_theSubjectsSituationIsNotSent_andCountsAsRefused() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        session.setState(SessionState.Reconnecting("s1", 0L))
+        runCurrent()
+
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+
+        assertTrue(session.sent.none { it is SessionMessage.PoseStart })
+        assertEquals(listOf(PoseStartStep.REFUSED), answers)
+    }
+
+    /** A drop as the session says it: with the other phone's name and this phone's role (#293). */
+    private fun dropped(id: String, name: String, role: Role = Role.PHOTOGRAPHER) =
+        SessionState.Reconnecting(id, 0L, peer = PeerInfo(name), role = role)
+
+    @Test
+    fun aDropSeenWithoutItsConnected_namesTheSubjectFromTheStateAlone() = runTest(dispatcher) {
+        // An earlier session, whose name must not come back.
+        session.setState(SessionState.Connected("s_0", PeerInfo("Sungmin"), Role.PHOTOGRAPHER))
+        runCurrent()
+        session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        runCurrent()
+
+        // A state flow shows its reader only the latest value: Connected and the drop right after it come as one.
+        session.setState(SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        session.setState(dropped("s_1", "Joonhyung"))
+        runCurrent()
+
+        assertEquals("Joonhyung", model.reconnectingWith.value)
+    }
+
+    @Test
+    fun aDrop_namesTheSubjectForTheWholeWait_untilTheLinkIsBack() = runTest(dispatcher) {
+        val connected = SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER)
+        session.setState(connected)
+        runCurrent()
+        assertNull(model.reconnectingWith.value)
+
+        session.setState(dropped("s_1", "Joonhyung"))
+        runCurrent()
+        assertEquals("Joonhyung", model.reconnectingWith.value)
+        // The session decides how long the wait is; the name has no time of its own.
+        advanceTimeBy(29_000)
+        runCurrent()
+        assertEquals("Joonhyung", model.reconnectingWith.value)
+
+        session.setState(connected)
+        runCurrent()
+        assertNull(model.reconnectingWith.value)
+    }
+
+    @Test
+    fun aDropThatIsGivenUp_namesNoOne() = runTest(dispatcher) {
+        // A room code's photographer waits in its room again.
+        session.setState(SessionState.Connected("s_1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        runCurrent()
+        session.setState(dropped("s_1", "Joonhyung"))
+        runCurrent()
+        session.setState(SessionState.Waiting("482915"))
+        runCurrent()
+        assertNull(model.reconnectingWith.value)
+
+        // An invitation's session ends.
+        session.setState(SessionState.Connected("s_2", PeerInfo("Sungmin"), Role.PHOTOGRAPHER))
+        runCurrent()
+        session.setState(dropped("s_2", "Sungmin"))
+        runCurrent()
+        assertEquals("Sungmin", model.reconnectingWith.value)
+        session.setState(SessionState.Ended(EndReason.CONNECTION_LOST))
+        runCurrent()
+        assertNull(model.reconnectingWith.value)
+    }
+
+    @Test
+    fun theSubjectsPhone_namesNoOneWhileReconnecting() = runTest(dispatcher) {
+        // Subject view has its own "Reconnecting…" over the video.
+        connected()
+        runCurrent()
+        session.setState(dropped("s1", "Dongje", Role.SUBJECT))
+        runCurrent()
+        assertNull(model.reconnectingWith.value)
     }
 
     private fun connected() = session.setState(SessionState.Connected("s1", PeerInfo("Dongje"), Role.SUBJECT))

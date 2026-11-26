@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-20, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Dongje Park, and Joonhyung Han
 package com.lastpenguin.pix.core
 
 import android.content.Context
@@ -8,6 +8,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.lastpenguin.pix.BuildConfig
 import com.lastpenguin.pix.account.AuthRepository
+import com.lastpenguin.pix.account.AuthState
 import com.lastpenguin.pix.account.AuthTokens
 import com.lastpenguin.pix.account.BearerTokens
 import com.lastpenguin.pix.account.CredentialManagerGoogleIdTokens
@@ -26,12 +27,16 @@ import com.lastpenguin.pix.camera.CameraSettings
 import com.lastpenguin.pix.camera.CameraXController
 import com.lastpenguin.pix.camera.DataStoreCameraSettings
 import com.lastpenguin.pix.camera.NARROWEST_FRAME_ASPECT
+import com.lastpenguin.pix.camera.PhonePhotoSource
+import com.lastpenguin.pix.camera.PhonePhotos
 import com.lastpenguin.pix.camera.PhoneTurns
 import com.lastpenguin.pix.camera.PhotoDeleter
+import com.lastpenguin.pix.camera.PhotoDeletion
 import com.lastpenguin.pix.camera.PhotoSaver
-import com.lastpenguin.pix.camera.PixAlbumPhotos
 import com.lastpenguin.pix.camera.SensorPhoneTurns
+import com.lastpenguin.pix.camera.canManageMedia
 import com.lastpenguin.pix.camera.frameAspect
+import com.lastpenguin.pix.camera.photoAccess
 import com.lastpenguin.pix.core.network.PixAccountApi
 import com.lastpenguin.pix.core.network.PixApi
 import com.lastpenguin.pix.core.network.PixAuthApi
@@ -41,6 +46,7 @@ import com.lastpenguin.pix.generation.GenerationConsent
 import com.lastpenguin.pix.generation.MlKitPersonSignals
 import com.lastpenguin.pix.generation.PersonDetector
 import com.lastpenguin.pix.generation.PoseGenerator
+import com.lastpenguin.pix.generation.PoseLibrary
 import com.lastpenguin.pix.generation.PoseTipper
 import com.lastpenguin.pix.generation.PoseTips
 import com.lastpenguin.pix.generation.PromptHistory
@@ -64,6 +70,7 @@ import com.lastpenguin.pix.session.ContentPhotoReader
 import com.lastpenguin.pix.session.DataStoreMobileDataNotice
 import com.lastpenguin.pix.session.DescriptionSyncer
 import com.lastpenguin.pix.session.GuideSyncer
+import com.lastpenguin.pix.session.HeldGuide
 import com.lastpenguin.pix.session.JpegGuideReferenceCodec
 import com.lastpenguin.pix.session.JpegPoseCandidateCodec
 import com.lastpenguin.pix.session.MaskGuideImageCodec
@@ -75,6 +82,7 @@ import com.lastpenguin.pix.session.PoseSyncer
 import com.lastpenguin.pix.session.RemoteControlHandler
 import com.lastpenguin.pix.session.RemoteVideo
 import com.lastpenguin.pix.session.RtcSessionManager
+import com.lastpenguin.pix.session.SessionGuideKeeper
 import com.lastpenguin.pix.session.SessionIdentity
 import com.lastpenguin.pix.session.SessionManager
 import com.lastpenguin.pix.session.SessionState
@@ -115,9 +123,9 @@ class AppContainer(
     // ---- Camera (#3) ----------------------------------------------------------
     val cameraController: CameraController,
     val cameraSettings: CameraSettings,
-    /** The newest photo in Pix's album, taken here or received in a session, for Camera's thumbnail (FR-1.6). */
-    val albumPhotos: StateFlow<List<Uri>>,
-    /** Deletes a photo from the viewer: from Pix's album, and from the session's photos too (FR-1.6). */
+    /** The phone's photos Pix may read, for Camera's thumbnail, the newest, and its viewer (FR-1.6). */
+    val phonePhotos: PhonePhotoSource,
+    /** Deletes a photo from the viewer: from the phone, and from the session's photos too (FR-1.6). */
     val photoDeleter: PhotoDeleter,
     // ---- Guide (#5, #6) -------------------------------------------------------
     /** The photographer's guide, clamped to the frame of the chosen aspect ratio (AD-10). */
@@ -134,6 +142,8 @@ class AppContainer(
     val referenceGuideMaker: ReferenceGuideMaker,
     /** Guides kept to use again, in the app's private files only (FR-3.8, AD-16, NFR-13). */
     val savedGuideStore: SavedGuideStore,
+    /** Each candidate kept in [savedGuideStore] as history, and what the ♥ marks (FR-4.14, #297). */
+    val poseLibrary: PoseLibrary,
     // ---- Pose generation (#7) ---------------------------------------------------
     val poseGenerator: PoseGenerator,
     /** Looks for a person in the scene photo before anything is sent (FR-4.13). */
@@ -193,6 +203,8 @@ class AppContainer(
                 InMemoryGuideRepository { cameraController.state.value.aspect.frameAspect }
             val mirrorGuideRepository: GuideRepository = InMemoryGuideRepository { NARROWEST_FRAME_ASPECT }
             val mirrorReference = MirrorReference()
+            // What the subject holds past a session, for `hello`: not the mirror, which is emptied at its end (#268).
+            val heldGuide = HeldGuide()
 
             /** Work that outlives every screen: loading the sign-in, presence, reading the saved guides. */
             val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -256,6 +268,8 @@ class AppContainer(
                 // A session's socket counts as signed in, so friends see "In a session" and an invitation to this
                 // phone is BUSY meanwhile (FR-6.9).
                 accessToken = authRepository::freshAccessToken,
+                // The other phone names this one by its account while signed in, else by the phone's name (#271).
+                accountName = { (authRepository.state.value as? AuthState.SignedIn)?.account?.displayName },
                 // Loads the native WebRTC library on the first session, not at app start.
                 peers = WebRtcRuntime(appContext, frameSource, relayOnly = BuildConfig.RELAY_ONLY),
                 frameSource = frameSource,
@@ -263,8 +277,8 @@ class AppContainer(
                 router = ChannelRouter(),
                 serverUrl = BuildConfig.SERVER_URL,
                 identity = SessionIdentity.of(appContext, BuildConfig.VERSION_NAME),
-                haveGuideId = { mirrorGuideRepository.guide.value?.id },
-                haveReferenceId = { mirrorReference.reference.value?.guideId },
+                haveGuideId = { heldGuide.guideId },
+                haveReferenceId = { heldGuide.referenceId },
             )
             val guideSyncer = GuideSyncer(
                 rtcSessionManager,
@@ -273,6 +287,7 @@ class AppContainer(
                 MaskGuideImageCodec(),
                 JpegGuideReferenceCodec(),
                 mirrorReference,
+                held = heldGuide,
             )
             val referenceGuideMaker: ReferenceGuideMaker =
                 MlKitReferenceGuideMaker(appContext, SubjectSegmenter(appContext), OutlineExtractor())
@@ -284,10 +299,29 @@ class AppContainer(
             val poseSyncer = PoseSyncer(rtcSessionManager, JpegPoseCandidateCodec())
             // As the subject, each set the photographer starts is this phone's history too (FR-4.11), whichever
             // screen is in front, once the server accepted its description.
+            val savedGuideStore = FileSavedGuideStore(File(appContext.filesDir, "guides"), appScope)
             val promptHistory = DataStorePromptHistory(appContext, appScope)
             promptHistory.followSubjectSets(descriptionSyncer.started, poseSyncer.mirror, poseSyncer.verdicts, appScope)
             val poseTips = PoseTips(poseTipper, guideRepository.guide, appScope, screenLanguage)
-            val album = PixAlbumPhotos(appContext.contentResolver, appScope)
+            val poseLibrary = PoseLibrary(referenceGuideMaker, savedGuideStore, appScope)
+            // In a session, each phone keeps what the other keeps by itself: the guides that go on the camera and every
+            // pose candidate (#297), whichever screen is in front.
+            SessionGuideKeeper(
+                savedGuideStore,
+                poseLibrary,
+                guideRepository,
+                guideSyncer.adopted,
+                mirrorGuideRepository,
+                mirrorReference.reference,
+                poseSyncer.mirror,
+            ).start(appScope)
+            val phonePhotos = PhonePhotos(
+                appContext.contentResolver,
+                appScope,
+                appContext.packageName,
+                appContext::photoAccess,
+                canManageMedia = appContext::canManageMedia,
+            )
             val photoSyncer = PhotoSyncer(
                 rtcSessionManager,
                 ContentPhotoReader(appContext.contentResolver),
@@ -296,14 +330,23 @@ class AppContainer(
             )
             return AppContainer(
                 cameraController = cameraController,
-                albumPhotos = album.photos,
-                photoDeleter = PhotoDeleter { uri -> photoSyncer.delete(uri, album, appScope) },
+                phonePhotos = phonePhotos,
+                photoDeleter = object : PhotoDeleter {
+                    override suspend fun delete(
+                        uri: Uri,
+                    ): PhotoDeletion = photoSyncer.delete(uri, phonePhotos, appScope)
+
+                    override fun asksFirst(uri: Uri) = phonePhotos.asksFirst(uri)
+
+                    override fun needsAccess(uri: Uri) = phonePhotos.needsAccess(uri)
+                },
                 cameraSettings = DataStoreCameraSettings(appContext),
                 guideRepository = guideRepository,
                 mirrorGuideRepository = mirrorGuideRepository,
                 mirrorReference = mirrorReference,
                 referenceGuideMaker = referenceGuideMaker,
-                savedGuideStore = FileSavedGuideStore(File(appContext.filesDir, "guides"), appScope),
+                savedGuideStore = savedGuideStore,
+                poseLibrary = poseLibrary,
                 poseGenerator = RemotePoseGenerator(pixApi),
                 personDetector = RuleBasedPersonDetector(MlKitPersonSignals()),
                 poseTipper = poseTipper,

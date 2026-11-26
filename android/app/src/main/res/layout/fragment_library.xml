@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The library (FR-3.11, R&S 6.2), from All on Add a pose guide's My library: every saved guide, newest first, with its
-     kind, filtered by kind. A tap uses a guide, a long press deletes it after asking, and Add photo makes a new one. -->
+<!-- The library (FR-3.11, R&S 6.2), from All on Add a pose guide's My library: every guide kept, newest first, with its
+     kind, situation, and memo, under All or Favorites and filtered by situation (#270, #297). A tap uses a guide, its ♥
+     adds it to Favorites, and its pencil edits its memo. A long press, or Select under ⋮, selects guides as a gallery
+     app does: the header then says how many, with Select all, and Delete shows at the bottom (#297). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -9,6 +11,7 @@
     android:paddingTop="8dp">
 
     <LinearLayout
+        android:clipToPadding="false"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
@@ -37,6 +40,31 @@
             android:importantForAccessibility="no"
             android:textAppearance="@style/TextAppearance.Pix.Header"
             android:textColor="@color/pix_text_faint" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- Select and Select all (#297); hidden while selecting and while nothing is listed. -->
+        <ImageButton
+            android:id="@+id/moreButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="-12dp"
+            android:background="@drawable/bg_header_icon"
+            android:contentDescription="@string/library_more"
+            android:src="@drawable/ic_more_vert"
+            app:tint="@color/pix_text" />
+
+        <!-- While selecting (#297): every guide listed is selected. -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/selectAllButton"
+            style="@style/Widget.Pix.Button.Header"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/library_select_all"
+            android:visibility="gone" />
     </LinearLayout>
 
     <!-- The filters (FR-3.11), each with its count; hidden while nothing is saved. -->
@@ -58,19 +86,32 @@
             android:layout_weight="1" />
 
         <Button
-            android:id="@+id/filterPhotos"
-            style="@style/Widget.Pix.Button.Segment"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1" />
-
-        <Button
-            android:id="@+id/filterGenerated"
+            android:id="@+id/filterFavorites"
             style="@style/Widget.Pix.Button.Segment"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1" />
     </LinearLayout>
+
+    <!-- The situations the saved poses were made for, each with its count (#270): a tap shows its guides only, and a
+         second tap all of them again. Hidden while no saved guide has a situation. -->
+    <HorizontalScrollView
+        android:id="@+id/situationScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:clipToPadding="false"
+        android:paddingHorizontal="20dp"
+        android:scrollbars="none"
+        android:visibility="gone">
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/situationChips"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:chipSpacingHorizontal="8dp"
+            app:singleLine="true" />
+    </HorizontalScrollView>
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -116,15 +157,17 @@
                 android:textAppearance="@style/TextAppearance.Pix.Body" />
         </LinearLayout>
 
+        <!-- While selecting (#297): deletes the selected guides after asking; off while none is. -->
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/addPhotoButton"
+            android:id="@+id/deleteSelectedButton"
             style="@style/Widget.Pix.Button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|center_horizontal"
             android:layout_marginBottom="20dp"
-            android:text="@string/add_photo"
-            app:icon="@drawable/ic_plus"
+            android:text="@string/delete"
+            android:visibility="gone"
+            app:icon="@drawable/ic_delete"
             app:iconPadding="6dp" />
     </FrameLayout>
 </LinearLayout>

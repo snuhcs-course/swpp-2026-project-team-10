@@ -1,12 +1,14 @@
-// AI-generated with Claude Code, 2026-11-06, reviewed by Jaewan Park
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.session
 
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.guide.GuideSource
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.guide.InMemoryGuideRepository
 import com.lastpenguin.pix.guide.NormalizedRect
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -17,6 +19,23 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/*
+ * The guide between the two phones (Design 2.5.1), with the fakes of ModuleFakes.kt; a guide made on the subject's
+ * phone is in GuideFromSubjectTest.
+ * Photographer, on connect (equivalence partitioning by what `hello` names): no guide (clear); a guide the subject
+ * lacks (image, state, reference); one it holds (state only); one it holds without its reference. After the clear on
+ * connect, the guide `hello` named goes in full (#268).
+ * Photographer, changes (state-based): a new guide; gesture steps every 50 ms, the newest winning; a final value at
+ * once; a removed guide; a guide removed while its reference is encoded.
+ * Photographer, after a drop in the same session (#268): the guide the subject got (state only); one changed meanwhile
+ * (in full, whatever the first `hello` named); an image or a reference photo whose encoding the drop cut off (sent
+ * once the link is back).
+ * Subject, receiving: the image with its state, anchor, source, and situation (#270); a state before its image; a
+ * broken image or reference; a reference before its image, and one of another guide; clear.
+ * Subject, the session's end and the next session (#268, state-based): the guide and its reference leave the mirror
+ * and stay held for `hello`; the next session draws nothing until a state names the held guide, then draws it with no
+ * new image; a state that names another guide waits for that image; a clear drops the held guide.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class GuideSyncerTest {
 
@@ -26,6 +45,7 @@ class GuideSyncerTest {
     private val codec = FakeGuideImageCodec()
     private val referenceCodec = FakeGuideReferenceCodec()
     private val mirrorReference = MirrorReference()
+    private val held = HeldGuide()
 
     private fun TestScope.syncer() =
         GuideSyncer(
@@ -36,7 +56,11 @@ class GuideSyncerTest {
             referenceCodec,
             mirrorReference,
             StandardTestDispatcher(testScheduler),
+            held,
         )
+
+    /** One session's sender or receiver runs in it, and stops when it is cancelled, as at a drop or the session's end. */
+    private fun TestScope.sessionScope() = TestScope(testScheduler)
 
     private fun sentTypes(): List<String> = session.sent.map { message ->
         when (message) {
@@ -110,7 +134,9 @@ class GuideSyncerTest {
     @Test
     fun `the image carries the guide's anchor and source, for the subject's Save guide`() = runTest {
         val box = NormalizedRect(0.3f, 0.2f, 0.7f, 0.9f)
-        guides.setGuide(fakeGuide("g1").copy(anchor = box, source = GuideSource.GENERATED))
+        guides.setGuide(
+            fakeGuide("g1").copy(anchor = box, source = GuideSource.GENERATED, situation = Situation.HALF_BODY),
+        )
         connected()
 
         syncer().startAsSender(backgroundScope)
@@ -119,6 +145,7 @@ class GuideSyncerTest {
         val begin = session.sent.first() as SessionMessage.GuideImageBegin
         assertEquals(box, begin.anchor)
         assertEquals(GuideSource.GENERATED, begin.source)
+        assertEquals("half_body", begin.situation)
     }
 
     @Test
@@ -200,6 +227,108 @@ class GuideSyncerTest {
         runCurrent()
 
         assertEquals(listOf("clear"), sentTypes())
+    }
+
+    @Test
+    fun `a guide the subject's hello named goes in full after the clear on connect`() = runTest {
+        // The subject drops what it holds at a clear, so its hello no longer says what it has (#268).
+        connected(haveGuideId = "g1", haveReferenceId = "g1")
+        syncer().startAsSender(backgroundScope)
+        runCurrent()
+        assertEquals(listOf("clear"), sentTypes())
+        session.sent.clear()
+
+        guides.setGuide(withReference("g1"))
+        runCurrent()
+
+        assertEquals(image + "state.final" + reference, sentTypes())
+    }
+
+    // ---- after a drop in the same session (#268) ----------------------------------------------------------------
+
+    @Test
+    fun `after a drop the guide the subject got is not sent again`() = runTest {
+        connected()
+        val syncer = syncer()
+        val live = sessionScope()
+        syncer.startAsSender(live)
+        runCurrent()
+        guides.setGuide(withReference("g1"))
+        runCurrent()
+        assertEquals(listOf("clear") + image + "state.final" + reference, sentTypes())
+        live.cancel()
+        runCurrent()
+        session.sent.clear()
+
+        syncer.startAsSender(backgroundScope, resumed = true)
+        runCurrent()
+
+        assertEquals(listOf("state.final"), sentTypes())
+    }
+
+    @Test
+    fun `after a drop a guide changed meanwhile goes in full, whatever the first hello named`() = runTest {
+        // The hello is the one from the session's start: it named g1, and the subject has held g2 since.
+        guides.setGuide(fakeGuide("g1"))
+        connected(haveGuideId = "g1")
+        val syncer = syncer()
+        val live = sessionScope()
+        syncer.startAsSender(live)
+        runCurrent()
+        guides.setGuide(fakeGuide("g2"))
+        runCurrent()
+        live.cancel()
+        runCurrent()
+        guides.setGuide(fakeGuide("g1"))
+        runCurrent()
+        session.sent.clear()
+
+        syncer.startAsSender(backgroundScope, resumed = true)
+        runCurrent()
+
+        assertEquals(image + "state.final", sentTypes())
+        assertEquals("g1", (session.sent.first() as SessionMessage.GuideImageBegin).guideId)
+    }
+
+    @Test
+    fun `an image whose encoding a drop cut off goes once the link is back`() = runTest {
+        connected()
+        val syncer = syncer()
+        val live = sessionScope()
+        syncer.startAsSender(live)
+        runCurrent()
+        session.sent.clear()
+        codec.onEncode = { live.cancel() }
+        guides.setGuide(fakeGuide("g1"))
+        runCurrent()
+        assertEquals(emptyList<String>(), sentTypes())
+        codec.onEncode = {}
+
+        syncer.startAsSender(backgroundScope, resumed = true)
+        runCurrent()
+
+        assertEquals(image + "state.final", sentTypes())
+    }
+
+    @Test
+    fun `a reference photo whose encoding a drop cut off goes once the link is back`() = runTest {
+        connected()
+        val syncer = syncer()
+        val live = sessionScope()
+        syncer.startAsSender(live)
+        runCurrent()
+        session.sent.clear()
+        referenceCodec.onEncode = { live.cancel() }
+        guides.setGuide(withReference("g1"))
+        runCurrent()
+        assertEquals(image + "state.final", sentTypes())
+        referenceCodec.onEncode = {}
+        session.sent.clear()
+
+        syncer.startAsSender(backgroundScope, resumed = true)
+        runCurrent()
+
+        assertEquals(listOf("state.final") + reference, sentTypes())
     }
 
     // ---- the reference photo (FR-3.9) ---------------------------------------------------------------------------
@@ -368,7 +497,7 @@ class GuideSyncerTest {
             val box = NormalizedRect(0.3f, 0.2f, 0.7f, 0.9f)
             val image = image("g1")
 
-            session.deliver(image.begin(box, GuideSource.GENERATED))
+            session.deliver(image.begin(box, GuideSource.GENERATED, Situation.FULL_BODY))
             for (i in image.chunks.indices) session.deliver(image.chunk(i))
             session.deliver(image.end())
             session.deliver(SessionMessage.GuideStateUpdate(GuideState("g1", cx = 0.8f, height = 0.4f), final = true))
@@ -376,6 +505,7 @@ class GuideSyncerTest {
 
             assertEquals(box, mirror.guide.value?.anchor)
             assertEquals(GuideSource.GENERATED, mirror.guide.value?.source)
+            assertEquals(Situation.FULL_BODY, mirror.guide.value?.situation)
             assertEquals(0.8f, mirror.state.value.cx, 0f)
             assertEquals(0.4f, mirror.state.value.height, 0f)
         }
@@ -450,5 +580,86 @@ class GuideSyncerTest {
         runCurrent()
         assertEquals("g2", mirror.guide.value?.id)
         assertEquals(0.5f, mirror.state.value.cx, 0f)
+    }
+
+    // ---- the session's end and the next session (#268) ----------------------------------------------------------
+
+    /** A session in which the photographer's guide [id] arrived with its reference photo, and which has ended. */
+    private fun TestScope.endedSessionWith(syncer: GuideSyncer, id: String) {
+        val first = sessionScope()
+        syncer.startAsReceiver(first)
+        runCurrent()
+        deliver(codec.encode(fakeGuide(id)))
+        deliver(referenceCodec.encode(withReference(id))!!)
+        session.deliver(SessionMessage.GuideStateUpdate(GuideState(id, cx = 0.3f), final = true))
+        runCurrent()
+        assertEquals(id, mirror.guide.value?.id)
+        first.cancel()
+        runCurrent()
+    }
+
+    @Test
+    fun `the guide and its reference leave the mirror when the session ends, and stay held for hello`() = runTest {
+        endedSessionWith(syncer(), "g1")
+
+        assertNull(mirror.guide.value)
+        assertNull(mirrorReference.reference.value)
+        assertEquals("g1", held.guideId)
+        assertEquals("g1", held.referenceId)
+    }
+
+    @Test
+    fun `the next session draws the held guide once a state names it, with no new image`() = runTest {
+        val syncer = syncer()
+        endedSessionWith(syncer, "g1")
+
+        syncer.startAsReceiver(backgroundScope)
+        runCurrent()
+        // Connecting: the photographer has not said what it shows.
+        assertNull(mirror.guide.value)
+
+        session.deliver(SessionMessage.GuideStateUpdate(GuideState("g1", cx = 0.6f), final = true))
+        runCurrent()
+
+        assertEquals("g1", mirror.guide.value?.id)
+        assertEquals(0.6f, mirror.state.value.cx, 0f)
+        assertEquals("g1", mirrorReference.reference.value?.guideId)
+        assertEquals(listOf("g1"), codec.decoded)
+    }
+
+    @Test
+    fun `a state that names another guide in the next session waits for that guide's image`() = runTest {
+        val syncer = syncer()
+        endedSessionWith(syncer, "g1")
+        syncer.startAsReceiver(backgroundScope)
+        runCurrent()
+
+        session.deliver(SessionMessage.GuideStateUpdate(GuideState("g2", cx = 0.6f), final = true))
+        runCurrent()
+        assertNull(mirror.guide.value)
+
+        deliver(codec.encode(fakeGuide("g2")))
+        runCurrent()
+        assertEquals("g2", mirror.guide.value?.id)
+        assertEquals(0.6f, mirror.state.value.cx, 0f)
+        assertNull(mirrorReference.reference.value)
+        assertEquals("g2", held.guideId)
+        assertNull(held.referenceId)
+    }
+
+    @Test
+    fun `a clear in the next session drops the held guide`() = runTest {
+        val syncer = syncer()
+        endedSessionWith(syncer, "g1")
+        syncer.startAsReceiver(backgroundScope)
+        runCurrent()
+
+        session.deliver(SessionMessage.GuideClear)
+        session.deliver(SessionMessage.GuideStateUpdate(GuideState("g1", cx = 0.6f), final = true))
+        runCurrent()
+
+        assertNull(mirror.guide.value)
+        assertNull(held.guideId)
+        assertNull(held.referenceId)
     }
 }

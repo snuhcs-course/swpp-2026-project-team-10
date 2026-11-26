@@ -30,15 +30,21 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 - [Dongje, 11-25] "With the timer set, wouldn't 'Joonhyung pressed the shutter' be understood?" (Built test-first: with the photographer's timer on, the subject's press starts the countdown on both phones, and Camera says "Joonhyung pressed the shutter"; either phone's shutter stops it, the subject's press saying in `cancel` what it meant, and Camera says "Joonhyung cancelled the timer".)
 - [Dongje, 11-25] "Rather than a 'Tap the shutter to cancel' line, put it in the tutorial." (The line under the subject's countdown is gone, and Subject view's tip on the shutter says "Take the photo, or cancel a timer".)
 - [Dongje, 11-25] "Take the line off the Camera screen too, and move it to the tutorial." (Camera's countdown shows the number alone, and its tip on the shutter says "Only the photo is saved, never the guide. Tap again to cancel a timer".)
-- [Dongje, 11-25] "Once this is built I want the subject to be able to set the timer too. Check it again." (The agent listed what that needs before building: one timer on the photographer's phone set from either, as the flash; *Timer* in the subject's camera menu with its icon beside the button; a request and the timer's state between the phones; what each phone says; and whether it goes in this PR.)
 
 ## The subject starts AI poses ([#276])
 
 - [Dongje, 11-25] "Can you do #276 in this PR too? Let the subject enter pose generation too. After entering, it can go through the same steps as when the photographer entered." (The agent read the issue, which was a teammate's, and the code. It answered that it can, asked whose task it is, and put up four points with a recommendation each: who takes the scene photo, what happens when the photographer's phone cannot start, the AI agreement on each phone, and the selfie.)
 - [Dongje, 11-25] "It is mine now. Go with all the recommendations." (Built test-first on the same branch: `pose.start` and its answer; the photographer's Camera begins the scene photo through the code its own tile runs, and the photographer takes it; the subject's sheet offers the situations and asks its own consent in its own words; the photographer's phone asks its user when it has no consent, naming the subject. R&S 4.18, Design 4.19, Testing 4.21.)
 
+## The timer set from the subject's phone ([#318])
+
+- [Dongje, 11-25] "Once this is built I want the subject to be able to set the timer too. Check it again." (The agent listed what that needs before building: one timer on the photographer's phone set from either, as the flash; *Timer* in the subject's camera menu with its icon beside the button; a request and the timer's state between the phones; what each phone says; and whether it goes in this PR.)
+- [Dongje, 11-25] "Go with all the recommendations, and draw the options for point 2." (The agent opened #318 for a PR of its own, and drew three places for the timer on the real Subject view, each with *Timer* in the menu: A, its icon beside the menu's button as on Camera; B, inside the shutter; C, a chip beside the zoom readout.)
+- [Dongje, 11-25] "Build A. Make it the same as Camera." (Built test-first: the timer's choice moved to one holder that the Camera screen and the session's handler share; `camera.timer.set`, the timer in `camera.state`, and a `timer` action of `camera.did`; *Timer* in Subject view's menu; the photographer's flash and timer beside the menu's button in Camera's places and sizes, which a layout test holds to each other; the shutter named for the timer; a line on each phone about the other's change. R&S 4.19, Design 4.20, Testing 4.22, and flow 5's countdown screen.)
+
 [#268]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/268
 [#273]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/273
 [#276]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/276
 [#293]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/293
 [#314]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/314
+[#318]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/318

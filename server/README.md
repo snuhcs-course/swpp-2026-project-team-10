@@ -180,12 +180,12 @@ Every worker brings the schema to the newest revision at start, before it takes 
 
 ## Deploy
 
-Pix has one server for `main` and one for `dev`. Each runs in two versions with the same setup: on a course server and on AWS ([Design 2.8][d28], *Hosting* and *Deployment*). Each course server is reachable only through the course's HTTP proxy on port 80, and only from the campus network. So the course servers have no HTTPS or WSS, and they cannot reach each other. The AWS servers stay on permanently, answer from every network, cellular data included, and serve HTTPS ([HTTPS](#https)). So the app's builds use the AWS servers.
+Pix has one server for `main` and one for `dev`. Each runs in two versions with the same setup: on a course server and on AWS ([Design 2.8][d28], *Hosting* and *Deployment*). Each course server is reachable only through the course's proxy, which serves HTTPS and WSS from every network with the course's own certificate and passes requests to the server's nginx on port 80. The course servers cannot reach each other. The AWS servers stay on permanently, answer from every network, cellular data included, and serve HTTPS with a certificate of their own ([HTTPS](#https)). The app's builds use the AWS servers.
 
 | Branch | Course server | AWS server (`ap-southeast-2`) | Builds |
 | --- | --- | --- | --- |
-| `main` | Server A (`ssh swpp-a`), `http://swpp26t10.147-46-242-169.sslip.io` | AWS main, `https://swpp26t10.15-134-147-114.sslip.io` | Release builds use AWS main. |
-| `dev` | Server B (`ssh swpp-b`), `http://swpp26t10.147-46-242-174.sslip.io` | AWS dev, `https://swpp26t10.3-105-185-251.sslip.io` | Debug builds use AWS dev by default. |
+| `main` | Server A (`ssh swpp-a`), `https://team10.swpp-2026-a.snu.ac.kr` | AWS main, `https://swpp26t10.15-134-147-114.sslip.io` | Release builds use AWS main. |
+| `dev` | Server B (`ssh swpp-b`), `https://team10.swpp-2026-b.snu.ac.kr` | AWS dev, `https://swpp26t10.3-105-185-251.sslip.io` | Debug builds use AWS dev by default. |
 
 To use a course server, set `pix.serverUrl` in a debug build.
 
@@ -222,7 +222,7 @@ sudo bash /tmp/pix-deploy.sh deploy
 
 The PR that makes such a change says so.
 
-A failure at any step leaves the serving copy as it was, and the timer does not try that `server/` tree again. To try again, fix the branch, or run `deploy.sh deploy`. On every pull request, the [server-image](../.github/workflows/server-image.yml) workflow builds the image and checks the routes through nginx. After a merge, the [server-deploy](../.github/workflows/server-deploy.yml) workflow waits until `/version` shows the commit, so a failed deploy shows as a red mark on the commit. This workflow is now disabled on GitHub, so it does not run.
+A failure at any step leaves the serving copy as it was, and the timer does not try that `server/` tree again. To try again, fix the branch, or run `deploy.sh deploy`. On every pull request, the [server-image](../.github/workflows/server-image.yml) workflow builds the image and checks the routes through nginx. After a merge, the [server-deploy](../.github/workflows/server-deploy.yml) workflow waits until `/version` shows the commit, so a failed deploy shows as a red mark on the commit. To watch a commit pushed while the workflow was off, run it by hand on `main` or `dev` from the Actions tab; it watches the branch's newest commit.
 
 ### Changing the deploy files
 

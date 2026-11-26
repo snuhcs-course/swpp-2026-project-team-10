@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.net.Uri
@@ -108,10 +108,11 @@ import org.junit.runner.RunWith
  * and no notice.
  * The subject starts AI poses (#276): on the photographer's phone, begun through the Camera screen in front, a notice,
  * and refused with that screen gone; on the subject's phone, the situation sent with its own number and its answer
- * heard, begun or not; no answer, refused after POSE_START_WAIT_MS (1 ms before / at it) and a late one unheard; the
- * photographer asked, waited for without a limit; an earlier request's answer, not the new one's; an answer no screen
- * read and a request that waits, both gone with their session; and nothing sent without a link, which counts as
- * refused.
+ * heard, begun or not; no answer, refused after POSE_START_WAIT_MS (1 ms before / at it); of the given-up request, a
+ * late refusal unheard, a late "asked" bringing it back with its answer said, and a late start said once; the
+ * photographer asked, waited for without a limit; one request at a time, and "asked" said again at another tile; a
+ * given-up request's refusal not the next one's answer; an answer no screen read and a request that waits, both
+ * gone with their session; and nothing sent without a link, which counts as refused.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 // Robolectric for ProcessLifecycleOwner, which the ViewModel observes for the background limit.
@@ -996,8 +997,8 @@ class SessionViewModelTest {
         runCurrent()
         assertEquals(listOf(PoseStartStep.REFUSED), answers)
 
-        // The answer comes after all: the request was given up, and nothing more is said.
-        answerPoses(started = true)
+        // A refusal comes after all: the request was given up, and nothing more is said.
+        answerPoses(started = false)
         runCurrent()
         assertEquals(listOf(PoseStartStep.REFUSED), answers)
     }
@@ -1067,6 +1068,63 @@ class SessionViewModelTest {
     }
 
     @Test
+    fun aLateWordThatThePhotographerIsAsked_bringsTheGivenUpRequestBack_andItsAnswerIsSaid() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+        val request = asked().request
+        advanceTimeBy(SessionViewModel.POSE_START_WAIT_MS)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED), answers)
+
+        // The answer was kept behind a full buffer: the photographer's phone has had its notice up all along.
+        answerPoses(started = false, asking = true, request = request)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED, PoseStartStep.ASKING), answers)
+        // The request waits again, so another tile asks nothing.
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+        assertEquals(1, session.sent.count { it is SessionMessage.PoseStart })
+
+        answerPoses(started = true, request = request)
+        runCurrent()
+        assertEquals(PoseStartStep.STARTED, answers.last())
+    }
+
+    @Test
+    fun aLateStartOfAGivenUpRequest_isSaid_andALateRefusalIsNotSaidAgain() = runTest(dispatcher) {
+        connected()
+        val answers = poseStartAnswers()
+        runCurrent()
+        model.askForPoses(Situation.DEFAULT)
+        runCurrent()
+        val first = asked().request
+        advanceTimeBy(SessionViewModel.POSE_START_WAIT_MS)
+        runCurrent()
+
+        // The poses did begin on the photographer's phone: the subject hears it after all.
+        answerPoses(started = true, request = first)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED, PoseStartStep.STARTED), answers)
+        // Once: the same answer again says nothing.
+        answerPoses(started = true, request = first)
+        runCurrent()
+        assertEquals(listOf(PoseStartStep.REFUSED, PoseStartStep.STARTED), answers)
+
+        model.askForPoses(Situation.LANDMARK)
+        runCurrent()
+        val second = asked().request
+        advanceTimeBy(SessionViewModel.POSE_START_WAIT_MS)
+        runCurrent()
+        answerPoses(started = false, request = second)
+        runCurrent()
+        // "Can't start AI poses right now" was said at the limit already.
+        assertEquals(listOf(PoseStartStep.REFUSED, PoseStartStep.STARTED, PoseStartStep.REFUSED), answers)
+    }
+
+    @Test
     fun anAnswerToARequestGivenUp_isNotTheNextOnes() = runTest(dispatcher) {
         connected()
         val answers = poseStartAnswers()
@@ -1080,7 +1138,8 @@ class SessionViewModelTest {
         model.askForPoses(Situation.LANDMARK)
         runCurrent()
 
-        answerPoses(started = true, request = first)
+        // The first's refusal, come late: said at its limit already, and not the second's answer.
+        answerPoses(started = false, request = first)
         runCurrent()
         assertEquals(listOf(PoseStartStep.REFUSED), answers)
 

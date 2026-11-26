@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, Joonhyung Han, and Dongje Park
 package com.lastpenguin.pix.session
 
 import android.os.SystemClock
@@ -921,24 +921,33 @@ class RtcSessionManager(
 
     /**
      * Realtime messages go out at once or not at all. Reliable messages wait in order until hello has gone out and
-     * the channel's buffer is below the limit (Design 2.8, Backpressure).
+     * the channel's buffer is below the limit (Design 2.8, Backpressure). With the realtime channel lost, its messages
+     * go on the reliable one and wait there like the rest, except a moment that is wrong late
+     * (`ChannelRouter.neverLate`): that one goes only while nothing is ahead of it, and is dropped otherwise, so "at
+     * once or not at all" holds for it on either channel.
      */
     private fun sendNow(message: SessionMessage): Boolean {
         val client = peer ?: return false
         val text = codec.encode(message)
         val routed = router.channelFor(message)
-        val channel = if (routed == Channel.REALTIME && realtimeLost) Channel.RELIABLE else routed
+        val standIn = routed == Channel.REALTIME && realtimeLost
+        val channel = if (standIn) Channel.RELIABLE else routed
         return when (channel) {
             Channel.REALTIME -> client.send(Channel.REALTIME, text)
 
             Channel.RELIABLE -> {
-                val wait = !helloSent || reliableQueue.isNotEmpty() ||
-                    client.bufferedAmount(Channel.RELIABLE) >= BACKPRESSURE_BYTES
-                if (wait) {
-                    reliableQueue.addLast(text)
-                    true
-                } else {
-                    client.send(Channel.RELIABLE, text)
+                val buffered = client.bufferedAmount(Channel.RELIABLE)
+                val wait = !helloSent || reliableQueue.isNotEmpty() || buffered >= BACKPRESSURE_BYTES
+                when {
+                    standIn && router.neverLate(message) ->
+                        !wait && buffered < MOMENT_BYTES && client.send(Channel.RELIABLE, text)
+
+                    wait -> {
+                        reliableQueue.addLast(text)
+                        true
+                    }
+
+                    else -> client.send(Channel.RELIABLE, text)
                 }
             }
         }
@@ -1209,5 +1218,11 @@ class RtcSessionManager(
 
         /** A bulk chunk waits below this, so that a control message sent next waits for this much at most. */
         const val BULK_BYTES = 64L * 1024
+
+        /**
+         * A moment that is wrong late goes on the reliable channel, in the lost realtime one's place, only below this:
+         * what a slow link sends in about a tenth of a second, so not behind a photo's chunks.
+         */
+        const val MOMENT_BYTES = 16L * 1024
     }
 }

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.os.SystemClock
@@ -188,6 +188,9 @@ class SessionViewModel(
 
     /** True once the photographer's phone said that its user is asked to agree, for the request that waits. */
     private var poseRequestAsked = false
+
+    /** The last request the time limit gave up: its answer may still come, kept behind a full buffer or a drop. */
+    private var poseRequestGivenUp: Int? = null
 
     /** Runs while a request waits for the photographer's phone to say anything ([POSE_START_WAIT_MS]). */
     private var poseStartWait: Job? = null
@@ -740,14 +743,34 @@ class SessionViewModel(
             // No word of it in time, not even that the photographer is asked: as far as this phone knows, nothing began.
             if (poseRequestWaiting == request) {
                 poseRequestWaiting = null
+                poseRequestGivenUp = request
                 _poseStartAnswers.trySend(PoseStartStep.REFUSED)
             }
         }
     }
 
-    /** What the photographer's phone says of the request that waits; any other request's answer is dropped. */
+    /**
+     * What the photographer's phone says of the request that waits. An answer to the request the limit gave up is
+     * heard too, since the photographer's phone acted on it: that its user is asked brings the request back, with
+     * "Waiting for … to agree" after the refusal this phone said too soon, and that the poses began is said. Its
+     * refusal was said at the limit. Any other request's answer is dropped.
+     */
     private fun onPoseStartAnswer(answer: SessionMessage.PoseStartAnswer) {
-        if (answer.request != poseRequestWaiting) return
+        if (answer.request != poseRequestWaiting) {
+            if (answer.request != poseRequestGivenUp) return
+            if (answer.asking) {
+                // Only while no later request waits: that one's own answer comes.
+                if (poseRequestWaiting != null) return
+                poseRequestGivenUp = null
+                poseRequestWaiting = answer.request
+                poseRequestAsked = true
+                _poseStartAnswers.trySend(PoseStartStep.ASKING)
+            } else if (answer.started) {
+                poseRequestGivenUp = null
+                _poseStartAnswers.trySend(PoseStartStep.STARTED)
+            }
+            return
+        }
         poseStartWait?.cancel()
         poseStartWait = null
         if (answer.asking) {
@@ -770,6 +793,7 @@ class SessionViewModel(
         poseStartWait = null
         poseRequestWaiting = null
         poseRequestAsked = false
+        poseRequestGivenUp = null
         while (_poseStartAnswers.tryReceive().isSuccess) Unit
     }
 

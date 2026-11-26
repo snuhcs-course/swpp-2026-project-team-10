@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 /**
@@ -38,6 +38,16 @@ class ChannelRouter {
 
         else -> Channel.RELIABLE
     }
+
+    /**
+     * True for a moment that is wrong late: the subject's press of the shutter and their start of AI poses, each given
+     * up by the subject's phone after 2 s (#314, #276). On the realtime channel such a message goes at once or not at
+     * all. With that channel lost the reliable one carries the realtime messages (Design 2.6.7), and there this one is
+     * sent only while nothing waits ahead of it, never queued: kept back, it would take a photo, or open the scene
+     * photo's step, once the subject was told that nothing happened.
+     */
+    fun neverLate(message: SessionMessage): Boolean =
+        message is SessionMessage.ShutterPress || message is SessionMessage.PoseStart
 
     /**
      * True for messages where only the newest value matters. A receiver drops one whose `seq` is not newer than

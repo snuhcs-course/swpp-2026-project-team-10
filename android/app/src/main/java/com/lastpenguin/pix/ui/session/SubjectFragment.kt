@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.animation.Animator
@@ -99,9 +99,16 @@ import java.text.DecimalFormat
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.webrtc.RendererCommon
@@ -426,50 +433,27 @@ class SubjectFragment :
                 launch { viewModel.photographerFocus.collect { showPhotographerFocus(binding, it) } }
                 // What the photographer did on their own camera, said where this screen's labels show (FR-7.4, #292).
                 launch { viewModel.photographerLines.collect { showPhotographerLine(binding, it) } }
+                // What became of this phone's own asks, each in a line of a label's time: said only while this screen
+                // is what its user looks at. Under Add a pose guide, another screen, or the photos, the line would
+                // come and go unseen, so it is left where it waits until the screen is uncovered.
                 launch {
-                    // What became of the situation this phone picked for AI poses (FR-6.15, #276): the photographer
-                    // takes the scene photo next, is asked to agree first, or their phone could not begin.
-                    sessionViewModel.poseStartAnswers.collect { step ->
-                        val started = step == PoseStartStep.STARTED
-                        val name = viewModel.uiState.value.photographerName
-                        if (step == PoseStartStep.ASKING) {
-                            // Their phone shows the AI notice first: this one waits, and says so.
-                            if (name != null) {
-                                showToggleLabel(
-                                    binding,
-                                    getString(R.string.subject_poses_asking, name),
-                                    R.drawable.ic_sparkle,
-                                    R.color.pix_text,
-                                )
+                    uncovered().collectLatest { shown ->
+                        if (!shown) return@collectLatest
+                        coroutineScope {
+                            // The situation this phone picked for AI poses (FR-6.15, #276).
+                            launch { sessionViewModel.poseStartAnswers.collect { showPoseStart(binding, it) } }
+                            // A press that took no photo (FR-7.8, #314).
+                            launch {
+                                viewModel.shutterRefusals.collect {
+                                    showToggleLabel(
+                                        binding,
+                                        getString(R.string.subject_shutter_refused),
+                                        R.drawable.ic_alert_small,
+                                        R.color.pix_text,
+                                    )
+                                }
                             }
-                            return@collect
                         }
-                        if (started && name != null) {
-                            showToggleLabel(
-                                binding,
-                                getString(R.string.subject_poses_started, name),
-                                R.drawable.ic_sparkle,
-                                R.color.pix_text,
-                            )
-                        } else if (!started) {
-                            showToggleLabel(
-                                binding,
-                                getString(R.string.subject_poses_refused),
-                                R.drawable.ic_alert_small,
-                                R.color.pix_text,
-                            )
-                        }
-                    }
-                }
-                launch {
-                    // A press that took no photo is said where the other lines are (FR-7.8, #314).
-                    viewModel.shutterRefusals.collect {
-                        showToggleLabel(
-                            binding,
-                            getString(R.string.subject_shutter_refused),
-                            R.drawable.ic_alert_small,
-                            R.color.pix_text,
-                        )
                     }
                 }
                 launch {
@@ -982,6 +966,63 @@ class SubjectFragment :
             if (inFront(binding) && viewModel.claimSetOpening(setId)) openGenerating()
         } else if (describing && describeId != null) {
             if (inFront(binding) && viewModel.claimDescribeOpening(describeId)) openDescribe()
+        }
+    }
+
+    /**
+     * Whether this screen itself is what its user looks at: the current destination, so not under a sheet such as Add
+     * a pose guide, which leaves it started, and not under its own photos.
+     */
+    private fun uncovered(): Flow<Boolean> {
+        // Without a navigation controller, as in a screen test, nothing can cover it but its photos.
+        val nav = runCatching { findNavController() }.getOrNull()
+        val onTop = if (nav == null) {
+            flowOf(true)
+        } else {
+            callbackFlow {
+                val listener = NavController.OnDestinationChangedListener { _, destination, _ ->
+                    trySend(destination.id == R.id.subjectFragment)
+                }
+                nav.addOnDestinationChangedListener(listener)
+                awaitClose { nav.removeOnDestinationChangedListener(listener) }
+            }
+        }
+        return combine(onTop, viewModel.uiState.map { it.photosOpen }) { top, photos -> top && !photos }
+            .distinctUntilChanged()
+    }
+
+    /**
+     * What became of the situation this phone picked for AI poses (FR-6.15, #276): the photographer takes the scene
+     * photo next, is asked to agree first, or their phone could not begin.
+     */
+    private fun showPoseStart(binding: FragmentSubjectBinding, step: PoseStartStep) {
+        val name = viewModel.uiState.value.photographerName
+        when (step) {
+            // Their phone shows the AI notice first: this one waits, and says so.
+            PoseStartStep.ASKING -> if (name != null) {
+                showToggleLabel(
+                    binding,
+                    getString(R.string.subject_poses_asking, name),
+                    R.drawable.ic_sparkle,
+                    R.color.pix_text,
+                )
+            }
+
+            PoseStartStep.STARTED -> if (name != null) {
+                showToggleLabel(
+                    binding,
+                    getString(R.string.subject_poses_started, name),
+                    R.drawable.ic_sparkle,
+                    R.color.pix_text,
+                )
+            }
+
+            PoseStartStep.REFUSED -> showToggleLabel(
+                binding,
+                getString(R.string.subject_poses_refused),
+                R.drawable.ic_alert_small,
+                R.color.pix_text,
+            )
         }
     }
 

@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.content.DialogInterface
@@ -17,6 +17,7 @@ import androidx.core.view.ViewCompat
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragmentInContainer
 import androidx.lifecycle.Lifecycle
+import androidx.navigation.testing.TestNavHostController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.android.material.button.MaterialButton
 import com.lastpenguin.pix.R
@@ -42,6 +43,7 @@ import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
+import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
@@ -127,6 +129,8 @@ import org.robolectric.shadows.ShadowDialog
  * and holds the shutter;
  * answered taken (free, no line), not taken (free, a line for a label's time), and not answered (the line after the
  * wait).
+ * A result under a sheet: a start's answer and a refused press that come while Add a pose guide covers the screen,
+ * said once it is gone.
  * This phone's start of AI poses (FR-6.15, #276): the answer said where the lines show, begun (who takes the scene
  * photo), not begun, or the photographer asked to agree first; no answer, said after the wait.
  */
@@ -151,6 +155,14 @@ class SubjectFragmentRenderTest {
         scenario = launchFragmentInContainer<SubjectFragment>(themeResId = R.style.Theme_Pix)
         idle()
         return modules
+    }
+
+    /** Subject view with its navigation in place before it starts, as in the app, so it knows what covers it. */
+    private fun launchWithNav(): Pair<TestAppContainer, TestNavHostController> {
+        val modules = TestAppContainer().install()
+        val (launched, nav) = launchPrepared<SubjectFragment>(R.id.subjectFragment) {}
+        scenario = launched
+        return modules to nav
     }
 
     private fun <T> onScreen(block: (FragmentSubjectBinding, SubjectFragment) -> T): T {
@@ -823,6 +835,48 @@ class SubjectFragmentRenderTest {
         val request = modules.session.sent.filterIsInstance<SessionMessage.PoseStart>().last().request
         modules.session.deliver(SessionMessage.PoseStartAnswer(started, request, asking))
         idle()
+    }
+
+    @Test
+    fun anAnswerThatComesUnderAddAPoseGuide_isSaidOnceTheSheetIsGone() {
+        val (modules, nav) = launchWithNav()
+        connectWithVideo(modules)
+        // The photographer reads the AI notice; meanwhile this phone's user opens the sheet again.
+        askAndAnswer(modules, started = false, asking = true)
+        waitMs(SubjectFragment.LABEL_MS + 100)
+        onScreen { binding, _ -> binding.guideButton.performClick() }
+        idle()
+        assertEquals(R.id.addGuideSheet, nav.currentDestination?.id)
+
+        val request = modules.session.sent.filterIsInstance<SessionMessage.PoseStart>().last().request
+        modules.session.deliver(SessionMessage.PoseStartAnswer(started = true, request = request))
+        idle()
+        // Under the sheet the line would come and go unseen: it waits.
+        assertFalse(label().second)
+        waitMs(SubjectFragment.LABEL_MS + 100)
+
+        nav.popBackStack()
+        idle()
+        assertEquals(string(R.string.subject_poses_started, "Dongje") to true, label())
+    }
+
+    @Test
+    fun aRefusedPressThatIsAnsweredUnderAddAPoseGuide_isSaidOnceTheSheetIsGone() {
+        val (modules, nav) = launchWithNav()
+        connectWithVideo(modules)
+        onScreen { binding, _ -> binding.shutterButton.performClick() }
+        idle()
+        onScreen { binding, _ -> binding.guideButton.performClick() }
+        idle()
+        assertEquals(R.id.addGuideSheet, nav.currentDestination?.id)
+
+        answer(modules, taken = false)
+        idle()
+        assertFalse(label().second)
+
+        nav.popBackStack()
+        idle()
+        assertEquals(string(R.string.subject_shutter_refused) to true, label())
     }
 
     @Test

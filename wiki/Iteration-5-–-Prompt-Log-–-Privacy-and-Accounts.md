@@ -27,4 +27,12 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 - [Jaewan, 11-21] "i think we can make the overall font size in the privacy policy page smaller. also for tables, just allow scrolling horizontally, and let's not try to squeeze this into the phone width"
 - [Jaewan, 11-21] "i've checked all, good"
 
+## The privacy policy for the ONE store listing ([#264])
+
+- [Sungmin, 11-21] "Wait, before doing this, wouldn't it be better to submit that privacy policy URL? What do you think? Should we make one? See this link: https://onestore-dev.gitbook.io/dev/help/faq/legal" (With a screenshot of the console's field.)
+- [Sungmin, 11-21] "Making a wiki page seems best. Use my email for questions, and name the operator only as the Last Penguin team."
+- [Sungmin, 11-21] "But would it be better to put this document on my personal GitHub, or in our repo...?"
+- [Sungmin, 11-21] "OK, commit and open the PR." ([#264])
+
+[#264]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/264
 [#287]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/287

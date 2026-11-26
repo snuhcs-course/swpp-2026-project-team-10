@@ -100,6 +100,24 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 - [Jaewan, 11-26] "seems like this is still slightly, very slightly moved inwards can you check this? the screenshots show"
 - [Jaewan, 11-26] "yes"
 
+## Notices in the zoom row's place, the timer's ring, the tip's button, and the photo viewer ([#328])
+
+- [Jaewan, 11-26] "I want to have three fixes: \ 1. in several places we have snack bars that have a '되돌리기' '다시 시도' '취소' etc option. but these currently show above the 1.0x zoom control button, which looks weird. can we have that snack bar at thebottom of the camera roll, even if it covers the zoom button, and instead allow the user to make it disappear by sweeping it down? \ 2. when we film with a timer, does it show like this? [Image #1] i think we removed the '셔터를 누르면 취소돼요' text, which is intended, but we don't have that ui in the shutter. can we do this? \ 3. pose tips are hidden whenever we touch any place in the screen. can we make this controllable only through the tip button? \ first check if you can apply these changes, and give me ui mockups. i'll confirm, and then start implementing"
+- [Jaewan, 11-26] "1. fill up 2. yes i think this is good. draw this in the mockup first 3. what othere cases do we have? \ don't implement these yet"
+- [Jaewan, 11-26] "on every notice \ before that, one more question: during a session, the '실시간으로 보는 중' text only appears in the subject side? no corresponding notification in the photographer side? and does that not collide with the guide control tool bar region? can you give me screenshots of how this works currently, using two emulators on S22, for all three camera ratios?"
+- [Jaewan, 11-26] "ok, close the emulators. i'll get back to this later, now implement the three we talked about earlier (in a new branch)"
+- [Jaewan, 11-26] "i want to install this app on my phone via android studio debug build, can i do this now?"
+- [Jaewan, 11-26] "one more. what happens if we delete a photo from the gallery now?"
+- [Jaewan, 11-26] "for a photo not taken by pix, android asks 'Pix에서 이 사진을 삭제하도록 허용하겠습니까?', but do we need to press '허용' for this all the time? i think it's better to always keep the '이 사진을 삭제할까요?' popup for all photos. if we need to grant permission, can we make this happen only once? is this possible? \ And the phrase '이 휴대폰에서 지워져요 / It is removed from this phone' seems kinda too artificial, any better candidates?"
+- [Jaewan, 11-26] "yes make that fix for allowing deleting once. also for the wording i'd choose for A, but for korean say '휴대폰 갤러리' instead of '갤러리'. also, since our grid shows newest images at the top, the scrolling should also put the newest image at the left. fix these too"
+- [Jaewan, 11-26] "skip the full check let's check them through github. fix the wireframes/docs, and then push this and create a pr. also create an issue (Iter5-A14) and link it"
+- [Jaewan, 11-26] "wait i want to first install this on my phone first can i do this first"
+- [Jaewan, 11-26] "just put allow access a separate popup at the first try, and never place allow access together with delete and cancel."
+- [Jaewan, 11-26] "when we first click a photo, can we make it place in the center of the bottom scroll bar (if possible)"
+- [Jaewan, 11-26] "make the snackbar disappearing animation slightly slower"
+- [Jaewan, 11-26] "ok now do the wireframes, issue, and pr"
+- [Jaewan, 11-26] "phone checks are done. also add the prompt logs"
+
 [#270]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/270
 [#292]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/292
 [#294]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/294
@@ -111,3 +129,4 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 [#310]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/310
 [#315]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/315
 [#321]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/321
+[#328]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/328

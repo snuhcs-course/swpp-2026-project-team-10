@@ -48,7 +48,8 @@ import org.robolectric.Robolectric
  * MediaStore after Pix asks, which then tells of the change; a photo already gone counts as deleted; one MediaStore
  * refuses for no reason of ownership is not, with no crash. Another app's photo: on Android 11 Pix does not ask, and
  * Android's question deletes it, MediaStore untouched; from Android 12 Pix asks for every photo, and another app's
- * needs the media access until the user allows it, with which Android's request deletes it unasked; on Android 10 Pix
+ * needs the media access until the user allows it, with which Android's request deletes it unasked, though never with
+ * chosen photos alone, where Android asks all the same; on Android 10 Pix
  * asks, and MediaStore's own question lets it delete it. Pix's photo from before a reinstall, which MediaStore refuses
  * as another's: Android's question.
  */
@@ -245,6 +246,19 @@ class PhonePhotosTest {
         assertTrue(photos.needsAccess(photo(11)))
         assertTrue(photos.needsAccess(photo(12)))
     }
+
+    @Test
+    fun `with chosen photos alone, the media access is never offered, as Android would ask all the same`() =
+        runTest {
+            store.rows = listOf(Row(10, 1_000, 1, owner = "com.example.gallery"))
+            access = PhotoAccess.CHOSEN
+            val photos = photos()
+
+            assertTrue(photos.asksFirst(photo(10)))
+            assertFalse(photos.needsAccess(photo(10)))
+            val result = photos.delete(photo(10))
+            assertTrue("$result", result is PhotoDeletion.NeedsConsent && result.deletesItself)
+        }
 
     @Test
     fun `with the media access allowed, another app's photo needs no more, and Android's request deletes it unasked`() =

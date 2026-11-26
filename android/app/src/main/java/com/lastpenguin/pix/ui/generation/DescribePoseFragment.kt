@@ -27,6 +27,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.chip.Chip
+import com.google.android.material.snackbar.Snackbar
 import com.lastpenguin.pix.R
 import com.lastpenguin.pix.databinding.FragmentDescribePoseBinding
 import com.lastpenguin.pix.generation.DESCRIPTION_MAX_LENGTH
@@ -78,6 +79,9 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose), ScenePho
 
     /** The scene photo shrinking into its place, while it does (#296). */
     private var sceneArrival: ValueAnimator? = null
+
+    // "The poses are in My library", while it shows; it goes with this screen's view.
+    private var posesKeptNotice: Snackbar? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentDescribePoseBinding.bind(view)
@@ -168,6 +172,9 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose), ScenePho
     override fun onDestroyView() {
         form = null
         sceneArrival?.cancel()
+        // The notice is the activity's and would outlive this screen, its *View* then reaching a screen that is gone.
+        posesKeptNotice?.dismiss()
+        posesKeptNotice = null
         super.onDestroyView()
     }
 
@@ -203,10 +210,11 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose), ScenePho
 
     /**
      * Back left a set whose poses are in the library (#297): a notice says so, with *View*, which opens the library at
-     * *All*, newest first, and ends the pose flow, so Back there is Camera.
+     * *All*, newest first, and ends the pose flow, so Back there is Camera. The notice goes with this screen's view.
      */
     private fun showPosesKept() {
-        showNoticeOnScreen(
+        posesKeptNotice?.dismiss()
+        posesKeptNotice = showNoticeOnScreen(
             getString(R.string.poses_kept_notice),
             NoticeLength.LONG,
             NoticeAction(R.string.poses_kept_view) { viewPoses() },
@@ -214,6 +222,8 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose), ScenePho
     }
 
     private fun viewPoses() {
+        // A tap that comes as the screen goes finds no navigation of its own.
+        if (view == null) return
         val navController = findNavController()
         if (navController.currentDestination?.id != R.id.describePoseFragment) return
         referenceViewModel.openFor(fromSubject = false)

@@ -67,7 +67,8 @@ fun interface PhotoDeleter {
 
     /**
      * Whether Android would ask before deleting [uri] every time, as for another app's photo, until Pix may manage the
-     * phone's media, which the user allows once (Android 12 and later; FR-1.16).
+     * phone's media, which the user allows once (Android 12 and later; FR-1.16). Never while Pix may read only some of
+     * the phone's photos, since Android then asks all the same.
      */
     fun needsAccess(uri: Uri): Boolean = false
 }
@@ -231,8 +232,11 @@ class PhonePhotos(
     override fun asksFirst(uri: Uri): Boolean =
         sdk < Build.VERSION_CODES.R || sdk >= Build.VERSION_CODES.S || uri !in others
 
+    // Only with every photo readable: with chosen photos alone, Android asks before a delete even once Pix may
+    // manage media (MediaProvider's PermissionActivity checks the read permission too), so the access would promise
+    // what it does not give.
     override fun needsAccess(uri: Uri): Boolean =
-        sdk >= Build.VERSION_CODES.S && uri in others && !canManageMedia()
+        sdk >= Build.VERSION_CODES.S && uri in others && !canManageMedia() && _access.value == PhotoAccess.ALL
 
     /**
      * Deletes [uri] from MediaStore; [photos] lose it once MediaStore tells of the change. Another app's photo goes to

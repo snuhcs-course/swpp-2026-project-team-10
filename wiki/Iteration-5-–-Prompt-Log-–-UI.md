@@ -150,6 +150,8 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 - [Jaewan, 11-26] "make the snackbar disappearing animation slightly slower"
 - [Jaewan, 11-26] "ok now do the wireframes, issue, and pr"
 - [Jaewan, 11-26] "phone checks are done. also add the prompt logs"
+- [Jaewan, 11-26] "there are changes in dev resolve the conflicts"
+- [Jaewan, 11-26] "codex left some reviews"
 
 [#270]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/270
 [#292]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/292

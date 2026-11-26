@@ -100,14 +100,52 @@ Back to [[AI Collaboration Report – Iteration 5|AI-Collaboration-Report-–-It
 - [Jaewan, 11-26] "seems like this is still slightly, very slightly moved inwards can you check this? the screenshots show"
 - [Jaewan, 11-26] "yes"
 
+## Impeccable's review, and its UI fixes ([#298], [#300], [#312])
+
+- [Sungmin, 11-23] "Now I'm going to handle issue #298. Take a look first."
+- [Sungmin, 11-23] "But what exactly does doing that do...? Is it changing the Android UI code, or what?"
+- [Sungmin, 11-23] "Just install everything yourself and review it." (The agent installed the Impeccable skill and reviewed Pix's screens with it.)
+- [Sungmin, 11-24] "I'm curious how it would look exactly once fixed. Before doing it, can you draw it first so only I can see it?" (A private page with each fix drawn before and after.)
+- [Sungmin, 11-24] "What does TalkBack mean? And weren't there more fixes besides these?"
+- [Sungmin, 11-24] "I don't think TalkBack needs to go in. But isn't something like this possible? In guide-edit mode, mark the guide so it looks movable, by painting something over it or drawing a box around it? Also draw the fixes written in the other issues. And the ratio's text can be left out."
+- [Sungmin, 11-24] "Apply option B for the edit-mode mark, in the shutter's place. What does showing the photo instead of the outline mean? I think the confirm dialog can go."
+- [Sungmin, 11-24] "Put it at the same link, and update GitHub."
+- [Sungmin, 11-24] "Did you change the documents too?"
+- [Sungmin, 11-24] "Yes, fix them and open the PR." ([#300]: Testing 4.4 records the guide's light teal fill while editing, and Back from the poses without "Go back?".)
+- [Sungmin, 11-25] "Now I'm going to build issue #298. First make an implementation plan."
+- [Sungmin, 11-25] "Then can you start with the parts that don't overlap issue #308?"
+- [Sungmin, 11-25] "If it doesn't change much code, bring the tip back too. Five seconds for Undo seems fine."
+- [Sungmin, 11-25] "Commit what's done so far and open the PR." ([#312], as a draft.)
+- [Sungmin, 11-25] "Oh, just build the rest too."
+- [Sungmin, 11-25] "Commit and push."
+- [Sungmin, 11-25] "Fix the description and take it out of draft."
+- [Sungmin, 11-25] "PR #312 has conflicts now. Resolve them." (With #308, then #313, merged meanwhile. The library now has two tabs, so the switches' touch target test takes two parts or more.)
+- [Sungmin, 11-25] "When done, commit and push."
+- [Sungmin, 11-25] "Build an APK from this PR and install it on the connected phone."
+
+## A photo turns into its guide ([#295], [#319])
+
+- [Sungmin, 11-25] "First plan how to build issue #295. Don't change anything." (The agent proposed one animation for every gallery photo, grown from the screenshot's cut, with two choices. The photo goes to the card's bottom right, where a screenshot's photo already goes. AI poses keep their fade, or the subject's phone would have to change too.)
+- [Sungmin, 11-25] "Go with the recommendations." (Built test-first: five screen tests failed on the old behaviour. `PhotoToGuide` and `PhotoToGuideView` replace the screenshot's cut. The line is the outline view's own drawing, shown along `OutlineExtractor.lines`. `ReferenceGuide.photo` keeps the photo, dropped on *Use*. R&S 4.19, Design 4.20, Testing 4.22, and Flow 1's note.)
+- [Sungmin, 11-25] "Commit and open the PR." ([#319])
+- [Sungmin, 11-26] "PR #319 has conflicts now. Resolve them and update the PR." (With #316 and #321: the revision rows renumbered, and Flow 1's images rendered again.)
+- [Sungmin, 11-26] "I connected the phone. Install the APK."
+- [Sungmin, 11-26] "Checked. Upload the prompt log too. If there are logs I didn't upload while building other features, include them as well." (On the phone, `seg.start`–`seg.end` took 0.49–1.33 s.)
+- [Sungmin, 11-26] "Let's just put the prompt logs in a new PR." (This section and the one above, the privacy policy's on its page, and ONE store's on a new page.)
+
 [#270]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/270
 [#292]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/292
 [#294]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/294
+[#295]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/295
 [#297]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/297
+[#298]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/298
+[#300]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/300
 [#301]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/301
 [#304]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/304
 [#306]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/306
 [#308]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/308
 [#310]: https://github.com/snuhcs-course/swpp-2026-project-team-10/issues/310
+[#312]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/312
 [#315]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/315
+[#319]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/319
 [#321]: https://github.com/snuhcs-course/swpp-2026-project-team-10/pull/321

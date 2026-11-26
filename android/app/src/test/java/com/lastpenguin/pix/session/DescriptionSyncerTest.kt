@@ -38,8 +38,9 @@ import org.junit.Test
  * Subject, the photo (fault injection, boundary): a broken transfer, a header over 1024 px or 1 MiB (at the limit read),
  * and a photo that does not decode are let go.
  * Subject, the field across a drop only one phone saw (state-based, Design 2.6.7): a release that could not be sent,
- * sent once the link is back; a field the photographer's phone freed while this one still holds it, held again with
- * its newest text; a hold the photographer's own field did not allow, and one of an earlier description, not asked for
+ * sent once the link is back; text typed into a field this phone still holds, not sent either, sent once the link is
+ * back, and not again for an echo of an earlier text; a field the photographer's phone freed while this one still
+ * holds it, held again with its newest text; a hold the photographer's own field did not allow, and one of an earlier description, not asked for
  * again; a description that says what the field asked for, which sends nothing.
  * Subject, the requests (boundary of the deadline): an edit sent only with a description and a session; a Generate 4
  * poses or Skip sent and waiting, answered by the end, reported just after 5 s and not just before, and refused
@@ -520,6 +521,30 @@ class DescriptionSyncerTest {
 
         // The photographer's phone says so: nothing more to ask.
         deliver(DescriptionStep.OPEN, "jump high")
+        runCurrent()
+        assertEquals(2, edits().size)
+    }
+
+    @Test
+    fun `text the link was down for goes out once it is back, though the field is still this phone's`() = runTest {
+        val syncer = open()
+        syncer.edit(holding = true, text = "jump")
+        deliver(DescriptionStep.OPEN, "jump", Role.SUBJECT)
+        runCurrent()
+
+        session.setState(SessionState.Reconnecting("s_1", 0L))
+        runCurrent()
+        assertFalse(syncer.edit(holding = true, text = "jump high"))
+        assertEquals(1, edits().size)
+
+        // The photographer's phone still says this phone holds the field, with the text from before the drop.
+        session.setState(SessionState.Connected("s_1", PeerInfo("Dongje", null), Role.SUBJECT, drops = 1))
+        runCurrent()
+        assertEquals(SessionMessage.PoseDescriptionEdit("d1", holding = true, text = "jump high"), edits().last())
+        assertEquals(2, edits().size)
+
+        // An echo of an earlier text is on its way while this phone types: what was sent is not sent again for it.
+        deliver(DescriptionStep.OPEN, "jump", Role.SUBJECT)
         runCurrent()
         assertEquals(2, edits().size)
     }

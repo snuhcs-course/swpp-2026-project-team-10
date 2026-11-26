@@ -119,8 +119,9 @@ data class StartedDescription(val text: String, val partner: SessionPartner?, va
  * its end, at another description, and when the session ends, saying in [ended] how it ended and in [started] what
  * description a set was made from, for the prompt history (FR-4.11). [edit] sends the field's text, and [go] sends
  * *Generate 4 poses* or *Skip* and waits [GO_TIMEOUT_MS] for the description's end; otherwise [goFailed]. What the
- * field asked for last is kept, sent or not, and sent again whenever the photographer's phone says otherwise or the
- * link is back ([reassert]): a drop that only one phone saw loses the field's hold or its release (Design 2.6.7).
+ * field asked for last is kept, and sent again when it could not be sent and the link is back, or when the
+ * photographer's phone names another holder ([reassert]): a drop that only one phone saw loses the field's hold, its
+ * release, or its newest text (Design 2.6.7).
  * Owner: Shared steps (Iter3-P16).
  */
 class DescriptionSyncer(
@@ -316,8 +317,8 @@ class DescriptionSyncer(
     private var receiver: CoroutineScope? = null
     private var deadline: Job? = null
 
-    /** Subject: what this phone's field last asked for of a description, whether it could be sent or not. */
-    private data class Asked(val descriptionId: String, val holding: Boolean, val text: String)
+    /** Subject: what this phone's field last asked for of a description, and whether it could be [sent]. */
+    private data class Asked(val descriptionId: String, val holding: Boolean, val text: String, val sent: Boolean)
 
     @Volatile
     private var asked: Asked? = null
@@ -456,25 +457,30 @@ class DescriptionSyncer(
      */
     fun edit(holding: Boolean, text: String): Boolean {
         val description = _mirror.value ?: return false
-        asked = Asked(description.descriptionId, holding, text)
-        if (!connected()) return false
-        session.send(SessionMessage.PoseDescriptionEdit(description.descriptionId, holding, text))
-        return true
+        val sent = connected()
+        asked = Asked(description.descriptionId, holding, text, sent)
+        if (sent) session.send(SessionMessage.PoseDescriptionEdit(description.descriptionId, holding, text))
+        return sent
     }
 
     /**
-     * Subject: sends what this phone's field asked for last again when [description], as the photographer's phone has
-     * it, says otherwise: held by nobody while this field holds it, as after a drop only the photographer's phone
-     * saw, which frees the field ([DescriptionRequest.Gone]); or held by this phone after its field let go, as after
-     * a drop only this phone saw, where the release was not sent. The photographer's own field holding it settles it
-     * the other way: this phone's hold was not taken, and is not asked for again.
+     * Subject: sends what this phone's field asked for last again, once the link is there. What could not be sent goes
+     * out whatever [description] says: the photographer's phone may still name this phone as the holder, with the text
+     * from before the drop. What was sent goes out again only when [description], as the photographer's phone has it,
+     * names another holder: nobody while this field holds it, as after a drop only the photographer's phone saw,
+     * which frees the field ([DescriptionRequest.Gone]); or this phone after its field let go. Its text is not
+     * compared, since an echo of an earlier text is on its way whenever this phone types. The photographer's own
+     * field holding the description settles it the other way: this phone's hold was not taken, and is not asked for
+     * again.
      */
     private fun reassert(description: MirrorDescription) {
         val mine = asked?.takeIf {
             it.descriptionId == description.descriptionId && description.writer != Role.PHOTOGRAPHER
         }
         asked = mine
-        if (mine == null || mine.holding == (description.writer == Role.SUBJECT) || !connected()) return
+        if (mine == null || !connected()) return
+        if (mine.sent && mine.holding == (description.writer == Role.SUBJECT)) return
+        asked = mine.copy(sent = true)
         session.send(SessionMessage.PoseDescriptionEdit(mine.descriptionId, mine.holding, mine.text))
         Timings.mark("pose.sent", "description edit again ${mine.descriptionId} holding=${mine.holding}")
     }

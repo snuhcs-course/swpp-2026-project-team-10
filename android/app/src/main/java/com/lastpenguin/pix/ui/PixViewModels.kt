@@ -51,6 +51,7 @@ object PixViewModels {
                 deleter = container.photoDeleter,
                 phoneTurns = container.phoneTurns,
                 zoomHold = container.remoteControlHandler.zoomHold,
+                timerChoice = container.remoteControlHandler.timerChoice,
                 onFocused = container.remoteControlHandler::focusedHere,
                 onDid = container.remoteControlHandler::didHere,
                 onCountdown = container.remoteControlHandler::countdownHere,

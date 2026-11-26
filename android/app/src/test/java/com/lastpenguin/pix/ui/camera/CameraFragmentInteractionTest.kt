@@ -27,6 +27,7 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.Accessibilit
 import androidx.core.view.isVisible
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragmentInContainer
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.MutableLiveData
 import androidx.navigation.testing.TestNavHostController
 import androidx.test.core.app.ApplicationProvider
@@ -40,6 +41,7 @@ import com.lastpenguin.pix.camera.PhoneAlbum
 import com.lastpenguin.pix.camera.PhotoAccess
 import com.lastpenguin.pix.camera.photoPermissions
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.session.EndReason
 import com.lastpenguin.pix.session.FakeCameraController
 import com.lastpenguin.pix.session.IcePath
@@ -49,6 +51,7 @@ import com.lastpenguin.pix.session.RtcSessionManager
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.session.shoot
+import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.ScreenTestSupport
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
@@ -61,6 +64,7 @@ import com.lastpenguin.pix.ui.generation.GenerationUiState
 import com.lastpenguin.pix.ui.generation.GenerationViewModel
 import com.lastpenguin.pix.ui.generation.SceneHandOff
 import com.lastpenguin.pix.ui.session.SessionViewModel
+import com.lastpenguin.pix.ui.settings.TutorialFragment
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
@@ -72,6 +76,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -125,6 +130,20 @@ import org.robolectric.shadows.ShadowDialog
  * A dropped link (#293, FR-6.12): who the phone reconnects with, for the whole wait, gone when the link is back;
  * replaced by "… disconnected" when the wait ends, and not back after it; another notice meanwhile keeps its own time,
  * and the line is back after it; a drop during the subject's pinch, where the pinch's end must not take the line down.
+ * The subject's shutter (#314, FR-7.8): a photo taken here with its notice; nothing while a pose's scene photo is
+ * framed, neither a photo nor the scene, though a cancel stops the scene photo's countdown; nothing while the camera is not ready; nothing once this screen is left, and
+ * a photo again when it is back; nothing with a sheet or the photos over the camera, which stays started under them;
+ * with this phone's timer on, the countdown with who pressed, and its photo at its end; the subject's second press,
+ * which cancels it with who cancelled; a cancel of a countdown this phone's shutter started; a press for a photo that
+ * meets a countdown, left to its own photo without a refusal.
+ * The subject's timer (#318): shown in this phone's bar and menu, with who set it, and off again.
+ * The subject starts AI poses (#276, FR-6.15): the scene photo's step begun here for their situation, with its notice;
+ * refused for a selfie without a front camera, while a scene photo is already framed (the step unchanged), with a
+ * sheet over the camera, and while this phone's timer counts down (the countdown going on to its photo); a press, and
+ * a start, while one of this screen's own questions is up (the agreement, End session) or the tutorial's tips are,
+ * taken again once it is answered or closed; the agreement's question gone with its session, ended or another's,
+ * and kept through a drop; without the agreement on this phone, asked first with the subject's name, begun once agreed,
+ * refused at "Not now", and a second request refused while the question is up.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -515,6 +534,542 @@ class CameraFragmentInteractionTest {
         idleFor(SessionViewModel.ZOOMING_LINGER_MS + 100)
 
         onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+    }
+
+    // ---- The subject's shutter (FR-7.8, #314) --------------------------------------------------------------------
+
+    private fun shutterAnswers(modules: TestAppContainer): List<SessionMessage.ShutterAnswer> =
+        modules.session.sent.filterIsInstance<SessionMessage.ShutterAnswer>()
+
+    /** Camera in a session as the photographer, with a camera that saves its photos, and no notice showing. */
+    private fun inASessionWithACameraThatSaves(): Pair<TestAppContainer, FakeCameraController> {
+        val camera = FakeCameraController().apply { photo = Uri.parse("content://media/external/images/9") }
+        val modules = launch(camera)
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        idleFor(CameraViewModel.NOTICE_MS)
+        return modules to camera
+    }
+
+    @Test
+    fun theSubjectsShutter_takesAPhotoHere_andSaysWhoTookIt() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idle()
+
+        assertEquals(1, camera.photoTurns.size)
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = true, press = 1)), shutterAnswers(modules))
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.remote_shutter_notice, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+    }
+
+    @Test
+    fun whileTheScenePhotoIsFramed_theSubjectsShutterTakesNothing() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+        val generation = generation()
+        generation.beginScene()
+        idle()
+
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idle()
+
+        // Neither a photo nor the pose's scene photo, which is the photographer's own step.
+        assertTrue(camera.photoTurns.isEmpty())
+        assertEquals(GenerationUiState.Phase.FRAMING, generation.uiState.value.phase)
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), shutterAnswers(modules))
+    }
+
+    @Test
+    fun whileTheCameraIsNotReady_theSubjectsPressIsNotTaken() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+        camera.setStatus(CameraStatus.STARTING)
+        idle()
+
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idle()
+
+        assertTrue(camera.photoTurns.isEmpty())
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), shutterAnswers(modules))
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.noticeText.visibility) }
+    }
+
+    /** The photographer's timer set to 3 s in the camera menu (FR-1.17), which then closes. */
+    private fun chooseThreeSeconds() {
+        onScreen { controls, _ -> controls.cameraMenuButton.performClick() }
+        onScreen { controls, _ -> controls.menuTimer.performClick() }
+        onScreen { controls, _ -> controls.cameraMenuButton.performClick() }
+    }
+
+    @Test
+    fun withTheTimerOn_theSubjectsShutterStartsTheCountdown_saysWhoPressed_andItsEndTakesThePhoto() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+        chooseThreeSeconds()
+        idleFor(CameraViewModel.NOTICE_MS)
+
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idle()
+
+        // The photographer's timer serves the subject's press too (FR-7.8): no photo yet, and no refusal.
+        assertTrue(camera.photoTurns.isEmpty())
+        assertEquals(
+            listOf(SessionMessage.ShutterAnswer(taken = false, press = 1, timer = true)),
+            shutterAnswers(modules),
+        )
+        assertEquals(SessionMessage.Countdown(3), modules.session.sent.last { it is SessionMessage.Countdown })
+        onScreen { controls, _ ->
+            assertEquals(View.VISIBLE, controls.countdownPanel.visibility)
+            assertEquals("3", controls.countdownNumber.text.toString())
+            assertEquals(
+                string(R.string.remote_shutter_pressed_notice, "Joonhyung"),
+                controls.noticeText.text.toString(),
+            )
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+
+        idleFor(3_100)
+        assertEquals(1, camera.photoTurns.size)
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.countdownPanel.visibility) }
+    }
+
+    @Test
+    fun theSubjectsSecondPress_cancelsTheCountdown_andSaysWhoCancelled() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+        chooseThreeSeconds()
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idleFor(1_000)
+
+        modules.session.deliver(SessionMessage.ShutterPress(2, cancel = true))
+        idle()
+
+        assertEquals(
+            SessionMessage.ShutterAnswer(taken = false, press = 2, timer = true),
+            shutterAnswers(modules).last(),
+        )
+        onScreen { controls, _ ->
+            assertEquals(View.GONE, controls.countdownPanel.visibility)
+            assertEquals(
+                string(R.string.remote_timer_cancel_notice, "Joonhyung"),
+                controls.noticeText.text.toString(),
+            )
+        }
+        idleFor(5_000)
+        assertTrue(camera.photoTurns.isEmpty())
+    }
+
+    @Test
+    fun theSubjectsCancel_alsoStopsACountdownThePhotographerStarted() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+        chooseThreeSeconds()
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idleFor(1_000)
+
+        modules.session.deliver(SessionMessage.ShutterPress(1, cancel = true))
+        idle()
+
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.countdownPanel.visibility) }
+        idleFor(5_000)
+        assertTrue(camera.photoTurns.isEmpty())
+    }
+
+    @Test
+    fun aPressForAPhoto_thatMeetsARunningCountdown_leavesItToItsOwnPhoto_withoutARefusal() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+        chooseThreeSeconds()
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idleFor(1_000)
+
+        // Pressed before the subject's phone showed the countdown.
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idle()
+
+        assertTrue(camera.photoTurns.isEmpty())
+        assertEquals(
+            listOf(SessionMessage.ShutterAnswer(taken = false, press = 1, timer = true)),
+            shutterAnswers(modules),
+        )
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.countdownPanel.visibility) }
+
+        idleFor(2_100)
+        assertEquals(1, camera.photoTurns.size)
+    }
+
+    @Test
+    fun whileTheScenePhotoCountsDown_theSubjectsCancelStopsIt_andAPressForAPhotoIsStillRefused() {
+        val (modules, _) = inASessionWithACameraThatSaves()
+        chooseThreeSeconds()
+        val generation = generation()
+        generation.beginScene()
+        idle()
+        // The timer counts down for the scene photo too (FR-1.17), and the subject's phone shows it.
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idleFor(1_000)
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.countdownPanel.visibility) }
+
+        // The scene photo stays the photographer's: a press for a photo is refused, as before.
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idle()
+        assertEquals(SessionMessage.ShutterAnswer(taken = false, press = 1), shutterAnswers(modules).last())
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.countdownPanel.visibility) }
+
+        // Its countdown is stopped by either phone's shutter, as any.
+        modules.session.deliver(SessionMessage.ShutterPress(2, cancel = true))
+        idle()
+        assertEquals(
+            SessionMessage.ShutterAnswer(taken = false, press = 2, timer = true),
+            shutterAnswers(modules).last(),
+        )
+        onScreen { controls, _ -> assertEquals(View.GONE, controls.countdownPanel.visibility) }
+        idleFor(5_000)
+        // No scene photo was taken: the step is still framing.
+        assertEquals(GenerationUiState.Phase.FRAMING, generation.uiState.value.phase)
+    }
+
+    @Test
+    fun theSubjectsTimer_showsInTheBarAndTheMenu_andSaysWhoSetIt() {
+        val (modules, _) = inASessionWithACameraThatSaves()
+
+        modules.session.deliver(SessionMessage.TimerSet(3))
+        idle()
+        onScreen { controls, _ ->
+            // This phone's one timer, set from the subject's menu (#318).
+            assertEquals(View.VISIBLE, controls.timerIndicator.visibility)
+            assertTrue(controls.menuTimer.isActivated)
+            assertEquals(
+                string(R.string.remote_timer_notice, "Joonhyung", 3),
+                controls.noticeText.text.toString(),
+            )
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+
+        modules.session.deliver(SessionMessage.TimerSet(0))
+        idle()
+        onScreen { controls, _ ->
+            assertEquals(View.GONE, controls.timerIndicator.visibility)
+            assertEquals(
+                string(R.string.remote_timer_off_notice, "Joonhyung"),
+                controls.noticeText.text.toString(),
+            )
+        }
+    }
+
+    @Test
+    fun onceThisScreenIsLeft_aPressIsNotTaken_andItIsAgainWhenTheScreenIsBack() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+
+        // Another screen covers Camera, as Settings does: its view goes, and the camera with it.
+        scenario!!.moveToState(Lifecycle.State.CREATED)
+        idle()
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idle()
+        assertTrue(camera.photoTurns.isEmpty())
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), shutterAnswers(modules))
+
+        scenario!!.moveToState(Lifecycle.State.RESUMED)
+        idle()
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idle()
+        assertEquals(1, camera.photoTurns.size)
+        assertEquals(SessionMessage.ShutterAnswer(taken = true, press = 1), shutterAnswers(modules).last())
+    }
+
+    @Test
+    fun withASheetOverTheCamera_theSubjectsPressIsNotTaken() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+        val nav = scenario!!.attachNav(R.id.cameraFragment)
+        // Add a pose guide is open over Camera, which stays started under it with its camera running.
+        nav.navigate(R.id.action_camera_to_addGuide)
+        idle()
+
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idle()
+
+        assertTrue(camera.photoTurns.isEmpty())
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), shutterAnswers(modules))
+    }
+
+    @Test
+    fun withThePhotosOpenOverTheCamera_theSubjectsPressIsNotTaken() {
+        val (modules, camera) = inASessionWithACameraThatSaves()
+        val picture = Bitmap.createBitmap(4, 3, Bitmap.Config.ARGB_8888)
+        onScreen { _, fragment ->
+            fragment.thumbnailOf = { picture }
+            fragment.photoOf = { picture }
+        }
+        // The session's one photo, taken here, and the viewer opened on it.
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        settleReads()
+        onScreen { controls, _ -> controls.galleryButton.performClick() }
+        settleReads()
+        assertTrue(cameraViewModel().uiState.value.photosOpen)
+        assertEquals(1, camera.photoTurns.size)
+
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idle()
+
+        assertEquals(1, camera.photoTurns.size)
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), shutterAnswers(modules))
+    }
+
+    // ---- The subject starts AI poses (FR-6.15, #276) --------------------------------------------------------------
+
+    private fun startAnswers(modules: TestAppContainer): List<SessionMessage.PoseStartAnswer> =
+        modules.session.sent.filterIsInstance<SessionMessage.PoseStartAnswer>()
+
+    /** Camera in a session as the photographer, on [modules], with no notice showing. */
+    private fun inASession(modules: TestAppContainer) {
+        shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
+        modules.install()
+        scenario = launchFragmentInContainer<CameraFragment>(themeResId = R.style.Theme_Pix)
+        idle()
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Joonhyung"), Role.PHOTOGRAPHER))
+        idle()
+        idleFor(CameraViewModel.NOTICE_MS)
+    }
+
+    @Test
+    fun theSubjectsSituation_beginsTheScenePhotoHere_andSaysWhoStartedIt() {
+        val modules = TestAppContainer()
+        inASession(modules)
+
+        modules.session.deliver(SessionMessage.PoseStart("full_body"))
+        idle()
+
+        // As if the photographer had picked the tile: the scene photo's step, for that situation.
+        val scene = generation().uiState.value
+        assertEquals(GenerationUiState.Phase.FRAMING, scene.phase)
+        assertEquals(Situation.FULL_BODY, scene.situation)
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = true)), startAnswers(modules))
+        onScreen { controls, _ ->
+            assertEquals(string(R.string.remote_pose_start_notice, "Joonhyung"), controls.noticeText.text.toString())
+            assertEquals(View.VISIBLE, controls.noticeText.visibility)
+        }
+    }
+
+    @Test
+    fun aSelfieForAPhoneWithoutAFrontCamera_isRefused() {
+        val camera = FakeCameraController().apply { hasFrontCamera.value = false }
+        val modules = TestAppContainer(camera = camera)
+        inASession(modules)
+
+        modules.session.deliver(SessionMessage.PoseStart("selfie"))
+        idle()
+
+        assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers(modules))
+    }
+
+    @Test
+    fun whileTheScenePhotoIsAlreadyFramed_theSubjectsStartIsRefused_andTheStepStaysAsItWas() {
+        val modules = TestAppContainer()
+        inASession(modules)
+        val generation = generation()
+        generation.chooseSituation(Situation.HALF_BODY)
+        generation.beginScene()
+        idle()
+
+        modules.session.deliver(SessionMessage.PoseStart("landmark"))
+        idle()
+
+        assertEquals(Situation.HALF_BODY, generation.uiState.value.situation)
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers(modules))
+    }
+
+    @Test
+    fun whileTheTimerCountsDown_theSubjectsStartIsRefused_andTheCountdownGoesOnToItsPhoto() {
+        val camera = FakeCameraController().apply { photo = Uri.parse("content://media/external/images/9") }
+        val modules = TestAppContainer(camera = camera)
+        inASession(modules)
+        chooseThreeSeconds()
+        onScreen { controls, _ -> controls.shutterButton.performClick() }
+        idleFor(1_000)
+
+        modules.session.deliver(SessionMessage.PoseStart("full_body"))
+        idle()
+
+        // Guide waits on this phone while the timer counts down (FR-1.17), and so does the subject's start.
+        assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers(modules))
+        onScreen { controls, _ -> assertEquals(View.VISIBLE, controls.countdownPanel.visibility) }
+
+        idleFor(2_100)
+        assertEquals(1, camera.photoTurns.size)
+    }
+
+    @Test
+    fun whileTheAgreementIsAsked_theSubjectsPressIsNotTaken() {
+        val camera = FakeCameraController().apply { photo = Uri.parse("content://media/external/images/9") }
+        val modules = TestAppContainer(camera = camera).apply { consent.given = false }
+        inASession(modules)
+        modules.session.deliver(SessionMessage.PoseStart("default"))
+        idle()
+        assertTrue((ShadowDialog.getLatestDialog() as AlertDialog).isShowing)
+
+        // The question covers the camera: the photographer reads it, and no photo is taken behind it.
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        idle()
+
+        assertTrue(camera.photoTurns.isEmpty())
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), shutterAnswers(modules))
+    }
+
+    @Test
+    fun whileEndSessionIsAsked_neitherTheSubjectsPressNorTheirStartOfPosesIsTaken() {
+        val camera = FakeCameraController().apply { photo = Uri.parse("content://media/external/images/9") }
+        val modules = TestAppContainer(camera = camera)
+        inASession(modules)
+        onScreen { controls, _ -> controls.endSessionButton.performClick() }
+        assertTrue((ShadowDialog.getLatestDialog() as AlertDialog).isShowing)
+
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        modules.session.deliver(SessionMessage.PoseStart("full_body"))
+        idle()
+
+        assertTrue(camera.photoTurns.isEmpty())
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), shutterAnswers(modules))
+        assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers(modules))
+
+        // Answered with Cancel, the camera is in front again.
+        (ShadowDialog.getLatestDialog() as AlertDialog).getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+        idle()
+        modules.session.deliver(SessionMessage.ShutterPress(2))
+        idle()
+        assertEquals(1, camera.photoTurns.size)
+    }
+
+    @Test
+    fun theQuestionForTheSubjectsPoses_goesWithItsSession_endedOrAnotherOnes() {
+        val modules = TestAppContainer().apply { consent.given = false }
+        inASession(modules)
+        modules.session.deliver(SessionMessage.PoseStart("default"))
+        idle()
+        val first = ShadowDialog.getLatestDialog() as AlertDialog
+        assertTrue(first.isShowing)
+
+        // A drop is the same session: the photographer still reads the question.
+        modules.session.setState(
+            SessionState.Reconnecting("s1", 0L, peer = PeerInfo("Joonhyung"), role = Role.PHOTOGRAPHER),
+        )
+        idle()
+        assertTrue(first.isShowing)
+
+        // The subject who asked leaves: nothing is left to agree to, and no step begins later.
+        modules.session.setState(SessionState.Ended(EndReason.PEER_LEFT))
+        idle()
+        assertFalse(first.isShowing)
+        assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
+
+        // Asked in one session and still up as another subject's begins: gone as well.
+        modules.session.setState(SessionState.Connected("s2", PeerInfo("Sungmin"), Role.PHOTOGRAPHER))
+        idle()
+        modules.session.deliver(SessionMessage.PoseStart("default"))
+        idle()
+        val second = ShadowDialog.getLatestDialog() as AlertDialog
+        assertTrue(second.isShowing)
+        modules.session.setState(SessionState.Connected("s3", PeerInfo("Jaewan"), Role.PHOTOGRAPHER))
+        idle()
+        assertFalse(second.isShowing)
+        assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
+    }
+
+    @Test
+    fun underTheTutorialsTips_neitherTheSubjectsPressNorTheirStartOfPosesIsTaken() {
+        val camera = FakeCameraController().apply { photo = Uri.parse("content://media/external/images/9") }
+        val modules = TestAppContainer(camera = camera)
+        inASession(modules)
+        // The first-use tips are a dialog over this screen, which stays the destination under them.
+        onScreen { _, fragment -> TutorialFragment.show(fragment, TutorialScreen.CAMERA) }
+        idle()
+        onScreen { _, fragment -> assertNotNull(TutorialFragment.over(fragment)) }
+
+        modules.session.deliver(SessionMessage.ShutterPress(1))
+        modules.session.deliver(SessionMessage.PoseStart("full_body"))
+        idle()
+
+        assertTrue(camera.photoTurns.isEmpty())
+        assertEquals(listOf(SessionMessage.ShutterAnswer(taken = false, press = 1)), shutterAnswers(modules))
+        assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers(modules))
+
+        // Closed, the camera is in front again.
+        onScreen { _, fragment -> TutorialFragment.over(fragment)!!.dismiss() }
+        idle()
+        modules.session.deliver(SessionMessage.ShutterPress(2))
+        idle()
+        assertEquals(1, camera.photoTurns.size)
+    }
+
+    @Test
+    fun withoutTheAgreementOnThisPhone_theSubjectsStartAsksForItFirst_andBeginsOnceAgreed() {
+        val modules = TestAppContainer().apply { consent.given = false }
+        inASession(modules)
+
+        modules.session.deliver(SessionMessage.PoseStart("default"))
+        idle()
+
+        // This phone sends the photo, so its user is asked, and told who wants the poses.
+        val notice = ShadowDialog.getLatestDialog() as AlertDialog
+        assertTrue(notice.isShowing)
+        val words = notice.findViewById<TextView>(android.R.id.message)!!.text.toString()
+        assertTrue(words, words.contains(string(R.string.pose_start_asked, "Joonhyung")))
+        assertTrue(words, words.contains(string(R.string.consent_message)))
+        // The subject's phone hears at once that this phone's user is asked, so it does not give the request up.
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false, asking = true)), startAnswers(modules))
+        assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
+
+        notice.getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        idle()
+
+        assertTrue(modules.consent.given)
+        assertEquals(GenerationUiState.Phase.FRAMING, generation().uiState.value.phase)
+        assertEquals(SessionMessage.PoseStartAnswer(started = true), startAnswers(modules).last())
+        assertEquals(2, startAnswers(modules).size)
+    }
+
+    @Test
+    fun notNowToTheAgreement_refusesTheSubjectsStart_andSendsNothing() {
+        val modules = TestAppContainer().apply { consent.given = false }
+        inASession(modules)
+        modules.session.deliver(SessionMessage.PoseStart("default"))
+        idle()
+
+        // A second request while the notice is up is refused at once: one question at a time.
+        modules.session.deliver(SessionMessage.PoseStart("landmark", request = 2))
+        idle()
+        assertEquals(SessionMessage.PoseStartAnswer(started = false, request = 2), startAnswers(modules).last())
+
+        (ShadowDialog.getLatestDialog() as AlertDialog).getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
+        idle()
+
+        assertFalse(modules.consent.given)
+        assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
+        // The first request: asked, then refused.
+        assertEquals(
+            listOf(
+                SessionMessage.PoseStartAnswer(started = false, asking = true),
+                SessionMessage.PoseStartAnswer(started = false),
+            ),
+            startAnswers(modules).filter { it.request == 0 },
+        )
+    }
+
+    @Test
+    fun withASheetOverTheCamera_theSubjectsStartIsRefused() {
+        val modules = TestAppContainer()
+        inASession(modules)
+        val nav = scenario!!.attachNav(R.id.cameraFragment)
+        // Add a pose guide is open over Camera, which stays under it.
+        nav.navigate(R.id.action_camera_to_addGuide)
+        idle()
+
+        modules.session.deliver(SessionMessage.PoseStart("full_body"))
+        idle()
+
+        assertEquals(GenerationUiState.Phase.IDLE, generation().uiState.value.phase)
+        assertEquals(listOf(SessionMessage.PoseStartAnswer(started = false)), startAnswers(modules))
     }
 
     /** The photographer's drop as the session says it: with the subject's name and this phone's role (#293). */

@@ -19,7 +19,7 @@ These files fix the contracts between the module owners. Design 2.1 marks them w
 | File | What it fixes | Design |
 |---|---|---|
 | `camera/CameraController.kt` | Camera interface, `CameraStatus`, `CameraCapabilities`, `CameraState`, `CameraFacing`, `AspectRatio`, `FlashMode`, `FrameSink` | 2.1, 2.3 |
-| `guide/GuideModels.kt` | `ReferenceGuide` (with a pose's `situation` and `forSituation`), `GuideState`, `NormalizedRect`, `PhotoCrop`, `GuideSource` | 2.3 |
+| `guide/GuideModels.kt` | `ReferenceGuide` (with a pose's `situation` and `forSituation`, and a photo's `photo`, which `withoutPicked` drops with `crop`), `GuideState`, `NormalizedRect`, `PhotoCrop`, `GuideSource` | 2.3 |
 | `guide/GuideRepository.kt`, `guide/ReferenceGuideMaker.kt` | Guide store and reference-to-guide interfaces | 2.1 |
 | `guide/SavedGuideStore.kt` | Saved guides on the phone, the library. `SavedGuideStore` (with `thumbnail`, which a cell reads when it shows, `setMemo`, `setFavorite`, and `delete(ids)`), `SavedGuide` (with its source, situation, memo, and whether it is a favorite), and `SavedGuideStore.InMemory` for tests. | 2.1, 2.3 |
 | `generation/GenerationModels.kt`, `generation/PoseGenerator.kt` | Pose requests, planned poses, generation and candidate events, generator interface | 2.1, 2.3 |
@@ -42,7 +42,7 @@ Every screen except the tutorial's tips is a destination in `res/navigation/nav_
 | Camera, Camera + guide, Photo saved, live light, Scene photo, Scene photo · Review | `camera/CameraFragment` | `CameraViewModel`, `SessionViewModel`, `GenerationViewModel`, `SettingsViewModel` |
 | Add a pose guide (bottom sheet) with *My library*, Consent notice | `guide/AddGuideSheet`, `SavedGuideList` | `ReferenceViewModel`, `GenerationViewModel`, `SettingsViewModel` |
 | Library | `guide/LibraryFragment`, `LibraryAdapter` | `ReferenceViewModel` |
-| Reference confirm (with a screenshot's cut), No person found | `guide/ReferenceConfirmFragment`, `ScreenshotCutView`, `NoPersonFoundFragment` | `ReferenceViewModel`, `SessionViewModel`, `SettingsViewModel` |
+| Reference confirm (a photo turning into its guide), No person found | `guide/ReferenceConfirmFragment`, `PhotoToGuideView`, `NoPersonFoundFragment` | `ReferenceViewModel`, `SessionViewModel`, `SettingsViewModel` |
 | Generate poses | `generation/DescribePoseFragment` | `GenerationViewModel`, `SessionViewModel`, `SettingsViewModel` |
 | Generating poses, Pick a pose, Couldn't create poses | `generation/GeneratingFragment`, `PickPoseFragment`, `GenerationFailedFragment` | `GenerationViewModel`, `ReferenceViewModel`, `PoseSaveViewModel`, `SessionViewModel` |
 | Who takes the photo? (bottom sheet), See their camera, Session not found | `session/ShootTogetherSheet`, `JoinCodeFragment`, `SessionNotFoundFragment` | `IncomingInvitationsViewModel`, `SessionViewModel` |

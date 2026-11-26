@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-24, reviewed by Jaewan Park and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.CameraCapabilities
@@ -309,8 +309,9 @@ class MessageCodecTest {
 
     @Test
     fun `unknown types, unknown fields, and garbage are tolerated`() {
-        // A type a later protocol may add; camera.flash.set, the earlier example here, exists since #57.
-        assertNull(codec.decode("""{"v":1,"t":"camera.timer.set","seq":1,"ts":0,"b":{"seconds":3}}"""))
+        // A type a later protocol may add; camera.flash.set and camera.timer.set, the earlier examples here, exist
+        // since #57 and #318.
+        assertNull(codec.decode("""{"v":1,"t":"camera.lens.set","seq":1,"ts":0,"b":{"lens":"tele"}}"""))
         assertNull(codec.decode("not json"))
         assertNull(codec.decode("""{"v":1}"""))
         val withExtra = codec.decode("""{"v":1,"t":"ping","seq":1,"ts":0,"b":{"ts":5,"extra":true}}""")

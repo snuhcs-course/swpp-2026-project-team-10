@@ -22,6 +22,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.util.TypedValue
 import android.view.MotionEvent
+import android.view.TouchDelegate
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
@@ -70,14 +71,18 @@ import com.lastpenguin.pix.camera.CameraFacing
 import com.lastpenguin.pix.camera.CameraStatus
 import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.PhotoAccess
+import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.camera.photoPermissions
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
+import com.lastpenguin.pix.generation.Situation
 import com.lastpenguin.pix.generation.TipState
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.session.EndReason
+import com.lastpenguin.pix.session.PoseStartStep
 import com.lastpenguin.pix.session.SessionState
+import com.lastpenguin.pix.session.ShutterOutcome
 import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.FlowProgressView
 import com.lastpenguin.pix.ui.Motion
@@ -106,6 +111,7 @@ import java.util.EnumMap
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -142,6 +148,12 @@ class CameraFragment :
         private set
     private var previewLogged = false
     private var noticeJob: Job? = null
+
+    /** The AI notice that the subject's start of poses asked this phone's user, while it is up (#276). */
+    private var askedForSubject: AlertDialog? = null
+
+    // The session whose subject asked for it: the question goes when that session ends, or another begins.
+    private var askedInSession: String? = null
 
     /** The notices shown without a time of their own ([holdNotice]), each until it is let go. */
     private val heldNotices = EnumMap<HeldNotice, String>(HeldNotice::class.java)
@@ -432,6 +444,23 @@ class CameraFragment :
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // While this screen is in front it takes the photos the subject's shutter asks for (FR-7.8, #314):
+                // only here is the camera bound, and the shutter the camera's own.
+                launch {
+                    val taker = { cancel: Boolean -> takeForSubject(controls, cancel) }
+                    // And it begins the scene photo for the situation the subject picked (FR-6.15, #276).
+                    val starter = { situation: Situation, answer: (PoseStartStep) -> Unit ->
+                        startPosesForSubject(situation, answer)
+                    }
+                    sessionViewModel.setRemoteShutter(taker)
+                    sessionViewModel.setRemotePoseStarter(starter)
+                    try {
+                        awaitCancellation()
+                    } finally {
+                        sessionViewModel.dropRemoteShutter(taker)
+                        sessionViewModel.dropRemotePoseStarter(starter)
+                    }
+                }
                 launch { viewModel.uiState.collect(::render) }
                 launch {
                     viewModel.phoneTurn.collect { turn ->
@@ -521,6 +550,8 @@ class CameraFragment :
                         if (connected != null) takeDownPeerGoneNotice(controls)
                         // Nothing is left to end once the subject has gone.
                         if (!live) dismissEndSession()
+                        // Nor to agree to for the subject's poses, once the session that asked is over or another's.
+                        if (askedForSubject != null && sessionId(state) != askedInSession) dismissAskedForSubject()
                         // The scene photo's top bar has only Back, the light, the ratio, its title, and Use.
                         controls.endSessionButton.isVisible = live && !isScenePhotoActive()
                         controls.shootTogetherButton.isVisible = !live && !isScenePhotoActive()
@@ -568,6 +599,23 @@ class CameraFragment :
                             is SessionNotice.RemoteGuide -> getString(R.string.remote_guide_notice, notice.name)
 
                             is SessionNotice.RemoteFocus -> getString(R.string.remote_focus_notice, notice.name)
+
+                            is SessionNotice.RemoteTimer -> if (notice.timer == ShutterTimer.OFF) {
+                                getString(R.string.remote_timer_off_notice, notice.name)
+                            } else {
+                                getString(R.string.remote_timer_notice, notice.name, notice.timer.seconds)
+                            }
+
+                            is SessionNotice.RemoteShutter -> getString(R.string.remote_shutter_notice, notice.name)
+
+                            is SessionNotice.RemoteShutterPress ->
+                                getString(R.string.remote_shutter_pressed_notice, notice.name)
+
+                            is SessionNotice.RemoteTimerCancel ->
+                                getString(R.string.remote_timer_cancel_notice, notice.name)
+
+                            is SessionNotice.RemotePoseStart ->
+                                getString(R.string.remote_pose_start_notice, notice.name)
 
                             is SessionNotice.Watching -> getString(R.string.peer_watching_notice, notice.name)
                         }
@@ -726,6 +774,8 @@ class CameraFragment :
     override fun onDestroyView() {
         dismissEndSession()
         dismissUndo()
+        // The question for the subject's poses goes with the screen, which answers it as "Not now".
+        askedForSubject?.dismiss()
         photoViewer?.stop()
         photoViewer = null
         photoEditsShown = null
@@ -1668,10 +1718,11 @@ class CameraFragment :
      * and opens that screen. Back closes it, and so does a touch anywhere else (setupTip).
      */
     private fun setupMenu(controls: FragmentCameraBinding) {
-        val toggle = View.OnClickListener { viewModel.setMenuOpen(!viewModel.uiState.value.menuOpen) }
-        controls.cameraMenuButton.setOnClickListener(toggle)
-        controls.flashIndicator.setOnClickListener(toggle)
-        controls.timerIndicator.setOnClickListener(toggle)
+        controls.cameraMenuButton.setOnClickListener { viewModel.setMenuOpen(!viewModel.uiState.value.menuOpen) }
+        // The flash's and the timer's icons beside the button are 16 dp, too small to take a tap of their own
+        // (NFR-16): the button's area reaches over them, so a tap on either is a tap on the button (#318). Set at each
+        // layout of their row, which an icon coming or going asks for.
+        controls.cameraSettings.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> reachOverIndicators(controls) }
         // During the scene photo, the phone's light, which a frame of the preview takes, where a photo's flash would not
         // reach it (FR-4.1).
         controls.menuFlash.setOnClickListener {
@@ -1686,6 +1737,22 @@ class CameraFragment :
         }
         menuBack = requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, enabled = false) {
             viewModel.setMenuOpen(false)
+        }
+    }
+
+    /**
+     * Lets the menu's button take the taps on the icons beside it: from the button to the last icon that shows, over
+     * the row's height, and no further, so the ratio after them keeps its own. Nothing to reach over while neither
+     * shows.
+     */
+    private fun reachOverIndicators(controls: FragmentCameraBinding) {
+        val row = controls.cameraSettings
+        val button = controls.cameraMenuButton
+        val last = listOf(controls.timerIndicator, controls.flashIndicator).firstOrNull { it.isVisible }
+        row.touchDelegate = if (last == null || !button.isVisible) {
+            null
+        } else {
+            TouchDelegate(Rect(button.left, 0, last.right, row.height), button)
         }
     }
 
@@ -2230,6 +2297,97 @@ class CameraFragment :
     /** Notices sit above the zoom row, clear of the shutter and the controls under the image (#298). */
     override val noticeAnchor: View?
         get() = binding?.let { if (it.zoomRow.isShown) it.zoomRow else it.bottomPanel }
+
+    /**
+     * Whether the camera itself is what the photographer looks at. Under a sheet, such as Add a pose guide, this screen
+     * stays started with its camera running, and so it does under its own photos and under a dialog of its own, the
+     * AI notice for the subject's poses, "End the session?", or the tutorial's tips: none of them is "in front", and
+     * what the subject asks of the camera is refused then (#314, #276). A new dialog of this screen belongs here too.
+     */
+    private fun cameraInFront(): Boolean {
+        // Without a navigation controller, as in a screen test, nothing can cover it.
+        val destination = runCatching { findNavController().currentDestination?.id }.getOrNull()
+        val covered = askedForSubject != null || endSessionDialog?.isShowing == true ||
+            TutorialFragment.over(this) != null
+        return (destination == null || destination == R.id.cameraFragment) && !viewModel.uiState.value.photosOpen &&
+            !covered
+    }
+
+    /**
+     * The subject's shutter (FR-7.8, #314): this screen's own shutter, pressed for them, with this phone's timer when
+     * it is on (FR-1.17), or, with [cancel], the stop of its countdown. Refused when the camera is not in front
+     * ([cameraInFront]), or when it is not ready or still takes the photo before. A pose's scene photo, framed or
+     * held, is the photographer's own step and never taken from the other phone; its countdown is the timer's like any
+     * other, so the subject's shutter stops it too.
+     */
+    private fun takeForSubject(controls: FragmentCameraBinding, cancel: Boolean): ShutterOutcome {
+        if (!cameraInFront()) return ShutterOutcome.REFUSED
+        if (isScenePhotoActive()) {
+            return if (cancel) viewModel.onSubjectShutter(cancel = true) else ShutterOutcome.REFUSED
+        }
+        val outcome = viewModel.onSubjectShutter(cancel)
+        if (outcome == ShutterOutcome.TAKEN) blinkPreview(controls.previewScrim)
+        return outcome
+    }
+
+    /**
+     * The subject picked a situation for AI poses (FR-6.15, #276): the scene photo's step begins here, as if this
+     * phone's user had picked the tile, and [answer] hears whether it began. Only from the camera itself
+     * ([cameraInFront]): a request that comes over a step, a sheet, the photos, or the question below is refused, and
+     * so is a selfie on a phone without a front camera, and one that comes while the timer counts down, when this
+     * phone's own Guide waits too (FR-1.17). This phone sends the photo, so without its user's agreement (FR-4.2) the
+     * notice asks first, saying who wants the poses; the step begins once they agree, and "Not now" refuses.
+     */
+    private fun startPosesForSubject(situation: Situation, answer: (PoseStartStep) -> Unit) {
+        val counting = viewModel.uiState.value.countdown != null
+        val free = cameraInFront() && !isScenePhotoActive() && !counting
+        if (!free || !generationViewModel.chooseSituation(situation)) return answer(PoseStartStep.REFUSED)
+        if (!generationViewModel.needsConsent) {
+            generationViewModel.beginScene()
+            return answer(PoseStartStep.STARTED)
+        }
+        // The subject's phone hears that the question is up, and waits for its answer however long it takes.
+        answer(PoseStartStep.ASKING)
+        val name = (sessionViewModel.state.value as? SessionState.Connected)?.peer?.displayName
+        val words = listOfNotNull(
+            name?.let { getString(R.string.pose_start_asked, it) },
+            getString(R.string.consent_message),
+        ).joinToString("\n\n")
+        var agreed = false
+        askedInSession = sessionId(sessionViewModel.state.value)
+        askedForSubject = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.consent_title)
+            .setMessage(words)
+            .setPositiveButton(R.string.consent_agree) { _, _ ->
+                agreed = true
+                generationViewModel.onConsentGiven()
+                generationViewModel.beginScene()
+                answer(PoseStartStep.STARTED)
+            }
+            .setNegativeButton(R.string.not_now, null)
+            .setOnDismissListener {
+                askedForSubject = null
+                if (!agreed) answer(PoseStartStep.REFUSED)
+            }
+            .show()
+    }
+
+    /** The id of the session [state] is, running or reconnecting; null outside one. */
+    private fun sessionId(state: SessionState): String? = when (state) {
+        is SessionState.Connected -> state.sessionId
+        is SessionState.Reconnecting -> state.sessionId
+        else -> null
+    }
+
+    /**
+     * Takes the question for the subject's poses down unanswered, which refuses the request: its session is over, so
+     * agreeing would begin the step for no one, or in another subject's session.
+     */
+    private fun dismissAskedForSubject() {
+        askedForSubject?.dismiss()
+        askedForSubject = null
+        askedInSession = null
+    }
 
     /** Over the guide-edit mode toggle for [CameraViewModel.NOTICE_MS]: what a pinch moves now (Design 2.8). */
     private fun showPinchMode(controls: FragmentCameraBinding, guide: Boolean) {

@@ -1,7 +1,8 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.FlashMode
+import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.guide.GuideState
 import com.lastpenguin.pix.session.PhotographerAction
 import com.lastpenguin.pix.session.Role
@@ -20,7 +21,13 @@ import org.junit.Test
  * a round trip keeps every field; `final` left out means a step; `guide.state` from a phone without `by` means the
  * photographer, and the echo of a `guide.move` carries `by: SUBJECT`; `camera.zoom.hold` naming a holder, null, or no
  * holder at all, the last two meaning a free zoom, and a `camera.zoom.set` with `cancel`, which is false when left out (#236).
+ * The subject's shutter (#314): the press with its number, and its answer, taken or not, naming that number; a press
+ * that cancels the photographer's timer, the answer of a press the timer took, and both fields left out.
+ * The subject's start of AI poses (#276): the situation's name, and the answer, begun or not.
  * The photographer's countdown (`camera.timer`, FR-1.17): the Design's example decodes, and a round trip keeps it.
+ * The timer set from the subject's phone (#318): `camera.timer.set`, the timer in `camera.state` (none from a phone of
+ * before it, which is off), and the photographer's own change as a `camera.did` of each value; seconds this Pix does
+ * not offer are no action.
  */
 class RemoteControlMessagesTest {
     private val codec = MessageCodec(clock = { 1_759_212_345_678L })
@@ -115,12 +122,14 @@ class RemoteControlMessagesTest {
             PhotographerAction.Zoom(2f),
             PhotographerAction.Brightness(-3),
             PhotographerAction.Flash(FlashMode.AUTO),
+            PhotographerAction.Timer(ShutterTimer.TEN),
+            PhotographerAction.Timer(ShutterTimer.OFF),
             PhotographerAction.GuideMove,
             PhotographerAction.Guide,
         )
 
         assertEquals(
-            listOf("zoom", "brightness", "flash", "guide.move", "guide"),
+            listOf("zoom", "brightness", "flash", "timer", "timer", "guide.move", "guide"),
             actions.map { it.toMessage().action },
         )
         for (action in actions) {
@@ -139,11 +148,72 @@ class RemoteControlMessagesTest {
     @Test
     fun anActionThisPhoneDoesNotKnow_isNoAction_andStillDecodes() {
         val newer = """{ "v": 3, "t": "camera.did", "seq": 8, "ts": 1759212355000,
-            "b": { "action": "timer", "seconds": 3 } }"""
+            "b": { "action": "lens", "lens": "tele" } }"""
 
         val received = decode(newer) as SessionMessage.PhotographerDid
 
         assertNull(received.toAction())
+        // A timer of seconds this Pix does not offer, as a later one may: no line either.
+        assertNull(SessionMessage.PhotographerDid("timer", seconds = 5).toAction())
+    }
+
+    @Test
+    fun theTimer_setFromTheSubjectsPhone_designExamples_decode() {
+        val set = """{ "v": 3, "t": "camera.timer.set", "seq": 13, "ts": 1759212355000, "b": { "seconds": 3 } }"""
+        val state = """{ "v": 3, "t": "camera.state", "seq": 21, "ts": 1759212355100,
+            "b": { "zoom": 1.0, "by": "SUBJECT", "final": true, "timer": 3 } }"""
+        val did = """{ "v": 3, "t": "camera.did", "seq": 22, "ts": 1759212356000,
+            "b": { "action": "timer", "seconds": 10 } }"""
+
+        assertEquals(SessionMessage.TimerSet(3), decode(set))
+        assertEquals(SessionMessage.CameraStateUpdate(1f, Role.SUBJECT, final = true, timer = 3), decode(state))
+        assertEquals(
+            PhotographerAction.Timer(ShutterTimer.TEN),
+            (decode(did) as SessionMessage.PhotographerDid).toAction(),
+        )
+        // A photographer's phone of before the timer's state says none, which is off.
+        val before = """{ "v": 3, "t": "camera.state", "seq": 2, "ts": 1759212355100,
+            "b": { "zoom": 1.0, "by": "PHOTOGRAPHER", "final": true } }"""
+        assertEquals(0, (decode(before) as SessionMessage.CameraStateUpdate).timer)
+    }
+
+    @Test
+    fun theSubjectsShutter_andItsAnswer_designExamples_decode() {
+        val press = """{ "v": 3, "t": "camera.shutter", "seq": 9, "ts": 1759212355000, "b": { "press": 7 } }"""
+        val taken = """{ "v": 3, "t": "camera.shutter.answer", "seq": 4, "ts": 1759212355100,
+            "b": { "taken": true, "press": 7 } }"""
+        val refused = """{ "v": 3, "t": "camera.shutter.answer", "seq": 5, "ts": 1759212355100,
+            "b": { "taken": false, "press": 8 } }"""
+
+        assertEquals(SessionMessage.ShutterPress(press = 7), decode(press))
+        assertEquals(SessionMessage.ShutterAnswer(taken = true, press = 7), decode(taken))
+        assertEquals(SessionMessage.ShutterAnswer(taken = false, press = 8), decode(refused))
+    }
+
+    @Test
+    fun theSubjectsShutter_withThePhotographersTimer_designExamples_decode() {
+        val cancel = """{ "v": 3, "t": "camera.shutter", "seq": 11, "ts": 1759212357000,
+            "b": { "press": 9, "cancel": true } }"""
+        val timer = """{ "v": 3, "t": "camera.shutter.answer", "seq": 6, "ts": 1759212357100,
+            "b": { "taken": false, "press": 9, "timer": true } }"""
+
+        assertEquals(SessionMessage.ShutterPress(press = 9, cancel = true), decode(cancel))
+        assertEquals(SessionMessage.ShutterAnswer(taken = false, press = 9, timer = true), decode(timer))
+        // A phone of before the timer sends neither field: a press for a photo, and an answer about one.
+        val before = """{ "v": 3, "t": "camera.shutter.answer", "seq": 2, "ts": 1759212355100,
+            "b": { "taken": false, "press": 1 } }"""
+        assertEquals(SessionMessage.ShutterAnswer(taken = false, press = 1, timer = false), decode(before))
+    }
+
+    @Test
+    fun theSubjectsStartOfPoses_andItsAnswer_designExamples_decode() {
+        val start = """{ "v": 3, "t": "pose.start", "seq": 12, "ts": 1759212355000,
+            "b": { "situation": "full_body" } }"""
+        val answer = """{ "v": 3, "t": "pose.start.answer", "seq": 6, "ts": 1759212355100,
+            "b": { "started": true } }"""
+
+        assertEquals(SessionMessage.PoseStart("full_body"), decode(start))
+        assertEquals(SessionMessage.PoseStartAnswer(started = true), decode(answer))
     }
 
     @Test
@@ -155,7 +225,16 @@ class RemoteControlMessagesTest {
             SessionMessage.FocusSet(0.62f, 0.4f),
             SessionMessage.Focused(0.38f, 0.4f),
             SessionMessage.Countdown(3),
+            SessionMessage.TimerSet(10),
             SessionMessage.ControlPermission(true),
+            SessionMessage.ShutterPress(press = 7),
+            SessionMessage.ShutterAnswer(taken = true, press = 7),
+            SessionMessage.ShutterAnswer(taken = false, press = 8),
+            SessionMessage.ShutterPress(press = 9, cancel = true),
+            SessionMessage.ShutterAnswer(taken = false, press = 9, timer = true),
+            SessionMessage.PoseStart("selfie"),
+            SessionMessage.PoseStartAnswer(started = true),
+            SessionMessage.PoseStartAnswer(started = false),
         )
 
         for (message in messages) assertEquals(message, decode(codec.encode(message)))

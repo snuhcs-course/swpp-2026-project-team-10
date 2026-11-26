@@ -64,7 +64,8 @@
             <!-- The flash while it is on or auto, and the timer while it is on (FR-1.12, FR-1.17): what the shutter will
                  do, with the menu closed. The size and line of the bar's other icons, on their line: a bottom margin
                  of half the bar's overhang centers them where the buttons center their icons. A tap on one opens the
-                 menu. -->
+                 menu: too small for a tap of their own, they are in the reach of the menu's button
+                 (CameraFragment.reachOverIndicators). -->
             <ImageView
                 android:id="@+id/flashIndicator"
                 android:layout_width="16dp"
@@ -551,8 +552,9 @@
             tools:visibility="visible" />
 
         <!-- The timer's countdown (FR-1.17): the seconds left, large in the middle of the image, so the people in the photo
-             can read it, and how to stop it. The number turns with the phone (FR-1.15) in a square, so it fits either
-             way. It passes touches through. -->
+             can read it. That the shutter stops it is the shutter's name meanwhile and the tutorial's tip, not a line
+             here. The number turns with the phone (FR-1.15) in a square, so it fits either way. It passes touches
+             through. -->
         <LinearLayout
             android:id="@+id/countdownPanel"
             android:layout_width="wrap_content"
@@ -574,12 +576,6 @@
                 android:textSize="120dp"
                 tools:ignore="SpUsage"
                 tools:text="3" />
-
-            <TextView
-                android:id="@+id/countdownHint"
-                style="@style/Widget.Pix.Chip.Small"
-                android:text="@string/countdown_cancel_hint"
-                android:textSize="13sp" />
         </LinearLayout>
 
         <LinearLayout

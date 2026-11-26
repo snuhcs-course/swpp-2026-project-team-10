@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.ui.session
 
 import android.graphics.Bitmap
@@ -13,6 +13,7 @@ import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.PhoneTurns
 import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.camera.PhotoDeletion
+import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.camera.frameAspect
 import com.lastpenguin.pix.camera.isAtZoomStep
 import com.lastpenguin.pix.camera.nextZoomStep
@@ -144,6 +145,11 @@ data class SubjectUiState(
      * back small.
      */
     val referenceHidden: Boolean = false,
+    /**
+     * A press of this phone's shutter waits for the photographer's phone to say whether it took the photo (FR-7.8,
+     * #314): the shutter takes no other press meanwhile.
+     */
+    val shutterWaiting: Boolean = false,
     /** Whether the guide on the video is a favorite in this phone's library (FR-6.16, #297): *Save guide* is filled. */
     val guideSaved: Boolean = false,
     val savingGuide: Boolean = false,
@@ -174,6 +180,8 @@ data class SubjectUiState(
     val menuOpen: Boolean = false,
     /** The seconds the photographer's timer has left before its photo (FR-1.17), from `camera.timer`; null otherwise. */
     val countdown: Int? = null,
+    /** The photographer's timer as chosen, on either phone (FR-1.17, #318). */
+    val timer: ShutterTimer = ShutterTimer.OFF,
 ) {
     /** The thumbnail's photo, none until the session's first. */
     val lastPhoto: Uri?
@@ -283,6 +291,14 @@ class SubjectViewModel(
         .map { it == Role.PHOTOGRAPHER }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    private val _shutterRefusals = Channel<Unit>(Channel.CONFLATED)
+
+    /**
+     * A press of this phone's shutter that took no photo (FR-7.8, #314): the photographer's phone said so, or said
+     * nothing in time. Subject view says it in a line; one that no screen read is not said later.
+     */
+    val shutterRefusals: Flow<Unit> = _shutterRefusals.receiveAsFlow()
+
     private val _toggleLabels = Channel<ToggleLabel>(Channel.CONFLATED)
 
     /** One label per zoom step, as on the Camera screen (Design 2.8); the newest replaces one not yet shown. */
@@ -329,6 +345,18 @@ class SubjectViewModel(
     // Runs while a tap to focus waits for its answer (SubjectUiState.baseAwaited).
     private var baseWait: Job? = null
 
+    // Runs while a press of the shutter waits for its answer (SubjectUiState.shutterWaiting).
+    private var shutterWait: Job? = null
+
+    // How many times this phone's shutter asked for a photo: the number of the press that waits, if one does.
+    private var shutterPresses = 0
+
+    // True when the press that waits asked to stop the photographer's countdown, not for a photo (FR-1.17).
+    private var shutterCancels = false
+
+    // Runs while a change of the timer waits for the photographer's phone to answer it ([TIMER_WAIT_MS]).
+    private var timerWait: Job? = null
+
     // Takes down a number whose next second never came (showCountdown).
     private var countdownExpiry: Job? = null
 
@@ -354,6 +382,8 @@ class SubjectViewModel(
         session.peerCamera.value?.let { camera ->
             _uiState.update { it.copy(zoom = camera.zoom, exposure = camera.exposure, flash = camera.flash) }
         }
+        // And their timer, which the first state of a session carries before this screen is there to hear it (#318).
+        _uiState.update { it.copy(timer = photographersTimer()) }
         viewModelScope.launch {
             // Kept by the session, so a state sent before this screen existed, or before `incoming` was collected,
             // is here too. Outside a gesture it is also the value to show.
@@ -428,6 +458,18 @@ class SubjectViewModel(
                     message.toAction()?.let { _photographerLines.tryEmit(PhotographerLine.Did(it)) }
                     return@collect
                 }
+                if (message is SessionMessage.ShutterAnswer) {
+                    // Only the press that still waits is answered: one given up already has said so, and its answer,
+                    // come late, is not the next press's.
+                    // A refusal is said for a press that asked for a photo and got neither it nor the timer.
+                    val cancel = shutterCancels
+                    if (message.press == shutterPresses && endShutterWait() &&
+                        !message.taken && !message.timer && !cancel
+                    ) {
+                        _shutterRefusals.trySend(Unit)
+                    }
+                    return@collect
+                }
                 if (message is SessionMessage.Countdown) {
                     showCountdown(message.left)
                     return@collect
@@ -442,8 +484,12 @@ class SubjectViewModel(
                         zoom = shownZoom(message.zoom, message.by, shown = it.zoom),
                         exposure = if (exposureSender.adjusting) it.exposure else message.exposure,
                         flash = message.flash,
+                        timer = photographersTimer(),
                     )
                 }
+                // Whatever the photographer's phone says of its state answers a change of the timer asked here.
+                timerWait?.cancel()
+                timerWait = null
                 if (message.by == Role.SUBJECT && message.final) {
                     Timings.mark("zoom.echo", "${message.zoom} exposure=${message.exposure} flash=${message.flash}")
                 }
@@ -836,6 +882,43 @@ class SubjectViewModel(
         _uiState.update { it.copy(baseAwaited = false) }
     }
 
+    /**
+     * This phone's shutter (FR-7.8, #314): asks the photographer's phone for a photo, at once, and holds the shutter
+     * until its answer or [SHUTTER_WAIT_MS]. While the photographer's countdown shows, the press asks to stop it
+     * instead (FR-1.17), as a tap on Camera's shutter does. False when nothing was asked: not connected, or a press
+     * still waits.
+     */
+    fun onShutter(): Boolean {
+        val ui = _uiState.value
+        if (!ui.connected || ui.shutterWaiting) return false
+        // What the press means goes with it: it may arrive after the countdown ended, and must not take a photo then.
+        val cancel = ui.countdown != null
+        // Numbered, so only its own answer ends its wait: one that comes after the wait is for no later press.
+        val press = ++shutterPresses
+        shutterCancels = cancel
+        session.send(SessionMessage.ShutterPress(press, cancel))
+        Timings.mark("shutter.sent", if (cancel) "cancel" else null)
+        _uiState.update { it.copy(shutterWaiting = true) }
+        shutterWait = viewModelScope.launch {
+            delay(SHUTTER_WAIT_MS)
+            // No word of it in time: as far as this phone knows, no photo was taken. A cancel says nothing: the
+            // countdown shows, or goes, by the photographer's own seconds.
+            shutterWait = null
+            _uiState.update { it.copy(shutterWaiting = false) }
+            if (!cancel) _shutterRefusals.trySend(Unit)
+        }
+        return true
+    }
+
+    /** The press's answer came, or nothing waits for it any longer; true when a press was waiting. */
+    private fun endShutterWait(): Boolean {
+        val waiting = shutterWait ?: return false
+        waiting.cancel()
+        shutterWait = null
+        _uiState.update { it.copy(shutterWaiting = false) }
+        return true
+    }
+
     fun setBrightnessOpen(open: Boolean) {
         _uiState.update { it.copy(brightnessOpen = open && it.hasBrightness) }
     }
@@ -879,8 +962,40 @@ class SubjectViewModel(
         Timings.mark("flash.sent", "$next")
     }
 
+    /**
+     * The menu's Timer cycles the photographer's timer off, 3 s, 10 s, like their own (FR-1.17, #318); the echo
+     * confirms or reverts it, and no echo within [TIMER_WAIT_MS] reverts it too. Not while the timer counts down, as
+     * on their phone.
+     */
+    fun onTimerTap() {
+        val ui = _uiState.value
+        if (!ui.connected || ui.countdown != null) return
+        val next = ui.timer.next()
+        _uiState.update { it.copy(timer = next) }
+        session.send(SessionMessage.TimerSet(next.seconds))
+        Timings.mark("timer.sent", "${next.seconds}")
+        // A phone that does not know the request says nothing: the item then goes back to what it said last, or it
+        // would show a timer that a press of the shutter does not get.
+        timerWait?.cancel()
+        timerWait = viewModelScope.launch {
+            delay(TIMER_WAIT_MS)
+            timerWait = null
+            _uiState.update { it.copy(timer = photographersTimer()) }
+        }
+    }
+
+    /**
+     * The photographer's timer as their phone said it last, which the session keeps. Seconds this Pix does not offer,
+     * from a later one, show as off, which this menu can name.
+     */
+    private fun photographersTimer(): ShutterTimer =
+        ShutterTimer.ofSeconds(session.peerTimerSeconds.value) ?: ShutterTimer.OFF
+
     private fun endInteractions() {
         endBaseWait()
+        endShutterWait()
+        timerWait?.cancel()
+        timerWait = null
         pendingZoomStep = null
         zoomHeldBack = false
         zoomSender.cancel()
@@ -890,6 +1005,15 @@ class SubjectViewModel(
 
     companion object {
         private const val SEND_INTERVAL_MS = 50L
+
+        /**
+         * How long a press of the shutter waits for its answer. The photographer's phone answers at once, so this is
+         * the link's time alone; after it the press counts as not taken.
+         */
+        const val SHUTTER_WAIT_MS = 2_000L
+
+        /** How long a change of the timer waits for the photographer's phone to answer it (#318). */
+        const val TIMER_WAIT_MS = 2_000L
 
         /**
          * How long one second of the photographer's countdown stays without the next (FR-1.17): the second itself

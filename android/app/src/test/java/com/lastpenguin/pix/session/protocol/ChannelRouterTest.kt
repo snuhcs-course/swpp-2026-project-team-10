@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park, Sungmin Jo, and Dongje Park
 package com.lastpenguin.pix.session.protocol
 
 import com.lastpenguin.pix.camera.FlashMode
@@ -66,10 +66,24 @@ class ChannelRouterTest {
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.FlashSet(FlashMode.AUTO)))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.FocusSet(0.6f, 0.4f)))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.Focused(0.4f, 0.4f)))
+        // A press is a moment that is wrong late: one kept behind a full buffer or a drop would take a photo the
+        // subject no longer waits for, so it goes at once or not at all (#314). Its answer must arrive.
+        assertEquals(Channel.REALTIME, router.channelFor(SessionMessage.ShutterPress(press = 1)))
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ShutterAnswer(taken = true, press = 1)))
+        // Each press counts: a later one does not replace it.
+        assertFalse(router.latestOnly(SessionMessage.ShutterPress(press = 1)))
+        // A start of AI poses is a moment too (#276): kept back, it would open the scene photo's step once the subject
+        // was told that nothing started.
+        assertEquals(Channel.REALTIME, router.channelFor(SessionMessage.PoseStart("full_body")))
+        assertFalse(router.latestOnly(SessionMessage.PoseStart("full_body")))
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PoseStartAnswer(started = true)))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.PhotographerDid("zoom", zoom = 2f)))
         assertFalse(router.latestOnly(SessionMessage.PhotographerDid("zoom", zoom = 2f)))
         // The countdown's seconds in order, its end among them (FR-1.17).
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.Countdown(3)))
+        // The timer's choice is a final value, as the flash's (#318).
+        assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.TimerSet(3)))
+        assertFalse(router.latestOnly(SessionMessage.TimerSet(3)))
         assertFalse(router.latestOnly(SessionMessage.Countdown(3)))
         assertEquals(Channel.RELIABLE, router.channelFor(SessionMessage.ControlPermission(false)))
         assertTrue(router.latestOnly(SessionMessage.GuideMove("g", 0.4f, 0.5f, 0.8f)))

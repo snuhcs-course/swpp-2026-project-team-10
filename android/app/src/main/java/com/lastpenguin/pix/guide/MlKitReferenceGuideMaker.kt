@@ -1,4 +1,4 @@
-// AI-generated with Claude Code, 2026-11-20, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
+// AI-generated with Claude Code, 2026-11-25, reviewed by Jaewan Park, Joonhyung Han, and Sungmin Jo
 package com.lastpenguin.pix.guide
 
 import android.content.Context
@@ -87,15 +87,19 @@ class MlKitReferenceGuideMaker(
      * the screenshot, small, and where the photo was in it.
      */
     private suspend fun fromPicked(image: Bitmap, wholeImage: Boolean): ReferenceGuide {
-        if (wholeImage) return build(image, GuideSource.GALLERY)
+        if (wholeImage) return whole(image)
         Timings.mark("cut.start")
         val photo = image.screenshotPhoto()
         Timings.mark("cut.end", photo?.let { "${it.width}x${it.height}" } ?: "whole")
-        if (photo == null) return build(image, GuideSource.GALLERY)
+        if (photo == null) return whole(image)
         val cut = Bitmap.createBitmap(image, photo.left, photo.top, photo.width, photo.height)
         val crop = PhotoCrop(shrink(image, CROP_ORIGINAL_LONG_SIDE), photo.relativeTo(image.width, image.height))
         return build(cut, GuideSource.GALLERY).copy(crop = crop)
     }
+
+    /** A picked photo used whole: the guide keeps it, as small as a screenshot's crop, for Reference confirm (#295). */
+    private suspend fun whole(image: Bitmap): ReferenceGuide =
+        build(image, GuideSource.GALLERY).copy(photo = shrink(image, CROP_ORIGINAL_LONG_SIDE))
 
     private fun Bitmap.screenshotPhoto(): PixelRect? {
         val pixels = IntArray(width * height)

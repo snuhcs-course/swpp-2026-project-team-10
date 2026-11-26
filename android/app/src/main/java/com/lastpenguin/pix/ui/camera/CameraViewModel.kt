@@ -21,6 +21,8 @@ import com.lastpenguin.pix.camera.PhoneTurns
 import com.lastpenguin.pix.camera.PhotoAccess
 import com.lastpenguin.pix.camera.PhotoDeleter
 import com.lastpenguin.pix.camera.PhotoDeletion
+import com.lastpenguin.pix.camera.ShutterTimer
+import com.lastpenguin.pix.camera.ShutterTimerChoice
 import com.lastpenguin.pix.camera.baseExposureIndex
 import com.lastpenguin.pix.camera.isAtZoomStep
 import com.lastpenguin.pix.camera.nextZoomStep
@@ -35,6 +37,7 @@ import com.lastpenguin.pix.guide.SavedGuideStore
 import com.lastpenguin.pix.session.PhotoShare
 import com.lastpenguin.pix.session.PhotographerAction
 import com.lastpenguin.pix.session.Role
+import com.lastpenguin.pix.session.ShutterOutcome
 import com.lastpenguin.pix.session.ZoomHold
 import com.lastpenguin.pix.telemetry.Telemetry
 import com.lastpenguin.pix.telemetry.TelemetryEvent
@@ -81,17 +84,6 @@ sealed interface ToggleLabel {
 
     /** The other phone's pinch holds the zoom, so this phone's changed nothing (FR-7.6, #236): "Jaewan is zooming". */
     data object ZoomHeld : ToggleLabel
-}
-
-/** The shutter's timer (FR-1.17): off, or the seconds from the shutter to the photo. */
-enum class ShutterTimer(val seconds: Int) {
-    OFF(0),
-    THREE(3),
-    TEN(10),
-    ;
-
-    /** The choice after this one at a tap on the menu's Timer: off, 3 s, 10 s, and off again. */
-    fun next(): ShutterTimer = entries[(ordinal + 1) % entries.size]
 }
 
 /** What a choice in the camera menu changed (FR-1.17), which the screen says in a short notice. */
@@ -328,6 +320,8 @@ class CameraViewModel(
     private val phoneTurns: PhoneTurns = PhoneTurns.Fixed(),
     /** Who holds the zoom in a session (`RemoteControlHandler.zoomHold`, FR-7.6); free outside one. */
     private val zoomHold: ZoomHold = ZoomHold(),
+    /** The timer as chosen, here or on the subject's phone (`RemoteControlHandler.timerChoice`, FR-1.17, #318). */
+    private val timerChoice: ShutterTimerChoice = ShutterTimerChoice(),
     /** Tells the subject's phone where a tap focused (`RemoteControlHandler.focusedHere`, FR-7.7). */
     private val onFocused: (x: Float, y: Float) -> Unit = { _, _ -> },
     /** Tells the subject's phone what was done on this camera (`RemoteControlHandler.didHere`, FR-7.4, #292). */
@@ -416,6 +410,8 @@ class CameraViewModel(
     init {
         // The last ratio chosen comes back when the screen opens (Design 2.8); before the camera binds, if it can.
         viewModelScope.launch { settings.aspectRatio()?.let(camera::setAspectRatio) }
+        // The timer as chosen, also from the subject's phone while this screen was away (#318).
+        viewModelScope.launch { timerChoice.timer.collect { timer -> _uiState.update { it.copy(timer = timer) } } }
         viewModelScope.launch {
             camera.status.collect { status -> _uiState.update { it.copy(cameraStatus = status) } }
         }
@@ -740,14 +736,17 @@ class CameraViewModel(
     }
 
     /**
-     * The menu's Timer (FR-1.17): each tap the next of off, 3 s, and 10 s, which the screen says in a notice. Not while
-     * the timer counts down.
+     * The menu's Timer (FR-1.17): each tap the next of off, 3 s, and 10 s, which the screen says in a notice and the
+     * subject's phone in a line. Not while the timer counts down.
      */
     fun onTimerTap() {
         if (_uiState.value.countdown != null) return
         val next = _uiState.value.timer.next()
+        // The one choice both phones' menus set (#318): here at once, so the next tap goes on from it.
         _uiState.update { it.copy(timer = next) }
+        timerChoice.set(next)
         _menuNotices.trySend(MenuNotice.Timer(next))
+        onDid(PhotographerAction.Timer(next))
     }
 
     /**
@@ -798,6 +797,27 @@ class CameraViewModel(
         if (state.shutterBusy || camera.status.value != CameraStatus.READY) return false
         startCountdown(state.timer.seconds)
         return false
+    }
+
+    /**
+     * The subject's shutter (FR-7.8, #314), which this phone's timer serves as it does its own (FR-1.17): with the
+     * timer off the photo now, with it on the countdown, whose end takes the photo. The subject's phone says what its
+     * press meant, since it may come late. A press to [cancel], made while that phone showed the countdown, stops it
+     * and never takes a photo or starts a countdown: with none left, nothing happens. A press for a photo that meets a
+     * countdown leaves it to its own photo.
+     */
+    fun onSubjectShutter(cancel: Boolean): ShutterOutcome {
+        val state = _uiState.value
+        if (state.countdown != null) {
+            if (!cancel) return ShutterOutcome.TIMER_KEPT
+            cancelCountdown()
+            return ShutterOutcome.TIMER_STOPPED
+        }
+        if (cancel) return ShutterOutcome.TIMER_KEPT
+        if (state.timer == ShutterTimer.OFF) return if (shoot()) ShutterOutcome.TAKEN else ShutterOutcome.REFUSED
+        if (state.shutterBusy || camera.status.value != CameraStatus.READY) return ShutterOutcome.REFUSED
+        startCountdown(state.timer.seconds)
+        return ShutterOutcome.TIMER_STARTED
     }
 
     /**

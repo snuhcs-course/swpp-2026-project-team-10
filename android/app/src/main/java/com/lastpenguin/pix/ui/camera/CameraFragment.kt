@@ -620,11 +620,6 @@ class CameraFragment :
                                 (notice.opacity * 100f).roundToInt(),
                             )
 
-                            is SessionNotice.RemoteGuideRemove -> getString(
-                                R.string.remote_guide_remove_notice,
-                                notice.name,
-                            )
-
                             is SessionNotice.RemoteGuideRestore ->
                                 getString(R.string.remote_guide_restore_notice, notice.name)
 
@@ -668,19 +663,20 @@ class CameraFragment :
                             // The focus box says the same, so its line is short (FR-7.7).
                             is SessionNotice.RemoteFocus -> showNotice(controls, text, SessionViewModel.FOCUS_NOTICE_MS)
 
-                            // As this phone's own ✕, with Undo, which puts the guide back where it was (FR-7.2).
-                            is SessionNotice.RemoteGuideRemove -> {
-                                undoNotice = showNoticeOnScreen(
-                                    text,
-                                    NoticeLength.UNDO,
-                                    NoticeAction(R.string.undo) {
-                                        viewModel.onUndoRemoteRemove(notice.guide, notice.state)
-                                    },
-                                )
-                            }
-
                             else -> showNotice(controls, text)
                         }
+                    }
+                }
+                launch {
+                    // The subject's ✕, as this phone's own, with Undo, which puts the guide back where it was (FR-7.2);
+                    // none once a guide is on the camera again, as after a screen that was stopped meanwhile.
+                    sessionViewModel.guideRemovals.collect { removal ->
+                        if (viewModel.uiState.value.guide != null) return@collect
+                        undoNotice = showNoticeOnScreen(
+                            getString(R.string.remote_guide_remove_notice, removal.name),
+                            NoticeLength.UNDO,
+                            NoticeAction(R.string.undo) { viewModel.onUndoRemoteRemove(removal.guide, removal.state) },
+                        )
                     }
                 }
                 launch { sessionViewModel.remoteFocus.collect { showRemoteFocus(controls, it) } }

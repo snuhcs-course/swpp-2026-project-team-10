@@ -135,7 +135,8 @@ import org.robolectric.shadows.ShadowDialog
  * (#298). The guide's panel (FR-7.2): hidden without a guide; with one, above the line that names the camera, Hide and
  * ✕ asking the photographer's phone; a hidden guide (Show, the opacity off); a guide this phone offered, whose Hide,
  * opacity, ✕, and the guide-edit toggle wait until the photographer adopts it, ♥ not. Undo (FR-7.2): after the photographer's ✕ and after
- * this phone's, a notice with Undo, which asks for the guide back, and which goes once a guide is on the video again.
+ * this phone's, a notice with Undo, which asks for the guide back, and which goes once a guide is on the video again;
+ * one that came while this screen was stopped, offered once it is back.
  * 1:1 (R&S 6.6): the 4:3 around the frame
  * dimmed; 3:4 not.
  * What the photographer did (#292): each action a line with their name where the labels show, for a label's time and
@@ -1995,6 +1996,24 @@ class SubjectFragmentRenderTest {
         modules.mirror.setGuide(guide)
         idle()
         assertNull(shownNotice())
+    }
+
+    @Test
+    fun aGuideThePhotographerRemovedWhileThisScreenWasStopped_offersUndoOnceItIsBack() {
+        val modules = launch()
+        connect(modules)
+        modules.mirror.setGuide(guide(withReference = false))
+        idle()
+        scenario!!.moveToState(Lifecycle.State.CREATED)
+
+        modules.session.deliver(SessionMessage.PhotographerDid("guide.remove"))
+        modules.mirror.setGuide(null)
+        idle()
+        scenario!!.moveToState(Lifecycle.State.RESUMED)
+        idle()
+
+        assertEquals(string(R.string.remote_guide_remove_notice, "Dongje"), shownNotice())
+        assertEquals(string(R.string.undo), noticeAction()?.text.toString())
     }
 
     @Test

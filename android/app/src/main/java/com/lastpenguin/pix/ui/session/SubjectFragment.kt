@@ -381,8 +381,21 @@ class SubjectFragment :
                     binding.guideOverlay.followLook(settingsViewModel.guideLook, viewModel.uiState.map { it.guide })
                 }
                 launch {
-                    // This phone's ✕ (FR-7.2): the photographer's phone offers the same Undo.
-                    viewModel.guideRemoved.collect { offerUndo(getString(R.string.guide_removed_from_camera)) }
+                    // Either phone's ✕ (FR-7.2), as the photographer's phone says it too, with the same Undo; none once a
+                    // guide is on the video again, as after a screen that was stopped meanwhile.
+                    viewModel.guideRemoved.collect { removal ->
+                        val ui = viewModel.uiState.value
+                        if (ui.guide != null) return@collect
+                        offerUndo(
+                            when (removal) {
+                                GuideRemoval.THIS_PHONE -> getString(R.string.guide_removed_from_camera)
+
+                                GuideRemoval.PHOTOGRAPHER ->
+                                    ui.photographerName?.let { getString(R.string.remote_guide_remove_notice, it) }
+                                        ?: getString(R.string.guide_removed_from_camera)
+                            },
+                        )
+                    }
                 }
                 launch {
                     viewModel.photoNotDeleted.collect {
@@ -1847,8 +1860,8 @@ class SubjectFragment :
                     white,
                 )
 
-                // As on the photographer's phone, with Undo (FR-7.2).
-                PhotographerAction.GuideRemove -> offerUndo(getString(R.string.remote_guide_remove_notice, name))
+                // Said with its Undo through guideRemoved, which waits for this screen (FR-7.2).
+                PhotographerAction.GuideRemove -> Unit
 
                 PhotographerAction.GuideRestore -> showToggleLabel(
                     binding,

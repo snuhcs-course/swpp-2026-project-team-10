@@ -12,6 +12,7 @@ import android.widget.LinearLayout
 import androidx.core.view.ViewCompat
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.fragment.app.testing.launchFragmentInContainer
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -77,7 +78,8 @@ import org.robolectric.annotation.GraphicsMode
  * a session connected, with who watches the camera in the line above the shutter for as long as they watch (R&S 6.2),
  * gone while the link reconnects and once the room waits alone, and a peer leaving or dropping, whose notice stays
  * 10 s and goes once the peer is back (#238); the subject's guide panel (FR-7.2): hiding and the opacity named in a
- * notice, and ✕ with Undo, which puts the guide back where it was, and the subject's own Undo named;
+ * notice, and ✕ with Undo, which puts the guide back where it was, also after a Camera stopped meanwhile, and the
+ * subject's own Undo named;
  * and the scene photo step in a session, without End session until it ends, a reconnect included; a guide added from
  * Subject view, with the reference thumbnail its phone sent (#234); the camera switch on a phone with and without a
  * front camera, gone while the
@@ -438,6 +440,28 @@ class CameraFragmentRenderTest {
                 controls.noticeText.text.toString(),
             )
         }
+    }
+
+    @Test
+    fun theSubjectsRemoveWhileCameraWasStopped_offersUndoOnceCameraIsBack() {
+        val modules = launch()
+        val guide = guide()
+        modules.guides.setGuide(guide)
+        modules.session.setState(SessionState.Connected("s1", PeerInfo("Test Account 2"), Role.PHOTOGRAPHER))
+        idle()
+        scenario!!.moveToState(Lifecycle.State.CREATED)
+
+        // As under Settings: the session goes on and takes the subject's ✕.
+        modules.session.deliver(SessionMessage.GuideRemove("guide-1"))
+        idle()
+        assertNull(modules.guides.guide.value)
+        scenario!!.moveToState(Lifecycle.State.RESUMED)
+        idle()
+
+        assertEquals(string(R.string.remote_guide_remove_notice, "Test Account 2"), shownNotice())
+        checkNotNull(noticeAction()).performClick()
+        idle()
+        assertSame(guide, modules.guides.guide.value)
     }
 
     @Test

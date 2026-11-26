@@ -85,6 +85,9 @@ internal fun nextSubjectTip(previous: SubjectTip?, shared: SharedTip?): SubjectT
     else -> SubjectTip(shared.guideId, shared.tip)
 }
 
+/** Whose ✕ took the guide off both phones (FR-7.2): this phone's, or the photographer's. */
+enum class GuideRemoval { THIS_PHONE, PHOTOGRAPHER }
+
 /** Subject view (R&S 6.6, FR-3.9, FR-4.10, FR-6.6, FR-6.15, FR-6.16, FR-7.1–7.3). */
 data class SubjectUiState(
     /** For "Dongje's camera"; arrives in `hello`. */
@@ -383,10 +386,16 @@ class SubjectViewModel(
     // The guide this phone's ✕ asked to remove, until it goes: its going is this phone's removal.
     private var removing: String? = null
 
-    private val _guideRemoved = Channel<Unit>(Channel.BUFFERED)
+    // The photographer said its ✕ (`camera.did`), whose guide may still be on the video until `guide.clear` comes.
+    private var photographerRemoving = false
 
-    /** This phone's ✕ took the guide off both phones: "Guide removed", with *Undo* (FR-7.2). */
-    val guideRemoved: Flow<Unit> = _guideRemoved.receiveAsFlow()
+    private val _guideRemoved = Channel<GuideRemoval>(Channel.BUFFERED)
+
+    /**
+     * A ✕ took the guide off both phones, once it is gone from the video: "Guide removed" or "Dongje removed the guide",
+     * with *Undo* (FR-7.2). Kept until the screen reads it, so a screen stopped meanwhile still offers *Undo*.
+     */
+    val guideRemoved: Flow<GuideRemoval> = _guideRemoved.receiveAsFlow()
 
     private val opacitySender = StepSender<GuideState>(viewModelScope, SEND_INTERVAL_MS) { state, final ->
         val guideId = state.guideId ?: return@StepSender
@@ -489,7 +498,18 @@ class SubjectViewModel(
                     return@collect
                 }
                 if (message is SessionMessage.PhotographerDid) {
-                    message.toAction()?.let { _photographerLines.tryEmit(PhotographerLine.Did(it)) }
+                    when (val action = message.toAction()) {
+                        null -> Unit
+
+                        // Not a line: a notice with Undo once the guide is gone, kept until the screen reads it.
+                        PhotographerAction.GuideRemove -> if (_uiState.value.guide == null) {
+                            _guideRemoved.trySend(GuideRemoval.PHOTOGRAPHER)
+                        } else {
+                            photographerRemoving = true
+                        }
+
+                        else -> _photographerLines.tryEmit(PhotographerLine.Did(action))
+                    }
                     return@collect
                 }
                 if (message is SessionMessage.ShutterAnswer) {
@@ -545,8 +565,14 @@ class SubjectViewModel(
                 if (guide?.id != previous?.id) {
                     guideSender.cancel()
                     opacitySender.cancel()
-                    if (guide == null && previous != null && previous.id == removing) _guideRemoved.trySend(Unit)
+                    if (guide == null && previous != null) {
+                        when {
+                            previous.id == removing -> _guideRemoved.trySend(GuideRemoval.THIS_PHONE)
+                            photographerRemoving -> _guideRemoved.trySend(GuideRemoval.PHOTOGRAPHER)
+                        }
+                    }
                     removing = null
+                    photographerRemoving = false
                 }
                 if (guide != null) lastGuideId = guide.id
             }

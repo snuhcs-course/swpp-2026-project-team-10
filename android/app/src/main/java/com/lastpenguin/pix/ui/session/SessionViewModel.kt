@@ -56,6 +56,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
+/**
+ * The subject's ✕ took [guide] off the camera, at [state]: "Joonhyung removed the guide", with *Undo*, which puts it
+ * back there (FR-7.2, FR-7.4). Not a [SessionNotice]: it waits for the Camera screen ([SessionViewModel.guideRemovals]).
+ */
+data class SubjectRemovedGuide(val name: String, val guide: ReferenceGuide, val state: GuideState)
+
 /** Short notices for the photographer's camera screen. */
 sealed interface SessionNotice {
     /** The other phone left or dropped: "Joonhyung left" (FR-6.10, FR-6.11). */
@@ -87,12 +93,6 @@ sealed interface SessionNotice {
 
     /** The subject set the guide's opacity: "Joonhyung set the guide's opacity to 70%" (FR-7.2, FR-7.4). */
     data class RemoteGuideOpacity(val name: String, val opacity: Float) : SessionNotice
-
-    /**
-     * The subject removed the guide: "Joonhyung removed the guide", with *Undo*, which puts [guide] back at [state]
-     * (FR-7.2, FR-7.4).
-     */
-    data class RemoteGuideRemove(val name: String, val guide: ReferenceGuide, val state: GuideState) : SessionNotice
 
     /** The subject's *Undo* put the guide back: "Joonhyung put the guide back" (FR-7.2, FR-7.4). */
     data class RemoteGuideRestore(val name: String) : SessionNotice
@@ -175,6 +175,14 @@ class SessionViewModel(
 
     private val _notices = MutableSharedFlow<SessionNotice>(extraBufferCapacity = 16)
     val notices: SharedFlow<SessionNotice> = _notices.asSharedFlow()
+
+    private val _guideRemovals = Channel<SubjectRemovedGuide>(Channel.BUFFERED)
+
+    /**
+     * The subject's ✕, with what *Undo* puts back (FR-7.2): kept until the Camera screen reads it, so a Camera stopped
+     * meanwhile, as under Settings, still offers *Undo* once it is back.
+     */
+    val guideRemovals: Flow<SubjectRemovedGuide> = _guideRemovals.receiveAsFlow()
 
     /** Runs while a pinch that ended without its last value is still named ([ZOOMING_LINGER_MS]). */
     private var zoomingLinger: Job? = null
@@ -572,7 +580,7 @@ class SessionViewModel(
                                     _notices.tryEmit(SessionNotice.RemoteGuideOpacity(name, action.opacity))
 
                                 is RemoteAction.GuideRemove ->
-                                    _notices.tryEmit(SessionNotice.RemoteGuideRemove(name, action.guide, action.state))
+                                    _guideRemovals.trySend(SubjectRemovedGuide(name, action.guide, action.state))
 
                                 is RemoteAction.GuideRestore -> _notices.tryEmit(SessionNotice.RemoteGuideRestore(name))
 

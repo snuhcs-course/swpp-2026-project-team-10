@@ -38,6 +38,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -89,8 +91,9 @@ import org.junit.Test
  * 10–90 %; ✕ a request; none sent without a guide or a connection, no opacity for a hidden guide, and none for a
  * guide this phone offered that the photographer has not adopted yet, which would drop it (then sent once it has);
  * neither guide-edit mode nor a move for it meanwhile.
- * Undo (FR-7.2): this phone's ✕ said once its guide is gone, not when the photographer's ✕ takes it, nor when another
- * guide replaces it; Undo asks for the last guide shown, only without a guide on the video and while connected. The
+ * Undo (FR-7.2): this phone's ✕ and the photographer's (its line before or after `guide.clear`) said once the guide is
+ * gone, and kept until read; not when another guide replaces it; Undo asks for the last guide shown, only without a
+ * guide on the video and while connected. The
  * photographer's hide, show, opacity, and removal each a line.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -769,9 +772,9 @@ class SubjectViewModelTest {
         }
 
     @Test
-    fun `this phone's remove is said once its guide is gone, and not for the photographer's or a replacement`() =
+    fun `this phone's remove is said once its guide is gone, and not for a replacement`() =
         runTest(dispatcher) {
-            val removed = mutableListOf<Unit>()
+            val removed = mutableListOf<GuideRemoval>()
             backgroundScope.launch { viewModel.guideRemoved.collect { removed += it } }
             connect()
             mirror.setGuide(fakeGuide("g1"))
@@ -782,9 +785,9 @@ class SubjectViewModelTest {
             assertTrue("not before the photographer's phone took it", removed.isEmpty())
             mirror.setGuide(null)
             runCurrent()
-            assertEquals(1, removed.size)
+            assertEquals(listOf(GuideRemoval.THIS_PHONE), removed)
 
-            // The photographer's own ✕ is its line, with its own Undo; a replaced guide is no removal.
+            // A guide replaced, or gone without a ✕ said, is no removal.
             mirror.setGuide(fakeGuide("g2"))
             runCurrent()
             mirror.setGuide(null)
@@ -793,7 +796,34 @@ class SubjectViewModelTest {
             viewModel.onRemoveGuide()
             mirror.setGuide(fakeGuide("g4"))
             runCurrent()
-            assertEquals(1, removed.size)
+            assertEquals(listOf(GuideRemoval.THIS_PHONE), removed)
+        }
+
+    @Test
+    fun `the photographer's remove is said once its guide is gone, whichever comes first, and waits to be read`() =
+        runTest(dispatcher) {
+            connect()
+            mirror.setGuide(fakeGuide("g1"))
+            runCurrent()
+
+            // The line before guide.clear: said once the guide goes.
+            session.deliver(SessionMessage.PhotographerDid("guide.remove"))
+            runCurrent()
+            mirror.setGuide(null)
+            runCurrent()
+            // guide.clear first, then the line: said at once.
+            mirror.setGuide(fakeGuide("g2"))
+            runCurrent()
+            mirror.setGuide(null)
+            runCurrent()
+            session.deliver(SessionMessage.PhotographerDid("guide.remove"))
+            runCurrent()
+
+            // Read only now, as by a Subject view that was stopped meanwhile.
+            assertEquals(
+                listOf(GuideRemoval.PHOTOGRAPHER, GuideRemoval.PHOTOGRAPHER),
+                viewModel.guideRemoved.take(2).toList(),
+            )
         }
 
     @Test
@@ -903,7 +933,6 @@ class SubjectViewModelTest {
         session.deliver(SessionMessage.PhotographerDid("guide.hide"))
         session.deliver(SessionMessage.PhotographerDid("guide.show"))
         session.deliver(SessionMessage.PhotographerDid("guide.opacity", opacity = 0.3f))
-        session.deliver(SessionMessage.PhotographerDid("guide.remove"))
         session.deliver(SessionMessage.PhotographerDid("guide.restore"))
         // From a newer photographer, and a ratio that is none.
         session.deliver(SessionMessage.PhotographerDid("lens"))
@@ -920,7 +949,6 @@ class SubjectViewModelTest {
                 PhotographerLine.Did(PhotographerAction.GuideVisible(false)),
                 PhotographerLine.Did(PhotographerAction.GuideVisible(true)),
                 PhotographerLine.Did(PhotographerAction.GuideOpacity(0.3f)),
-                PhotographerLine.Did(PhotographerAction.GuideRemove),
                 PhotographerLine.Did(PhotographerAction.GuideRestore),
             ),
             lines,

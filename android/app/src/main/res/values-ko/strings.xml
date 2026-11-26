@@ -159,7 +159,10 @@
     <string name="share_photo">사진 공유</string>
     <string name="delete_photo">사진 삭제</string>
     <string name="delete_photo_title">이 사진을 삭제할까요?</string>
-    <string name="delete_photo_message">이 휴대폰에서 지워져요.</string>
+    <string name="delete_photo_message">휴대폰 갤러리에서도 삭제되며, 되돌릴 수 없어요.</string>
+    <string name="media_access_title">다른 앱 사진도 바로 삭제할까요?</string>
+    <string name="media_access_message">다른 앱의 사진은 지울 때마다 Android가 한 번 더 물어요. Pix에 미디어 관리를 한 번 허용하면 다음부터는 묻지 않아요.</string>
+    <string name="allow_media_access">권한 허용</string>
     <string name="photo_not_deleted">사진을 삭제하지 못했어요.</string>
     <string name="remote_zoom_notice">%1$s님이 배율을 %2$s×에 맞췄어요</string>
     <string name="zoom_held_label">%1$s님이 배율을 바꾸고 있어요</string>

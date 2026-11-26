@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The tip button (FR-4.10): glass like the other icons over the image, tinted with the accent while its tip is open
+     (activated), as the guide-edit toggle beside it is with the guide's color. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/pix_accent_glass" android:state_activated="true" />
+    <item android:color="@color/pix_glass" />
+</selector>

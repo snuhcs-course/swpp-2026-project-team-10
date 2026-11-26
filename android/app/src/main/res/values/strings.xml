@@ -168,7 +168,11 @@
     <string name="share_photo">Share photo</string>
     <string name="delete_photo">Delete photo</string>
     <string name="delete_photo_title">Delete this photo?</string>
-    <string name="delete_photo_message">It is removed from this phone.</string>
+    <string name="delete_photo_message">It\'s deleted from your gallery too, and can\'t be undone.</string>
+    <!-- Offered once, after Delete, for the first photo of another app's that Android would ask about (FR-1.16). -->
+    <string name="media_access_title">Delete other apps\' photos without asking?</string>
+    <string name="media_access_message">Android asks again each time you delete another app\'s photo. Allow Pix to manage media once, and it won\'t ask again.</string>
+    <string name="allow_media_access">Allow access</string>
     <string name="photo_not_deleted">Couldn\'t delete this photo.</string>
     <string name="remote_zoom_notice">%1$s set zoom to %2$s×</string>
     <string name="zoom_held_label">%1$s is zooming</string>

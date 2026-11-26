@@ -38,6 +38,9 @@
     <color name="pix_accent_glow">#38F2C14E</color>
     <!-- The accent at 20%: a slider's halo, and the brightness button while its slider is open. -->
     <color name="pix_accent_soft">#33F2C14E</color>
+    <!-- The glass over the image tinted with the accent, as pix_guide_glass is with the guide's color: the tip button
+         while its tip is open (FR-4.10). -->
+    <color name="pix_accent_glass">#A9514221</color>
     <color name="pix_on_accent">#141413</color>
     <!-- The pose flow's bar under the top bar (R&S 6.3, #210): the accent dimmed to 75% over the ground, on a dark
          track. -->
@@ -72,6 +75,8 @@
     <color name="camera_shutter">#F4F4F2</color>
     <color name="camera_shutter_pressed">#D6D6D3</color>
     <color name="camera_shutter_disabled">#59F4F4F2</color>
+    <!-- The shutter's ring while the timer counts down (FR-1.17): the white at 28% where the accent has not filled it. -->
+    <color name="camera_countdown_track">#47F4F4F2</color>
     <!-- The shutter while the scene photo for poses is framed (R&S 6.3, #210), and its disc while pressed. -->
     <color name="camera_shutter_scene">#F2C14E</color>
     <color name="camera_shutter_scene_pressed">#D6A93F</color>

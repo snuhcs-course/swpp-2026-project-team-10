@@ -1,4 +1,4 @@
-// AI-generated with ChatGPT Codex and Claude Code, 2026-11-05, reviewed by Dongje Park and Sungmin Jo
+// AI-generated with ChatGPT Codex and Claude Code, 2026-11-26, reviewed by Jaewan Park, Dongje Park, and Sungmin Jo
 package com.lastpenguin.pix.ui.camera
 
 import android.view.View
@@ -146,11 +146,14 @@ internal fun sceneMove(from: FramePlace, to: FramePlace): SceneMove {
 
 /**
  * Puts [row], the zoom row, [margin] above whichever comes first: the image's visible bottom ([imageBottom]) or the
- * first panel shown in [panels], the column of panels above the controls. Both are laid out with their bottoms on
- * the controls' top, in the coordinates of their parent; only the row's translation moves (R&S 6.2).
+ * first panel shown in [panels], the column of panels above the controls, and [line], where a notice sits (NoticeAnchor),
+ * on that bottom or top itself, so a notice takes the row's place. All three are laid out with their bottoms on the
+ * controls' top, in the coordinates of their parent; only their translations move (R&S 6.2).
  */
-internal fun placeZoomRow(row: View, panels: ViewGroup, imageBottom: Float, margin: Float) {
+internal fun placeZoomRow(row: View, panels: ViewGroup, imageBottom: Float, margin: Float, line: View) {
     val panel = panels.children.firstOrNull { it.isVisible }
     val panelsTop = if (panel == null) panels.bottom - panels.paddingBottom else panels.top + panel.top
-    row.translationY = minOf(imageBottom, panelsTop.toFloat()) - margin - row.bottom
+    val floor = minOf(imageBottom, panelsTop.toFloat())
+    row.translationY = floor - margin - row.bottom
+    line.translationY = floor - line.bottom
 }

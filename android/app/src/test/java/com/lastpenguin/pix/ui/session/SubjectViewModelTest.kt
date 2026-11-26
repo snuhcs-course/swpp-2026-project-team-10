@@ -1452,7 +1452,7 @@ class SubjectViewModelTest {
 
     // The photographer's tip of the guide on the video (FR-4.10, #213), state-based: none; a tip before its guide,
     // with its guide, with another guide, and after its guide went; closed until the tip button, which opens and
-    // closes it and takes its dot away; a touch anywhere closes an open one; new words for the same guide keep the
+    // closes it and takes its dot away, and is the only way to close it; new words for the same guide keep the
     // banner as it is; a tip that goes takes the banner with it, and one that comes back starts closed; a guide the
     // photographer hides closes an open tip, which stays closed when the guide shows again.
 
@@ -1486,21 +1486,6 @@ class SubjectViewModelTest {
         model.onTipButton()
         assertEquals(SubjectTip("g1", tip, open = true, unseen = false), model.uiState.value.tip)
         model.onTipButton()
-        assertEquals(SubjectTip("g1", tip, open = false, unseen = false), model.uiState.value.tip)
-    }
-
-    @Test
-    fun aTouchAnywhere_closesAnOpenTip_andLeavesAClosedOneAsItIs() = runTest {
-        val model = withTips()
-        mirror.setGuide(fakeGuide("g1"))
-        session.deliver(tipMessage("g1"))
-        runCurrent()
-
-        model.onAnyTouch()
-        assertEquals(SubjectTip("g1", tip, open = false, unseen = true), model.uiState.value.tip)
-
-        model.onTipButton()
-        model.onAnyTouch()
         assertEquals(SubjectTip("g1", tip, open = false, unseen = false), model.uiState.value.tip)
     }
 
@@ -1571,7 +1556,6 @@ class SubjectViewModelTest {
         assertNull(model.uiState.value.tip)
         // Nothing to open or close without a tip.
         model.onTipButton()
-        model.onAnyTouch()
         assertNull(model.uiState.value.tip)
 
         session.deliver(tipMessage("g1"))

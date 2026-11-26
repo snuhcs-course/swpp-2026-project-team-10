@@ -15,6 +15,12 @@
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+    <!-- Media management (Android 12 and later), which the user turns on once in Android's settings from the viewer's
+         Delete: Android then deletes another app's photo without asking each time (FR-1.16). A special access, not a
+         permission asked for at run time. -->
+    <uses-permission
+        android:name="android.permission.MANAGE_MEDIA"
+        tools:ignore="ProtectedPermissions" />
     <!-- Analytics adds the advertising ID's permissions; Pix shows no ads and never reads one (Design 2.8, Telemetry). -->
     <uses-permission
         android:name="com.google.android.gms.permission.AD_ID"

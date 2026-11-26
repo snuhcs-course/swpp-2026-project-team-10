@@ -1,19 +1,24 @@
-// AI-generated with Claude Code, 2026-11-25, reviewed by Sungmin Jo
+// AI-generated with Claude Code, 2026-11-26, reviewed by Jaewan Park and Sungmin Jo
 package com.lastpenguin.pix
 
-import android.view.View
+import android.Manifest
+import android.app.Application
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.google.android.material.R as materialR
+import com.lastpenguin.pix.databinding.FragmentCameraBinding
 import com.lastpenguin.pix.session.PeerInfo
 import com.lastpenguin.pix.session.Role
 import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.protocol.SessionMessage
+import com.lastpenguin.pix.ui.ScreenTestSupport.assertNoticeInTheZoomRowsPlace
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNoticeView
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
+import com.lastpenguin.pix.ui.ScreenTestSupport.windowBox
 import com.lastpenguin.pix.ui.TestAppContainer
 import com.lastpenguin.pix.ui.camera.CameraFragment
 import com.lastpenguin.pix.ui.session.SessionViewModel
@@ -23,11 +28,14 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
 
 /*
  * The subject's notice about the photographer's photo (FR-6.14), a Snackbar since #298, shown by the activity because Subject view may be under
  * another step of the session. Partitions: a photo that fails to save names the photographer; one that comes while the
- * activity is stopped waits for it; the notice over Camera sits above its controls, Camera's notice anchor (#298).
+ * activity is stopped waits for it. A notice over Camera, shown by the activity, sits in the zoom row's place, 12 dp
+ * above the line the row stands on, covering the readout and never the controls under the image (#298); Subject view's
+ * is in SubjectFragmentRenderTest.
  */
 @RunWith(AndroidJUnit4::class)
 class MainActivityPhotoNoticeTest {
@@ -67,7 +75,10 @@ class MainActivityPhotoNoticeTest {
     }
 
     @Test
-    fun `a notice over Camera sits above its controls`() {
+    fun `a notice over Camera takes the zoom row's place, clear of the controls`() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        // With the camera, so its zoom row shows rather than the camera's message.
+        shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
         val modules = TestAppContainer().install()
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { it.viewModel<SessionViewModel>().joinRoom("123456") }
@@ -81,12 +92,11 @@ class MainActivityPhotoNoticeTest {
             scenario.onActivity { activity ->
                 val host = activity.supportFragmentManager.primaryNavigationFragment!!
                 val camera = host.childFragmentManager.primaryNavigationFragment as CameraFragment
-                val anchor = checkNotNull(camera.noticeAnchor)
-                val notice = checkNotNull(activity.window.decorView.findViewById<View>(materialR.id.snackbar_text))
-                    .parent.parent as View
-                val noticeAt = IntArray(2).also { notice.getLocationInWindow(it) }
-                val anchorAt = IntArray(2).also { anchor.getLocationInWindow(it) }
-                assertTrue("the notice above Camera's controls", noticeAt[1] + notice.height <= anchorAt[1])
+                val controls = FragmentCameraBinding.bind(camera.requireView())
+                assertEquals(controls.noticeLine, camera.noticeAnchor)
+                val notice = checkNotNull(shownNoticeView())
+                assertNoticeInTheZoomRowsPlace(notice, controls.zoomRow, controls.zoomReadout, controls.noticeLine)
+                assertTrue("clear of the controls", windowBox(notice).bottom <= windowBox(controls.bottomPanel).top)
             }
         }
     }

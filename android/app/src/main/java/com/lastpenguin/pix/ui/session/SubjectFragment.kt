@@ -53,6 +53,7 @@ import com.lastpenguin.pix.ui.Motion
 import com.lastpenguin.pix.ui.NoticeAnchor
 import com.lastpenguin.pix.ui.NoticeLength
 import com.lastpenguin.pix.ui.PixViewModels
+import com.lastpenguin.pix.ui.camera.CountdownRing
 import com.lastpenguin.pix.ui.camera.ExposureScale
 import com.lastpenguin.pix.ui.camera.FocusBrightness
 import com.lastpenguin.pix.ui.camera.FramePlace
@@ -77,6 +78,7 @@ import com.lastpenguin.pix.ui.camera.framePlace
 import com.lastpenguin.pix.ui.camera.guideSaveIcon
 import com.lastpenguin.pix.ui.camera.guideSaveTint
 import com.lastpenguin.pix.ui.camera.isUnder
+import com.lastpenguin.pix.ui.camera.keepTouches
 import com.lastpenguin.pix.ui.camera.lerp
 import com.lastpenguin.pix.ui.camera.photoThumbnail
 import com.lastpenguin.pix.ui.camera.photoToView
@@ -198,6 +200,12 @@ class SubjectFragment :
 
     @VisibleForTesting
     internal var photoOf: (Uri) -> Bitmap? = { uri -> requireContext().photoToView(uri) }
+
+    // The shutter's ring while the photographer's timer counts down (FR-1.17), made with the first countdown shown.
+    private var countdownRing: CountdownRing? = null
+
+    @VisibleForTesting
+    internal val shutterRing: CountdownRing? get() = countdownRing
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentSubjectBinding.bind(view)
@@ -681,7 +689,7 @@ class SubjectFragment :
         if (area.bottom <= area.top) return
         val imageBottom = minOf(place.frame.bottom, area.bottom - area.underControls)
         val margin = ZOOM_ROW_MARGIN_DP * resources.displayMetrics.density
-        placeZoomRow(binding.zoomRow, binding.bottomOverlays, imageBottom, margin)
+        placeZoomRow(binding.zoomRow, binding.bottomOverlays, imageBottom, margin, binding.noticeLine)
         binding.pinchModeLabel.translationY = binding.zoomRow.translationY
     }
 
@@ -839,6 +847,8 @@ class SubjectFragment :
         // A dialog belongs to the activity: one left open would leave a screen that is gone.
         leaveDialog?.dismiss()
         leaveDialog = null
+        countdownRing?.stop()
+        countdownRing = null
         turningIcons?.stop()
         turningIcons = null
         photoViewer?.stop()
@@ -875,13 +885,11 @@ class SubjectFragment :
     }
 
     /**
-     * The photographer's tip (FR-4.10, #213): the tip button opens and closes it, a touch anywhere closes it and still
-     * does what it does where it lands, and the banner is clickable as well, so TalkBack can close it.
+     * The photographer's tip (FR-4.10, #213): only the tip button opens and closes it, and a touch anywhere else, on the
+     * banner too, leaves it as it is. A touch anywhere closes the camera menu.
      */
     private fun setupTip(binding: FragmentSubjectBinding) {
         binding.root.onTouchEnd = { event ->
-            // The tip button opens and closes the tip itself; closed here first, its tap would only open it again.
-            if (!binding.tipButtonFrame.isUnder(event, binding.root)) viewModel.onAnyTouch()
             // The camera menu closes at a touch anywhere but on it or its button, which opens and closes it (FR-1.17).
             if (!binding.cameraMenuButton.isUnder(event, binding.root) &&
                 !binding.cameraMenu.isUnder(event, binding.root)
@@ -890,26 +898,23 @@ class SubjectFragment :
             }
         }
         binding.tipButton.setOnClickListener { viewModel.onTipButton() }
-        binding.tipBanner.setOnClickListener { viewModel.onAnyTouch() }
-        ViewCompat.replaceAccessibilityAction(
-            binding.tipBanner,
-            AccessibilityActionCompat.ACTION_CLICK,
-            getString(R.string.close_tip),
-        ) { _, _ ->
-            viewModel.onAnyTouch()
-            true
-        }
+        // A tap on the open tip neither closes it nor focuses the photographer's camera through it (FR-7.7).
+        binding.tipBanner.keepTouches()
     }
 
     /**
      * The photographer's tip of the guide on the video (FR-4.10, #213): its button while that guide has one and shows,
-     * with a dot until the tip was opened, and the banner only once the button opened it.
+     * with a dot until the tip was opened, lit while the tip is open and named for what its tap does, and the banner
+     * only once the button opened it.
      */
     private fun renderTip(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         val tip = ui.tip?.takeIf { ui.guide != null && ui.guideState.visible }
+        val open = tip?.open == true
         binding.tipButtonFrame.isVisible = tip != null
         binding.tipDot.isVisible = tip?.unseen == true
-        binding.tipBanner.isVisible = tip?.open == true
+        binding.tipButton.isActivated = open
+        binding.tipButton.contentDescription = getString(if (open) R.string.close_tip else R.string.show_tip)
+        binding.tipBanner.isVisible = open
         binding.tipText.text = tip?.tip?.text
     }
 
@@ -1064,8 +1069,8 @@ class SubjectFragment :
      * The line right above the shutter, once connected (#314; in the shutter's place before it, #271): whose camera
      * this is and that it is live, or, from the photographer's shutter until the photo is saved here, that it is coming
      * (FR-6.14). While a step's button shows, the video's own text says what the photographer does, so the line is
-     * the name alone, without the red dot. The open tip takes the line's place until a touch closes it: at the largest font the two do not
-     * fit above the shutter together.
+     * the name alone, without the red dot. The open tip takes the line's place until its button closes it: at the
+     * largest font the two do not fit above the shutter together.
      */
     private fun renderCaption(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         binding.cameraCaption.isVisible = ui.connected && ui.tip?.open != true
@@ -1124,11 +1129,13 @@ class SubjectFragment :
     /**
      * This phone's shutter (FR-7.8, #314): dimmed while the photographer's video does not show, as while the link
      * reconnects or their camera is off for a pose's step, and while a press waits for its answer. While the
-     * photographer's timer counts down it stops the countdown, as Camera's own does, and is named so (FR-1.17); the
-     * tutorial's tip on it says so, and no line on the screen.
+     * photographer's timer counts down it stops the countdown, as Camera's own does (FR-1.17): it shows Camera's stop
+     * square in the timer's ring, filling through the photographer's seconds, and is named so; the tutorial's tip on it
+     * says so too, and no line on the screen.
      */
     private fun renderShutter(binding: FragmentSubjectBinding, ui: SubjectUiState) {
         binding.shutterButton.isEnabled = ui.connected && videoShowing.value && !ui.shutterWaiting
+        renderCountdownRing(binding.shutterButton, ui)
         val name = ui.photographerName
         val timer = ui.timer
         binding.shutterButton.contentDescription = when {
@@ -1143,6 +1150,27 @@ class SubjectFragment :
 
             else -> getString(R.string.subject_shutter, name)
         }
+    }
+
+    /**
+     * The timer's ring on the shutter while the photographer's countdown shows (FR-1.17), over the timer's whole length
+     * as chosen; the white shutter again as it ends.
+     */
+    private fun renderCountdownRing(shutter: View, ui: SubjectUiState) {
+        val left = ui.countdown
+        val ring = countdownRing
+        if (left == null) {
+            ring?.stop()
+            if (ring != null &&
+                shutter.background === ring.drawable
+            ) {
+                shutter.setBackgroundResource(R.drawable.bg_shutter)
+            }
+            return
+        }
+        val shown = ring ?: CountdownRing(requireContext()).also { countdownRing = it }
+        if (shutter.background !== shown.drawable) shutter.background = shown.drawable
+        shown.show(left, ui.timer.seconds)
     }
 
     /**
@@ -1569,9 +1597,17 @@ class SubjectFragment :
         findNavController().popBackStack(R.id.cameraFragment, false)
     }
 
-    /** Notices sit above the zoom row, as on Camera, clear of the slot and the controls under the video (#298). */
+    /**
+     * Notices take the zoom row's place, as on Camera, so they cover the row but never the line that names the camera,
+     * the shutter, or the controls under the video (#298); above the controls while the row is hidden. Over the
+     * session's photos, they sit where the viewer says, not over the photo.
+     */
     override val noticeAnchor: View?
-        get() = view?.let(FragmentSubjectBinding::bind)?.let { if (it.zoomRow.isShown) it.zoomRow else it.bottomPanel }
+        get() {
+            val binding = view?.let(FragmentSubjectBinding::bind) ?: return null
+            photoViewer?.takeIf { it.isOpen }?.let { return it.noticeAnchor }
+            return if (binding.zoomRow.isShown) binding.noticeLine else binding.bottomPanel
+        }
 
     /**
      * Passes frames to the renderer and remembers when the last one came, to detect a paused camera, and its shape. It

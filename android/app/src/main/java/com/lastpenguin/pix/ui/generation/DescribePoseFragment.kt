@@ -40,12 +40,15 @@ import com.lastpenguin.pix.session.SessionState
 import com.lastpenguin.pix.session.partner
 import com.lastpenguin.pix.settings.TutorialScreen
 import com.lastpenguin.pix.ui.Motion
+import com.lastpenguin.pix.ui.NoticeAction
+import com.lastpenguin.pix.ui.NoticeLength
 import com.lastpenguin.pix.ui.PixViewModels
 import com.lastpenguin.pix.ui.guide.ReferenceViewModel
 import com.lastpenguin.pix.ui.session.SessionViewModel
 import com.lastpenguin.pix.ui.settings.SettingsViewModel
 import com.lastpenguin.pix.ui.settings.showTutorialWhenDue
 import com.lastpenguin.pix.ui.settings.tutorialFor
+import com.lastpenguin.pix.ui.showNoticeOnScreen
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
@@ -76,6 +79,9 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose), ScenePho
 
     /** The scene photo shrinking into its place, while it does (#296). */
     private var sceneArrival: ValueAnimator? = null
+
+    // "The poses are in My library", while it shows; it goes with this screen's view.
+    private var posesKeptNotice: Snackbar? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val binding = FragmentDescribePoseBinding.bind(view)
@@ -140,7 +146,7 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose), ScenePho
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 // Its tutorial tips the first time it opens, on either phone (FR-10.4).
                 launch { showTutorialWhenDue(settingsViewModel.tutorialFor(TutorialScreen.GENERATE_POSES)) }
-                launch { viewModel.posesKept.collect { showPosesKept(view) } }
+                launch { viewModel.posesKept.collect { showPosesKept() } }
                 combine(viewModel.uiState, sessionViewModel.state, viewModel.usedBefore, ::Triple)
                     .collect { (generation, session, used) ->
                         // In a session the subject writes the description too, one field at a time (FR-6.15).
@@ -166,6 +172,9 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose), ScenePho
     override fun onDestroyView() {
         form = null
         sceneArrival?.cancel()
+        // The notice is the activity's and would outlive this screen, its *View* then reaching a screen that is gone.
+        posesKeptNotice?.dismiss()
+        posesKeptNotice = null
         super.onDestroyView()
     }
 
@@ -201,19 +210,20 @@ class DescribePoseFragment : Fragment(R.layout.fragment_describe_pose), ScenePho
 
     /**
      * Back left a set whose poses are in the library (#297): a notice says so, with *View*, which opens the library at
-     * *All*, newest first, and ends the pose flow, so Back there is Camera.
+     * *All*, newest first, and ends the pose flow, so Back there is Camera. The notice goes with this screen's view.
      */
-    private fun showPosesKept(view: View) {
-        val context = requireContext()
-        Snackbar.make(view, R.string.poses_kept_notice, Snackbar.LENGTH_LONG)
-            .setBackgroundTint(context.getColor(R.color.pix_surface_3))
-            .setTextColor(context.getColor(R.color.pix_text))
-            .setActionTextColor(context.getColor(R.color.pix_accent))
-            .setAction(R.string.poses_kept_view) { viewPoses() }
-            .show()
+    private fun showPosesKept() {
+        posesKeptNotice?.dismiss()
+        posesKeptNotice = showNoticeOnScreen(
+            getString(R.string.poses_kept_notice),
+            NoticeLength.LONG,
+            NoticeAction(R.string.poses_kept_view) { viewPoses() },
+        )
     }
 
     private fun viewPoses() {
+        // A tap that comes as the screen goes finds no navigation of its own.
+        if (view == null) return
         val navController = findNavController()
         if (navController.currentDestination?.id != R.id.describePoseFragment) return
         referenceViewModel.openFor(fromSubject = false)

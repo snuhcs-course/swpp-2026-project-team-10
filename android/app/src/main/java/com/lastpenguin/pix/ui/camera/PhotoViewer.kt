@@ -52,10 +52,11 @@ import kotlinx.coroutines.withContext
  * A thumbnail's photos in a viewer over the screen, inside Pix, as a gallery app shows them (FR-1.6, FR-6.14; Design
  * 2.6.5): over Camera, a session's or Pix's album, and over Subject view, the session's, so a session and its video go
  * on under it, where the phone's gallery would show one photo and put Pix in the background. One photo a page, read off
- * the main thread through [load] and opened at the newest; a pinch or a double tap zooms it ([ZoomablePhotoView]). A
- * strip of their thumbnails, read through [thumbnail], is under them: the one on screen selected, and a tap on one
- * shows its photo. A tap on the photo hides the header and the strip, and another shows them; a drag down closes the
- * viewer as Back does ([onBack]). Share sends the photo on screen through the phone's share sheet, and Delete asks
+ * the main thread through [load] and opened at the newest; a pinch or a double tap zooms it ([ZoomablePhotoView]). The
+ * pages run newest first, as the grid does: the newest at the left, and a swipe to the left shows an older one. A strip
+ * of their thumbnails in that order, read through [thumbnail], is under them: the one on screen selected, and a tap on
+ * one shows its photo. A tap on the photo hides the header and the strip, and another shows them; a drag down closes
+ * the viewer as Back does ([onBack]). Share sends the photo on screen through the phone's share sheet, and Delete asks
  * first, then hands it to [onDelete]. A photo that comes while it is open is one more page, and the page on screen
  * stays. It fades in and out, and while it is open TalkBack reads only it. Its pages go once it is closed. It turns
  * with the phone ([turnTo], #207): held sideways, it is a landscape screen, the photo over all of it, so a landscape
@@ -64,9 +65,11 @@ import kotlinx.coroutines.withContext
  * middle choose through [onTab] between that grid, at each opening, and the phone's albums, each a cover, its name,
  * and its count, whose tap opens its grid under its name through [onOpenAlbum]. While Pix may not read every photo, a
  * line above them says so, with [onAccess] to change it. The grid's squares and the albums' covers are read at their
- * own size through [cell]. Delete asks first only where [asksFirst] says so: Android asks itself before another app's
- * photo goes. It is built in [holder] when it first opens: a screen that
- * never opens it builds no pager, whose RecyclerView would cost every Camera screen.
+ * own size through [cell]. Delete asks first only where [asksFirst] says so: on Android 11 Android asks itself before
+ * another app's photo goes. Where Android would ask that for every photo until Pix may manage the phone's media, the
+ * first such delete offers that access in a question of its own after Delete ([offersAccess], [onAllowAndDelete]). It
+ * is built in [holder] when it first opens: a screen that never opens it builds no pager, whose RecyclerView would cost
+ * every Camera screen.
  */
 internal class PhotoViewer(
     private val holder: ViewGroup,
@@ -77,6 +80,14 @@ internal class PhotoViewer(
     private val onDelete: (Uri) -> Unit,
     private val onPick: (Uri) -> Unit = {},
     private val asksFirst: (Uri) -> Boolean = { true },
+    /**
+     * Whether Delete offers the media access before [Uri] goes: Android would ask about it each time until Pix may
+     * manage the phone's media, and Pix has not offered that yet. Its offer is told to [onAccessOffered], once.
+     */
+    private val offersAccess: (Uri) -> Boolean = { false },
+    private val onAccessOffered: () -> Unit = {},
+    /** The offer's *Allow access*: Pix asks to manage the phone's media, then deletes [Uri]. */
+    private val onAllowAndDelete: (Uri) -> Unit = {},
     private val onAccess: () -> Unit = {},
     /** A square of a photo, cut from its middle, the [Int] px on each side, for the grid and the albums' covers. */
     cell: (Uri, Int) -> Bitmap? = { uri, _ -> thumbnail(uri) },
@@ -142,7 +153,7 @@ internal class PhotoViewer(
     /** The header and the strip show; a tap on the photo hides them, and each opening shows them. */
     private var chromeShown = true
 
-    /** Delete's question, while it is open. */
+    /** Delete's question, or the media access's offer, while one is open. */
     private var asking: Dialog? = null
 
     /** How the phone is held (`PhoneTurns`), which the viewer turns with once built. */
@@ -175,6 +186,13 @@ internal class PhotoViewer(
         binding.photoViewerStrip.adapter = strip
         // A selected thumbnail changes at once, without the list's fade.
         binding.photoViewerStrip.itemAnimator = null
+        // A new width, as at the first opening or held sideways, pads the strip anew, and the photo on screen goes back
+        // to its middle.
+        binding.photoViewerStrip.addOnLayoutChangeListener { list, left, _, right, _, oldLeft, _, oldRight, _ ->
+            if (right - left != oldRight - oldLeft && padStrip(list as RecyclerView)) {
+                list.post { built?.let { select(it, it.photoViewerPages.currentItem) } }
+            }
+        }
         binding.photoViewerGrid.layoutManager = GridLayoutManager(holder.context, GRID_COLUMNS)
         binding.photoViewerGrid.adapter = cells
         // Its photos change only while a page covers it, where the list's moves would play unseen.
@@ -190,7 +208,7 @@ internal class PhotoViewer(
         binding.photoViewerShare.setOnClickListener { pages.photoAt(pager.currentItem)?.let(::share) }
         binding.photoViewerDelete.setOnClickListener {
             pages.photoAt(pager.currentItem)?.let { photo ->
-                if (asksFirst(photo)) confirmDelete(photo) else onDelete(photo)
+                if (asksFirst(photo)) confirmDelete(photo) else delete(photo)
             }
         }
         binding.photoViewerAccessButton.setOnClickListener { onAccess() }
@@ -217,6 +235,17 @@ internal class PhotoViewer(
         for (reader in listOf(stripReader, cellReader, coverReader)) reader.forget()
         for (shown in listOf(strip, cells, albumCards, pages)) shown.notifyItemRangeChanged(0, shown.itemCount)
     }
+
+    /** Whether the viewer is open, or opening, over the screen. */
+    val isOpen: Boolean
+        get() = built?.root?.let { it.isVisible && it.tag != CLOSING } == true
+
+    /**
+     * Where a notice sits while the viewer is open (#298), such as "Couldn't delete this photo.": above the strip while
+     * it shows, clear of the photo's middle, and otherwise, over the grid or a photo alone, at the screen's bottom (null).
+     */
+    val noticeAnchor: View?
+        get() = built?.photoViewerStrip?.takeIf { isOpen && it.isShown }
 
     /** Turns the viewer upright for a phone held at [turn], as the screen's controls turn (FR-1.16). */
     fun turnTo(turn: Int) {
@@ -265,13 +294,15 @@ internal class PhotoViewer(
             // The grid keeps what it shows while the albums show, or one sliding away would turn to other photos as it
             // goes; it gets its photos again before it comes back.
             if (!albumsShown) cells.show(photos)
-            // The pages read their photos only once they show, so a grid opened alone reads none at full size.
+            // The pages, newest first, as the grid shows them, so the newest is at the left and a swipe to the left goes
+            // back in time. They read their photos only once they show, so a grid opened alone reads none at full size.
+            val newestFirst = photos.asReversed()
             if (!layer) {
                 val onScreen = pages.photoAt(binding.photoViewerPages.currentItem).takeIf { shown && !showsGallery }
-                pages.show(photos)
-                strip.show(photos)
-                // A whole new list keeps the pager's place, not its photo.
-                val now = onScreen?.let(photos::indexOf) ?: -1
+                pages.show(newestFirst)
+                strip.show(newestFirst)
+                // A whole new list keeps the pager's place, not its photo: a photo that comes is one more page before it.
+                val now = onScreen?.let(newestFirst::indexOf) ?: -1
                 if (now >= 0 && now != binding.photoViewerPages.currentItem) openPage(binding, now)
             }
             val turned = shown && layer != showsGallery
@@ -281,7 +312,7 @@ internal class PhotoViewer(
                 // A drag that closed it, or that went back to the grid, left the background faded.
                 followDrag(binding, 0f)
                 when {
-                    !layer -> openPage(binding, photos.indexOf(at).takeIf { it >= 0 } ?: photos.lastIndex)
+                    !layer -> openPage(binding, newestFirst.indexOf(at).takeIf { it >= 0 } ?: 0)
 
                     turned -> pageInGrid(binding)
 
@@ -664,13 +695,26 @@ internal class PhotoViewer(
         binding.photoViewerStrip.alpha = chrome
     }
 
-    /** The strip's thumbnail of the photo at [position] selected, and in the middle of the strip when it scrolls. */
+    /**
+     * The strip's thumbnail of the photo at [position] selected, and in the strip's middle, as a photo opens and at
+     * each swipe: its padded start is half the strip less a thumbnail from its edge ([padStrip]), so a thumbnail at no
+     * offset from there stands in the middle, the first and the last too.
+     */
     private fun select(binding: ViewPhotoViewerBinding, position: Int) {
         strip.selected = position
         val list = binding.photoViewerStrip
         val layout = list.layoutManager as? LinearLayoutManager ?: return
+        padStrip(list)
+        layout.scrollToPositionWithOffset(position, 0)
+    }
+
+    /** Pads both ends of the strip by half its width less a thumbnail; true when that changed them. */
+    private fun padStrip(list: RecyclerView): Boolean {
         val item = list.resources.getDimensionPixelSize(R.dimen.photo_thumb_touch)
-        layout.scrollToPositionWithOffset(position, (list.width - list.paddingStart - list.paddingEnd - item) / 2)
+        val side = ((list.width - item) / 2).coerceAtLeast(0)
+        if (list.width == 0 || (list.paddingStart == side && list.paddingEnd == side)) return false
+        list.setPaddingRelative(side, list.paddingTop, side, list.paddingBottom)
+        return true
     }
 
     /**
@@ -710,13 +754,39 @@ internal class PhotoViewer(
 
     /** Delete asks first, as Pix does for a saved guide (FR-3.8); the photo goes only with its Delete. */
     private fun confirmDelete(uri: Uri) {
+        ask(
+            MaterialAlertDialogBuilder(holder.context)
+                .setTitle(R.string.delete_photo_title)
+                .setMessage(R.string.delete_photo_message)
+                .setPositiveButton(R.string.delete) { _, _ -> delete(uri) }
+                .setNegativeButton(R.string.cancel, null),
+        )
+    }
+
+    /**
+     * Deletes [uri], after offering the media access first when [offersAccess] says so (FR-1.16): a question of its own,
+     * apart from Delete's, shown once. *Allow access* asks for it, and *Not now* deletes as before, with Android's
+     * question; Back keeps the photo.
+     */
+    private fun delete(uri: Uri) {
+        if (!offersAccess(uri)) {
+            onDelete(uri)
+            return
+        }
+        onAccessOffered()
+        ask(
+            MaterialAlertDialogBuilder(holder.context)
+                .setTitle(R.string.media_access_title)
+                .setMessage(R.string.media_access_message)
+                .setPositiveButton(R.string.allow_media_access) { _, _ -> onAllowAndDelete(uri) }
+                .setNegativeButton(R.string.not_now) { _, _ -> onDelete(uri) },
+        )
+    }
+
+    /** Shows the question [builder] makes, as the one open, taken down with the screen. */
+    private fun ask(builder: MaterialAlertDialogBuilder) {
         asking?.dismiss()
-        val question = MaterialAlertDialogBuilder(holder.context)
-            .setTitle(R.string.delete_photo_title)
-            .setMessage(R.string.delete_photo_message)
-            .setPositiveButton(R.string.delete) { _, _ -> onDelete(uri) }
-            .setNegativeButton(R.string.cancel, null)
-            .create()
+        val question = builder.create()
         question.setOnDismissListener { if (asking === question) asking = null }
         asking = question
         question.show()
@@ -923,8 +993,8 @@ private class PhotoCells(
 }
 
 /**
- * The viewer's strip: a thumbnail of each photo, read through [thumbnails], the photo on screen [selected], outlined
- * and bright, the others dimmed; a tap on one picks its photo through [onPick].
+ * The viewer's strip: a thumbnail of each photo, newest first, read through [thumbnails], the photo on screen
+ * [selected], outlined and bright, the others dimmed; a tap on one picks its photo through [onPick].
  */
 private class PhotoStrip(
     private val thumbnails: ThumbnailReader,
@@ -975,8 +1045,9 @@ private class PhotoStrip(
         val chosen = position == selected
         item.isSelected = chosen
         thumb.binding.photoThumbImage.alpha = if (chosen) 1f else DIMMED
+        // Counted from the oldest, as the grid's squares and the pages are, though the strip runs newest first.
         item.contentDescription =
-            item.context.getString(R.string.photo_page_counter_description, position + 1, photos.size)
+            item.context.getString(R.string.photo_page_counter_description, photos.size - position, photos.size)
         // Bound again with every change of the count, so the place it was bound with stays right.
         item.setOnClickListener { onPick(position) }
     }
@@ -1056,8 +1127,8 @@ private class AlbumCards(
 }
 
 /**
- * The viewer's pages: each photo, whole until zoomed, with its [gestures]; or why it is not there, such as a photo
- * deleted from the album since. TalkBack reads which photo of how many.
+ * The viewer's pages: each photo, newest first, whole until zoomed, with its [gestures]; or why it is not there, such
+ * as a photo deleted from the album since. TalkBack reads which photo of how many, counted from the oldest.
  */
 private class PhotoPages(
     private val scope: CoroutineScope,
@@ -1123,7 +1194,7 @@ private class PhotoPages(
         image.contentDescription = if (photos.size <= 1) {
             context.getString(R.string.session_photo)
         } else {
-            context.getString(R.string.photo_page_counter_description, position + 1, photos.size)
+            context.getString(R.string.photo_page_counter_description, photos.size - position, photos.size)
         }
     }
 

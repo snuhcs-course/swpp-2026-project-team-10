@@ -40,15 +40,19 @@ import com.lastpenguin.pix.session.protocol.DescriptionStep
 import com.lastpenguin.pix.session.protocol.PoseSetStep
 import com.lastpenguin.pix.session.protocol.SessionMessage
 import com.lastpenguin.pix.settings.TutorialScreen
+import com.lastpenguin.pix.ui.ScreenTestSupport.assertNoticeInTheZoomRowsPlace
 import com.lastpenguin.pix.ui.ScreenTestSupport.attachNav
 import com.lastpenguin.pix.ui.ScreenTestSupport.bitmap
 import com.lastpenguin.pix.ui.ScreenTestSupport.guide
 import com.lastpenguin.pix.ui.ScreenTestSupport.idle
 import com.lastpenguin.pix.ui.ScreenTestSupport.launchPrepared
 import com.lastpenguin.pix.ui.ScreenTestSupport.shownNotice
+import com.lastpenguin.pix.ui.ScreenTestSupport.shownNoticeView
 import com.lastpenguin.pix.ui.ScreenTestSupport.string
 import com.lastpenguin.pix.ui.ScreenTestSupport.viewModel
+import com.lastpenguin.pix.ui.ScreenTestSupport.windowBox
 import com.lastpenguin.pix.ui.TestAppContainer
+import com.lastpenguin.pix.ui.camera.CountdownShutterDrawable
 import com.lastpenguin.pix.ui.camera.ExposureBarView
 import com.lastpenguin.pix.ui.camera.ExposureScale
 import com.lastpenguin.pix.ui.camera.FocusBrightness
@@ -56,6 +60,7 @@ import com.lastpenguin.pix.ui.camera.REFERENCE_HIDDEN_ALPHA
 import com.lastpenguin.pix.ui.camera.REFERENCE_PEEK_DP
 import com.lastpenguin.pix.ui.camera.fitViewfinderFrame
 import com.lastpenguin.pix.ui.settings.TutorialFragment
+import com.lastpenguin.pix.ui.showNoticeOnScreen
 import java.time.Duration
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
@@ -89,8 +94,11 @@ import org.robolectric.shadows.ShadowDialog
  * gone with a replaced or removed guide, moved to another corner on this phone only, and hidden at the video's side
  * by a flick and shown again by a tap on its handle, on this phone only, and hidden while enlarged (the small strip,
  * and small when it is back; #237), a mirror through each change of its size; the camera menu (FR-1.17): its flash's
- * tap, which keeps it open, and Back and its button closing it; the photographer's countdown (FR-1.17): each second
- * with their name, the menu's flash disabled, and all gone at its end; remote focus with the
+ * tap, which keeps it open, and Back and its button closing it; a notice in the zoom row's place, above the line that
+ * names the camera (#298); the photographer's countdown (FR-1.17): each second
+ * with their name, the menu's flash disabled, and all gone at its end, and the shutter a stop square in the timer's
+ * ring, from each second's place in the timer's length, also for a first second that comes midway, and white again at
+ * its end; remote focus with the
  * brightness beside it (FR-7.7, FR-7.3, #273): a tap inside the image (the focus asked for at the photographer's x, the
  * box there, the bar beside it), beside the image and in guide-edit mode (nothing), on a camera without point focus
  * (the bar alone); a drag on the bar (steps, then the final value; both gone after the idle time); a drag on the video
@@ -1170,6 +1178,25 @@ class SubjectFragmentRenderTest {
         onScreen { binding, _ -> assertEquals(View.GONE, binding.cameraMenu.visibility) }
     }
 
+    // ---- A notice (#298) -------------------------------------------------------------------------------------------
+
+    @Test
+    fun aNotice_takesTheZoomRowsPlace_aboveTheLineThatNamesTheCamera() {
+        val modules = launch()
+        connect(modules)
+
+        onScreen { _, fragment -> fragment.showNoticeOnScreen("A notice") }
+        idle()
+
+        onScreen { binding, fragment ->
+            assertEquals(binding.noticeLine, fragment.noticeAnchor)
+            val notice = checkNotNull(shownNoticeView())
+            assertNoticeInTheZoomRowsPlace(notice, binding.zoomRow, binding.zoomReadout, binding.noticeLine)
+            assertTrue(binding.cameraCaption.isShown)
+            assertTrue("above the camera's name", windowBox(notice).bottom <= windowBox(binding.cameraCaption).top)
+        }
+    }
+
     // ---- The photographer's timer (FR-1.17) ----------------------------------------------------------------------
 
     @Test
@@ -1197,6 +1224,54 @@ class SubjectFragmentRenderTest {
             assertEquals(View.GONE, binding.countdownPanel.visibility)
             assertTrue(binding.menuFlash.isEnabled)
         }
+    }
+
+    @Test
+    fun thePhotographersCountdown_putsTheTimersRingOnTheShutter_fromEachSecondsPlace_andTheWhiteShutterAfter() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, hasFlash = true)
+        state(modules, timer = 3)
+
+        modules.session.deliver(SessionMessage.Countdown(3))
+        idle()
+        assertRing(fill = 0f)
+        waitMs(500)
+        assertRing(fill = 1f / 6)
+
+        modules.session.deliver(SessionMessage.Countdown(2))
+        idle()
+        assertRing(fill = 1f / 3)
+
+        modules.session.deliver(SessionMessage.Countdown(0))
+        idle()
+        onScreen { binding, fragment ->
+            assertFalse(binding.shutterButton.background is CountdownShutterDrawable)
+            assertFalse(checkNotNull(fragment.shutterRing).drawable.filling)
+        }
+    }
+
+    @Test
+    fun aFirstSecondThatComesMidway_putsTheRingAtItsPlaceInTheTimersLength() {
+        val modules = launch()
+        connect(modules, exposureRange = -4..4, hasFlash = true)
+        state(modules, timer = 10)
+
+        // The seconds before it were lost, as when the link came back during the countdown.
+        modules.session.deliver(SessionMessage.Countdown(4))
+        idle()
+
+        assertRing(fill = 0.6f)
+        // It fills the 0.4 left in the 4 s left.
+        waitMs(1_000)
+        assertRing(fill = 0.7f)
+    }
+
+    /** The shutter shows the timer's ring, filled [fill] now and filling on. */
+    private fun assertRing(fill: Float) = onScreen { binding, fragment ->
+        val ring = checkNotNull(fragment.shutterRing).drawable
+        assertSame(ring, binding.shutterButton.background)
+        assertEquals(fill, ring.fill, 0.001f)
+        assertTrue(ring.filling)
     }
 
     // ---- Remote focus, with the brightness beside it (FR-7.7, FR-7.3, #273) -----------------------------------

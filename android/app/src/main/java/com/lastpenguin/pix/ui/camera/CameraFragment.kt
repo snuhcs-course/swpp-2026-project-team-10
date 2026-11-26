@@ -4,6 +4,7 @@ package com.lastpenguin.pix.ui.camera
 import android.Manifest
 import android.animation.ValueAnimator
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
@@ -73,6 +74,7 @@ import com.lastpenguin.pix.camera.FlashMode
 import com.lastpenguin.pix.camera.PhotoAccess
 import com.lastpenguin.pix.camera.ShutterTimer
 import com.lastpenguin.pix.camera.frameAspect
+import com.lastpenguin.pix.camera.manageMediaSettings
 import com.lastpenguin.pix.camera.photoPermissions
 import com.lastpenguin.pix.core.Timings
 import com.lastpenguin.pix.databinding.FragmentCameraBinding
@@ -211,12 +213,18 @@ class CameraFragment :
 
     private var shutterFade: ValueAnimator? = null
 
+    // The shutter's ring while the timer counts down (FR-1.17), made with the first countdown of this view.
+    private var countdownRing: CountdownRing? = null
+
     // The move under way, which a test sets to a point between its ends: the display's paused frames catch up at once.
     @VisibleForTesting
     internal val frameMove: ValueAnimator? get() = move
 
     @VisibleForTesting
     internal val shutterTurn: ValueAnimator? get() = shutterFade
+
+    @VisibleForTesting
+    internal val shutterRing: CountdownRing? get() = countdownRing
 
     @VisibleForTesting
     internal val stillFlip: ValueAnimator? get() = flip
@@ -255,6 +263,11 @@ class CameraFragment :
     // Android's own question before another app's photo is deleted (FR-1.16).
     private val deleteQuestion = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
         viewModel.deleteAnswered(it.resultCode == Activity.RESULT_OK)
+    }
+
+    // Android's screen that lets Pix manage the phone's media (FR-1.16): the photo asked for goes once it closes.
+    private val mediaAccess = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        viewModel.accessAnswered()
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -414,6 +427,10 @@ class CameraFragment :
                 onDelete = viewModel::deletePhoto,
                 onPick = viewModel::pickPhoto,
                 asksFirst = viewModel::asksBeforeDeleting,
+                // Once, at the first photo of another app's that Android would ask about (FR-1.16).
+                offersAccess = { uri -> viewModel.needsAccessToDelete(uri) && !settingsViewModel.mediaAccessOffered() },
+                onAccessOffered = settingsViewModel::markMediaAccessOffered,
+                onAllowAndDelete = ::allowAndDelete,
                 onAccess = ::changePhotoAccess,
                 cell = { uri, px -> cellOf(uri, px) },
                 onTab = viewModel::chooseGalleryTab,
@@ -806,6 +823,8 @@ class CameraFragment :
         sceneGuideFading = false
         shutterFade?.cancel()
         shutterFade = null
+        countdownRing?.stop()
+        countdownRing = null
         binding = null
         sceneBack = null
         aspectsBack = null
@@ -1026,7 +1045,7 @@ class CameraFragment :
         if (area.bottom <= area.top) return
         val imageBottom = minOf(place.frame.bottom, area.bottom - area.underControls)
         val margin = ZOOM_ROW_MARGIN_DP * resources.displayMetrics.density
-        placeZoomRow(controls.zoomRow, controls.bottomOverlays, imageBottom, margin)
+        placeZoomRow(controls.zoomRow, controls.bottomOverlays, imageBottom, margin, controls.noticeLine)
         controls.pinchModeLabel.translationY = controls.zoomRow.translationY
     }
 
@@ -1334,23 +1353,21 @@ class CameraFragment :
         renderReference(controls, state)
         renderTip(controls, state)
         renderScenePhoto(controls, generationViewModel.uiState.value, state, ready)
+        renderCountdownRing(state)
         renderLatency(controls)
         // The mode's label goes with its toggle.
         if (!controls.editGuideButton.isVisible) controls.pinchModeLabel.isVisible = false
     }
 
     /**
-     * The pose tip (FR-4.10): a touch anywhere closes the banner and still does what it does where it lands; the tip
-     * button opens it again. The banner is clickable as well, so TalkBack can close it.
+     * What a touch anywhere closes, and the pose tip (FR-4.10), which only its button opens and closes: a touch anywhere
+     * else, on the banner too, leaves it as it is.
      */
     private fun setupTip(controls: FragmentCameraBinding) {
         (controls.root as TouchWatchingLayout).onTouchEnd = { event ->
             // The ratios close at a touch anywhere but on them or their button, which opens and closes them itself.
             val onRatios = controls.aspectButton.isUnder(event, controls.root) ||
                 controls.aspectPanel.isUnder(event, controls.root)
-            // The tip button opens and closes the tip itself; closed here first, its tap would only open it again. A
-            // new ratio keeps the guide, so choosing one leaves its tip open too.
-            if (!controls.tipButtonFrame.isUnder(event, controls.root) && !onRatios) viewModel.onAnyTouch()
             if (!onRatios) viewModel.setAspectsOpen(false)
             // So does the camera menu (FR-1.17), whose button and the icons beside it open and close it.
             if (!controls.cameraSettings.isUnder(event, controls.root) &&
@@ -1361,30 +1378,27 @@ class CameraFragment :
             // The scene photo's panel goes at a touch anywhere, which still does what it does there (#231).
             generationViewModel.dismissSceneHint()
         }
-        // Clickable as well, like the tip's banner, so TalkBack can take it away.
+        // Clickable as well, so TalkBack can take it away.
         controls.sceneGuide.setOnClickListener { generationViewModel.dismissSceneHint() }
         controls.tipButton.setOnClickListener { viewModel.onTipButton() }
-        controls.tipBanner.setOnClickListener { viewModel.onAnyTouch() }
-        ViewCompat.replaceAccessibilityAction(
-            controls.tipBanner,
-            AccessibilityActionCompat.ACTION_CLICK,
-            getString(R.string.close_tip),
-        ) { _, _ ->
-            viewModel.onAnyTouch()
-            true
-        }
+        // A tap on the open tip neither closes it nor focuses the image under it.
+        controls.tipBanner.keepTouches()
     }
 
     /**
      * The pose tip of the guide on the camera (FR-4.10): hidden with the guide, and the button only while a tip is
-     * coming or there. The scene photo step hides both (renderScenePhoto).
+     * coming or there, lit while the tip is open and named for what its tap does. The scene photo step hides both
+     * (renderScenePhoto).
      */
     private fun renderTip(controls: FragmentCameraBinding, state: CameraUiState) {
         val tip = state.tip?.takeIf { state.guide != null && state.guideState.visible }
         val available = tip != null && tip.state != TipState.Failed
+        val open = tip?.open == true
         controls.tipButtonFrame.isVisible = available
         controls.tipDot.isVisible = available && tip.unseen
-        controls.tipBanner.isVisible = tip?.open == true
+        controls.tipButton.isActivated = open
+        controls.tipButton.contentDescription = getString(if (open) R.string.close_tip else R.string.show_tip)
+        controls.tipBanner.isVisible = open
         controls.tipText.text = when (val shown = tip?.state) {
             TipState.Preparing -> getString(R.string.tip_preparing)
             is TipState.Ready -> shown.tip.text
@@ -1552,7 +1566,7 @@ class CameraFragment :
         val framing = active && !held
         val panel = framing && (scene.sceneHint || scene.noPerson)
         showSceneGuide(controls, scene, shown = panel, animate = before != null)
-        turnShutter(controls, framing, animate = changed)
+        turnShutter(controls, framing, counting = camera.countdown != null, animate = changed)
         if (!active) return
 
         controls.sceneTitle.setText(R.string.scene_title)
@@ -1647,19 +1661,30 @@ class CameraFragment :
     }
 
     /**
-     * The shutter in the accent while the scene photo is framed (#210), white otherwise; as the step starts or ends
-     * ([animate]), the new one fades in over the old in [Motion.MOVE_MS]. Its tag names the drawable it shows.
+     * The shutter in the accent while the scene photo is framed (#210), white otherwise, and while the timer counts down
+     * ([counting], FR-1.17) a stop square in the timer's ring, on either. As the step starts or ends ([animate]), the
+     * new one fades in over the old in [Motion.MOVE_MS]; the countdown's comes and goes at once. Its tag names the
+     * drawable it shows, [COUNTDOWN_SHUTTER] for the ring.
      */
-    private fun turnShutter(controls: FragmentCameraBinding, scene: Boolean, animate: Boolean) {
-        val want = if (scene) R.drawable.bg_shutter_scene else R.drawable.bg_shutter
+    private fun turnShutter(controls: FragmentCameraBinding, scene: Boolean, counting: Boolean, animate: Boolean) {
         val button = controls.shutterButton
+        if (counting) {
+            if (button.tag == COUNTDOWN_SHUTTER) return
+            button.tag = COUNTDOWN_SHUTTER
+            shutterFade?.cancel()
+            shutterFade = null
+            button.background = ring().drawable
+            return
+        }
+        val want = if (scene) R.drawable.bg_shutter_scene else R.drawable.bg_shutter
         if (button.tag == want) return
+        val fromCountdown = button.tag == COUNTDOWN_SHUTTER
         button.tag = want
         shutterFade?.cancel()
         shutterFade = null
         val from = button.background
         val to = AppCompatResources.getDrawable(requireContext(), want)?.mutate()
-        if (!animate || !Motion.on() || from == null || to == null) {
+        if (!animate || fromCountdown || !Motion.on() || from == null || to == null) {
             button.setBackgroundResource(want)
             return
         }
@@ -1674,6 +1699,21 @@ class CameraFragment :
             start()
         }
     }
+
+    /**
+     * The timer's ring on the shutter (FR-1.17), which turnShutter puts there while the timer counts down: it fills
+     * through the countdown's seconds, the timer's whole length, and is full at the photo.
+     */
+    private fun renderCountdownRing(state: CameraUiState) {
+        val left = state.countdown
+        if (left == null) {
+            countdownRing?.stop()
+            return
+        }
+        ring().show(left, state.timer.seconds)
+    }
+
+    private fun ring(): CountdownRing = countdownRing ?: CountdownRing(requireContext()).also { countdownRing = it }
 
     /** The camera menu with the flash, aspect ratio, and brightness (FR-1.11–1.13, FR-1.17). */
     private fun renderCameraSettings(controls: FragmentCameraBinding, state: CameraUiState, ready: Boolean) {
@@ -2294,9 +2334,32 @@ class CameraFragment :
         undoNotice = null
     }
 
-    /** Notices sit above the zoom row, clear of the shutter and the controls under the image (#298). */
+    /**
+     * The media access offer's *Allow access* (FR-1.16): Android's screen that lets Pix manage the phone's media, then the
+     * photo is deleted, without Android's question once allowed. A phone without that screen asks Android's question at
+     * once.
+     */
+    private fun allowAndDelete(uri: Uri) {
+        viewModel.deleteAfterAccess(uri)
+        val settings = requireContext().manageMediaSettings()
+        try {
+            if (settings != null) mediaAccess.launch(settings) else viewModel.accessAnswered()
+        } catch (_: ActivityNotFoundException) {
+            viewModel.accessAnswered()
+        }
+    }
+
+    /**
+     * Notices take the zoom row's place, on the line it stands on, so they cover the readout and the buttons beside it
+     * but never the shutter or the controls under the image (#298); above the controls while the row is hidden. Over
+     * the photo viewer, they sit where it says, not over the photo.
+     */
     override val noticeAnchor: View?
-        get() = binding?.let { if (it.zoomRow.isShown) it.zoomRow else it.bottomPanel }
+        get() {
+            val controls = binding ?: return null
+            photoViewer?.takeIf { it.isOpen }?.let { return it.noticeAnchor }
+            return if (controls.zoomRow.isShown) controls.noticeLine else controls.bottomPanel
+        }
 
     /**
      * Whether the camera itself is what the photographer looks at. Under a sheet, such as Add a pose guide, this screen
@@ -2501,6 +2564,10 @@ class CameraFragment :
 
         /** The controls that wait while the timer counts down, dimmed this much (FR-1.17). */
         private const val COUNTDOWN_DIM = 0.35f
+
+        /** The shutter's tag while it shows the timer's ring (turnShutter); no drawable's id is 0. */
+        @VisibleForTesting
+        internal const val COUNTDOWN_SHUTTER = 0
 
         /** The largest font scale the top bar's pill follows (capPillText). */
         private const val PILL_MAX_FONT_SCALE = 1.3f
